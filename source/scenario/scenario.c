@@ -899,6 +899,8 @@ boolean scenario_location_potentially_visible(
 	return BIT_VECTOR_TEST_FLAG(players_get_combined_pvs(), location->cluster_index);
 }
 
+/* port: wrapped by scenario_trigger_volume_test_object in forge_hooks.c */
+#define scenario_trigger_volume_test_object orig_scenario_trigger_volume_test_object
 boolean scenario_trigger_volume_test_object(
 	short trigger_volume_index,
 	long object_index)
@@ -910,6 +912,7 @@ boolean scenario_trigger_volume_test_object(
 
 	return result;
 }
+#undef scenario_trigger_volume_test_object
 
 void scenario_debug_to_file(
 	FILE *stream)

@@ -15,6 +15,9 @@
 #include "../src/port_config.h"
 #include <stdlib.h>
 #include <string.h>
+#undef malloc
+#undef free
+#undef realloc
 /* Unmodified iOrange/bcdec, MIT option (see third_party/bcdec/LICENSE).
  * Revision 80859ed3b7afb1c527a2a99d70c61457bea72d0c.
  * https://github.com/iOrange/bcdec
@@ -779,4 +782,167 @@ void mcc_bitmaps_dispose(struct mcc_runtime *runtime)
     if (textures->items) free(textures->items);
     if (textures->clones) free(textures->clones);
     free(textures);runtime->bitmaps=NULL;
+}
+
+int mcc_forge_convert_single_bitmap(
+    struct mcc_runtime *runtime,
+    char const *tag_name,
+    uint32_t resource_index,
+    unsigned channels,
+    struct bitmap_data *bitmap,
+    unsigned char **out_pixels,
+    uint32_t *out_size)
+{
+    struct bitmap_data normalized;
+    unsigned level, faces;
+    uint64_t raw_size = 0, decoded_size = 0;
+    unsigned char *raw = NULL, *pixels = NULL, *hardware = NULL;
+    int convert, bytes_per_pixel, non_power_two;
+    uint32_t input_offset = 0, output_offset = 0, hardware_size, allocation;
+
+    if (!runtime || !bitmap || !out_pixels || !out_size)
+        return 0;
+    *out_pixels = NULL;
+    *out_size = 0;
+    if (!channels)
+        channels = 1;
+
+    normalized = *bitmap;
+    faces = bitmap->type == 2 ? 6 : 1;
+    convert = bitmap->format == 18 || channels == 2 || channels == 4 ||
+        ((bitmap->flags & 16) && bitmap->format >= 14 && bitmap->format <= 17);
+    bytes_per_pixel = mcc_bitmap_bytes(bitmap->format);
+    non_power_two = bitmap->type == 0 &&
+        ((bitmap->width & (bitmap->width - 1)) || (bitmap->height & (bitmap->height - 1)));
+
+    if (bitmap->width <= 0 || bitmap->height <= 0 || bitmap->depth <= 0 ||
+        bitmap->type < 0 || bitmap->type > 2 ||
+        bitmap->width > 16384 || bitmap->height > 16384 || bitmap->depth > 512 ||
+        bitmap->mipmap_count < 0 || bitmap->mipmap_count > 13 ||
+        bitmap->pixels_size <= 0 ||
+        (!bytes_per_pixel && (bitmap->format < 14 || bitmap->format > 18)))
+        return 0;
+
+    mcc_bitmap_complete_mips(&normalized);
+    for (level = 0; level <= (unsigned)normalized.mipmap_count; level++)
+    {
+        unsigned w = MAX(bitmap->width >> level, 1);
+        unsigned h = MAX(bitmap->height >> level, 1);
+        unsigned d = MAX(bitmap->depth >> level, 1);
+        uint64_t slice = bytes_per_pixel
+            ? (uint64_t)w * h * bytes_per_pixel
+            : (uint64_t)((w + 3) / 4) * ((h + 3) / 4) * (bitmap->format == 14 ? 8 : 16);
+        raw_size += slice * d * faces;
+        decoded_size += (uint64_t)w * h * d * faces * 4;
+    }
+    if (raw_size > (uint32_t)bitmap->pixels_size || raw_size > MCC_BITMAP_ALLOCATION_LIMIT ||
+        (convert && decoded_size > MCC_BITMAP_ALLOCATION_LIMIT))
+        return 0;
+
+    if (non_power_two)
+    {
+        if (decoded_size > MCC_BITMAP_ALLOCATION_LIMIT)
+            return 0;
+        convert = 1;
+        normalized.flags = (normalized.flags & ~1u) | 16u;
+        normalized.mipmap_count = 0;
+        decoded_size = (uint64_t)(unsigned)bitmap->width * (unsigned)bitmap->height * 4;
+    }
+    normalized.flags &= ~0x1000;
+    if (convert)
+    {
+        normalized.format = 11;
+        normalized.flags &= ~(2 | 4 | 8 | 32 | 0x100);
+    }
+    else
+    {
+        normalized.flags &= ~(8 | 0x100);
+    }
+    normalized.flags &= ~0x200;
+    normalized.flags = (normalized.flags & ~64) | 128;
+    normalized.flags &= ~(2 | 4);
+    if (normalized.format >= 14 && normalized.format <= 16)
+        normalized.flags |= 2;
+    if (normalized.format == 17)
+        normalized.flags |= 4;
+    if (!bitmap_verify(&normalized, FALSE))
+        return 0;
+
+    hardware_size = (uint32_t)rasterizer_xbox_bitmap_get_pixel_data_size(&normalized);
+    allocation = (MAX(hardware_size, (uint32_t)(convert ? decoded_size : raw_size)) + 127u) & ~127u;
+    if (!hardware_size || allocation > MCC_BITMAP_ALLOCATION_LIMIT)
+        return 0;
+
+    raw = malloc((size_t)raw_size);
+    if (!raw)
+        return 0;
+    if (bitmap->flags & 0x100)
+    {
+        char resource_name[272], group_name[272];
+        if (!tag_name || !tag_name[0])
+            goto failed;
+        snprintf(resource_name, sizeof(resource_name), "%s_%lu", tag_name, (unsigned long)resource_index);
+        snprintf(group_name, sizeof(group_name), "%s__pixels", tag_name);
+        if (!mcc_resources_read(runtime, 1, resource_name, bitmap->pixels_offset, (uint32_t)raw_size, raw, group_name))
+            goto failed;
+    }
+    else if (!mcc_runtime_read(runtime, bitmap->pixels_offset, (uint32_t)raw_size, raw))
+    {
+        goto failed;
+    }
+
+    if (convert)
+    {
+        pixels = malloc(allocation);
+        if (!pixels)
+            goto failed;
+        memset(pixels, 0, allocation);
+        for (level = 0; level <= (unsigned)normalized.mipmap_count; level++)
+        {
+            unsigned w = MAX(bitmap->width >> level, 1);
+            unsigned h = MAX(bitmap->height >> level, 1);
+            unsigned d = MAX(bitmap->depth >> level, 1);
+            unsigned slice;
+            unsigned source_bytes = bytes_per_pixel
+                ? w * h * bytes_per_pixel
+                : ((w + 3) / 4) * ((h + 3) / 4) * (bitmap->format == 14 ? 8 : 16);
+            for (slice = 0; slice < faces * d; slice++)
+            {
+                mcc_bitmap_decode(raw + input_offset, (uint32_t *)(pixels + output_offset), w, h, bitmap->format, channels);
+                input_offset += source_bytes;
+                output_offset += w * h * 4;
+            }
+        }
+        free(raw);
+        raw = NULL;
+    }
+    else
+    {
+        pixels = raw;
+        raw = NULL;
+    }
+
+    hardware = malloc(allocation);
+    if (!hardware)
+        goto failed;
+    memset(hardware, 0, allocation);
+    if (!mcc_bitmap_pack(&normalized, pixels, (uint32_t)(convert ? decoded_size : raw_size), hardware,
+        normalized.type == 0 && (normalized.flags & 2) ? allocation : hardware_size))
+        goto failed;
+    free(pixels);
+    pixels = NULL;
+
+    bitmap->format = normalized.format;
+    bitmap->flags = normalized.flags;
+    bitmap->mipmap_count = normalized.mipmap_count;
+    bitmap->pixels_size = (long)allocation;
+    *out_pixels = hardware;
+    *out_size = allocation;
+    return 1;
+
+failed:
+    if (raw) free(raw);
+    if (pixels) free(pixels);
+    if (hardware) free(hardware);
+    return 0;
 }

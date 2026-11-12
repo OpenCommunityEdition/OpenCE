@@ -180,6 +180,15 @@ Mods go in a `mods` folder next to `maps`. Each mod is a folder of Halo PC tag f
 Refer to [docs/mods.md](docs/mods.md) to make your own.
 
 
+## Forge
+
+Select **Multiplayer > Forge** on the main menu to open the Forge hub for solo or collaborative multiplayer map editing:
+
+- **Monitor Mode (`F1` / D-Pad Up):** Toggle between Spartan and 343 Guilty Spark Monitor to fly, grab (`Left Click` / `A`), rotate (`Hold R` / `RT`), duplicate (`C` / D-Pad Right), snap (`G` / `Z` / `F`), or delete (`Delete` / `Y`) objects, spawns, teleporters, and gametype objectives.
+- **Object Palette (`F2` / `X`):** Spawn vehicles, weapons, equipment, scenery, devices, dynamic lights, gametype objectives, and custom tags with live 3D model previews.
+- **Tag Options & Standalone Map Saving (`F5` / Pause > Save Map):** Extract tags from Custom Edition maps into the local tag vault (`OpenCE Forge/`) and bake placed objects, spawns, objectives, and imported tags directly into standalone `.map` files in `custom_maps/`.
+
+
 ## Graphics
 
 The game retains the original look and feel as it did on the Xbox by default. The video settings menus have additional options that go beyond it.

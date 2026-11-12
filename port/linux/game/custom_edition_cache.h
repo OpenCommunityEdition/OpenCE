@@ -197,6 +197,26 @@ boolean custom_edition_cache_relies_on(
 void custom_edition_cache_tags_unload(
 	void);
 
+/* Loads the Custom Edition map at `path` into the tag cache for its tags to
+be taken out as tag bundles (tag_bundle.h), while no Custom Edition map is
+played (at the main menu): its tags are converted and checked as for play,
+but for its models, which a bundle keeps as Halo PC's; of its sounds, those
+`sound_tags` names (as custom_edition_sounds_decode_tags; none for NULL, the
+conversion silencing those this build cannot play) are decoded. Its tag
+header, or NULL after logging why. Loading it again, or another, lets the one
+before go. */
+struct tag_bundle_source;
+void *custom_edition_cache_bundle_open(
+	char const *path,
+	byte const *sound_tags,
+	long sound_tag_count);
+/* The map custom_edition_cache_bundle_open loaded, as tag_bundle_write
+reads one (all of it zero when none is). */
+void custom_edition_cache_bundle_source(
+	struct tag_bundle_source *source);
+void custom_edition_cache_bundle_close(
+	void);
+
 /* Reads `size` bytes of the loaded map at `offset`, which counts in the
 combined space of the map, its bitmaps.map and its sounds.map
 (custom_edition_cache_combine_resource_offsets), for the tag `tag_index` as
@@ -255,6 +275,17 @@ boolean custom_edition_sounds_decode(
 	unsigned long loaded_bytes,
 	long decoded_offset,
 	unsigned long decoded_limit);
+/* ... of the sound tags `tags` names alone (a flag for each of the first
+`tag_count` tags, by absolute index; NULL: every one): the sounds of the
+tags taken out as bundles (custom_edition_cache_bundle_open), not the
+whole map's. */
+boolean custom_edition_sounds_decode_tags(
+	byte *tag_cache,
+	unsigned long loaded_bytes,
+	long decoded_offset,
+	unsigned long decoded_limit,
+	byte const *tags,
+	long tag_count);
 /* The samples `data` (`data_bytes` of them) of a sound permutation of
 `compression` (16-bit PCM, little-endian or `big_endian`; Xbox ADPCM; Ogg
 Vorbis), `channels` channels at `rate`, encoded as Xbox ADPCM at
@@ -336,6 +367,29 @@ boolean custom_edition_models_convert(
 	struct custom_edition_load_report const *report,
 	byte *model_data);
 void custom_edition_models_dispose(
+	void);
+
+/* Gives the gbxmodel `model` of a tag bundle (the tag `name`, added to the
+loaded map) this build's layout and compressed geometry in buffers of its own,
+made from the bundle's file data (`model_data_size` bytes), where each part's
+vertices and strip are at its offsets, which `read` reads (`size` bytes at
+`offset`, FALSE unless all were read). FALSE after logging why: the model is
+then partly converted and must not be drawn.
+custom_edition_injected_models_dispose releases the buffers of every one
+either way. */
+struct model;
+typedef boolean (*custom_edition_model_data_read_proc)(
+	void *context,
+	unsigned long offset,
+	unsigned long size,
+	void *buffer);
+boolean custom_edition_injected_model_convert(
+	struct model *model,
+	char const *name,
+	unsigned long model_data_size,
+	custom_edition_model_data_read_proc read,
+	void *context);
+void custom_edition_injected_models_dispose(
 	void);
 
 /* Called by scenario_structure_bsp_load and scenario_structure_bsp_unload

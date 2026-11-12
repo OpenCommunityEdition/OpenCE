@@ -3747,7 +3747,7 @@ static void game_engine_update_purge(
 
 	/* (a client of the distributed netcode removes items when the host does,
 	port/linux/game/network_distributed.c) */
-	if (!network_game_distributed_client())
+	if (!network_game_distributed_client() && !g_forge_session_enabled) /* port: keep Forge-placed weapons & equipment from despawning after 30s */
 	{
 		struct object_iterator item_iterator;
 
@@ -4415,7 +4415,8 @@ void game_engine_handle_server_message(
 	return;
 }
 
-void game_engine_post_rasterize_objects(
+/* port: wrapped by game_engine_post_rasterize_objects in forge_hooks.c */
+void orig_game_engine_post_rasterize_objects(
 	void)
 {
 	if (game_engine && game_engine->post_rasterize_objects)
@@ -4526,10 +4527,13 @@ static void game_engine_update_teleporter(
 	long source_flag_index;
 	long destination_flag_index;
 
-	if (player->unit_index == NONE)
+	if (!scenario || scenario->netgame_flags.count <= 0 || player->unit_index == NONE)
 		return;
 
 	unit = unit_get(player->unit_index);
+	/* port: guard against out-of-range teleporter_index in single player or after live edits */
+	if (player->teleporter_index < 0 || player->teleporter_index >= scenario->netgame_flags.count)
+		player->teleporter_index = NONE;
 	if (player->teleporter_index != NONE)
 	{
 		struct scenario_netgame_flag *previous_flag = TAG_BLOCK_GET_ELEMENT(
@@ -4843,7 +4847,7 @@ static void game_engine_update_vehicle_respawn(
 	long now = game_time_get();
 	short index;
 
-	if (respawn_ticks <= 0 || network_game_distributed_client() || now % TICKS_PER_SECOND)
+	if (respawn_ticks <= 0 || network_game_distributed_client() || g_forge_session_enabled || now % TICKS_PER_SECOND) /* port: disable automatic vehicle home reset in Forge */
 		return;
 	/* (where the map put them: the vehicles there at the first look) */
 	if (game_engine_vehicle_home_count == NONE)
@@ -5041,6 +5045,16 @@ void game_engine_update(
 				!"unreachable");
 			break;
 		}
+	}
+	/* port: single-player teleporters and queued sounds */
+	else if (global_scenario_try_and_get() && !main_menu_is_active())
+	{
+		struct data_iterator player_iterator;
+
+		game_engine_update_multiplayer_sound();
+		data_iterator_new(&player_iterator, player_data);
+		while (data_iterator_next(&player_iterator))
+			game_engine_update_teleporter(player_iterator.datum_index);
 	}
 
 	return;
@@ -5730,6 +5744,9 @@ boolean game_engine_should_end_game(
 {
 	boolean should_end_game = FALSE;
 
+	/* port: Forge sessions continue indefinitely until ended from the menu */
+	if (g_forge_session_enabled)
+		return FALSE;
 	/* port: Infection's round ends by its own rules (infection.c) */
 	if (infection_enabled())
 		return FALSE;
@@ -7092,7 +7109,7 @@ boolean multiple_teams_alive(
 {
 	boolean result = FALSE;
 
-	if (players_in_game() <= 1)
+	if (g_forge_session_enabled || players_in_game() <= 1) /* port: Forge sessions stay active */
 		return TRUE;
 	else
 	{
@@ -8170,7 +8187,8 @@ long game_engine_remap_weapon(
 	return list_index_to_weapon_definition_index(weapon_list_index);
 }
 
-long game_engine_remap_object_definition(
+/* port: wrapped by game_engine_remap_object_definition in forge_hooks.c */
+long orig_game_engine_remap_object_definition(
 	long definition_index)
 {
 	short object_type;

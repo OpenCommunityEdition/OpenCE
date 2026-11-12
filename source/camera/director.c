@@ -326,7 +326,8 @@ long director_get_followed_unit(
 	return NONE;
 }
 
-director_perspective director_get_perspective(
+/* port: wrapped by director_get_perspective in forge_hooks.c */
+director_perspective orig_director_get_perspective(
 	short local_player_index)
 {
 	struct director *camera;
@@ -1095,7 +1096,8 @@ void director_initialize_for_new_map(
 	return;
 }
 
-void director_update(
+/* port: wrapped by director_update in forge_hooks.c */
+void orig_director_update(
 	real time_delta_sec)
 {
 	short local_player_index;

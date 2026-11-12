@@ -114,6 +114,9 @@ short network_distributed_server_machines(long *machine_indices, short maximum);
 void network_player_attach_unit(long player_index, long unit_index);
 void network_player_detach_unit(long player_index);
 void network_player_show_pickup(long player_index, short kind, long definition_index, short count);
+/* forge_network.c's */
+unsigned char forge_tag_stream_handles_message(void const *message, unsigned short size);
+void forge_tag_stream_handle_message(long machine_index, void const *message, unsigned short size, unsigned char from_stream);
 /* game_engine.c's */
 long game_engine_write_network_state(byte *buffer, long size);
 void game_engine_read_network_state(byte const *buffer, long size);
@@ -136,6 +139,7 @@ void main_build_identity(long *number, char *flavor, size_t flavor_size, char *r
 	char *version, size_t version_size);
 int port_mods_list(char *text, unsigned long size);
 void console_warning(const char *format, ...);
+int forge_is_unit_in_monitor_mode(long unit_index);
 
 /* the host: a client's game run faster than its clock (a speed hack, which
 speeds up the machine's own clock: nothing on it can tell), found by its
@@ -679,6 +683,11 @@ static struct distributed_own_position
 static long distributed_own_windows[MAXIMUM_LOCAL_PLAYERS];
 static long distributed_own_air_episodes[MAXIMUM_LOCAL_PLAYERS];
 static real distributed_own_round_trip;
+/* port: Forge Monitor Mode teleport grace window so the host's anti-cheat
+anchor/ceiling check and client's stale-packet correction accept the new
+Spartan landing coordinates after Monitor flight */
+static long distributed_monitor_grace_until_tick[MAXIMUM_TRACKED_PLAYERS];
+static long distributed_client_monitor_grace_until_tick[MAXIMUM_LOCAL_PLAYERS];
 /* the host: the players each machine had when it last told the host that it
 had loaded (a machine new at its index has none of the old one's state) */
 static long distributed_machine_players[HALO_PORT_MAXIMUM_NETWORK_MACHINES][MAXIMUM_LOCAL_PLAYERS];
@@ -3636,6 +3645,63 @@ static boolean distributed_prediction_rides(
 		distributed_predictions[player_index].state.deck_present;
 }
 
+/* port: reset host prediction anchors and client position history when a
+player enters, flies in, or exits Forge Monitor Mode so the player is never
+teleported back to their pre-Monitor Spartan coordinates */
+void network_distributed_notify_forge_monitor_teleport(
+	long player_index,
+	long unit_index,
+	real_point3d const *new_position,
+	boolean is_monitor)
+{
+	long now = game_time_get();
+
+	(void)is_monitor;
+	if (game_connection() == _game_connection_network_server)
+	{
+		short p_abs = (short)DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+		if (p_abs >= 0 && p_abs < MAXIMUM_TRACKED_PLAYERS && new_position)
+		{
+			distributed_accepted[p_abs].valid = FALSE;
+			distributed_predictions[p_abs].valid = FALSE;
+			distributed_predictions[p_abs].taken_host_time = NONE;
+			distributed_host_speeds[p_abs].unit_index = unit_index;
+			distributed_host_speeds[p_abs].velocity.i = 0.0f;
+			distributed_host_speeds[p_abs].velocity.j = 0.0f;
+			distributed_host_speeds[p_abs].velocity.k = 0.0f;
+			distributed_host_speeds[p_abs].grounded = TRUE;
+			distributed_host_speeds[p_abs].ground_height = new_position->z;
+			distributed_host_speeds[p_abs].top_height = new_position->z;
+			distributed_host_speeds[p_abs].ground_time = now;
+			distributed_monitor_grace_until_tick[p_abs] = now + 3 * TICKS_PER_SECOND;
+		}
+	}
+	else if (game_connection() == _game_connection_network_client)
+	{
+		short local_player_index;
+		short slot;
+
+		for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+		{
+			for (slot = 0; slot < OWN_POSITION_TICKS; slot++)
+			{
+				distributed_own_positions[local_player_index][slot].time = NONE;
+				distributed_own_positions[local_player_index][slot].unit_index = NONE;
+			}
+			if (new_position && unit_index != NONE)
+			{
+				slot = (short)(now & (OWN_POSITION_TICKS - 1));
+				distributed_own_positions[local_player_index][slot].time = now;
+				distributed_own_positions[local_player_index][slot].unit_index = unit_index;
+				distributed_own_positions[local_player_index][slot].position = *new_position;
+				distributed_own_positions[local_player_index][slot].elevator_index = NONE;
+			}
+			distributed_client_monitor_grace_until_tick[local_player_index] = now + 3 * TICKS_PER_SECOND;
+		}
+	}
+}
+
 static void distributed_apply_predictions(
 	boolean riders)
 {
@@ -3699,7 +3765,30 @@ static void distributed_apply_predictions(
 	}
 }
 
+static void distributed_correct_own_unit_forge(
+	struct player_datum const *player,
+	long unit_index,
+	struct distributed_unit_state const *state)
+{
+	real_point3d before = object_get(unit_index)->object.position;
+	boolean skip_monitor_correction = forge_is_unit_in_monitor_mode(unit_index) != 0;
+
+	if (!skip_monitor_correction &&
+		player->local_player_index >= 0 &&
+		player->local_player_index < MAXIMUM_LOCAL_PLAYERS &&
+		game_time_get() < distributed_client_monitor_grace_until_tick[player->local_player_index])
+	{
+		if (distance_squared3d(&before, &state->position) <= 4.0f)
+			distributed_client_monitor_grace_until_tick[player->local_player_index] = 0;
+		else
+			skip_monitor_correction = TRUE;
+	}
+	if (!skip_monitor_correction)
+		distributed_correct_own_unit(player, unit_index, state);
+}
+
 /* (a client) the host's word on a player's unit */
+#define distributed_correct_own_unit distributed_correct_own_unit_forge
 static void distributed_handle_unit_state(
 	long host_time,
 	struct distributed_unit_state const *state)
@@ -3835,6 +3924,7 @@ static void distributed_handle_unit_state(
 		}
 	}
 }
+#undef distributed_correct_own_unit
 
 /* (a client) the host's word on every player's unit */
 static void distributed_handle_unit_states(
@@ -4910,6 +5000,8 @@ static void distributed_advance_checkpoint(void)
 
 static void distributed_restore_checkpoint(void)
 {
+	csmemset(distributed_monitor_grace_until_tick, 0, sizeof(distributed_monitor_grace_until_tick));
+	csmemset(distributed_client_monitor_grace_until_tick, 0, sizeof(distributed_client_monitor_grace_until_tick));
 	distributed_reset_checkpoint_state(TRUE);
 	network_objects_discard_client_effects();
 	network_objects_reverted();
@@ -4950,6 +5042,8 @@ void network_distributed_new_game(
 	distributed_checkpoint_synchronized = FALSE;
 
 	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
+	csmemset(distributed_monitor_grace_until_tick, 0, sizeof(distributed_monitor_grace_until_tick));
+	csmemset(distributed_client_monitor_grace_until_tick, 0, sizeof(distributed_client_monitor_grace_until_tick));
 	distributed_reset_checkpoint_state(TRUE);
 	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
 	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
@@ -5027,8 +5121,28 @@ void network_distributed_tick(
 
 			for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 			{
-				distributed_rider_pass[player_index] = distributed_prediction_rides(player_index,
-					distributed_living_unit(distributed_player(player_index)));
+				long unit_index = distributed_living_unit(distributed_player(player_index));
+
+				distributed_rider_pass[player_index] = distributed_prediction_rides(player_index, unit_index);
+				if (unit_index != NONE && object_get(unit_index)->object.parent_object_index == NONE &&
+					(forge_is_unit_in_monitor_mode(unit_index) ||
+						game_time_get() < distributed_monitor_grace_until_tick[player_index]))
+				{
+					struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
+					struct object_datum *mon_obj = object_get(unit_index);
+
+					distributed_accepted[player_index].valid = FALSE;
+					if (distributed_predictions[player_index].valid && unit_index == state->unit_index &&
+						scenario_leaf_index_from_point(&state->position) != NONE)
+					{
+						object_set_position(unit_index, &state->position, NULL, NULL);
+					}
+					distributed_host_speeds[player_index].unit_index = unit_index;
+					distributed_host_speeds[player_index].grounded = TRUE;
+					distributed_host_speeds[player_index].ground_height = mon_obj->object.position.z;
+					distributed_host_speeds[player_index].top_height = mon_obj->object.position.z;
+					distributed_host_speeds[player_index].ground_time = game_time_get();
+				}
 			}
 		}
 		profile_scope(distributed_tick_apply_predictions_section, distributed_apply_predictions(FALSE);)
@@ -5952,8 +6066,14 @@ static boolean distributed_message_epoch_valid(
 	return TRUE;
 }
 
+static void orig_network_distributed_handle_message(
+	long machine_index,
+	word const *message,
+	word size);
+
 /* a message of the distributed kind; machine_index is the sender's on the
 host, NONE on a client */
+#define network_distributed_handle_message orig_network_distributed_handle_message
 void network_distributed_handle_message(
 	long machine_index,
 	word const *message,
@@ -6455,6 +6575,21 @@ void network_distributed_handle_message(
 		break;
 	}
 	}
+}
+#undef network_distributed_handle_message
+
+void network_distributed_handle_message(
+	long machine_index,
+	word const *message,
+	word size)
+{
+	if (forge_tag_stream_handles_message(message, size))
+	{
+		forge_tag_stream_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	orig_network_distributed_handle_message(machine_index, message, size);
 }
 
 /* (the host: network_server_message_handler.c) a client machine's message

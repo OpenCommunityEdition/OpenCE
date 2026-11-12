@@ -397,6 +397,7 @@ void network_game_client_reset_settings_staging(void); /* port: discard partial 
 #include "text/unicode.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
+#include "forge_net_override.h" /* port: port/linux/game/forge_net_override.h */
 
 /* ---------- constants */
 
@@ -1885,6 +1886,26 @@ boolean network_game_client_remove_player(
 				}
 			}
 
+			/* port: a local player who leaves while another remains no longer has
+			its slot: its entry in the local players is cleared here, as the datum
+			stays until a joiner takes the slot (network_game_spawn_player), which
+			then deletes it and makes another with a new identifier, and the entry
+			would name a player that no longer exists (player_get halts on it). The
+			last to leave ends the game, whose sounds and views still name it until
+			then, so its entry stays */
+			if (network_player_index != MAXIMUM_NUMBER_OF_PLAYERS &&
+				player->machine_index == client->machine_index &&
+				player->controller_index >= 0 && player->controller_index < MAXIMUM_LOCAL_PLAYERS &&
+				local_player_get_player_index(player->controller_index) == player_index)
+			{
+				local_player_set_player_index(player->controller_index, NONE);
+				/* (and its control, which names its unit: the datum no longer has a
+				local player index, so the host deleting the unit does not reset it
+				(network_player_detach_unit), and player_control_update would get a
+				unit that is gone) */
+				player_control_new_unit(player->controller_index, NONE);
+			}
+
 			/* port: a dedicated server's own machine never has a player
 			(port/linux/game/server_director.c): it leaves only when a player
 			of its own goes, which none is */
@@ -3093,7 +3114,9 @@ static boolean network_game_client_idle_pregame(
 					network_event("the game put off is over: waiting for the host's next start");
 				}
 				else if (!custom_edition_level_name(client->game.map.name) ||
-					custom_edition_cache_playable(client->game.map.name))
+					custom_edition_cache_playable(client->game.map.name) ||
+					custom_edition_cache_multiplayer(client->game.map.name) ||
+					custom_edition_cache_campaign(client->game.map.name))
 				{
 					network_event("the map is downloaded: joining the game the host started");
 					if (!network_game_client_game_has_started(client))
@@ -3282,7 +3305,8 @@ version is this machine's (HALO_PORT_NETWORK_VERSION), and it plays the
 distributed netcode (a host of this version built before the lockstep
 netcode was removed may play that). If not the player is told why (when
 tell), and nothing is joined. */
-boolean network_game_client_advertised_game_compatible(
+/* port: wrapped by network_game_client_advertised_game_compatible in forge_hooks.c */
+boolean orig_network_game_client_advertised_game_compatible(
 	struct network_game_client *client,
 	struct network_advertised_game const *game,
 	boolean tell)
@@ -3400,7 +3424,8 @@ boolean network_game_client_port_advertised_game_summary(
 
 /* port: the advertised game's kind (an OpenCE gametype's mode, and Hardcore:
 port/linux/game/game_modes.h), for the server browser's name of it */
-byte network_game_client_advertised_game_kind(
+/* port: wrapped by network_game_client_advertised_game_kind in forge_hooks.c */
+byte orig_network_game_client_advertised_game_kind(
 	struct network_game_client *client,
 	struct network_advertised_game const *game)
 {

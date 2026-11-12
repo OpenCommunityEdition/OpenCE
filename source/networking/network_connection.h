@@ -90,6 +90,9 @@ boolean network_connection_server_accept_client_connection(
 void network_server_allow_client_connections(
 	struct network_connection *server_connection,
 	boolean allow_client_connections);
+/* port: the bytes the reliable stream has not sent yet (network_connection.c) */
+long network_connection_reliable_backlog(
+	struct network_connection *connection);
 
 /* ---------- globals */
 

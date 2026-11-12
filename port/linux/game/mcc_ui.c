@@ -118,7 +118,7 @@ boolean mcc_ui_trusted_action(struct widget_instance *widget, word function)
 {
     struct mcc_ui_widget_prefix const *prefix = (void const *)widget;
     return widget && mcc_cache_tags_loaded() &&
-        function >= MCC_PAUSE_ACTION_RESUME && function <= MCC_PAUSE_ACTION_FRIENDLY_FIRE &&
+        function >= MCC_PAUSE_ACTION_RESUME && function <= MCC_PAUSE_ACTION_SAVE_MAP &&
         mcc_pause_owns(prefix->definition);
 }
 
@@ -248,7 +248,7 @@ boolean mcc_ui_event_function(struct widget_instance *widget,
     if (!mcc_ui_owns_widget(widget)) return FALSE;
     controller = mcc_ui_controller(widget, event);
     *result = TRUE;
-    if (function >= MCC_PAUSE_ACTION_RESUME && function <= MCC_PAUSE_ACTION_FRIENDLY_FIRE) {
+    if (function >= MCC_PAUSE_ACTION_RESUME && function <= MCC_PAUSE_ACTION_SAVE_MAP) {
         if (!mcc_ui_trusted_action(widget, function)) {
             *result = FALSE;
             return TRUE;
@@ -289,6 +289,10 @@ boolean mcc_ui_event_function(struct widget_instance *widget,
             *result = config_write("network.coop_own_friendly_fire",
                 config_boolean("network.coop_own_friendly_fire") ? "false" : "true");
             mcc_pause_friendly_fire(config_boolean("network.coop_own_friendly_fire"));
+            return TRUE;
+        case MCC_PAUSE_ACTION_SAVE_MAP:
+            mcc_ui_close_for_controller(controller, deleted);
+            mcc_pause_trigger_forge_save();
             return TRUE;
         }
     }

@@ -1835,6 +1835,8 @@ static void hud_calculate_bitmap_bounds(
 	return;
 }
 
+/* port: wrapped by hud_draw_bitmap_direct in forge_hooks.c */
+#define hud_draw_bitmap_direct orig_hud_draw_bitmap_direct
 void hud_draw_bitmap_direct(
 	struct bitmap_data const *bitmap,
 	short placement,
@@ -1893,6 +1895,7 @@ void hud_draw_bitmap_direct(
 
 	return;
 }
+#undef hud_draw_bitmap_direct
 
 void hud_draw_meter(
 	short local_player_index,
@@ -2021,6 +2024,8 @@ void hud_draw_meter(
 	return;
 }
 
+/* port: wrapped by hud_draw_numbers in forge_hooks.c */
+#define hud_draw_numbers orig_hud_draw_numbers
 void hud_draw_numbers(
 	short local_player_index,
 	struct hud_absolute_placement_definition const *absolute_placement,
@@ -2379,3 +2384,4 @@ void hud_draw_numbers(
 
 	return;
 }
+#undef hud_draw_numbers

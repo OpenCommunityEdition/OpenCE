@@ -154,6 +154,18 @@ static void _game_engine_play_multiplayer_sound(
 
 	global_scenario_get();
 	game_globals = (struct game_globals_multiplayer_sound_view *)scenario_get_game_globals();
+	/* port: single-player maps have no multiplayer_information block */
+	if (!game_globals || game_globals->multiplayer_information.count <= 0)
+	{
+		if (sound_index == _multiplayer_sound_teleporter_activate)
+		{
+			long fallback_sound_index = tag_loaded('snd!', "sound\\sfx\\impulse\\teleporter");
+
+			if (fallback_sound_index != NONE)
+				unspatialized_impulse_sound_new(fallback_sound_index, 1.0f);
+		}
+		return;
+	}
 	multiplayer_information = TAG_BLOCK_GET_ELEMENT(
 		&game_globals->multiplayer_information,
 		0,
@@ -211,6 +223,9 @@ static long get_sound_length_in_ticks(
 
 	global_scenario_get();
 	game_globals = (struct game_globals_multiplayer_sound_view *)scenario_get_game_globals();
+	/* port: single-player maps have no multiplayer_information block */
+	if (!game_globals || game_globals->multiplayer_information.count <= 0)
+		return 0;
 	multiplayer_information = TAG_BLOCK_GET_ELEMENT(
 		&game_globals->multiplayer_information,
 		0,

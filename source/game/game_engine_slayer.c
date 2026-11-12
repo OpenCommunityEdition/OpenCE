@@ -672,7 +672,7 @@ static void slayer_player_update(
 	}
 
 	/* (a client ends the game when the host has) */
-	if (!network_game_distributed_client() &&
+	if (!g_forge_session_enabled && !network_game_distributed_client() && /* port: Forge sessions do not end on score */
 		slayer_get_score(index, _get_score_team) >=
 		game_engine_get_variant()->universal_variant.score_to_win)
 	{

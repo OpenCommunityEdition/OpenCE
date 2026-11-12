@@ -57,5 +57,7 @@ short mcc_pause_key_button(long parent, long child);
 short mcc_pause_key_offset(long parent, long child, short accept_width, short back_width);
 void mcc_pause_dispose(void);
 void mcc_pause_friendly_fire(boolean enabled);
+void mcc_pause_set_forge_save_callbacks(boolean (*enabled_fn)(void), void (*trigger_fn)(void));
+void mcc_pause_trigger_forge_save(void);
 
 #endif

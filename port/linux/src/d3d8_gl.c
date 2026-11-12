@@ -7920,47 +7920,50 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 #endif
 
 		platform_video_drawable_size(&window_width, &window_height);
-		/* letterbox to the back buffer's aspect ratio */
-		width = window_width;
-		height = (int)((long)window_width * back_buffer->target.gl_height / back_buffer->target.gl_width);
-		if (height > window_height)
+		if (window_width > 0 && window_height > 0)
 		{
-			height = window_height;
-			width = (int)((long)window_height * back_buffer->target.gl_width / back_buffer->target.gl_height);
-		}
-		x = (window_width - width) / 2;
-		y = (window_height - height) / 2;
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-		glDisable(GL_SCISSOR_TEST);
-		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT);
-		/* (display.hdr's back buffer, or display.hdr_output's window, by a
-		shader: a blit neither makes the pixels linear nor, on OpenGL ES,
-		converts half floats) */
-		if (!((back_buffer->target.format == GL_RGBA16F || hdr.float_window) &&
-			xgpu_post_present(back_buffer->target.texture, x, y, width, height,
-				hdr.float_window ? hdr.sdr_white : 0.0f)))
-		{
-			glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
-			/* Creating the source framebuffer binds both targets. A cached
-			map can reach this first blit without a loading-screen draw. */
+			/* letterbox to the back buffer's aspect ratio */
+			width = window_width;
+			height = (int)((long)window_width * back_buffer->target.gl_height / back_buffer->target.gl_width);
+			if (height > window_height)
+			{
+				height = window_height;
+				width = (int)((long)window_height * back_buffer->target.gl_width / back_buffer->target.gl_height);
+			}
+			x = (window_width - width) / 2;
+			y = (window_height - height) / 2;
 			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-			/* row 0 of the render target is the top of the picture */
-			glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
-				x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-		}
-		/* (the HDR calibration screen's pattern, brighter than the back
-		buffer's white can be) */
-		if (hdr_calibration_shown(FALSE) && hdr.display_on)
-		{
-			int window[4];
+			glDisable(GL_SCISSOR_TEST);
+			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+			glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+			/* (display.hdr's back buffer, or display.hdr_output's window, by a
+			shader: a blit neither makes the pixels linear nor, on OpenGL ES,
+			converts half floats) */
+			if (!((back_buffer->target.format == GL_RGBA16F || hdr.float_window) &&
+				xgpu_post_present(back_buffer->target.texture, x, y, width, height,
+					hdr.float_window ? hdr.sdr_white : 0.0f)))
+			{
+				glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(back_buffer->target.texture, 0));
+				/* Creating the source framebuffer binds both targets. A cached
+				map can reach this first blit without a loading-screen draw. */
+				glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+				/* row 0 of the render target is the top of the picture */
+				glBlitFramebuffer(0, 0, (GLint)back_buffer->target.gl_width, (GLint)back_buffer->target.gl_height,
+					x, y + height, x + width, y, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+			}
+			/* (the HDR calibration screen's pattern, brighter than the back
+			buffer's white can be) */
+			if (hdr_calibration_shown(FALSE) && hdr.display_on)
+			{
+				int window[4];
 
-			window[0] = x;
-			window[1] = y;
-			window[2] = width;
-			window[3] = height;
-			hdr_calibration_draw(back_buffer, window);
+				window[0] = x;
+				window[1] = y;
+				window[2] = width;
+				window[3] = height;
+				hdr_calibration_draw(back_buffer, window);
+			}
 		}
 		glBindVertexArray(device.vertex_array);
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);

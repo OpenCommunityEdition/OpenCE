@@ -15657,8 +15657,9 @@ static char const *hs_host_player_command(
 
 /* port: a command someone typed (the console, the telnet console, a cheat
 button, init.txt): what it logs is its answer, shown whatever
-config.toml's game.console_log is (terminal_command_running) */
-boolean hs_compile_and_evaluate(
+config.toml's game.console_log is (terminal_command_running); wrapped by
+hs_compile_and_evaluate in forge_hooks.c */
+boolean orig_hs_compile_and_evaluate(
 	char const *expression)
 {
 	boolean was_running = terminal_command_running;

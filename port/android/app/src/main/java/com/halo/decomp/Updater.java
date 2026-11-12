@@ -9,6 +9,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -47,7 +48,7 @@ import java.util.zip.ZipInputStream;
  * app must keep for Android to install a new version over it.
  */
 final class Updater {
-    private static final String REPOSITORY = "OpenCommunityEdition/OpenCE";
+    private static final String REPOSITORY = BuildConfig.HALO_BUILD_REPOSITORY;
     private static final String USER_AGENT = "halo-ce-universal-updater";
     private static final int TIMEOUT_MILLISECONDS = 20000;
     /** the most a download (a release's zip, about 35 MB) or the app in it may be */
@@ -186,14 +187,32 @@ final class Updater {
             try (InputStream stream = connection.getInputStream()) {
                 String tag = new JSONObject(new String(readAll(stream), StandardCharsets.UTF_8)).optString("tag_name");
 
-                return tag.startsWith("build-") ? Integer.parseInt(tag.substring(6)) : 0;
+                if (tag.startsWith("build-"))
+                    return Integer.parseInt(tag.substring(6));
             } finally {
                 connection.disconnect();
             }
         } catch (Exception e) {
             android.util.Log.i("halo", "update: could not check for a new version: " + e);
-            return 0;
         }
+        try {
+            HttpURLConnection connection = open("https://api.github.com/repos/" + REPOSITORY + "/releases?per_page=10");
+
+            connection.setRequestProperty("Accept", "application/vnd.github+json");
+            try (InputStream stream = connection.getInputStream()) {
+                JSONArray releases = new JSONArray(new String(readAll(stream), StandardCharsets.UTF_8));
+                for (int i = 0; i < releases.length(); i++) {
+                    String tag = releases.getJSONObject(i).optString("tag_name");
+                    if (tag.startsWith("build-"))
+                        return Integer.parseInt(tag.substring(6));
+                }
+            } finally {
+                connection.disconnect();
+            }
+        } catch (Exception e) {
+            android.util.Log.i("halo", "update: could not check releases list: " + e);
+        }
+        return 0;
     }
 
     /* ---------- the player's answer */

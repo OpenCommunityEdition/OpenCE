@@ -179,6 +179,10 @@ enum
 	ids from _distributed_message_mcc_grenades up outside MCC games */
 	_distributed_message_vehicle_riding_map = 107,
 
+	/* Forge session-RAM-only custom tag streaming over the reliable stream. */
+	_distributed_message_forge_tag_request = 108,
+	_distributed_message_forge_tag_stream = 109,
+
 	NUMBER_OF_DISTRIBUTED_MESSAGES
 };
 

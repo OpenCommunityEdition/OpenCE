@@ -34,6 +34,8 @@ long light_new_unattached(
 	real_vector3d const *direction,
 	real scale);
 void light_delete(long light_index);
+/* port: delete any attached or unattached light datums owned by object_index */
+void light_delete_all_for_object(long object_index);
 void lights_queue_lens_flare(
 	long lens_flare_definition_index,
 	real_point3d const *position,

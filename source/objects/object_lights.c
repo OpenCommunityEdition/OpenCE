@@ -987,6 +987,16 @@ void lights_preprocess_scene(
 			FALSE);
 		light->rasterizer_light_index = NONE;
 		lights_port.radius_writes++;
+		/* port: if the owner object was deleted or is being deleted, remove the light immediately */
+		if (light->object_index != NONE)
+		{
+			struct object_header_datum const *obj_header = object_header_try_and_get(light->object_index);
+			if (!obj_header || !obj_header->datum || TEST_FLAG(obj_header->flags, _object_header_being_deleted_bit))
+			{
+				light_delete(light_index);
+				continue;
+			}
+		}
 		if (light->parent_light_index != NONE)
 		{
 			struct point_light_definition *definition = light_definition_get(
@@ -1002,6 +1012,23 @@ void lights_preprocess_scene(
 				datum_delete(light_data, light_index);
 			}
 			else if (object_try_and_get(light->object_index))
+			{
+				light_disconnect_from_map(light_index);
+				light_reconnect_to_map(light_index);
+			}
+		}
+		else if (light->object_index != NONE && TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
+		{
+			/* port: keep attached lights synchronized with their object's marker when moved in Forge */
+			struct object_marker markers[1];
+			object_get_marker_by_name(
+				light->object_index,
+				object_get_attachment_marker_name(light->object_index, light->attachment_marker_index),
+				markers,
+				1);
+			if (distance_squared3d(&light->position, &markers[0].matrix.position) > 1.0e-6f ||
+				distance_squared3d((real_point3d const *)&light->forward, (real_point3d const *)&markers[0].matrix.forward) > 1.0e-6f ||
+				distance_squared3d((real_point3d const *)&light->up, (real_point3d const *)&markers[0].matrix.up) > 1.0e-6f)
 			{
 				light_disconnect_from_map(light_index);
 				light_reconnect_to_map(light_index);
@@ -1367,6 +1394,40 @@ void light_delete(
 	return;
 }
 
+/* port: delete any attached or unattached light datums owned by object_index */
+void light_delete_all_for_object(
+	long object_index)
+{
+	long light_index;
+	struct object_datum *object;
+
+	if (object_index == NONE || !light_data || !light_data->valid)
+		return;
+	for (light_index = data_next_index(light_data, NONE);
+		light_index != NONE;
+		light_index = data_next_index(light_data, light_index))
+	{
+		struct light_datum *light = datum_try_and_get(light_data, light_index);
+		if (light && light->object_index == object_index)
+		{
+			light_delete(light_index);
+		}
+	}
+	object = object_try_and_get(object_index);
+	if (object)
+	{
+		short i;
+
+		for (i = 0; i < MAXIMUM_NUMBER_OF_ATTACHMENTS_PER_OBJECT; ++i)
+		{
+			if (object->object.attachment_types[i] == _object_attachment_type_light)
+				object->object.attachment_indices[i] = NONE;
+		}
+		SET_FLAG(object->object.flags, _object_has_attached_lights_bit, FALSE);
+		SET_FLAG(object->object.flags, _object_dynamic_lighting_recompute_bit, FALSE);
+	}
+}
+
 real object_get_self_illumination(
 	long object_index)
 {
@@ -1530,14 +1591,14 @@ void light_particle(
 void light_disconnect_from_map(
 	long light_index)
 {
-	struct light_datum *light = light_get(light_index);
+	struct light_datum *light = datum_try_and_get(light_data, light_index);
 
-	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
+	/* port: safe if already disconnected or let go */
+	if (!light)
+		return;
+	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit) &&
+		TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
 	{
-		match_assert(
-			"c:\\halo\\SOURCE\\objects\\object_lights.c",
-			0x4D0,
-			TEST_FLAG(light->flags, _point_light_connected_to_map_bit));
 		cluster_partition_disconnect(
 			&light_cluster_partition,
 			light_index,
@@ -1958,12 +2019,17 @@ void lights_render_specular(
 void light_reconnect_to_map(
 	long light_index)
 {
-	struct light_datum *light = light_get(light_index);
-	struct point_light_definition *definition = light_definition_get(light->definition_index);
+	struct light_datum *light = datum_try_and_get(light_data, light_index);
+	struct point_light_definition *definition;
 	struct object_marker markers[1];
 	struct location location;
 	real_point3d position;
 	real radius;
+
+	/* port: guard against stale or deleted light handles */
+	if (!light)
+		return;
+	definition = light_definition_get(light->definition_index);
 
 	if (light->parent_light_index == NONE)
 	{
@@ -1988,6 +2054,15 @@ void light_reconnect_to_map(
 
 	if (TEST_FLAG(light->flags, _point_light_connects_to_map_bit))
 	{
+		/* port: if already connected, disconnect before reconnecting at the new transform */
+		if (TEST_FLAG(light->flags, _point_light_connected_to_map_bit))
+		{
+			cluster_partition_disconnect(
+				&light_cluster_partition,
+				light_index,
+				&light->cluster_reference);
+			SET_FLAG(light->flags, _point_light_connected_to_map_bit, FALSE);
+		}
 		light_compute_bounding_sphere(
 			light_index,
 			TRUE,

@@ -1365,6 +1365,9 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 		platform_log("display: HDR %s (SDR white %.2f, headroom %.2f), %s window", hdr ? "on" : "off", sdr_white,
 			headroom, platform_float_window ? "floating-point" : "8-bit");
 	}
+	input_state.focused = (SDL_GetWindowFlags(platform_window) &
+		(SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_MOUSE_FOCUS)) != 0 ||
+		SDL_GetKeyboardFocus() == platform_window;
 	platform_mouse_capture(TRUE);
 #endif
 	return TRUE;
@@ -1592,28 +1595,35 @@ void platform_video_swap(void)
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
 	SDL_WindowFlags window_flags;
 	int focused;
+	int minimized;
 	int vsync;
 	Uint64 swap_start;
 #endif
-#ifdef HALO_WINDOWS
-	/* SDL can restore its fullscreen styles on a mode or focus change.
-	Keep borderless on the desktop before the driver presents a frame. */
-	win32_window_borderless_apply(platform_window);
-#endif
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+#ifndef HALO_WINDOWS
 	SDL_PumpEvents();
+#endif
 	window_flags = platform_window ? SDL_GetWindowFlags(platform_window) : 0;
-	focused = platform_window && (window_flags & SDL_WINDOW_INPUT_FOCUS) != 0 &&
-		(window_flags & SDL_WINDOW_MINIMIZED) == 0;
+	minimized = (window_flags & SDL_WINDOW_MINIMIZED) != 0;
+	focused = platform_window && (window_flags & SDL_WINDOW_INPUT_FOCUS) != 0 && !minimized;
 	vsync = config_boolean("display.vsync");
+#ifdef HALO_WINDOWS
+	/* Keep wglSwapIntervalEXT steady on Windows 11 so focus blips do not
+	reconfigure the WGL-on-DXGI presentation swapchain mid-frame. */
+	platform_swap_interval(vsync ? 1 : 0);
+#else
 	platform_swap_interval((vsync && focused) ? 1 : 0);
-	swap_sound_begin();
-	swap_start = SDL_GetTicks();
-	SDL_GL_SwapWindow(platform_window);
-	swap_time = SDL_GetTicks() - swap_start;
-	swap_sound_end();
-	if (swap_time >= 2000)
-		platform_log("display: showing a frame took %.1f s in the graphics driver", (double)swap_time / 1000.0);
+#endif
+	if (!minimized)
+	{
+		swap_sound_begin();
+		swap_start = SDL_GetTicks();
+		SDL_GL_SwapWindow(platform_window);
+		swap_time = SDL_GetTicks() - swap_start;
+		swap_sound_end();
+		if (swap_time >= 2000)
+			platform_log("display: showing a frame took %.1f s in the graphics driver", (double)swap_time / 1000.0);
+	}
 #else
 	{
 	Uint64 swap_start;
@@ -1632,7 +1642,7 @@ void platform_video_swap(void)
 #endif
 	interval = frame_interval_ns();
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
-	if (!interval && vsync && !focused)
+	if (!interval && ((vsync && !focused) || minimized))
 		interval = refresh_period_ns();
 #endif
 	if (!interval)
@@ -1680,7 +1690,9 @@ void platform_mouse_capture(BOOL capture)
 	SDL_EVENT_WINDOW_FOCUS_GAINED. SDL_SetWindowRelativeMouseMode would only
 	set SDL_WINDOW_MOUSE_RELATIVE_MODE then, without testing XInput2, and
 	later calls would find it set and return at once) */
-	if (!capture || SDL_GetKeyboardFocus() != platform_window)
+	if (!capture ||
+		(SDL_GetKeyboardFocus() != platform_window &&
+		 !(SDL_GetWindowFlags(platform_window) & SDL_WINDOW_INPUT_FOCUS)))
 	{
 		mouse_warp_capture = FALSE;
 		SDL_SetWindowRelativeMouseMode(platform_window, false);
@@ -1694,8 +1706,8 @@ void platform_mouse_capture(BOOL capture)
 		{
 			mouse_warp_capture = FALSE;
 			SDL_SetWindowMouseGrab(platform_window, false);
-			SDL_ShowCursor();
 		}
+		SDL_HideCursor();
 		return;
 	}
 	mouse_warp_capture = TRUE;
@@ -2332,6 +2344,9 @@ void platform_pump_events(void)
 			if (event.key.down && !event.key.repeat && event.key.scancode == SDL_SCANCODE_F11)
 			{
 				platform_window_set_fullscreen(!platform_window_fullscreen());
+				input_state.focused = TRUE;
+				input_state.mouse_released = FALSE;
+				platform_mouse_capture(!input_state.ui_pointer && !scoreboard_pointer_active);
 			}
 #endif
 			break;
@@ -2438,6 +2453,19 @@ void platform_pump_events(void)
 				if (event.button.down)
 					mouse_buttons_pressed[event.button.button] = 1;
 			}
+#if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+			if (event.button.down && !input_state.ui_pointer && !scoreboard_pointer_active)
+			{
+				input_state.focused = TRUE;
+				if (input_state.mouse_released ||
+					!SDL_GetWindowRelativeMouseMode(platform_window) ||
+					SDL_CursorVisible())
+				{
+					input_state.mouse_released = FALSE;
+					platform_mouse_capture(TRUE);
+				}
+			}
+#endif
 			break;
 		case SDL_EVENT_MOUSE_WHEEL:
 			if (binding_capture == _binding_capture_waiting && event.wheel.y != 0.0f)
@@ -2488,10 +2516,14 @@ void platform_pump_events(void)
 			memset(input_state.keys, 0, sizeof(input_state.keys));
 			memset(input_state.mouse_buttons, 0, sizeof(input_state.mouse_buttons));
 			memset(mouse_buttons_pressed, 0, sizeof(mouse_buttons_pressed));
+			mouse_buttons_down = 0;
 			input_state.focused = FALSE;
 			/* (the scoreboard's pointer goes; the mouse is taken back for
 			the aim as the window has the focus again) */
 			scoreboard_pointer_active = FALSE;
+#ifdef HALO_WINDOWS
+			win32_window_borderless_apply(platform_window);
+#endif
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
 			if (mouse_warp_capture)
 			{
@@ -2572,6 +2604,19 @@ void platform_pump_events(void)
 		}
 	}
 #if !defined(HALO_ANDROID) && !defined(HALO_WEB)
+	if (!input_state.focused &&
+		((SDL_GetWindowFlags(platform_window) & SDL_WINDOW_INPUT_FOCUS) != 0 ||
+		 SDL_GetKeyboardFocus() == platform_window))
+	{
+		input_state.focused = TRUE;
+	}
+	if (input_state.focused && !input_state.ui_pointer &&
+		!scoreboard_pointer_active && !input_state.mouse_released &&
+		((!SDL_GetWindowRelativeMouseMode(platform_window) && !mouse_warp_capture) ||
+		 SDL_CursorVisible()))
+	{
+		platform_mouse_capture(TRUE);
+	}
 	if (mouse_warp_capture && mouse_needs_warp && !input_state.ui_pointer &&
 		!scoreboard_pointer_active && !input_state.mouse_released)
 	{
@@ -2863,7 +2908,7 @@ static void screen_keyboard_update(void)
 }
 
 #endif
-void platform_input_read(struct platform_input_state *state, BOOL consume_motion)
+void orig_platform_input_read(struct platform_input_state *state, BOOL consume_motion)
 {
 	pthread_mutex_lock(&input_lock);
 	*state = input_state;
@@ -2920,4 +2965,52 @@ void platform_input_read(struct platform_input_state *state, BOOL consume_motion
 		input_state.mouse_wheel = 0;
 	}
 	pthread_mutex_unlock(&input_lock);
+}
+
+int platform_window_is_focused(void)
+{
+	int is_focused;
+
+	pthread_mutex_lock(&input_lock);
+	is_focused = input_state.focused != 0;
+	pthread_mutex_unlock(&input_lock);
+	return is_focused;
+}
+
+short platform_vk_key_down(int vk)
+{
+	short down = 0;
+	int scancode;
+
+	if (vk <= 0 || vk >= 256)
+		return 0;
+	pthread_mutex_lock(&input_lock);
+	if (input_state.focused)
+	{
+		if (vk == 0x01)
+			down = (input_state.mouse_buttons[SDL_BUTTON_LEFT] || (mouse_buttons_down & (1u << SDL_BUTTON_LEFT))) ? (short)0x8000 : 0;
+		else if (vk == 0x02)
+			down = (input_state.mouse_buttons[SDL_BUTTON_RIGHT] || (mouse_buttons_down & (1u << SDL_BUTTON_RIGHT))) ? (short)0x8000 : 0;
+		else if (vk == 0x04)
+			down = (input_state.mouse_buttons[SDL_BUTTON_MIDDLE] || (mouse_buttons_down & (1u << SDL_BUTTON_MIDDLE))) ? (short)0x8000 : 0;
+		else if (vk == 0x10)
+			down = (input_state.keys[SDL_SCANCODE_LSHIFT] || input_state.keys[SDL_SCANCODE_RSHIFT]) ? (short)0x8000 : 0;
+		else if (vk == 0x11)
+			down = (input_state.keys[SDL_SCANCODE_LCTRL] || input_state.keys[SDL_SCANCODE_RCTRL]) ? (short)0x8000 : 0;
+		else if (vk == 0x12)
+			down = (input_state.keys[SDL_SCANCODE_LALT] || input_state.keys[SDL_SCANCODE_RALT]) ? (short)0x8000 : 0;
+		else
+		{
+			for (scancode = 0; scancode < SDL_SCANCODE_COUNT; scancode++)
+			{
+				if (input_state.keys[scancode] && virtual_key_from_scancode((SDL_Scancode)scancode) == (BYTE)vk)
+				{
+					down = (short)0x8000;
+					break;
+				}
+			}
+		}
+	}
+	pthread_mutex_unlock(&input_lock);
+	return down;
 }

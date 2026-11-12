@@ -1267,6 +1267,7 @@ long player_new(
 		player->squad_index = NONE;
 		player->cluster_index = NONE;
 		player->aim_assist_unit_index = NONE;
+		player->teleporter_index = NONE; /* port: single-player teleporters */
 		player->speed_multiplier = 1.0f;
 		player->team_index = 1;
 
@@ -1535,6 +1536,8 @@ static void player_spawn(
 	player2 = player_get(player_index);
 	player2->action_result = _player_action_result_reload;
 	player2->action_object_index = NONE;
+	if (!game_engine_running())
+		player2->teleporter_index = NONE; /* port: single-player teleporters */
 	if (player->local_player_index != NONE)
 		observer_obsolete_position(player->local_player_index);
 
@@ -3889,6 +3892,9 @@ static boolean player_handle_weapon_swap(
 	result = FALSE;
 	if (!players_decide_pickups())
 		return result;
+	/* port: do not swap or pick up weapons/powerups while in Forge Monitor mode */
+	if (player->unit_index != NONE && forge_is_unit_in_monitor_mode(player->unit_index))
+		return result;
 	switch (player->action_result)
 	{
 	case _player_action_result_swap_for_weapon:
@@ -4302,6 +4308,11 @@ static void player_examine_nearby_item(
 	player = player_get(player_index);
 	unit = unit_get(player->unit_index);
 	item = item_get(item_index);
+	/* port: do not pick up ammo, grenades, weapons, or equipment or show pickup prompts while in Forge Monitor mode */
+	if (player->unit_index != NONE && forge_is_unit_in_monitor_mode(player->unit_index))
+	{
+		return;
+	}
 	if (item->object.parent_object_index != NONE ||
 		item->item.ignore_object_index == player->unit_index)
 	{

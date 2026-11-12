@@ -11,6 +11,7 @@ def staged = new File(rootDir, "../../build/android")
 // none and never look for updates
 def buildNumberText = System.getenv("HALO_BUILD_NUMBER") ?: "0"
 def buildNumber = buildNumberText.isInteger() ? buildNumberText.toInteger() : 0
+def buildRepository = System.getenv("GITHUB_REPOSITORY") ?: "SutlabSol/HaloOpenCE-Forge"
 
 // the workflow's signing key (.github/workflows/build.yml): every build of
 // main signed with it can install over the one before; without it, the
@@ -28,6 +29,7 @@ android {
         versionCode Math.max(1, buildNumber)
         versionName buildNumber > 0 ? "build " + buildNumber : "1.0"
         buildConfigField "int", "HALO_BUILD_NUMBER", "${buildNumber}"
+        buildConfigField "String", "HALO_BUILD_REPOSITORY", "\"${buildRepository}\""
         ndk {
             abiFilters "arm64-v8a"
         }

@@ -31,6 +31,10 @@
 #include <stdint.h>
 #include <errno.h>
 
+#undef malloc
+#undef free
+#undef realloc
+
 void *mcc_memory_reserve(uint32_t address, uint32_t size);
 void mcc_memory_release(void *allocation, uint32_t size);
 int mcc_tags_prepare(struct mcc_runtime *runtime);
@@ -279,6 +283,11 @@ void *mcc_runtime_allocate(struct mcc_runtime *runtime, uint32_t bytes)
 
 boolean mcc_cache_tags_loaded(void) { return mcc_loaded; }
 
+char const *mcc_cache_loaded_level_name(void)
+{
+    return (mcc_loaded && mcc_loaded_cache.level_name[0]) ? mcc_loaded_cache.level_name : NULL;
+}
+
 short mcc_cache_scenario_type(void)
 {
     return mcc_loaded ? (short)mcc_loaded_cache.report.identity.scenario_type : NONE;
@@ -481,4 +490,81 @@ void const *mcc_cache_bitmap_pixels(struct bitmap_data const *bitmap,unsigned lo
     pixels=mcc_loaded ? mcc_bitmaps_pixels(&mcc_loaded_cache,bitmap,&size,coverage) : NULL;
     if (bytes) *bytes=size;
     return pixels;
+}
+
+struct mcc_runtime *mcc_forge_browser_open(FILE *fp, char const *map_path, void *tag_buf, uint32_t tag_sz)
+{
+    struct mcc_runtime *rt;
+    char const *slash1, *slash2, *leaf;
+    char stem[64];
+    char *dot;
+    uint64_t fsz = 0;
+
+    if (!fp || !map_path || !tag_buf || tag_sz < 64u)
+        return NULL;
+    {
+        long size;
+        if (fseek(fp, 0, SEEK_END) || (size = ftell(fp)) < 2048)
+            return NULL;
+        fsz = (uint64_t)size;
+    }
+
+    rt = (struct mcc_runtime *)calloc(1, sizeof(*rt));
+    if (!rt)
+        return NULL;
+    rt->source.context = fp;
+    rt->source.read = mcc_file_read;
+    rt->source.size = fsz;
+
+    slash1 = strrchr(map_path, '/');
+    slash2 = strrchr(map_path, '\\');
+    leaf = (slash1 > slash2) ? (slash1 + 1) : (slash2 ? (slash2 + 1) : map_path);
+    snprintf(stem, sizeof(stem), "%s", leaf);
+    dot = strrchr(stem, '.');
+    if (dot)
+        *dot = '\0';
+    {
+        char const *ws = strstr(map_path, "976730");
+        char ws_id[64];
+        ws_id[0] = '\0';
+        if (ws)
+        {
+            ws += 6;
+            if (*ws == '/' || *ws == '\\')
+                ws++;
+            {
+                size_t k = 0;
+                while (ws[k] && ws[k] != '/' && ws[k] != '\\' && k + 1 < sizeof(ws_id))
+                {
+                    ws_id[k] = ws[k];
+                    k++;
+                }
+                ws_id[k] = '\0';
+            }
+        }
+        if (ws_id[0] != '\0')
+            snprintf(rt->level_name, sizeof(rt->level_name), "mcc_maps\\%s\\%s", ws_id, stem);
+        else
+            snprintf(rt->level_name, sizeof(rt->level_name), "mcc_maps\\%s", stem);
+    }
+
+    if (mcc_cache_load(&rt->source, tag_buf, tag_sz, &rt->report) != MCC_CACHE_OK)
+    {
+        free(rt);
+        return NULL;
+    }
+    rt->tags = (unsigned char *)tag_buf;
+    rt->used = tag_sz;
+    rt->capacity = tag_sz;
+    rt->tag_index = rt->tags + 40;
+    mcc_resources_select(rt, rt->tags);
+    return rt;
+}
+
+void mcc_forge_browser_close(struct mcc_runtime *rt)
+{
+    if (!rt)
+        return;
+    mcc_resources_dispose(rt);
+    free(rt);
 }

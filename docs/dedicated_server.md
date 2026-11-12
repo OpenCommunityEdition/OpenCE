@@ -873,10 +873,13 @@ a rotation that long is saved whole and read back after a restart.
   `crazy_king`, `race`, `team_race`, `rally`, `team_rally`, and Halo PC's
   names `ffa`, `ffa_slayer`, `teamslayer`, `tslayer`, `koth`, `team_koth`,
   `iron_ctf`, `teamrace`, `teamoddball`), an OpenCE gametype's (`swat`,
-  `infection`, `gun_game`, `hardcore`, `hardcore_ctf`, `hardcore_oddball`,
+  `infection`, `gun_game`, `forge`, `hardcore`, `hardcore_ctf`, `hardcore_oddball`,
   `hardcore_king`), a gametype file's name (`gametypes/<name>.toml`), or
   `file=<name>` (a gametype a player's game saved, below). A gametype's
-  name is letters, digits, `_`, `-` and `.`, in any case.
+  name is letters, digits, `_`, `-` and `.`, in any case. A `forge` entry
+  (`<map>:forge`) runs a collaborative Forge session with no score or time
+  limit and saves map edits to `OpenCE Forge/saved_maps/<map>.txt`
+  (`OpenCE Forge/saved_maps/custom_maps/<map>.txt` for a Custom Edition map).
 - A rule is a gametype rule's name or its short name (`score`, `time`,
   `weapons`, `ff`...; `GET /api/gametypes`'s schema lists them), with a
   value it takes; a rule of another game engine than the gametype's is
