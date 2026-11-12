@@ -43,6 +43,7 @@ static void seed_of(int machine, unsigned char *seed)
 {
 	memset(seed, 0, P2P_SEED_SIZE);
 	seed[0] = (unsigned char)(machine + 1);
+	seed[1] = (unsigned char)((machine + 1) >> 8);
 }
 
 static struct mm_record searching(int machine, unsigned long sequence)
@@ -241,6 +242,16 @@ static void check_election(void)
 	}
 	CHECK((winners & (winners - 1)) != 0, "E14: one of the three always wins when it can: %d", winners);
 }
+
+struct machine
+{
+	struct mm_search search;
+	int quit;
+};
+
+static struct machine machines[8];
+static int machine_count;
+static unsigned long now_ms, now_unix;
 
 int main(void)
 {

@@ -23,7 +23,7 @@ enum
 	MM_FLAG_HELD = 4,
 	MM_MAXIMUM_POOL = 8,
 	MM_MAXIMUM_UNITS = 256,
-	/* a searcher counts once heard on this many records */
+	/* records after the first */
 	MM_REFRESHES_COUNTED = 2,
 	MM_SEALED_TOKEN_SIZE = P2P_TOKEN_SIZE + P2P_SEAL_OVERHEAD,
 	MM_HEADER_SIZE = 2 + 1 + 2 + 1 + 4 + 1 + 1 + 1 + 1 + P2P_KEY_SIZE,
@@ -80,5 +80,40 @@ struct mm_unit
 
 int mm_pool(const struct mm_unit *units, int count, int players, int *pool);
 int mm_elect(const struct mm_unit *units, const int *pool, int pool_count);
+
+struct mm_peer
+{
+	int used;
+	int playlist, size;
+	struct mm_record record;
+	/* this machine's milliseconds, not the sender's clock */
+	unsigned long heard;
+	int refreshes;
+};
+
+struct mm_search
+{
+	unsigned char seed[P2P_SEED_SIZE], key[P2P_KEY_SIZE], key_hash[P2P_KEY_HASH_SIZE];
+	int state;
+	struct p2p_mm_choice choice;
+	/* Unix seconds, never sent */
+	unsigned long started;
+	unsigned long marks_from;
+	/* 1, 0 (strict router) or -1 (STUN has not answered yet) */
+	int can_host;
+	unsigned long sequence;
+	int queue_count;
+	int queues[P2P_MM_MAXIMUM_TOPICS][2];
+	int next_queue;
+	unsigned long next_record;
+	struct mm_peer peers[MM_MAXIMUM_UNITS];
+};
+
+int mm_counted(const struct mm_peer *peer);
+
+void mm_start(struct mm_search *search, const unsigned char *seed, const struct p2p_mm_choice *choice,
+	unsigned long now, unsigned long unix_now);
+/* the record must already be verified (mm_record_read) */
+void mm_heard(struct mm_search *search, const struct mm_record *record, unsigned long now);
 
 #endif

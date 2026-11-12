@@ -412,4 +412,16 @@ enum
 /* CTF has no free-for-all variant; playlists has a bit per playlist */
 int mm_playlist_has_size(unsigned playlists, int size);
 
+struct p2p_mm_choice
+{
+	unsigned playlists;
+	int size;
+};
+enum
+{
+	P2P_MM_OFF,
+	P2P_MM_LOOKING,
+	P2P_MM_QUEUED,
+};
+
 #endif
