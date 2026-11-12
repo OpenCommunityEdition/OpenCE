@@ -8849,7 +8849,7 @@ void pc_menu_game_data_function_invoke(
         if (!widget->focused_child || !widget->focused_child->visible ||
             widget->parameters.list.selected_index<1 || widget->parameters.list.selected_index>4 ||
             (widget->parameters.list.selected_index==3 && !mcc_share_menu_can_remove()))
-            widget->parameters.list.selected_index=4;
+            focus_row(widget,4);
     }
     else if (!strcmp(name,"port mcc share update")) {
         struct widget_instance *download=named(widget,"download",0);

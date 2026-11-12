@@ -139,6 +139,21 @@ test("an entry's text, its rules, and custom maps' names", () => {
   assert.strictEqual(app.mapToken({ name: 'bloodgulch', kind: 'xbox' }), 'bloodgulch');
 });
 
+test('MCC picker entries retain their namespace when saved or played', () => {
+  const level = 'mcc_maps\\package\\arena';
+  for (const map of [
+    { kind: 'mcc', name: 'package\\arena', level },
+    { kind: 'mcc', name: 'package\\arena' },
+    { kind: 'mcc', name: level },
+  ]) {
+    const entry = app.makeEntry(app.mapToken(map), 'slayer', '');
+    assert.strictEqual(entry.text, level + ':slayer');
+    assert.deepStrictEqual(app.playBody(entry), { map: level, gametype: 'slayer' });
+    // The saved rotation API returns only the leaf in map, but keeps text intact.
+    assert.deepStrictEqual(app.playBody({ ...entry, map: 'arena' }), { map: level, gametype: 'slayer' });
+  }
+});
+
 const SETTINGS = [
   { name: 'server.name', type: 'string', value: 'OpenCE', default: 'OpenCE Dedicated', comment: 'The name', env: 'HALO_SERVER_NAME',
     pinned: false, secret: false, choices: null, min: null, max: null },

@@ -1,24 +1,8 @@
-/*
-APP.JS
-
-The dedicated server's admin page (docs/dedicated_server.md: the HTTP API
-and the RCON). It is served with Content-Security-Policy default-src 'self',
-so it makes every element with createElement and sets text with textContent:
-no HTML from strings, no inline styles or handlers.
-
-- The session is the HttpOnly cookie POST /api/login sets; the page keeps
-  only its CSRF token, sent on every change (X-CSRF-Token). It ends after
-  30 minutes without an HTTP request (the WebSocket's do not count): the
-  page asks GET /api/session every 5 minutes while it is open.
-- What the server sends may be older or newer than the page: settings'
-  values typed or as text, maps with or without a title, gametypes with or
-  without their engine. The page takes either.
-- Events and the status come over the RCON's WebSocket (/ws, signed in by
-  the cookie); while it is down the page polls /api/status, /api/players,
-  /api/log and /api/events every 3 seconds.
-- Everything but startPage uses no document: Node tests it
-  (tools/server_ui_tests).
-*/
+/* Dedicated server admin page: docs/dedicated_server.md.
+ * Use createElement/textContent under CSP, never HTML strings. The session
+ * uses an HttpOnly cookie; changes carry X-CSRF-Token. HTTP polls back up RCON.
+ * Functions outside startPage are tested in tools/server_ui_tests.
+ */
 
 'use strict';
 
@@ -277,6 +261,8 @@ function rulesText(text) {
 // a map of /api/maps as the rotation names it
 function mapToken(map) {
   if (!map) return '';
+  if (map.kind === 'mcc') return map.level ||
+    (/^mcc_maps[\\/]/i.test(map.name) ? map.name : 'mcc_maps\\' + map.name);
   return map.kind === 'custom' && !/^custom_maps\\/.test(map.name) ? 'custom_maps\\' + map.name : map.name;
 }
 
@@ -290,7 +276,8 @@ const titleOf = (map) => String((map && (map.title || map.name)) || '');
 function playBody(entry) {
   const text = String(entry.text || '').replace(/\s+/g, '');
   if (entry.gametype && (text.includes('+') || Object.keys(entry.rules || {}).length)) return { map: text };
-  return entry.gametype ? { map: entry.map, gametype: entry.gametype } : { map: entry.map };
+  const map = (parseEntryText(text) || entry).map;
+  return entry.gametype ? { map, gametype: entry.gametype } : { map };
 }
 
 function makeEntry(map, gametype, rules) {
@@ -902,7 +889,8 @@ function startPage(root) {
     $('add-map').replaceChildren(...page.maps.slice().sort((a, b) => titleOf(a).localeCompare(titleOf(b)))
       .map((map) => option(mapToken(map), `${titleOf(map)} (${map.kind === 'custom' ? 'custom' : map.name})`)));
     $('add-gametype').replaceChildren(
-      h('optgroup', { attrs: { label: 'Built-in' } }, builtin.map((name) => option(name, name))),
+      // Co-op is a rotation mode, not a base for multiplayer gametype files.
+      h('optgroup', { attrs: { label: 'Built-in' } }, [...new Set([...builtin, 'coop'])].map((name) => option(name, name))),
       h('optgroup', { attrs: { label: 'Files' } }, (gametypes.files || []).map((file) => option(file.name, `${file.name} (${file.base})`))));
     $('new-base').replaceChildren(...builtin.map((name) => option(name, name)));
   }

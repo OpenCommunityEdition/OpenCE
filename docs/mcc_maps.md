@@ -512,18 +512,33 @@ these generated strings is not implemented.
 ## MCC sharing eligibility
 
 The MCC-owned policy in `mcc_share_rules.c` applies to local and Workshop
-packages. Host opt-in, a known gameplay SHA-256 and a host-local list entry
-with maker credit are required. Unknown/stock content, loose maps, `_shared`,
-unsafe names and invalid origin states are refused. A Workshop ID is advisory;
-it neither grants redistribution permission nor proves which bytes are present.
-The host's `mcc_share.txt` classifies exact map/used-resource content, not a
-filename. Required JSON is separately identified and validated.
+packages. The host's `network.map_share` setting enables eligible packages
+automatically after their gameplay content has been validated. Loose maps,
+`_shared`, unsafe names and invalid origin states are refused. A Workshop ID
+is advisory; it neither grants redistribution permission nor proves which bytes
+are present. An existing `mcc_share.txt` can supply attribution, but no approval
+list is required. Required JSON is separately identified and validated.
 
 The planner uses the loader's validated resource selection. Self-contained maps
 do not transfer unrelated resources; used package dependencies follow their
 actual resolved paths, including Workshop `halo1/maps`. A used root/shared
-resource refuses the offer and is named in the host log. An invalid package
-override cannot be silently skipped in favor of another resource.
+resource is never transferred: the joiner must supply its matching local copy.
+Package copies identified as base resources are excluded too. An invalid
+package override cannot be silently skipped in favor of another resource.
+
+### Matching local shared resources
+
+When joining a host, OpenCE checks the installed base-resource candidates
+against the host's full SHA-256 content fingerprint. An older file in the
+MCC root does not hide a matching copy in either shared folder. Package-owned
+resources keep precedence; a broken package override is not silently replaced.
+The loader uses the exact resource selection that passed validation and checks
+the loaded content again before joining. Missing matches require the player to
+install the matching resources locally; the host never supplies base resources.
+
+Host sharing remembers whether a package resource duplicates a local base file.
+Repeated requests reuse that classification only while the map and every resource
+candidate retain their file stamps. A changed candidate forces a fresh comparison.
 
 ## Sharing a package with a joiner
 
@@ -533,9 +548,8 @@ The messages are request **103** and response **104**; see
 [NETCODE.md](../port/linux/NETCODE.md#mcc-package-sharing).
 Custom Edition sharing and its messages remain independent.
 
-Enable host `network.mcc_map_share` (default off), list
-`<gameplay SHA-256> <maker>` in `mcc_share.txt`, and have the joiner enable
-`network.map_download` (existing default on). A missing/differing package
+Enable host `network.map_share` and joiner `network.map_download` (both default
+on). The same host setting covers CE maps and MCC packages. A missing/differing package
 prompts before any chunk download or stage creation. When either permission
 is off, only manual installation or a valid Workshop page is offered as a
 content-acquisition action, plus cancellation. Matching installed content

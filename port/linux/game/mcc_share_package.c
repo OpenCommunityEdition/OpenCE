@@ -67,10 +67,8 @@ static int base_resource_copy(char const *resource,unsigned type)
     source=fopen(resource,"rb");
     if (!source) return -1;
     if (fseek(source,0,SEEK_END) || (size=ftell(source))<0) {fclose(source);return -1;}
-    for (set=0;set<3;set++) {
-        snprintf(path,sizeof(path),"mcc_maps/%s%s.map",
-            set==0 ? "" : set==1 ? "_shared/singleplayer/" : "_shared/multiplayer/",
-            type==1 ? "bitmaps" : "sounds");
+    for (set=0;set<MCC_PACKAGE_BASE_SETS;set++) {
+        if (!mcc_package_base_resource_path(type,set,path)) {fclose(source);return -1;}
         errno=0;
         base=fopen(path,"rb");
         if (!base) {
@@ -93,6 +91,34 @@ static int base_resource_copy(char const *resource,unsigned type)
     return 0;
 }
 
+static int base_resources(char const *level,char const resources[2][128],unsigned *mask)
+{
+    static struct {
+        int valid;
+        char level[64],resources[2][128];
+        struct mcc_precache_snapshot files;
+        unsigned mask;
+    } cached;
+    struct mcc_precache_snapshot before,after;
+    unsigned i,bits=0;
+    if (!mcc_precache_snapshot(level,&before)) return 0;
+    if (cached.valid && !strcmp(level,cached.level) &&
+        !memcmp(resources,cached.resources,sizeof(cached.resources)) &&
+        !memcmp(&before,&cached.files,sizeof(before))) {*mask=cached.mask;return 1;}
+    cached.valid=0;
+    for (i=0;i<2;i++) {
+        int base;
+        if (!resources[i][0]) continue;
+        base=mcc_package_shared_resource(resources[i],i+1) ? 1 : base_resource_copy(resources[i],i+1);
+        if (base<0) return 0;
+        if (base) bits|=1u<<i;
+    }
+    if (!mcc_precache_snapshot(level,&after) || memcmp(&before,&after,sizeof(before))) return 0;
+    strcpy(cached.level,level);memcpy(cached.resources,resources,sizeof(cached.resources));
+    cached.files=after;cached.mask=bits;cached.valid=1;*mask=bits;
+    return 1;
+}
+
 void mcc_share_package_build(char const *level, struct mcc_share_host_package *package)
 {
     static char list[65537];
@@ -106,7 +132,7 @@ void mcc_share_package_build(char const *level, struct mcc_share_host_package *p
     unsigned char digest[32];
     FILE *file;
     size_t length=0;
-    unsigned i;
+    unsigned i,base_mask;
     memset(package,0,sizeof(*package));
     package->refusal=MCC_SHARE_RESULT_NOT_SHAREABLE;
     if (!mcc_package_name(level,canonical) || !mcc_identity_host_package(canonical,digest)) return;
@@ -134,6 +160,10 @@ void mcc_share_package_build(char const *level, struct mcc_share_host_package *p
         error(_error_silent,"mcc share: %s no longer has validated resource selections; select the map again",canonical);
         return;
     }
+    if (!base_resources(canonical,resources,&base_mask)) {
+        error(_error_silent,"mcc share: cannot classify unchanged resource files for %s",canonical);
+        return;
+    }
     snprintf(map,sizeof(map),"%s.map",leaf);
     if (!source_path(maps,map,path) || !add_file(package,MCC_SHARE_FILE_MAP,map,path)) {
         error(_error_silent,"mcc share: cannot safely read %s/%s",maps,map);
@@ -142,7 +172,6 @@ void mcc_share_package_build(char const *level, struct mcc_share_host_package *p
     for (i=1;i<=2;i++) {
         char const *resource=i==1 ? "bitmaps.map" : "sounds.map";
         char expected[128];
-        int base;
         if (!resources[i-1][0]) continue;
         if (mcc_package_shared_resource(resources[i-1],i)) continue;
         /* Share the validated package selection, never unrelated siblings or
@@ -152,12 +181,7 @@ void mcc_share_package_build(char const *level, struct mcc_share_host_package *p
                 canonical,resources[i-1]);
             return;
         }
-        base=base_resource_copy(resources[i-1],i);
-        if (base<0) {
-            error(_error_silent,"mcc share: cannot classify resource %s against local base resources",resources[i-1]);
-            return;
-        }
-        if (base) continue;
+        if (base_mask&(1u<<(i-1))) continue;
         /* The platform resolves Workshop halo1/maps fallbacks exactly as the
          * resource reader did. The beside-level directory alone is insufficient. */
         platform_translate_path(resources[i-1],path,sizeof(path));

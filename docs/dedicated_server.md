@@ -88,8 +88,9 @@ or CE loaders. Resource/content validation still occurs before gameplay.
 Base dependencies must be installed locally on the server and each player.
 The server still needs Xbox `maps/ui.map` for its menus.
 
-`sv_maps` includes MCC multiplayer entries with kind `mcc` and their package
-identity. Use `sv_map mcc_maps\2898867177\Lava_Lab slayer` for an immediate
+`sv_maps` and the web map picker include MCC multiplayer and campaign entries
+with kind `mcc` and their package identity. The MCC catalog is cached during
+server operation; restart after adding or removing local packages. Use `sv_map mcc_maps\2898867177\Lava_Lab slayer` for an immediate
 change. Rotations and voting preserve explicit MCC paths; bare map names keep
 their existing Xbox/CE lookup order. `network.map_share` automatically offers
 eligible MCC packages with custom resources, metadata and previews, excluding
@@ -621,7 +622,7 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | `GET /api/gametypes/{name}` | viewer | `{"ok":true,"name":…,"text":"<the TOML>"}` |
 | `PUT /api/gametypes/{name}` | admin | `{"text":"<TOML>"}` → `{"ok":true}`, or `400 invalid` with `line` and `message` (a name is `a`–`z`, `0`–`9`, `_` and `-`, 32 at most) |
 | `DELETE /api/gametypes/{name}` | admin | `{"ok":true}` |
-| `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox` or `custom`; `title` is the map's display name, else its `name`) |
+| `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox`, `custom` or `mcc`; `title` is the map's display name, else its `name`) |
 | `GET /api/bans` | admin | `{"ok":true,"bans":[{"n":0,"when":"2026-10-19 18:00:00","ip":"…","hwid":"…","discord_id":"…","discord_verified":true,"players":"…","reason":"…","until":<unix>\|null}…]}` |
 | `GET /api/vpn` | viewer | `{"ok":true,"policy":"link","fail":"open","lists":[{"master":"<url>","key_id":"…","serial":12,"generated":<unix>,"fetched":<unix>\|null,"ranges":30582,"error":""}…],"file":"<server.vpn_list>","allow_ranges":0,"block_ranges":0,"held":true,"refused":{"vpn_link_required":0,"vpn_blocked":0,"vpn_link_invalid":0,"vpn_link_too_new":0,"vpn_link_in_use":0}}` (`held`: a list is held, from a master or the file) |
 | `POST /api/vpn/check` | moderator | `{"ip":"203.0.113.5"}` → `{"ok":true,"listed":true,"by":"netlist"}` (`by`: `netlist`, `vpn_block.txt`, `vpn_allow.txt`, or `""`) |

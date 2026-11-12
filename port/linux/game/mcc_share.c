@@ -335,6 +335,7 @@ static int mcc_share_identity_check(void *user, char const *stage_dir)
     for (i=0;i<count;i++) if (!keep[i] &&
         !mcc_share_stage_discard_preview(&mcc_share_globals.stage,indices[i])) goto done;
     mcc_share_check=mcc_validation_check_begin(mcc_share_globals.level,stage_dir);
+    mcc_validation_check_expect(mcc_share_check,mcc_share_digest);
     if (mcc_share_check) ok=MCC_SHARE_CHECK_PENDING;
  done:
     free(entries);

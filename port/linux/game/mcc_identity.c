@@ -371,6 +371,7 @@ void mcc_identity_update(void)
                 mcc_identity_job.index++;return;
             }
             mcc_identity_job.check=mcc_validation_check_begin(candidate,NULL);
+            mcc_validation_check_expect(mcc_identity_job.check,mcc_identity_job.digest);
             if (!mcc_identity_job.check) {mcc_identity_failed("There is not enough memory to check the MCC package.");return;}
         }
         status=mcc_validation_check_step(mcc_identity_job.check,&proof,reason,sizeof(reason));

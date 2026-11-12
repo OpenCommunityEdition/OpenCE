@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_mcc_rotation_and_catalog(tmp_path):
     (tmp_path / "cseries.h").write_text(
         "#ifndef MCC_SERVER_TEST_CSERIES_H\n#define MCC_SERVER_TEST_CSERIES_H\n"
-        "#include <stddef.h>\ntypedef unsigned char boolean;\n#define TRUE 1\n#endif\n")
+        "#include <stddef.h>\ntypedef unsigned char boolean;\n#define TRUE 1\n#define FALSE 0\n#endif\n")
     source = tmp_path / "server.c"
     source.write_text(r'''
 #include <stdio.h>
@@ -30,11 +30,11 @@ static FILE *fixture_fopen(char const *name,char const *mode) {
 #include "SERVER_SOURCE"
 #undef fopen
 void mcc_maps_rescan(void) {rescans++;}
-short mcc_maps_count(boolean multiplayer) {assert(multiplayer);return 1;}
-short mcc_maps_index(short row,boolean multiplayer) {assert(row==0&&multiplayer);return 0;}
-char const *mcc_maps_level_name(short index) {assert(index==0);return "mcc_maps\\123\\arena";}
+short mcc_maps_count(boolean multiplayer) {assert(!multiplayer);return 2;}
+short mcc_maps_index(short row,boolean multiplayer) {assert(row<2&&!multiplayer);return row;}
+char const *mcc_maps_level_name(short index) {return index==0 ? "mcc_maps\\123\\arena" : "mcc_maps\\123\\mission";}
 static void each(void *user,char const *name,char const *level,char const *kind) {
-    (void)user;assert(!strcmp(name,"123\\arena"));assert(!strcmp(level,"mcc_maps\\123\\arena"));
+    (void)user;assert(!strcmp(name,listed%2 ? "123\\mission" : "123\\arena"));assert(!strcmp(level+9,name));
     assert(!strcmp(kind,"mcc"));listed++;
 }
 static void save(unsigned version,unsigned type) {
@@ -67,7 +67,8 @@ int main(void) {
     e=parse("bloodgulch:ctf");assert(e.map_kind==_server_map_name&&!e.rejected[0]);
     e=parse("custom_maps/arena:slayer");assert(e.map_kind==_server_map_custom&&!e.rejected[0]);
     e=parse("levels/a10/a10:coop");assert(e.map_kind==_server_map_path&&!e.rejected[0]);
-    assert(mcc_server_maps_each(each,NULL)==1&&rescans==1&&listed==1);
+    assert(mcc_server_maps_each(each,NULL)==2&&rescans==0&&listed==2);
+    assert(mcc_server_maps_each(each,NULL)==2&&rescans==0&&listed==4);
     return 0;
 }
 '''.replace("SERVER_SOURCE", (ROOT / "port/linux/game/mcc_server.c").as_posix()))

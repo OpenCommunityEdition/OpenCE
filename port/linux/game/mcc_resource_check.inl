@@ -30,13 +30,15 @@ void mcc_resources_check_end(struct mcc_resource_check *check)
     free(check);
 }
 
-struct mcc_resource_check *mcc_resources_check_begin(char const *name,
-    struct mcc_cache_source const *source, char *reason, size_t size)
+struct mcc_resource_check *mcc_resources_check_begin_candidate(char const *name,
+    struct mcc_cache_source const *source, int candidate, char *reason, size_t size)
 {
     struct mcc_resource_check *check;
     struct mcc_cache_identity identity;
     unsigned char header[MCC_CACHE_HEADER_BYTES];
     void *raw=NULL;
+    char paths[2][128];
+    unsigned type;
     enum mcc_cache_status status=MCC_CACHE_READ_FAILED;
     check=calloc(1,sizeof(*check));
     if (!check) return NULL;
@@ -50,7 +52,14 @@ struct mcc_resource_check *mcc_resources_check_begin(char const *name,
     if (!raw) goto failed;
     check->runtime.source=*source;
     status=mcc_cache_load(source,raw,identity.tag_data_size,&check->runtime.report);
-    if (status!=MCC_CACHE_OK || !mcc_resources_select(&check->runtime,raw)) goto failed;
+    if (status!=MCC_CACHE_OK) goto failed;
+    memset(paths,0,sizeof(paths));
+    if (candidate>=0) for (type=1;type<=2;type++) {
+        if (!(type==1 ? check->runtime.report.external_bitmap_count : check->runtime.report.external_sound_count)) continue;
+        if (!mcc_package_resource_candidate(name,type,type==1 ? (unsigned)candidate%MCC_PACKAGE_BASE_SETS :
+            (unsigned)candidate/MCC_PACKAGE_BASE_SETS,paths[type-1])) goto failed;
+    }
+    if (!mcc_resources_select_paths(&check->runtime,raw,candidate<0 ? NULL : paths)) goto failed;
     free(raw);
     check->mask=(check->runtime.report.external_bitmap_count ? 1u : 0u) |
         (check->runtime.report.external_sound_count ? 2u : 0u);
@@ -123,4 +132,10 @@ int mcc_resources_check_step(struct mcc_resource_check *check, uint32_t *checksu
         }
     } while (spent<4194304 && (unsigned long)(system_milliseconds()-began)<2);
     return 0;
+}
+
+struct mcc_resource_check *mcc_resources_check_begin(char const *name,
+    struct mcc_cache_source const *source,char *reason,size_t size)
+{
+    return mcc_resources_check_begin_candidate(name,source,-1,reason,size);
 }

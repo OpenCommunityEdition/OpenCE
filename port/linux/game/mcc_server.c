@@ -42,11 +42,11 @@ void mcc_server_resolve(struct server_entry *entry)
 int mcc_server_maps_each(void (*each)(void *, const char *, const char *, const char *),void *context)
 {
     short row,count,index;
-    mcc_maps_rescan();
-    count=mcc_maps_count(TRUE);
+    /* Read the cached catalog; an HTTP refresh must not rescan mid-game. */
+    count=mcc_maps_count(FALSE);
     for (row=0;row<count;row++) {
         char const *level;
-        index=mcc_maps_index(row,TRUE);
+        index=mcc_maps_index(row,FALSE);
         level=mcc_maps_level_name(index);
         if (level) each(context,level+9,level,"mcc");
     }
