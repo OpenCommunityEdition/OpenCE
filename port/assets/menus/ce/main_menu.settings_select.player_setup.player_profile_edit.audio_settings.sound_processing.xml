@@ -14,7 +14,9 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/help">
 		<data input="port settings help"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_reverb" x="54" y="73"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_resampler" x="54" y="103"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_hrtf" x="54" y="103"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_resampler" x="54" y="133"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_stereo_doppler" x="54" y="163"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -31,13 +33,31 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/reverb_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="audio.reverb" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_hrtf" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/hrtf_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/hrtf_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/hrtf_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/hrtf_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="audio.hrtf" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_resampler" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/resampler_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/resampler_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/resampler_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/resampler_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/resampler_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="SINC|LINEAR" setting="audio.resampler" values="sinc|linear" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/resampler_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="XBOX|SINC|LINEAR" setting="audio.resampler" values="xbox|sinc|linear" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/op_stereo_doppler" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/stereo_doppler_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/stereo_doppler_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/stereo_doppler_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/stereo_doppler_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="audio.stereo_doppler" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
@@ -52,11 +72,15 @@
 	</widget>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/labels">
 		<string text="REVERB:"/>
+		<string text="3D HRTF:"/>
 		<string text="RESAMPLER:"/>
+		<string text="STEREO DOPPLER:"/>
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/sound_processing/help_strings">
 		<string text=""/>
 		<string text="Echo sounds as the place you are in does, and\nmuffle those behind walls, as the Xbox did."/>
-		<string text="How sounds are converted to the output's rate:\nsinc is clean; linear is brighter, with aliasing."/>
+		<string text="Xbox-style directional sound for headphones\nand speakers. On by default."/>
+		<string text="Xbox models the original sound. Sinc reduces\naliasing; linear gives a brighter sound."/>
+		<string text="Shift stereo sounds' pitch as they come and go,\nas 3D sounds' is. The Xbox played them flat."/>
 	</strings>
 </menus>

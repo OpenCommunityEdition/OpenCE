@@ -23,8 +23,6 @@ import re
 import struct
 import sys
 
-from custom_edition_tag_footprints import Cache, CUSTOM_EDITION_VERSION, XBOX_VERSION, read_cache
-
 SOURCE = Path(__file__).resolve().parent.parent / "source" / "hs"
 
 # where the scripts are in a scenario (scenario_definitions.h)
@@ -87,6 +85,8 @@ class MapScripts:
     """The function and engine global names one map's scripts use."""
 
     def __init__(self, path):
+        # (imported here so the table parsing works without the map reader)
+        from custom_edition_tag_footprints import Cache
         self.cache = Cache(path)
         scenario = [key for key in self.cache.addresses if key[0] == "scnr"]
         if not scenario:
@@ -207,6 +207,8 @@ class MapScripts:
 
 
 def maps_in(paths):
+    # (imported here so the table parsing works without the map reader)
+    from custom_edition_tag_footprints import CUSTOM_EDITION_VERSION, XBOX_VERSION, read_cache
     for path in map(Path, paths):
         for candidate in sorted(path.glob("*.map")) if path.is_dir() else [path]:
             try:

@@ -66,6 +66,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.h */
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "cutscene/cinematics.h"
@@ -652,6 +653,9 @@ void hud_render_damage_indicators(
 		real scale = hud_globals_get_scale(local_player_count() > 1);
 		byte damage_indicators[NUMBER_OF_HUD_DAMAGE_INDICATOR_DIRECTIONS];
 		short direction;
+
+		/* port: an MCC map's indicator bitmap's own scale (mcc_hud.c) */
+		scale *= mcc_hud_bitmap_scale(definition->indicator_bitmap.index);
 
 		player_effect_get_damage_indicators(
 			local_player_index,

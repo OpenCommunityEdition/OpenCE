@@ -48,6 +48,8 @@ change it.
 | Server name (`HALO_SERVER_NAME`) | `server.name`, 15 characters |
 | Rotation (`HALO_SERVER_ROTATION`) | `server.rotation` |
 | Max players (`HALO_SERVER_MAX_PLAYERS`) | `server.max_players` |
+| Vehicle riding base (`HALO_NET_VEHICLE_RIDING`) | `network.vehicle_riding`, `false`; the base setting, which each gametype's riding rule overrides in multiplayer (a gametype without the rule is off) |
+| Override gametype vehicle riding (`HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE`) | `server.vehicle_riding_override_gametype`, `false`; `true` turns the gametype's override off |
 | Join password (`HALO_SERVER_PASSWORD`) | `server.password` |
 | Public (`HALO_SERVER_PUBLIC`) | `server.public` |
 | Message of the day (`HALO_SERVER_MOTD`) | `server.motd` |

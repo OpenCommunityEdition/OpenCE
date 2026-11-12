@@ -60,7 +60,7 @@ symbols in this file:
 #include "errors.h"
 #include "data.h"
 #include "reference_lists.h"
-#include "objects/objects.h"
+#include "objects/objects.h" /* port: object_try_and_get, for deleted objects */
 
 /* ---------- constants */
 
@@ -81,6 +81,7 @@ enum
 
 /* ---------- prototypes */
 
+/* port: lists step over objects deleted since they were made */
 static long object_list_skip_deleted(long object_index, long *reference_index);
 
 /* ---------- globals */

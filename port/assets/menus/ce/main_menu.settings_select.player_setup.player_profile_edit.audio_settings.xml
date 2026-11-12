@@ -147,6 +147,6 @@
 		<string text="Play sound at all; from the next time the game\nstarts."/>
 		<string text="Talk in network games: while PUSH TO TALK is held\n(Controls), whenever you speak, or never."/>
 		<string text="The other players' voices."/>
-		<string text="The reverb, and how sounds are converted to the\noutput's rate."/>
+		<string text="Directional sound, reverb and how sounds are\nconverted to the output's rate."/>
 	</strings>
 </menus>

@@ -904,6 +904,7 @@ symbols in this file:
 #include "physics/collision_debug.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "mcc_campaign.h" /* port: port/linux/game/mcc_campaign.c */
 
 /* ---------- constants */
 
@@ -2884,6 +2885,9 @@ typedef char verify_hs_external_global_settable_in_maps_size[
 boolean hs_external_global_settable_by_maps(
 	short global_index)
 {
+	/* port: MCC's separately scoped campaign controls (mcc_campaign.c) */
+	if (mcc_campaign_global_settable(global_index))
+		return TRUE;
 	return global_index>=0 &&
 		global_index<(short)NUMBEROF(hs_external_global_settable_in_maps) &&
 		hs_external_global_settable_in_maps[global_index];

@@ -205,6 +205,26 @@ static boolean unit_get_aim_assist_parameters(
 	return FALSE;
 }
 
+/* port: reusable target query; MCC ray construction stays in mcc_projectiles.c. */
+long player_get_aim_assist_target(long player_index, real_point3d const *position,
+	real_vector3d const *direction, real_point3d *target_position, real *autoaim_level)
+{
+	struct player_datum *player = player_get(player_index);
+	long unit_index = unit_get_aiming_unit_index(player->unit_index);
+	struct aim_assist_parameters parameters;
+	struct aim_assist_target target;
+
+	*autoaim_level = 0.0f;
+	if (unit_get_aim_assist_parameters(unit_index, unit_get_zoom_level(unit_index), &parameters) &&
+		aim_assist(&parameters, position, direction, player->unit_index, player->team_index, &target))
+	{
+		*target_position = target.position;
+		*autoaim_level = target.autoaim_level;
+		return target.object_index;
+	}
+	return NONE;
+}
+
 static int compare_targets(
 	void const *target0,
 	void const *target1)

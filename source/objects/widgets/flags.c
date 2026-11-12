@@ -214,6 +214,10 @@ void flag_set_trailing_shape(
 /* ---------- globals */
 
 struct data_array *flag_data;
+/* port: the game time the cloth last stepped and the frames' time since
+(flags_update) */
+static long flag_last_step_game_time = NONE;
+static real flag_pending_delta = 0.0f;
 
 /* ---------- public code */
 
@@ -231,6 +235,9 @@ void flags_initialize_for_new_map(
 	void)
 {
 	data_make_valid(flag_data);
+	/* port: the new map's game time starts again (flags_update) */
+	flag_last_step_game_time = NONE;
+	flag_pending_delta = 0.0f;
 
 	return;
 }
@@ -271,16 +278,24 @@ void flags_update(
 	frames a second held the cloth eight times as stiff, and it hung and
 	flapped unlike the Xbox's. Step on the first frame after each tick, for
 	all the time since the last step; the frames between draw it where its
-	object is drawn (flag_render_proper). */
-	static long last_step_game_time = NONE;
-	static real pending_delta = 0.0f;
+	object is drawn (flag_render_proper). The step is never longer than the
+	ticks since the last one: frames while the game time stands still (a
+	network client held for the host, a map download) add nothing, and a
+	game time gone back or jumping (a new map, a checkpoint) counts as a
+	tick, as contrails_update counts it. */
+	long ticks;
 
-	pending_delta += delta;
-	if (last_step_game_time == game_time_get())
+	flag_pending_delta += delta;
+	if (flag_last_step_game_time == game_time_get())
 		return;
-	last_step_game_time = game_time_get();
-	delta = pending_delta;
-	pending_delta = 0.0f;
+	ticks = game_time_get() - flag_last_step_game_time;
+	if (flag_last_step_game_time == NONE || ticks < 1 || ticks > TICKS_PER_SECOND)
+		ticks = 1;
+	flag_last_step_game_time = game_time_get();
+	delta = flag_pending_delta;
+	if (delta > (real)ticks / TICKS_PER_SECOND)
+		delta = (real)ticks / TICKS_PER_SECOND;
+	flag_pending_delta = 0.0f;
 
 	for (flag_index = data_next_index(flag_data, NONE);
 		flag_index != NONE;

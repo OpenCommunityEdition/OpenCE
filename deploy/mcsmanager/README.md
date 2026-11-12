@@ -32,6 +32,28 @@ shares; give each its own with
 `env HALO_SAVE_ROOT=saves ./halo --server` for its start command).
 `config.toml` is written beside `halo` at the first start.
 
+## Vehicle riding
+
+The host entry uses `config.toml`:
+
+```toml
+[network]
+vehicle_riding = false
+
+[server]
+vehicle_riding_override_gametype = false
+```
+
+The Docker entry sets `HALO_NET_VEHICLE_RIDING=false` and
+`HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE=false` in its environment;
+edit those values there (they win over `config.toml` and cannot be changed
+by `sv_set` or the web page). The first is the base setting; in multiplayer each
+gametype's riding rule overrides it (a gametype
+without the rule is off), and the second, set to `true`, turns
+that override off. A co-op entry's
+`+riding` rule or a map's own choice takes precedence
+(docs/dedicated_server.md, "Vehicle riding").
+
 ## Ports
 
 UDP 2302 is the tunnel port, the one players need; the web page, its API
