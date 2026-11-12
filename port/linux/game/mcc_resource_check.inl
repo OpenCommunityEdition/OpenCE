@@ -4,10 +4,24 @@
 struct mcc_resource_check {
     struct mcc_runtime runtime;
     struct mcc_sha256 hash;
-    uint32_t table[256], crc, offset, size;
+    uint32_t crc, offset, size;
     unsigned type, mask;
     int framed;
 };
+
+int mcc_resources_check_paths(struct mcc_resource_check const *check, char paths[2][128])
+{
+    unsigned type;
+    memset(paths,0,2*128);
+    if (!check) return 0;
+    for (type=1;type<=2;type++) {
+        struct mcc_resources const *resources=check->runtime.resources;
+        if (!(check->mask&(1u<<(type-1)))) continue;
+        if (!resources || !resources->files[type-1].stream) return 0;
+        strcpy(paths[type-1],resources->files[type-1].path);
+    }
+    return 1;
+}
 
 void mcc_resources_check_end(struct mcc_resource_check *check)
 {
@@ -24,7 +38,6 @@ struct mcc_resource_check *mcc_resources_check_begin(char const *name,
     unsigned char header[MCC_CACHE_HEADER_BYTES];
     void *raw=NULL;
     enum mcc_cache_status status=MCC_CACHE_READ_FAILED;
-    uint32_t i,j,value;
     check=calloc(1,sizeof(*check));
     if (!check) return NULL;
     if (!source || !source->read || source->size>0x7fffffffu ||
@@ -41,12 +54,7 @@ struct mcc_resource_check *mcc_resources_check_begin(char const *name,
     free(raw);
     check->mask=(check->runtime.report.external_bitmap_count ? 1u : 0u) |
         (check->runtime.report.external_sound_count ? 2u : 0u);
-    check->crc=~check->runtime.report.identity.checksum;
-    for (i=0;i<256;i++) {
-        value=i;
-        for (j=0;j<8;j++) value=(value>>1)^(0xEDB88320u & (0u-(value&1u)));
-        check->table[i]=value;
-    }
+    check->crc=check->runtime.report.identity.checksum;
     mcc_sha256_begin(&check->hash);
     mcc_sha256_add(&check->hash,"GulchCE MCC content v1",sizeof("GulchCE MCC content v1")-1);
     return check;
@@ -61,9 +69,15 @@ failed:
 int mcc_resources_check_step(struct mcc_resource_check *check, uint32_t *checksum,
     unsigned char digest[32])
 {
-    unsigned char buffer[16384];
+#ifdef HALO_WEB
+    /* OPFS proxies each read to a worker. Larger bounded reads reduce that
+     * overhead without changing the identity bytes or the slice limits. */
+    unsigned char buffer[65536],marker;
+#else
+    unsigned char buffer[16384],marker;
+#endif
     struct mcc_resource_file *resource;
-    uint32_t bytes,k,spent=0;
+    uint32_t bytes,spent=0;
     unsigned long began=system_milliseconds();
     long size;
     /* Bound both CPU work and bytes. No validation slices run in gameplay. */
@@ -74,7 +88,8 @@ int mcc_resources_check_step(struct mcc_resource_check *check, uint32_t *checksu
                 if (!resource || fseek(resource->stream,0,SEEK_END) ||
                     (size=ftell(resource->stream))<0 || fseek(resource->stream,0,SEEK_SET)) return -1;
                 check->size=(uint32_t)size;
-                check->crc=(check->crc>>8)^check->table[(check->crc^check->type)&255];
+                marker=(unsigned char)check->type;
+                check->crc=(uint32_t)crc32(check->crc,&marker,1);
             } else check->size=(uint32_t)check->runtime.source.size;
             mcc_fingerprint_file_header(&check->hash,check->type,check->size);
             check->framed=1;
@@ -84,8 +99,7 @@ int mcc_resources_check_step(struct mcc_resource_check *check, uint32_t *checksu
         if (bytes) {
             if (check->type) {
                 if (fread(buffer,1,bytes,resource->stream)!=bytes) return -1;
-                for (k=0;k<bytes;k++)
-                    check->crc=(check->crc>>8)^check->table[(check->crc^buffer[k])&255];
+                check->crc=(uint32_t)crc32(check->crc,buffer,(uInt)bytes);
             } else if (!check->runtime.source.read(check->runtime.source.context,
                 check->offset,bytes,buffer)) return -1;
             mcc_sha256_add(&check->hash,buffer,(int)bytes);
@@ -93,10 +107,13 @@ int mcc_resources_check_step(struct mcc_resource_check *check, uint32_t *checksu
             spent+=bytes;
         }
         if (check->offset==check->size) {
-            if (check->type) check->crc=(check->crc>>8)^check->table[(check->crc^0xff)&255];
+            if (check->type) {
+                marker=0xff;
+                check->crc=(uint32_t)crc32(check->crc,&marker,1);
+            }
             do {check->type++;} while (check->type<=2 && !(check->mask&(1u<<(check->type-1))));
             if (check->type>2) {
-                *checksum=~check->crc;
+                *checksum=check->crc;
                 if (!*checksum) *checksum=1;
                 mcc_sha256_end(&check->hash,digest);
                 return 1;

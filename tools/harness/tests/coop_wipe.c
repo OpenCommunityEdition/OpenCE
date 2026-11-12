@@ -51,6 +51,9 @@ static struct {boolean saved_game_valid;void *base_address;unsigned long cpu_all
 #define GAME_STATE_SIZE 1024
 #define GAME_STATE_CPU_SIZE 512
 static int mcc_loaded,mcc_capture_succeeds=1,mcc_captures;
+static int console_capture_succeeds=1,console_captures,save_writes;
+static int live_image_generation,saved_image_generation;
+static boolean hs_console_state_capture(void){console_captures++;return console_capture_succeeds;}
 static int mcc_cache_tags_loaded(void){return mcc_loaded;}
 static int mcc_checkpoint_capture(void *image,unsigned long bytes,unsigned long used,unsigned long capacity)
 {
@@ -66,19 +69,22 @@ static void game_state_revert(void){reverts++;}
 static void game_state_call_before_save_procs(void){}
 static void main_stop_time(void){}
 static void main_start_time(void){}
-static boolean game_state_write_to_file(void){return save_succeeds;}
+static boolean game_state_write_to_file(void){save_writes++;if(save_succeeds)saved_image_generation=live_image_generation;return save_succeeds;}
 static void game_state_note_event(char const *note){(void)note;}
 /* The unrelated state reset by the actual new-game lifecycle entry point. */
 static int coop_presentation,coop_events,host_devices,client_devices,client_names_differing[1];
 static int host_sent_transforms[1],host_sent_looks[1],host_sent_devices[1],host_player_structure_bsps[1],host_friendly_fire[1];
 static int host_sent_screen_effect,host_resend,players_vitality,host_attachment_count,host_looping_sound_count;
 static struct {int definition_indices[4];} client_script_sounds;
+static struct {int count;} client_looping_sounds;
 static struct {int objective,nav_point_count;} host_hud_state;
 static struct {boolean offered,skip_save_written;int voters,cooldown_until;} skip_vote;
 static void skip_vote_clear(void){}
 static void coop_enemies_new_game(void){}
 static void coop_pickups_new_game(void){}
 static void coop_vehicles_new_game(void){}
+static int sound_syncs;
+static void coop_sound_sync_reset(void){sound_syncs=0;}
 #include "under_test.inc"
 static long add_player(void){long id=datum_new(player_data);int slot=DATUM_INDEX_TO_ABSOLUTE_INDEX(id);CHECK(id!=NONE,"player fixture full");((struct player_datum *)datum_get(player_data,id))->unit_index=100+slot;live_machine_players[slot<2?slot:2][slot<3?0:1]=id;return id;}
 static struct player_datum *player(int slot){return (void *)(player_data->data+slot*player_data->size);}
@@ -90,6 +96,7 @@ static void setup(void)
  tick=main_loss_last_tick=0;paused=FALSE;all_dead=TRUE;save_succeeds=TRUE;reverts=respawns=diagnostics=0;
  memset(&main_globals,0,sizeof(main_globals));game_state_globals.saved_game_valid=FALSE;
  mcc_loaded=FALSE;mcc_capture_succeeds=TRUE;mcc_captures=0;
+ console_capture_succeeds=TRUE;console_captures=save_writes=0;live_image_generation=1;saved_image_generation=0;
  network_coop_new_game();game_state_save();
 }
 static void wipe(void){main_lost_map();tick+=92;main_lost_map_private();}
@@ -131,13 +138,31 @@ int main(int argc,char **argv)
   mcc_loaded=TRUE;game_state_save();
   CHECK(mcc_captures==1&&game_state_globals.saved_game_valid,"MCC checkpoint capture skipped");
   mcc_capture_succeeds=FALSE;game_state_save();
-  CHECK(mcc_captures==2&&!game_state_globals.saved_game_valid,"failed MCC capture left valid checkpoint");
+  CHECK(mcc_captures==2&&game_state_globals.saved_game_valid,"failed MCC capture discarded previous checkpoint");
+ } else CASE("console-save") {
+  for(int mcc=0;mcc<2;mcc++){
+   struct coop_checkpoint_players previous;
+   setup();mcc_loaded=mcc;previous=checkpoint_players;
+   add_player();live_image_generation=2;console_capture_succeeds=FALSE;
+   game_state_save();
+   CHECK(console_captures==2&&save_writes==1&&saved_image_generation==1,"failed console capture wrote a saved image");
+   CHECK(!mcc_captures&&game_state_globals.saved_game_valid,"failed console capture reached MCC or discarded previous state");
+   CHECK(!memcmp(&previous,&checkpoint_players,sizeof(previous)),"failed console capture published new roster");
+   wipe();CHECK(!reverts&&respawns==1,"failed console capture rewound a team wipe");
+   console_capture_succeeds=TRUE;game_state_save();
+   CHECK(console_captures==3&&save_writes==2&&saved_image_generation==2&&game_state_globals.saved_game_valid,
+         "successful console capture did not publish the replacement image");
+   CHECK(mcc_captures==mcc&&checkpoint_players.count==3&&network_coop_wipe_reverts(),
+         "successful console capture did not publish the replacement roster");
+   wipe();CHECK(reverts==1&&respawns==1,"replacement checkpoint could not restore the team");
+  }
  } else CASE("new-map") {
   CHECK(network_coop_wipe_reverts(),"valid checkpoint rejected");
-  host_attachment_count=3;host_looping_sound_count=2;
+  host_attachment_count=3;host_looping_sound_count=2;client_looping_sounds.count=2;sound_syncs=2;
   network_coop_new_game();
   CHECK(!network_coop_wipe_reverts(),"checkpoint metadata survived a new game/map");
-  CHECK(host_attachment_count==0&&host_looping_sound_count==0,"attachment or sound history survived a new game/map");
+  CHECK(host_attachment_count==0&&host_looping_sound_count==0&&client_looping_sounds.count==0,"attachment or sound history survived a new game/map");
+  CHECK(sound_syncs==0,"a host's time for a sound survived a new game/map");
  } else CASE("delay") {
   main_lost_map();tick=91;main_lost_map_private();CHECK(!reverts&&!respawns,"rewound early");
   tick=92;main_lost_map_private();CHECK(reverts==1&&!main_globals.lost_map&&!main_globals.loss_timer,"wipe did not clear loss state");

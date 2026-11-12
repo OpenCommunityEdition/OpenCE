@@ -420,6 +420,7 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer_xbox_internal.h"
 #include "rasterizer_xbox_vertex_shaders.h"
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.c */
 
 /* ---------- constants */
 
@@ -1313,9 +1314,10 @@ void rasterizer_model_part_skinning(
 	if (!many_node_matrices)
 		return;
 	node_count = custom_edition_part_palette(vertex_buffer, &nodes);
+	/* port: and an MCC map's part's (mcc_cache.c) */
 	{
-		extern short mcc_cache_part_palette(void const *buffer, byte const **nodes);
 		short mcc_count = mcc_cache_part_palette(vertex_buffer, &nodes);
+
 		if (mcc_count)
 			node_count = mcc_count;
 	}

@@ -1,10 +1,9 @@
-/* MCC object compatibility: colors, placement and boat controls.
+/* MCC object compatibility: colors, placement and item scale.
  * The legacy object paths and game variants remain unchanged. */
 #include "cseries.h"
 #include "game/game_engine.h"
 #include "mcc_cache.h"
 #include "mcc_objects.h"
-#include "physics/powered_mass_point_datum.h"
 #include <string.h>
 
 /* MeinCrap's dropped block weapon uses a 0.001 tag scale. The item update
@@ -14,15 +13,6 @@
 boolean mcc_item_small_scale(real scale)
 {
     return mcc_cache_tags_loaded() && scale >= 0.001f && scale < 0.5f;
-}
-
-/* The three-point boat controller assigns only its propeller's friction
- * speed. MCC boats can enable water friction on the other two hydrofoils,
- * too. Their inactive controls must start at zero, not leftover stack data.
- * The caller subsequently supplies all three rotations and lift ratios. */
-void mcc_boat_controls_initialize(struct powered_mass_point_datum *state)
-{
-    if (mcc_cache_tags_loaded()) memset(state, 0, 3 * sizeof(*state));
 }
 
 /* Signed object functions can extrapolate an RGB change color. The caller

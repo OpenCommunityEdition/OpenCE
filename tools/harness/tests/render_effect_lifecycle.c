@@ -7,6 +7,7 @@ typedef struct { real red, green, blue; } real_rgb_color;
 typedef struct { real alpha, red, green, blue; } real_argb_color;
 typedef struct { real yaw, pitch, roll; } real_euler_angles3d;
 typedef struct { real scale; real_vector3d forward, left, up; real_point3d position; } real_matrix4x3;
+#define TICKS_PER_SECOND 30
 #define MAXIMUM_LOCAL_PLAYERS 4
 #define MAXIMUM_NUMBER_OF_LOCAL_PLAYERS 4
 #define NUMBER_OF_DAMAGE_INDICATORS 4

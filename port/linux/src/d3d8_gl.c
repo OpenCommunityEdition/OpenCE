@@ -79,6 +79,23 @@ OpenGL ES, which has no glClipControl: its depth from -1 would lose the
 precision near 0 that reversing gains */
 BOOL xgpu_reversed_depth;
 
+/* A record of the device's own (a vertex array, a render target, a
+framebuffer, a program): the renderer cannot go on without it. The web
+build's malloc gives NULL when the heap is full, rather than aborting
+(-sABORTING_MALLOC=0, tools/web_build.py), and WebAssembly does not trap a
+write through it (address 0 is memory), so stop here instead. */
+static void *device_record_new(size_t size)
+{
+	void *record = calloc(1, size);
+
+	if (!record)
+	{
+		fprintf(stderr, "d3d8: out of memory for a %lu byte record\n", (unsigned long)size);
+		abort();
+	}
+	return record;
+}
+
 /* ---------- the screen's width
 
 The Xbox screen is 640x480. The native ports can draw a wider one: 480
@@ -1626,7 +1643,7 @@ static struct vertex_array_entry *vertex_array_get(const struct vertex_layout *l
 		if (entry->hash == hash && !memcmp(&entry->layout, layout, sizeof(*layout)))
 			return entry;
 	}
-	entry = calloc(1, sizeof(*entry));
+	entry = device_record_new(sizeof(*entry));
 	entry->hash = hash;
 	entry->layout = *layout;
 	memset(entry->bindings, 0xff, sizeof(entry->bindings));
@@ -1982,6 +1999,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	unsigned long width, height, slot;
 	long screen;
 	BOOL depth;
+	GLint previous_texture;
 
 	if (!surface || !surface->Data)
 		return NULL;
@@ -2028,7 +2046,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 			return render_target_remember(surface, screen, entry);
 		}
 	}
-	entry = calloc(1, sizeof(*entry));
+	entry = device_record_new(sizeof(*entry));
 	entry->target.data = surface->Data;
 	entry->target.width = width;
 	entry->target.height = height;
@@ -2041,10 +2059,14 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
 	entry->target.format = depth ? (xgpu_reversed_depth ? GL_DEPTH32F_STENCIL8 : GL_DEPTH24_STENCIL8) :
 		entry->screen_buffer && hdr.active ? GL_RGBA16F : GL_RGBA8;
+	/* Textures may already be selected for this draw. Allocating its target
+	 * must not replace the active sampler's input with the output image. */
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &previous_texture);
 	glGenTextures(1, &entry->target.texture);
 	glBindTexture(GL_TEXTURE_2D, entry->target.texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	render_target_storage(&entry->target);
+	glBindTexture(GL_TEXTURE_2D, (GLuint)previous_texture);
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
@@ -2084,7 +2106,7 @@ static GLuint framebuffer_find(GLuint color, GLuint depth, BOOL renderbuffers)
 			return entry->framebuffer;
 		}
 	}
-	entry = calloc(1, sizeof(*entry));
+	entry = device_record_new(sizeof(*entry));
 	entry->color = color;
 	entry->depth = depth;
 	entry->renderbuffers = renderbuffers;
@@ -3721,6 +3743,11 @@ HRESULT WINAPI D3DDevice_CreateVertexShader(CONST DWORD *declaration, CONST DWOR
 		/* header: program type in the low word, instruction count in the high */
 		object->instruction_count = function[0] >> 16;
 		object->instructions = malloc(object->instruction_count * 4 * sizeof(DWORD));
+		if (!object->instructions && object->instruction_count)
+		{
+			free(object);
+			return E_OUTOFMEMORY;
+		}
 		memcpy(object->instructions, function + 1, object->instruction_count * 4 * sizeof(DWORD));
 	}
 	parse_declaration(object, declaration);
@@ -4024,7 +4051,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 			return entry->shader;
 		}
 	}
-	entry = calloc(1, sizeof(*entry));
+	entry = device_record_new(sizeof(*entry));
 	entry->hash = hash;
 	entry->key = *key;
 	source = nv2a_pixel_shader_to_glsl(key);
@@ -4071,7 +4098,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 			return entry;
 		}
 	}
-	entry = calloc(1, sizeof(*entry));
+	entry = device_record_new(sizeof(*entry));
 	entry->vertex_shader = vertex_shader;
 	entry->fragment_shader = fragment_shader;
 	memset(&entry->uniforms, 0xff, sizeof(entry->uniforms));
@@ -4579,7 +4606,7 @@ static GLuint mip_composite_get(const struct xgpu_texture_description *descripti
 	}
 	if (!composite)
 	{
-		composite = calloc(1, sizeof(*composite));
+		composite = device_record_new(sizeof(*composite));
 		composite->data = data;
 		composite->width = description->width;
 		composite->height = description->height;
@@ -6325,6 +6352,12 @@ static unsigned long stream_upload_swizzled(const struct vertex_shader_object *d
 		free(scratch);
 		scratch_size = size + 65536;
 		scratch = malloc(scratch_size);
+		/* (out of memory: the colours go up unswapped) */
+		if (!scratch)
+		{
+			scratch_size = 0;
+			return stream_upload(data, size);
+		}
 	}
 	memcpy(scratch, data, size);
 	for (vertex = 0; vertex + stride <= size; vertex += stride)
@@ -6807,6 +6840,10 @@ static WORD *quad_indices(const WORD *indices, unsigned long count, unsigned lon
 	WORD *result = malloc(quads * 6 * sizeof(WORD) + 2);
 	unsigned long quad;
 
+	/* (out of memory: none, and the draw is dropped) */
+	*out_count = 0;
+	if (!result)
+		return NULL;
 	for (quad = 0; quad < quads; quad++)
 	{
 		WORD v0 = indices ? indices[quad * 4] : (WORD)(quad * 4);
@@ -6850,9 +6887,12 @@ void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_v
 		unsigned long count;
 		WORD *indices = quad_indices(NULL, vertex_count, &count);
 
-		glDrawElements(GL_TRIANGLES, (GLsizei)count, GL_UNSIGNED_SHORT,
-			(const void *)index_upload(indices, count * sizeof(WORD)));
-		free(indices);
+		if (indices)
+		{
+			glDrawElements(GL_TRIANGLES, (GLsizei)count, GL_UNSIGNED_SHORT,
+				(const void *)index_upload(indices, count * sizeof(WORD)));
+			free(indices);
+		}
 	}
 	else
 	{
@@ -7093,6 +7133,8 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 	if (primitive_type == D3DPT_QUADLIST)
 	{
 		indices = quad_indices(index_data, vertex_count, &count);
+		if (!indices)
+			return;
 		source = indices;
 	}
 #ifdef HALO_GLES
@@ -7101,6 +7143,11 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		/* the indices are copied anyway: rebase them */
 		WORD *rebased = malloc(count * sizeof(WORD) + 2);
 
+		if (!rebased)
+		{
+			free(indices);
+			return;
+		}
 		for (index = 0; index < count; index++)
 			rebased[index] = (WORD)(source[index] - minimum);
 		glDrawElements(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
@@ -7321,7 +7368,7 @@ void WINAPI D3DDevice_End(void)
 				free(placed);
 			}
 		}
-		else
+		else if (indices)
 		{
 			glDrawElements(GL_TRIANGLES, (GLsizei)index_count, GL_UNSIGNED_SHORT,
 				(const void *)index_upload(indices, index_count * sizeof(WORD)));
@@ -7653,6 +7700,8 @@ static void write_screenshot(struct render_target_entry *target)
 	if (!directory)
 		return;
 	pixels = malloc(image_size);
+	if (!pixels)
+		return;
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, framebuffer_get(target->target.texture, 0));
 #ifdef HALO_GLES
 	/* (OpenGL ES reads a half float target only as floats) */
@@ -7660,6 +7709,11 @@ static void write_screenshot(struct render_target_entry *target)
 	{
 		float *texels = malloc(image_size * sizeof(float));
 
+		if (!texels)
+		{
+			free(pixels);
+			return;
+		}
 		glReadPixels(0, 0, (GLsizei)width, (GLsizei)height, GL_RGBA, GL_FLOAT, texels);
 		for (row = 0; row < image_size; row++)
 		{

@@ -51,8 +51,9 @@ typedef int boolean;
 #define csmemset memset
 enum {MAP_STEP_MAPS, MAP_STEP_DIFFICULTIES};
 struct player_profile {int last_single_player_map_played;};
-struct widget_instance {struct {struct {short selected_index;struct widget_instance *extended_description;} list;} parameters;};
+struct widget_instance {char const *name;struct {struct {short selected_index;struct widget_instance *extended_description;} list;} parameters;};
 static struct widget_instance spinner, description, list;
+static void map_screen_row_text(short entry,wchar_t *text){(void)entry;*text=0;}
 /* Presentation belongs to the frontend module; this fixture checks map selection. */
 static void frontend_multiplayer_difficulty(struct widget_instance *widget,short chosen){(void)widget;(void)chosen;}
 static struct {short shown_level,saved_level;struct {boolean available;void *finished;} levels[10];} campaign;
@@ -152,6 +153,7 @@ static void level_description(struct widget_instance *widget,char const *prefix,
 int main(int argc,char **argv) {
     boolean deleted=FALSE;
     if(argc<2)return 99;
+    list.name="fixture_list";
     list.parameters.list.extended_description=&description;
     {int i;for(i=0;i<2;i++){mcc_map_browser_open(&mcc_solo_browsers[i],i);mcc_map_browser_open(&mcc_host_browsers[i],i);}}
     if(!strcmp(argv[1],"kinds")) {

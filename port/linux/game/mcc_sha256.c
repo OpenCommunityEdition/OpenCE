@@ -108,4 +108,3 @@ void mcc_sha256_end(struct mcc_sha256 *context, unsigned char *digest)
 		digest[index * 4 + 3] = (unsigned char)context->state[index];
 	}
 }
-

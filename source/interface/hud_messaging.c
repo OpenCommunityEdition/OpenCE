@@ -547,7 +547,7 @@ static void render_state_bitmap(
 	draws a button by its place among the HUD globals' button icons: before
 	the map's own picture of it is looked for, which a Custom Edition map's
 	message icons (13 sequences to the Xbox's 24) may not have, so that the
-	button was not drawn */
+	button was not drawn. An MCC map's own buttons are drawn as its HUD's are */
 	if (!mcc_cache_tags_loaded() && hud_hires_button_draw(icon, cursor_bounds, color))
 		return;
 	if (icon->frame_rate)

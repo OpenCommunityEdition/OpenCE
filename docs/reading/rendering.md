@@ -220,6 +220,28 @@ and the final presentation flip must agree. The opening comment in
 OpenGL ES/WebGL adaptations. Do not assume a desktop GL facility is available
 on Android or the web because the C file is shared.
 
+`prepare_draw` binds sampled textures before render targets because resolving
+a sampled multisample image can change framebuffer bindings. When
+`render_target_get` allocates a new target, it temporarily binds that texture
+on the active texture unit. It must restore that unit's previous 2D binding
+before returning, including a previous binding of zero. Invalidating the
+renderer’s state cache alone does not restore the actual GL binding.
+
+This shared contract was verified by tracing CE DeathIsland's first water-ripple
+draws in a browser process that had not loaded MCC. Each newly allocated output
+texture replaced sampler 3's input; the sampled texture ID then equalled the
+framebuffer's color attachment ID. WebGL rejects this feedback with
+`INVALID_OPERATION`, as specified in its
+[texture/framebuffer feedback rules](https://registry.khronos.org/webgl/specs/latest/1.0/#6.26).
+The fix preserves the allocation's prior binding without changing map-family
+loading paths or the existing intentional-feedback copy. The
+[allocation regression](../../tools/test_render_target_binding.py) executes the
+real target lookup and storage functions with recorded GL bindings, covering
+color/depth allocation, distinct inputs, unbound inputs, active-unit preservation,
+cached lookups without new queries, and callers that explicitly select a texture.
+It is a state-contract test; current visual/platform evidence belongs in the
+[validation ledger](../mcc_refactor_validation.md).
+
 `fragment_shader_get` first caches the complete pixel-shader state key, so a
 repeat draw does not translate GLSL again. GulchCE's `fragment_source_get`
 then reuses a compiled fragment shader only when the generated source matches

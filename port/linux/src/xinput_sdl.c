@@ -45,6 +45,7 @@ drive the controller.
 /* port/linux/game/network_aim_assist.c */
 extern unsigned char network_aim_assist_block_mouse(void);
 #include "halo_keyboard.h"
+#include "keyboard_prompts.h"
 #include "controller_buttons.h"
 #include "controller_remap.h"
 #include "frontend_input.h"

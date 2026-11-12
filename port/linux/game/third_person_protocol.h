@@ -2,10 +2,9 @@
 #ifndef THIRD_PERSON_PROTOCOL_H
 #define THIRD_PERSON_PROTOCOL_H
 
-/* Separate agreement versions; never advertise these as upstream compatibility. */
-#define THIRD_PERSON_PROTOCOL_VERSION 32712
-/* MCC projectile agreement changes independently of Xbox/CE camera sessions. */
-#define THIRD_PERSON_PROTOCOL_MCC_VERSION 32714
+/* OpenCE 43 plus shoulder-camera input and policy in cooperative flag bits 4-5.
+ * All map families share this agreement; older camera sessions are incompatible. */
+#define THIRD_PERSON_PROTOCOL_VERSION 32744
 
 struct network_game;
 void third_person_session_host_begin(void);
@@ -19,7 +18,7 @@ void third_person_session_client_clear(void);
 unsigned int third_person_session_version(char const *map);
 int third_person_session_compatible(char const *map, unsigned int version, unsigned int flags);
 
-#define THIRD_PERSON_PROTOCOL_JOIN_KIND 101
+#define THIRD_PERSON_PROTOCOL_JOIN_KIND 102
 #define THIRD_PERSON_PROTOCOL_JOIN_REVISION 1
 #define THIRD_PERSON_PROTOCOL_JOIN_MAX 520
 

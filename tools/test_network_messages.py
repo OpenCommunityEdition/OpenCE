@@ -5,9 +5,11 @@ Builds tools/tests/network_messages_test.c against the game's packet table
 byte_swapping.c), compiled with the build's own flags (from build.ninja, so
 `python3 configure.py` first) plus AddressSanitizer, and checks:
 
-- each message encodes to the same bytes as REFERENCE, captured from the
-  packet table as upstream ships it: the wire is shared with OpenCE and
-  every earlier build, and must not move a byte;
+- each message encodes to the historical REFERENCE captured from OpenCE
+  build 138. This reference predates account-link joins and GulchCE's shared
+  checkpoint agreement; it is not the current protocol's acceptance oracle.
+  See test_join_protocol.py for the current join codec and test_mcc_protocol.py
+  for the audited differences from the later OpenCE 41 baseline;
 - no encode or decode reads or writes past a message's structure (each sits
   alone in its own allocation, which AddressSanitizer guards).
 

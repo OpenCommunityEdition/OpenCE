@@ -191,7 +191,6 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
-#include "mcc_protocol.h" /* port: legacy/MCC settings boundary */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
@@ -966,8 +965,7 @@ static boolean network_game_client_receive_game_settings_piece(
 {
 	boolean result = TRUE;
 
-	if ((piece->total_size != sizeof(network_game_client_settings_staging) &&
-		piece->total_size != offsetof(struct network_game, mcc_content_sha256)) || /* port: OpenCE prefix */
+	if (piece->total_size != sizeof(network_game_client_settings_staging) || /* port: one complete versioned record */
 		!piece->length ||
 		piece->length > sizeof(piece->data) ||
 		piece->offset + piece->length > piece->total_size)
@@ -981,7 +979,7 @@ static boolean network_game_client_receive_game_settings_piece(
 		/* each record is sent in order from its start, over a stream */
 		if (piece->offset == 0)
 		{
-			/* port: legacy settings have no MCC digest; never retain the last one. */
+			/* port: never retain bytes from the preceding settings record. */
 			csmemset(&network_game_client_settings_staging, 0, sizeof(network_game_client_settings_staging));
 			network_game_client_settings_staging_total = piece->total_size;
 			network_game_client_settings_staging_size = 0;
@@ -1002,8 +1000,9 @@ static boolean network_game_client_receive_game_settings_piece(
 			if (network_game_client_settings_staging_size == piece->total_size)
 			{
 				network_game_client_settings_staging_size = 0;
-				/* port: a legacy-sized record can never admit an MCC map. */
-				result = mcc_protocol_settings_valid(&network_game_client_settings_staging, piece->total_size) &&
+				/* port: validate the bounded name before any string consumers. */
+				result = memchr(network_game_client_settings_staging.map.name, 0,
+					sizeof(network_game_client_settings_staging.map.name)) != NULL &&
 					network_game_client_game_settings_updated(client, &network_game_client_settings_staging);
 				if (!result)
 				{

@@ -79,8 +79,8 @@ int main(void){int i,p,saved;struct network_game remote;
  host_setting="forced_off";CHECK(third_person_host_policy()==2);
  host_setting="bad";CHECK(third_person_host_policy()==0);
  capability=0;current=&remote;preference=1;CHECK(third_person_policy()==2&&!third_person_enabled());
- CHECK(!third_person_match_flags_valid(8)&&third_person_match_flags_valid(7));capability=1;current=NULL;
- for(i=0;i<256;i++)CHECK(!!third_person_match_flags_valid(i)==(i<=23));
+ CHECK(!third_person_match_flags_valid(16)&&third_person_match_flags_valid(15));capability=1;current=NULL;
+ for(i=0;i<256;i++)CHECK(!!third_person_match_flags_valid(i)==(i<=47));
  CHECK(!third_person_match_flags_valid(256));
  for(p=0;p<3;p++)for(i=0;i<2;i++){
   remote.cooperative_flags=(p<<THIRD_PERSON_POLICY_SHIFT)|1;current=&remote;
@@ -94,15 +94,15 @@ int main(void){int i,p,saved;struct network_game remote;
   current=NULL;CHECK(third_person_policy()==0&&third_person_enabled()==preference);
  }
  server_pointer=&host;host.game.cooperative_flags=3;host.state=0;
- network_game_server_port_set_camera_policy(1);CHECK(host.game.cooperative_flags==11&&sends==1);
- network_game_server_port_set_camera_policy(2);CHECK(host.game.cooperative_flags==19&&sends==2);
+ network_game_server_port_set_camera_policy(1);CHECK(host.game.cooperative_flags==19&&sends==1);
+ network_game_server_port_set_camera_policy(2);CHECK(host.game.cooperative_flags==35&&sends==2);
  network_game_server_port_set_camera_policy(-1);network_game_server_port_set_camera_policy(3);
- CHECK(host.game.cooperative_flags==19&&sends==2);
- host.state=1;network_game_server_port_set_camera_policy(0);CHECK(host.game.cooperative_flags==19&&sends==2);
+ CHECK(host.game.cooperative_flags==35&&sends==2);
+ host.state=1;network_game_server_port_set_camera_policy(0);CHECK(host.game.cooperative_flags==35&&sends==2);
  host.state=0;network_game_server_port_set_camera_policy(0);CHECK(host.game.cooperative_flags==3&&sends==3);
  server_pointer=NULL;network_game_server_port_set_camera_policy(1);CHECK(sends==3);
  /* A lobby unlock just before OK must not save the forced display value. */
- current=&remote;remote.cooperative_flags=8;preference=0;saved=writes;
+ current=&remote;remote.cooperative_flags=16;preference=0;saved=writes;
  camera_setting_show(&spinner,&setting);CHECK(spinner.parameters.list.selected_index==1&&setting.loaded_index==NONE);
  setting_changed_save(&spinner,&setting);CHECK(writes==saved&&preference==0);
  remote.cooperative_flags=0;setting_changed_save(&spinner,&setting);CHECK(writes==saved&&preference==0);

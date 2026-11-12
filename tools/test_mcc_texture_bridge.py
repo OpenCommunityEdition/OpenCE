@@ -312,3 +312,39 @@ int main(int argc,char **argv) {
 def test_mcc_texture_bridge(bridge_tool, case):
     result = subprocess.run([str(bridge_tool), case], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, f"{case}: exit {result.returncode}\n{result.stdout}{result.stderr}"
+
+
+@pytest.fixture(scope="module", params=["desktop", "gles", "web"])
+def upload_tool(request, tmp_path_factory):
+    clang = shutil.which("clang")
+    if not clang:
+        pytest.skip("clang is needed for MCC texture upload tests")
+    work = tmp_path_factory.mktemp("mcc-upload-" + request.param)
+    native = (ROOT / "port/linux/src/xbox_textures.c").read_text()
+    header = (ROOT / "port/linux/src/xgpu.h").read_text()
+    source = (ROOT / "tools/tests/mcc_texture_upload.c").read_text()
+    source = source.replace("/* DESCRIPTION */", structure(header, "xgpu_texture_description"))
+    source = source.replace("/* UPLOAD */", function(native, "xgpu_mcc_texture_upload"))
+    path = work / "upload.c"
+    path.write_text(source)
+    binary = work / ("upload.exe" if sys.platform == "win32" else "upload")
+    command = [clang, "-std=gnu89", "-O2", "-Wall", "-Wextra", "-Werror", str(path), "-o", str(binary)]
+    if sys.platform == "win32":
+        command += ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"]
+    else:
+        command += ["-m32"]
+    if request.param != "desktop":
+        command += ["-DHALO_GLES"]
+    if request.param == "web":
+        command += ["-DHALO_WEB"]
+    result = subprocess.run(command, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    return binary
+
+
+@pytest.mark.parametrize("case", ["rgba", "rgba_cube", "rgba_volume", "dxt", "dxt_cube",
+                                  "dxt_volume", "dxt_odd", "dxt_fallback", "dxt_fallback_cube",
+                                  "dxt_twelve", "dxt_tiny"])
+def test_mcc_upload_platform_contract(upload_tool, case):
+    result = subprocess.run([str(upload_tool), case], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, f"{case}: exit {result.returncode}\n{result.stdout}{result.stderr}"

@@ -359,12 +359,12 @@ int main(int argc,char **argv) {
     admission += "\n" + (ROOT / "port/linux/game/mcc_validation.inl").read_text()
     source.write_text(source_code.replace("int main(int argc,char **argv)", "#define fopen mcc_test_fopen\n#define fread mcc_test_fread\n" + admission + "\n#undef fopen\n#undef fread\nint main(int argc,char **argv)"))
     output = work / ("catalog.exe" if sys.platform == "win32" else "catalog")
-    command = [compiler, "-include", str(ROOT / "port/linux/game/mcc_loading.h"), str(ROOT / "tools/mcc_loading_stub.c"), "-std=c99", "-Wall", "-Wextra", "-Werror",
+    command = [compiler, "-include", str(ROOT / "port/linux/game/mcc_loading.h"), str(ROOT / "tools/mcc_loading_stub.c"), "-std=c99", "-Wall", "-Wextra", "-Werror", "-DZ_PREFIX",
                "-I", str(work), "-I", str(ROOT / "port/linux/game"), str(source),
                str(ROOT / "port/linux/game/mcc_maps.c"),
                str(ROOT / "port/linux/game/mcc_workshop.c"),
                str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/src/workshop_collections.c"),
-               str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), "-o", str(output)]
+               str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/third_party/zlib/crc32.c"), "-o", str(output)]
     if sys.platform == "win32":
         command[1:1] = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld", "-D_CRT_SECURE_NO_WARNINGS"]
     result = subprocess.run(command, capture_output=True, text=True)
@@ -830,6 +830,34 @@ def test_missing_campaign_mission_is_not_skipped(catalog_tool, tmp_path, monkeyp
     fields, _ = run(catalog_tool, tmp_path)
     assert fields["next_0"] == "-1|mcc_maps\\Campaign\\missing"
     assert fields["next_1"] == "2|"
+
+
+@pytest.mark.parametrize("candidates", [1, 2])
+def test_downloaded_campaign_does_not_splice_other_snapshots(catalog_tool, tmp_path, monkeypatch, candidates):
+    # The real catalog receives identical ordered metadata for every package.
+    # Even one same-Workshop candidate cannot prove the intended binary version:
+    # campaign JSON names missions but does not contain their gameplay digests.
+    # This is a catalog boundary test, not receipt validation or network testing.
+    first = "dl_" + "1" * 20
+    folders = [first] + ["dl_" + str(i + 2) * 20 for i in range(candidates)]
+    install(tmp_path, {})
+    root = tmp_path / "mcc_maps"
+    (root / "list.txt").write_text("\n".join("/" + name for name in folders))
+    for index, folder in enumerate(folders):
+        package = root / folder
+        package.mkdir()
+        mission = "z10" if index == 0 else "a10"
+        (package / "list.txt").write_text(mission + ".map\n")
+        (package / (mission + ".map")).write_bytes(header(scenario=0, internal=f"revision_{index}"))
+        (package / "workshop_id.txt").write_text("12345\nExample campaign\n")
+    monkeypatch.setenv("TEST_MISSIONS", "z10,a10")
+    fields, maps = run(catalog_tool, tmp_path)
+    assert len(maps) == candidates + 1
+    assert maps[0] == f"mcc_maps\\{first}\\z10|1"
+    assert fields["next_0"] == f"-1|mcc_maps\\{first}\\a10"
+    # The following mission remains available as an individual selection.
+    assert all(name.endswith("\\a10|1") for name in maps[1:])
+    assert all(fields[f"next_{i}"] == "2|" for i in range(1, candidates + 1))
 
 
 def test_workshop_browser_keeps_title_longer_than_filename(catalog_tool, tmp_path):

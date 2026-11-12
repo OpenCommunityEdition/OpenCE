@@ -7,12 +7,24 @@ on:
     paths:
       - "port/linux/game/**"
       - "port/linux/src/**"
+      - "port/linux/include/**"
+      - "port/include/xdk/**"
       - "port/windows/src/win32_steam_workshop.c"
+      - "port/windows/src/win32_posix.c"
+      - "port/windows/include/posix/sys/mman.h"
       - "port/tools/**"
       - "port/third_party/bcdec/**"
       - "source/**"
       - "tools/test_mcc_*.py"
-      - "tools/tests/mcc_share_rules.c"
+      - "tools/test_checkpoint_epoch.py"
+      - "tools/test_join_protocol.py"
+      - "tools/test_windows_mcc_startup.py"
+      - "tools/test_hud_ammo_thresholds.py"
+      - "tools/hud_assets.py"
+      - "tools/linux_sysroot.py"
+      - "tools/windows_build.py"
+      - "port/assets/hud/**"
+      - "tools/tests/mcc_share_*.c"
       - "tools/test_steam_workshop.py"
       - "tools/test_frontend_*.py"
       - "tools/frontend_*.py"
@@ -26,6 +38,7 @@ on:
       - "tools/test_cache_file_formats.py"
       - "tools/harness/**"
       - ".github/workflows/mcc.yml"
+      - ".github/workflows/build.yml"
   pull_request:
   workflow_dispatch:
 
@@ -45,19 +58,39 @@ jobs:
       - name: Install native test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld gcc-multilib python3-pytest python3-numpy python3-pil
+          sudo apt-get install -y clang lld gcc-multilib python3-pytest python3-numpy python3-pil python3-yaml
           python3 -m pip install --only-binary=:all: --target "$RUNNER_TEMP/frontend-python" -r tools/requirements-frontend.txt
           echo "PYTHONPATH=$RUNNER_TEMP/frontend-python" >> "$GITHUB_ENV"
       - name: Check MCC parsing, validation, codecs and existing CE parsing
         run: >-
           python3 -m pytest -q -rP
+          tools/test_mcc_ci.py
+          tools/test_mcc_avoidance.py
+          tools/test_mcc_cameras.py
+          tools/test_mcc_chicago.py
+          tools/test_mcc_damage_tags.py
+          tools/test_mcc_environment_shader.py
+          tools/test_mcc_hud_layout.py
+          tools/test_mcc_hud_mask.py
+          tools/test_mcc_hud_view.py
+          tools/test_mcc_hud_normalization.py
+          tools/test_mcc_movement.py
+          tools/test_mcc_particles.py
+          tools/test_mcc_seats.py
           tools/test_mcc_cache_format.py
           tools/test_mcc_tag_validation.py
           tools/test_mcc_media.py
           tools/test_mcc_resources.py
           tools/test_mcc_validation.py
           tools/test_mcc_share_rules.py
+          tools/test_mcc_share.py
+          tools/test_mcc_share_stage.py
+          tools/test_mcc_share_metadata.py
+          tools/test_mcc_share_storage.py
+          tools/test_mcc_share_menu.py
+          tools/test_mcc_share_game.py
           tools/test_mcc_identity.py
+          tools/test_mcc_admission.py
           tools/test_mcc_workshop.py
           tools/test_steam_workshop.py
           tools/test_mcc_android_importer.py
@@ -66,9 +99,13 @@ jobs:
           tools/test_frontend_multiplayer.py
           tools/test_frontend_navigation.py
           tools/test_frontend_presentation.py
+          tools/test_mcc_metadata_importer.py
           tools/test_mcc_loading.py
+          tools/test_mcc_load_network.py tools/test_mcc_loading_progress.py
           tools/test_mcc_precache.py
           tools/test_mcc_protocol.py
+          tools/test_checkpoint_epoch.py
+          tools/test_join_protocol.py
           tools/test_mcc_bitmap_flags.py
           tools/test_mcc_shader_channels.py
           tools/test_mcc_hud.py
@@ -105,6 +142,57 @@ jobs:
           CC: clang
         run: python3 -m pytest -q tools/test_mcc_previews.py
 
+      - name: Check MCC sharing metadata and receipts with address and undefined-behavior sanitizers
+        env:
+          MCC_SHARE_METADATA_SANITIZE: "1"
+          MCC_SHARE_STORAGE_SANITIZE: "1"
+          CC: clang
+        run: python3 -m pytest -q tools/test_mcc_share_metadata.py tools/test_mcc_share_storage.py
+
+  hud-meter-render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install hidden software-GL test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld cmake ninja-build pkg-config xvfb xauth \
+            libgl1-mesa-dev libgl1-mesa-dri libx11-dev libxext-dev libxcursor-dev \
+            libxi-dev libxfixes-dev libxrandr-dev libxss-dev libxtst-dev python3-numpy python3-pil python3-scipy
+      - name: Build the project's pinned SDL3 for the test host
+        run: |
+          python3 - <<'PY'
+          import io
+          import os
+          from pathlib import Path
+          import tarfile
+          from tools.linux_sysroot import SDL_URLS, SDL_SHA256, SDL_VERSION, download
+          stage = Path(os.environ['RUNNER_TEMP']) / 'mcc-sdl-source'
+          stage.mkdir()
+          with tarfile.open(fileobj=io.BytesIO(download(SDL_URLS, SDL_SHA256))) as archive:
+              archive.extractall(stage, filter='data')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write(f'MCC_SDL_SOURCE={stage / ("SDL3-" + SDL_VERSION)}\n')
+          PY
+      - name: Install SDL3
+        run: |
+          cmake -S "$MCC_SDL_SOURCE" -B "$RUNNER_TEMP/mcc-sdl-build" -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/mcc-sdl" \
+            -DCMAKE_INSTALL_LIBDIR=lib -DSDL_SHARED=ON -DSDL_STATIC=OFF \
+            -DSDL_TEST_LIBRARY=OFF -DSDL_TESTS=OFF -DSDL_WAYLAND=OFF
+          cmake --build "$RUNNER_TEMP/mcc-sdl-build" --parallel 2
+          cmake --install "$RUNNER_TEMP/mcc-sdl-build"
+      - name: Check MCC coverage and fill thresholds through the production shader
+        env:
+          SDL_VIDEO_DRIVER: x11
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          export PKG_CONFIG_PATH="$RUNNER_TEMP/mcc-sdl/lib/pkgconfig"
+          export LD_LIBRARY_PATH="$RUNNER_TEMP/mcc-sdl/lib"
+          # This is a direct runner: pytest would collect no render checks.
+          xvfb-run -a python3 tools/test_mcc_hud_meter_render.py
+
   windows-adapters:
     runs-on: windows-2025
     timeout-minutes: 10
@@ -112,7 +200,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Python test dependencies
         run: |
-          python -m pip install pytest numpy --only-binary=:all: -r tools/requirements-frontend.txt
+          python -m pip install pytest numpy pyyaml --only-binary=:all: -r tools/requirements-frontend.txt
       - name: Check native x86 MCC adapters and legacy isolation
         shell: cmd
         run: |
@@ -121,8 +209,10 @@ jobs:
           call "%MCC_VS_INSTALL%\Common7\Tools\VsDevCmd.bat" -host_arch=x64 -arch=x86
           if errorlevel 1 exit /b 1
           clang --version
+          python -m pytest -q tools/test_mcc_ci.py tools/test_mcc_avoidance.py tools/test_mcc_cameras.py tools/test_mcc_chicago.py tools/test_mcc_damage_tags.py tools/test_mcc_environment_shader.py tools/test_mcc_hud_layout.py tools/test_mcc_hud_normalization.py tools/test_mcc_movement.py tools/test_mcc_particles.py tools/test_mcc_seats.py tools/test_mcc_memory.py tools/test_windows_mcc_startup.py
+          if errorlevel 1 exit /b 1
           python -m pytest -q tools/test_mcc_previews.py tools/test_mcc_preview_menu.py tools/test_mcc_xbox_menu.py tools/test_mcc_progress.py
           if errorlevel 1 exit /b 1
-          python -m pytest -q tools/test_mcc_recordings.py tools/test_mcc_native_smoke.py tools/test_mcc_cache_format.py tools/test_mcc_tag_validation.py tools/test_mcc_media.py tools/test_mcc_resources.py tools/test_mcc_validation.py tools/test_mcc_share_rules.py tools/test_mcc_identity.py tools/test_mcc_workshop.py tools/test_steam_workshop.py tools/test_mcc_loading.py tools/test_mcc_precache.py tools/test_mcc_protocol.py tools/test_mcc_bitmap_flags.py tools/test_mcc_shader_channels.py tools/test_mcc_hud.py tools/test_mcc_vorbis.py tools/test_mcc_texture_bridge.py tools/test_mcc_geometry.py tools/test_mcc_scripts.py tools/test_mcc_campaign.py tools/test_mcc_parameters.py tools/test_mcc_syntax.py tools/test_mcc_maps.py tools/test_mcc_menu.py tools/test_mcc_pause.py tools/test_mcc_pause_runtime.py tools/test_mcc_ui.py tools/test_mcc_ui_network.py tools/test_mcc_ui_teams.py tools/test_mcc_lifecycle.py tools/test_mcc_weapon_camera.py tools/test_mcc_projectiles.py tools/test_mcc_saved_games.py tools/test_mcc_network.py tools/test_mcc_checkpoint.py tools/test_mcc_object_names.py tools/test_mcc_effects_gain.py tools/test_mcc_sprites.py tools/test_mcc_change_colors.py tools/test_mcc_grenades.py tools/test_cache_file_formats.py
+          python -m pytest -q tools/test_mcc_recordings.py tools/test_mcc_native_smoke.py tools/test_mcc_cache_format.py tools/test_mcc_tag_validation.py tools/test_mcc_media.py tools/test_mcc_resources.py tools/test_mcc_validation.py tools/test_mcc_share_rules.py tools/test_mcc_share.py tools/test_mcc_share_stage.py tools/test_mcc_share_metadata.py tools/test_mcc_share_storage.py tools/test_mcc_share_menu.py tools/test_mcc_share_game.py tools/test_mcc_identity.py tools/test_mcc_admission.py tools/test_mcc_workshop.py tools/test_steam_workshop.py tools/test_mcc_loading.py tools/test_mcc_load_network.py tools/test_mcc_loading_progress.py tools/test_mcc_precache.py tools/test_mcc_protocol.py tools/test_checkpoint_epoch.py tools/test_join_protocol.py tools/test_mcc_bitmap_flags.py tools/test_mcc_shader_channels.py tools/test_mcc_hud.py tools/test_mcc_hud_mask.py tools/test_mcc_hud_view.py tools/test_mcc_vorbis.py tools/test_mcc_texture_bridge.py tools/test_mcc_geometry.py tools/test_mcc_scripts.py tools/test_mcc_campaign.py tools/test_mcc_parameters.py tools/test_mcc_syntax.py tools/test_mcc_maps.py tools/test_mcc_menu.py tools/test_mcc_pause.py tools/test_mcc_pause_runtime.py tools/test_mcc_ui.py tools/test_mcc_ui_network.py tools/test_mcc_ui_teams.py tools/test_mcc_lifecycle.py tools/test_mcc_weapon_camera.py tools/test_mcc_projectiles.py tools/test_mcc_saved_games.py tools/test_mcc_network.py tools/test_mcc_checkpoint.py tools/test_mcc_object_names.py tools/test_mcc_effects_gain.py tools/test_mcc_sprites.py tools/test_mcc_change_colors.py tools/test_mcc_grenades.py tools/test_cache_file_formats.py
           if errorlevel 1 exit /b 1
           python -m pytest -q tools/test_frontend_menu.py tools/test_frontend_multiplayer.py tools/test_frontend_navigation.py tools/test_frontend_presentation.py

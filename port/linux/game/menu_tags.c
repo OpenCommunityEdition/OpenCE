@@ -375,6 +375,8 @@ static char const *const port_function_names[] =
 	"port mcc xbox init", "port mcc xbox open", "port mcc xbox choose", "port mcc xbox back",
 	"port mcc xbox left", "port mcc xbox right", "port mcc xbox card",
 	"port mcc xbox profile",
+	"port mcc share download", "port mcc share workshop", "port mcc share cancel", "port mcc share closed",
+	"port mcc downloads open", "port mcc downloads previous", "port mcc downloads next", "port mcc downloads remove",
 	"port pause end game", "port coop friendly fire",
 	"port coop begin", "port coop player 2 list initialize", "port coop player 2",
 	"port lobby open", "port lobby add player", "port lobby join", "port lobby leave",
@@ -442,8 +444,12 @@ static char const *const port_game_data_input_names[] =
 	"port gamepad layout preview",
 	"port controller update",
 	/* (the main menu's Mods) */
+	"port mcc share update", "port mcc share text",
+	"port mcc downloads update", "port mcc downloads text",
 	"port mods update",
 	"port changelog focus update",
+	"port mcc share update", "port mcc share text",
+	"port mcc downloads update", "port mcc downloads text",
 	/* (network co-op's pause menu's FRIENDLY FIRE: its text, ON or OFF) */
 	"port coop friendly fire text",
 	/* (the gametype editor's description, with OPENCE OPTIONS' row) */
@@ -1698,13 +1704,28 @@ static long pause_list_patch(struct cache_file_tag_instance *instances, struct u
 	Xbox's of two rows does, and draws within its bounds) */
 	{
 		short room = (short)(list->bounds.y1 - list->bounds.y0);
-		short column = (short)((count + added - 1) * spacing + model->bounds.y1 - model->bounds.y0);
+		short height = (short)(model->bounds.y1 - model->bounds.y0);
+		short column = (short)((count + added - 1) * spacing + height);
+		short old_column = (short)((count - 1) * spacing + height);
+		short off_centre = (short)(children[0].vertical_offset - (room - old_column) / 2);
 
 		*growth = 0;
-		if (column <= room)
+		if (column <= room && off_centre >= -4 && off_centre <= 4)
 		{
 			for (child = 0; child < count + added; child++)
 				grown[child].vertical_offset = (short)((room - column) / 2 + child * spacing);
+		}
+		else if (column <= room)
+		{
+			/* the map placed its own rows (a staircase, say): they keep their places,
+			and the new buttons follow the same steps */
+			short step = count >= 2 ?
+				(short)(children[count - 1].horizontal_offset - children[count - 2].horizontal_offset) : 0;
+
+			for (child = 0; child < added; child++)
+				grown[quit + child].horizontal_offset = (short)(children[quit].horizontal_offset + child * step);
+			for (child = quit + added; child < count + added; child++)
+				grown[child].horizontal_offset = (short)(children[child - added].horizontal_offset + added * step);
 		}
 		else
 		{
@@ -2832,7 +2853,8 @@ struct pc_menu_setting *pc_menu_setting_get(
 	return NULL;
 }
 
-/* Share the existing widget definition with read-only legend layout. */
+/* Menu layout readers use this module's existing tag definition, not a second
+ * private structure or hard-coded field offsets in the glyph feature. */
 void pc_menu_widget_text_bounds(long tag, rectangle2d *bounds, short *text_offset)
 {
     struct ui_widget_definition const *definition = tag_get(UI_WIDGET_DEFINITION_TAG, tag);

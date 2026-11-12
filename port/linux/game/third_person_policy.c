@@ -13,8 +13,8 @@ int config_write(char const *name, char const *value);
 
 boolean third_person_match_flags_valid(unsigned long flags)
 {
-	/* Bits zero through two are upstream co-op flags; policy value three is reserved. */
-	return !(flags & ~(7UL | (third_person_session_active() ? THIRD_PERSON_POLICY_MASK : 0))) &&
+	/* Bits zero through three are upstream co-op and vehicle riding flags; policy value three is reserved. */
+	return !(flags & ~(15UL | (third_person_session_active() ? THIRD_PERSON_POLICY_MASK : 0))) &&
 		((flags & THIRD_PERSON_POLICY_MASK) >> THIRD_PERSON_POLICY_SHIFT) <= _third_person_forced_off;
 }
 

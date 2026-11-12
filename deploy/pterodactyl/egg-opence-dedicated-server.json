@@ -70,6 +70,26 @@
             "field_type": "text"
         },
         {
+            "name": "Vehicle riding base",
+            "description": "The base setting (network.vehicle_riding); each gametype's riding rule overrides it in multiplayer, and a gametype without the rule is off. A co-op entry's +riding rule or a map's own choice takes precedence.",
+            "env_variable": "HALO_NET_VEHICLE_RIDING",
+            "default_value": "false",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:true,false",
+            "field_type": "text"
+        },
+        {
+            "name": "Override gametype vehicle riding",
+            "description": "True: turns the gametype's override off, so multiplayer uses network.vehicle_riding (server.vehicle_riding_override_gametype). A map's own choice still wins.",
+            "env_variable": "HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE",
+            "default_value": "false",
+            "user_viewable": true,
+            "user_editable": true,
+            "rules": "required|string|in:true,false",
+            "field_type": "text"
+        },
+        {
             "name": "Join password",
             "description": "The password the server browser asks for; empty for none. The invite link joins without it.",
             "env_variable": "HALO_SERVER_PASSWORD",

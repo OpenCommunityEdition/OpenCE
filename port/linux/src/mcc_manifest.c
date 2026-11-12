@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#ifdef HALO_WEB
+#include "../../web/src/web_mcc_storage.h"
+#endif
 
 /* xbox_files.c; only the existing virtual file service crosses this boundary. */
 extern void platform_translate_path(const char *, char *, unsigned long);
@@ -164,6 +167,9 @@ int mcc_manifest_package_root(const char *level, char path[1024])
 	platform_translate_path(request, path, 1024);
 	for (last = path; *last; last++) if (*last == '\\') *last = '/';
 	last = strrchr(path, '/'); if (!last) return 0; *last = 0;
+#ifdef HALO_WEB
+    if (!web_mcc_directory_visible(path)) { path[0]=0; return 0; }
+#endif
 	/* Compare the actual resolution, not just the item id: local overrides
      * must never inherit a different installation's order or titles. */
 	if (steam_workshop_package_folder(package, steam, sizeof(steam)) && equal(path, steam))

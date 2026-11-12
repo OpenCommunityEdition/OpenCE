@@ -179,7 +179,7 @@ BOOL xgpu_mcc_texture_get(DWORD const *resource,D3DCOLOR const *palette,
         }
         if (!entry->texture) {
             GLuint created=0;
-            created=xgpu_texture_name_new();
+            glGenTextures(1,&created);
             if (created && xgpu_mcc_texture_upload(created,entry->target,
                 &entry->description,entry->pixels,entry->bytes,palette)) {
                 entry->texture=created;
@@ -238,7 +238,7 @@ unsigned long mcc_texture_bridge_prepare(void const *bitmap, unsigned long budge
             }
         }
         if (estimate<256*1024 || estimate>budget) return 0;
-        created=xgpu_texture_name_new();
+        glGenTextures(1,&created);
         if (created && xgpu_mcc_texture_upload(created,entry->target,description,entry->pixels,entry->bytes,NULL)) {
             entry->texture=created;entry->palette_present=FALSE;
             return (unsigned long)estimate;

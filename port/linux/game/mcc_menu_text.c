@@ -15,6 +15,8 @@ static boolean field(long tag, short index)
     char const *name, *leaf;
     if (tag == NONE) return FALSE;
     name=tag_get_name(tag); leaf=strrchr(name,'\\'); leaf=leaf ? leaf+1 : name;
+    if (!strcmp(name,"pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\mcc_download\\description") ||
+        !strcmp(name,"pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\network_setup\\mcc_downloads\\description")) return TRUE;
     if (!strncmp(name,"pc\\mcc_xbox\\",12) && !strcmp(leaf,"status")) return TRUE;
     if (!strcmp(leaf,"mcc_folder_name") || !strcmp(leaf,"mcc_folder_help")) return TRUE;
     if (index < MCC_MAPS_FIRST_DISPLAY_INDEX || index >= MCC_MAPS_FIRST_DISPLAY_INDEX+MCC_MAPS_MAXIMUM) return FALSE;

@@ -11,7 +11,7 @@ from harness import function
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def run_c(tmp_path, code):
+def run_c(tmp_path, code, link_math=False):
     compiler = shutil.which('clang')
     if not compiler:
         pytest.skip('clang required')
@@ -19,7 +19,8 @@ def run_c(tmp_path, code):
     binary = tmp_path / 'style.exe'
     source.write_text(code)
     target = ['--target=i686-pc-windows-msvc'] if sys.platform == 'win32' else ['-m32']
-    result = subprocess.run([compiler, *target, '-std=gnu89', '-O1', str(source), '-o', str(binary)],
+    libraries = ['-lm'] if link_math and sys.platform != 'win32' else []
+    result = subprocess.run([compiler, *target, '-std=gnu89', '-O1', str(source), '-o', str(binary), *libraries],
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     subprocess.run([str(binary)], check=True, timeout=10)
@@ -125,7 +126,12 @@ struct rasterizer_dynamic_screen_geometry_parameters {
 };
 static int enabled=1,gems,live,last_asset=-1,draws;
 static short controller_glyph_style(void) {return (short)gems;}
-#define controller_glyph_draw(style,index,icon,cursor,color,unbind) 0
+static boolean controller_glyph_draw(short style, short index,
+    struct icon_hud_element_definition const *icon, rectangle2d *cursor, pixel32 color)
+{
+    (void)style; (void)index; (void)icon; (void)cursor; (void)color;
+    return FALSE;
+}
 #define controller_glyphs_dispose() ((void)0)
 static pixel32 drawn_color;
 static int drawn_blend;

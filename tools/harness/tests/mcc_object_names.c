@@ -20,12 +20,13 @@ typedef unsigned short word;
 #define _error_silent 0
 #define match_assert(a,b,c) do {if(!(c))abort();} while(0)
 #define CHECK(c) do {if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);return 1;}}while(0)
-enum {_game_connection_network_server=1,_game_connection_network_client=2,_distributed_message_mcc_object_names=92,_distributed_to_clients=0};
+enum {_game_connection_network_server=1,_game_connection_network_client=2,_distributed_to_clients=0};
 struct scenario_object_name {char name[32];short runtime_object_type;};
 static struct scenario_object_name definitions[32767];
 struct scenario {struct {long count;void *address;} object_names;};
 struct object_datum {long definition_index;struct {short name_index;long first_child_object_index,next_object_index;} object;};
-struct distributed_message_header {long tick;short type,count;};
+typedef word message_header;
+/* DISTRIBUTED_HEADER */
 static struct scenario scenario;
 static struct object_datum objects[8];
 static long legacy[512],*object_name_list=legacy;
@@ -43,7 +44,7 @@ static long player_index_from_unit_index(long i){(void)i;return NONE;}
 static char const *tag_get_name(long id){(void)id;return "object";}
 static void error(int level,char const *fmt,...){(void)level;(void)fmt;}
 static void distributed_send(void *msg,short type,short count,word size,short dest){
-    if(type!=_distributed_message_mcc_object_names||count!=1||size!=80||dest||sends>=64)abort();
+    if(type!=_distributed_message_mcc_object_names||count!=1||size!=sizeof(struct distributed_message_header)+sizeof(packets[0])||dest||sends>=64)abort();
     memcpy(packets[sends++],(byte *)msg+sizeof(struct distributed_message_header),72);
 }
 long object_index_from_name_index(short name);
@@ -52,6 +53,104 @@ static void object_name_list_delete(long object);
 static long object_new_by_name(short name){long id=++created;object_name_list_new(id,name);return id;}
 static void object_delete(long object){deleted++;object_name_list_delete(object);}
 /* IMPLEMENTATION */
+
+/* Exercise the cache's actual cleanup order; other owners have no allocations
+ * in this names-only fixture. Failed preparation uses the same unload entry. */
+#define mcc_loaded loaded
+static struct {void *tags;unsigned long capacity;} mcc_loaded_cache;
+static FILE *mcc_stream;
+#define mcc_validation_cancel() ((void)0)
+#define mcc_cache_validation_clear() ((void)0)
+#define mcc_cache_precache_clear() ((void)0)
+#define mcc_hud_glyphs_dispose() ((void)0)
+#define mcc_campaign_dispose() ((void)0)
+#define mcc_ui_teams_reset() ((void)0)
+#define mcc_script_threads_dispose() ((void)0)
+#define mcc_checkpoint_dispose() ((void)0)
+#define mcc_grenades_reset() ((void)0)
+#define mcc_parameters_dispose() ((void)0)
+#define mcc_texture_cache_dispose() ((void)0)
+#define mcc_geometry_dispose(runtime) ((void)(runtime))
+#define mcc_audio_dispose(runtime) ((void)(runtime))
+#define mcc_bitmaps_dispose(runtime) ((void)(runtime))
+#define mcc_resources_dispose(runtime) ((void)(runtime))
+#define mcc_validation_dispose(runtime) ((void)(runtime))
+#define mcc_memory_release(address,capacity) ((void)(address),(void)(capacity))
+/* CACHE_UNLOAD */
+
+static int snapshot_case(long count,int invalid)
+{
+    static byte saved[MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM+32];
+    static byte live[MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM];
+    unsigned long bytes=(unsigned long)count*4,i;
+    unsigned long wrong[4];
+    long value,expected;
+    short last=(short)(count-1);
+    scenario.object_names.count=count;
+    object_name_list_clear();
+    object_name_list_new(1,0);object_name_list_new(2,511);object_name_list_new(3,last);
+    object_set_object_index_for_name_index(1,4);
+    memset(saved,0xA5,sizeof(saved));
+    CHECK(mcc_object_names_snapshot(NULL)==bytes);
+    CHECK(mcc_object_names_snapshot(saved+16)==bytes);
+    for(i=0;i<16;i++)CHECK(saved[i]==0xA5&&saved[16+bytes+i]==0xA5);
+    for(i=0;i<(unsigned long)count;i++){
+        memcpy(&value,saved+16+i*4,4);
+        expected=i==0?1:i==1?4:i==511?2:i==(unsigned long)last?3:NONE;
+        CHECK(value==expected&&object_index_from_name_index((short)i)==expected);
+    }
+    if(invalid){
+        /* A rejected older image must not replace any currently live mapping. */
+        object_set_object_index_for_name_index(0,7);
+        CHECK(mcc_object_names_snapshot(live)==bytes);
+        wrong[0]=0;wrong[1]=bytes-1;wrong[2]=bytes+1;wrong[3]=MCC_OBJECT_NAMES_SNAPSHOT_MAXIMUM+4;
+        for(i=0;i<4;i++){
+            CHECK(!mcc_object_names_validate(saved+16,wrong[i]));
+            CHECK(!mcc_object_names_restore(saved+16,wrong[i]));
+        }
+        CHECK(!mcc_object_names_validate(NULL,bytes)&&!mcc_object_names_restore(NULL,bytes));
+        CHECK(!mcc_object_names_validate(NULL,0)&&!mcc_object_names_restore(NULL,0));
+        CHECK(mcc_object_names_snapshot(saved+16)==bytes&&!memcmp(saved+16,live,bytes));
+        CHECK(object_index_from_name_index(0)==7);
+    }else{
+        object_name_list_clear();
+        for(i=0;i<(unsigned long)count;i++)CHECK(object_index_from_name_index((short)i)==NONE);
+        CHECK(mcc_object_names_validate(saved+16,bytes)&&mcc_object_names_restore(saved+16,bytes));
+        CHECK(mcc_object_names_snapshot(live)==bytes&&!memcmp(saved+16,live,bytes));
+        CHECK(object_index_from_name_index(0)==1&&object_index_from_name_index(1)==4);
+        CHECK(object_index_from_name_index(511)==2&&object_index_from_name_index(last)==3);
+    }
+    for(i=0;i<16;i++)CHECK(saved[i]==0xA5&&saved[16+bytes+i]==0xA5);
+    for(i=0;i<512;i++)CHECK(legacy[i]==NONE);
+    return 0;
+}
+
+static int lifecycle_case(char const *kind)
+{
+    long i;
+    scenario.object_names.count=32767;
+    object_name_list_new(1,513);object_name_list_new(2,32766);
+    if(!strcmp(kind,"restart"))object_name_list_clear();
+    else{
+        if(!strcmp(kind,"failed_unload")){
+            loaded=FALSE;
+            CHECK(!mcc_object_names_snapshot(NULL));
+            CHECK(mcc_object_names_validate(NULL,0)&&mcc_object_names_restore(NULL,0));
+            loaded=TRUE;CHECK(object_index_from_name_index(513)==1);
+            loaded=FALSE;
+        }
+        mcc_cache_tags_unload();CHECK(!loaded);
+        mcc_cache_tags_unload();CHECK(!loaded);
+        /* A legacy map still owns its original table after MCC disposal. */
+        scenario.object_names.count=512;
+        object_name_list_new(3,511);CHECK(object_index_from_name_index(511)==3);
+        object_name_list_clear();loaded=TRUE;scenario.object_names.count=32767;
+    }
+    for(i=0;i<32767;i++)CHECK(object_index_from_name_index((short)i)==NONE);
+    object_claim_scenario_name(4,32766);CHECK(object_index_from_name_index(32766)==4);
+    return 0;
+}
+
 int main(int argc,char **argv)
 {
     long i;
@@ -59,9 +158,15 @@ int main(int argc,char **argv)
     CHECK(argc==2);
     scenario.object_names.count=640;scenario.object_names.address=definitions;
     for(i=0;i<32767;i++)definitions[i].runtime_object_type=6;
-    for(i=0;i<8;i++)objects[i].object.first_child_object_index=NONE;
+    for(i=0;i<8;i++){
+        objects[i].object.first_child_object_index=NONE;
+        objects[i].object.name_index=NONE;
+    }
     object_name_list_clear();mcc_object_names_network_reset();
     CHECK(mcc_object_names_entry_size()==72);
+    if(!strncmp(argv[1],"snapshot_",9))return snapshot_case(strtol(argv[1]+9,NULL,10),0);
+    if(!strncmp(argv[1],"invalid_snapshot_",17))return snapshot_case(strtol(argv[1]+17,NULL,10),1);
+    if(!strcmp(argv[1],"restart")||!strcmp(argv[1],"unload")||!strcmp(argv[1],"failed_unload"))return lifecycle_case(argv[1]);
     if(!strcmp(argv[1],"legacy")){
         loaded=0;scenario.object_names.count=512;
         object_name_list_new(1,511);CHECK(object_index_from_name_index(511)==1);
@@ -81,6 +186,11 @@ int main(int argc,char **argv)
         object_name_list_new(1,513);object_set_object_index_for_name_index(638,1);
         object_name_list_delete(1);CHECK(object_index_from_name_index(513)==NONE&&object_index_from_name_index(638)==NONE);
         object_name_list_new(2,513);CHECK(object_index_from_name_index(513)==2);
+        object_set_object_index_for_name_index(1,4);object_set_object_index_for_name_index(639,4);
+        CHECK(objects[4].object.name_index==NONE);
+        object_name_list_delete(4);
+        CHECK(object_index_from_name_index(1)==NONE&&object_index_from_name_index(639)==NONE);
+        CHECK(object_index_from_name_index(513)==2&&objects[4].object.name_index==NONE);
     }else{
         scenario.object_names.count=32767;
         object_name_list_new(1,512);object_name_list_new(2,32766);

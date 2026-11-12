@@ -116,6 +116,24 @@ lifetime rather than only a successful hit.
 
 ## Gameplay authority and feature boundaries
 
+A vehicle controller also produces temporary state. Read `vehicle_update`
+and `update_human_boat_physics` in
+[vehicles.c](../../source/units/vehicles.c), then `physics_update`,
+`physics_compute_new` and `physics_update_old` in
+[physics.c](../../source/physics/physics.c). The powered-point controls are
+local to one tick; authored physics flags determine which controls become
+forces. They are different from persistent object state and from the mass-point
+output array that physics clears. Initializing one does not initialize the other.
+
+The [boat investigation](../mcc_maps.md#shared-engine-investigation-7-november-2026)
+shows why that distinction matters: the shared three-point boat controller
+initializes all three temporary records before assigning its active controls.
+Equivalent accepted Xbox, Custom Edition and MCC inputs receive the same
+correction. This replaces the former MCC initializer without changing authored
+tags or other vehicle controllers. The regression tests exercise both physics
+paths' forces and resulting motion. Matching network agreements exclude older
+legacy peers whose driven-boat prediction still used uninitialized controls.
+
 The host decides network spawns, pickups, damage and deletion. A client
 may predict its own movement while still needing the host's object changes.
 Do not infer ownership from a local object being present. Read the checks

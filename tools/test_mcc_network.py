@@ -6,6 +6,7 @@ import shutil
 import subprocess
 
 import pytest
+from harness import enum_with, structure
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -22,6 +23,9 @@ def mcc_network_tool(tmp_path_factory):
                                if not line.startswith("#include"))
     damage = (ROOT / "port/linux/game/mcc_network_damage.inc").read_text()
     prefix = (ROOT / "tools/harness/tests/mcc_network.c").read_text()
+    distributed = (ROOT / "port/linux/game/network_distributed.h").read_text()
+    prefix = prefix.replace("/* DISTRIBUTED_HEADER */", structure(distributed, "distributed_message_header")
+                            + enum_with(distributed, "_distributed_message_player_prediction"))
     # The packet harness must use the current production snapshot size.
     header = (ROOT / "port/linux/game/mcc_campaign.h").read_text()
     size = re.search(r"^#define MCC_CAMPAIGN_SNAPSHOT_BYTES (\d+)u", header, re.M).group(1)
@@ -133,8 +137,8 @@ int main(void) {
  CHECK(_distributed_message_chat_up == 87);
  CHECK(_distributed_message_chat_down == 88);
  CHECK(_distributed_message_chat_config == 89);
- CHECK(_distributed_message_mcc_grenades == 96);
- CHECK(_distributed_message_mcc_campaign == 97);
+ CHECK(_distributed_message_mcc_grenades == 97);
+ CHECK(_distributed_message_mcc_campaign == 98);
  for (i = 0; i < NUMBER_OF_DISTRIBUTED_MESSAGES; ++i) {
   h.type = i;
   CHECK(!!map_share_handles_message((word *)&h, sizeof(h)) == (i >= 83 && i <= 86));

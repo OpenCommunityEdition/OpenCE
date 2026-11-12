@@ -1,6 +1,3 @@
-> **`online-third-person` branch:** OpenCE Crossplay is the default host mode and disables the optional shoulder camera. GulchCE Third Person sessions require matching camera builds. MCC maps always require compatible GulchCE clients.
-
-
 <p align="center">
   <img width="420" height="420" alt="gulchceopencelogo" src="https://github.com/user-attachments/assets/1787aa2f-3305-4353-8dd4-27d08661f6d4" />
 </p>
@@ -15,16 +12,16 @@
   <a href="https://www.youtube.com/channel/UC9Hn6j6BdKwoyu_hGXdfzvw">check out the youtube</a>
   <br>
   <br>
-  forever <strong>compatible</strong>, for <strong>everyone</strong>
+  built for <strong>Windows, Linux, Android and the web</strong>
 </p>
 <hr>
 
 <h3 align="center">
-GulchCE will always be compatible with OpenCE, so everyone can play together.
+This development branch requires matching GulchCE network builds.
 </h3>
 <br>
 <p align="center">
-Any fork compatible with OpenCE is also compatible with GulchCE. Crossplay galore!
+Shared checkpoint recovery, boat controls and clock recovery require matching simulation agreements.
 </p>
 <br>
 <p align="center">
@@ -55,19 +52,26 @@ release signing is configured, `SHA256SUMS.sig` carries the Ed25519 signature;
 
 The Linux binary release is available on the [AUR](https://aur.archlinux.org/packages/gulchce-bin).
 
-## Will you always stay compatible with OpenCE?
+## Can I play with OpenCE clients?
 
-GulchCE and OpenCE players can play together on Xbox and Custom Edition maps
-in **OpenCE Crossplay** sessions. This branch also offers **GulchCE Third
-Person** sessions, which require matching camera builds. MCC maps require
-compatible GulchCE clients in either session mode.
+This development branch requires matching GulchCE clients on Xbox, Custom
+Edition and MCC maps. Shared checkpoint recovery separates delayed messages
+from a restored player's earlier object handle. Boat controls also require
+matching simulation so hosts and predicting clients use initialized forces.
+Clients also recover small clock delays by running the missing simulation ticks.
+Existing OpenCE 41 clients cannot join these sessions.
 
-This is due to MCC-specific netcode additions that only function when an
-MCC map is being played online. OpenCE clients wouldn't recognise the
-network messages.
+The shared console fix also changes the saved game allocation layout. Older
+cores and checkpoints are refused; start a new map or campaign session with
+this build. Original save files are not migrated. See the
+[console checkpoint walkthrough](docs/reading/console_checkpoints.md).
 
-Once MCC map support is fully ironed out on GulchCE, OpenCE will be asked
-if they would like the MCC map support feature on their own, main repo.
+**GulchCE Standard** keeps the optional shoulder camera disabled. **GulchCE
+Third Person** uses its own matching camera agreement. Recovery works in both
+modes; changing the camera setting does not restore old-client compatibility.
+
+An upstream contribution is planned. Compatibility with a future OpenCE
+release depends on the agreement it adopts and must be validated separately.
 
 ## How do I install MCC maps?
 
@@ -162,6 +166,11 @@ maps need neither set. If a required resource is missing or incompatible,
 GulchCE refuses to load the map and reports what needs attention.
 
 ### Choose a map and play
+
+In the browser build, import Xbox base data first, then use **Custom maps**
+to add CE files or an MCC package folder to the site's private storage.
+See the [browser import guide](port/web/README.md#custom-edition-and-mcc-imports)
+for supported metadata, storage limits and recovery behavior.
 
 - **Modern, Stock and Classic PC:** choose **MCC SINGLEPLAYER** or
   **MCC MULTIPLAYER** in the map selector, then open the package folder and
@@ -258,6 +267,72 @@ Maps that require OpenSauce are not compatible.
 Both the server browser and the LAN browser support automatic map downloads - when you join a game it will download the custom maps from other players, with any of `bitmaps.map`, `sounds.map` and `loc.map` you are missing. This works on a LAN and on the
 Internet, when the host has map sharing enabled (on by default).
 Refer to [docs/custom_edition_caches.md](docs/custom_edition_caches.md).
+
+## MCC maps
+
+OpenCE supports Halo 1 MCC Workshop maps through Steam discovery on Windows/Linux, package imports on Android, or manual installation.
+
+You still need the [Xbox game data](#a-copy-of-halo-combat-evolved-is-required). Obtain any required MCC resources from your own installed copy of Halo 1 in MCC.
+
+### Windows and Linux
+
+1. Subscribe to a Halo 1 MCC Workshop map or campaign and let Steam finish downloading it.
+2. Open **Settings > Network Setup > Map Sharing > MCC Packages**.
+3. Enable **STEAM DISCOVERY**. For campaign mission ordering and progression, also enable **CAMPAIGN MISSIONS**. Both are off by default.
+4. Reopen the map list. Restart OpenCE if the package is missing.
+
+OpenCE reads Workshop packages directly—no copying required, and Steam can be closed while playing. Some maps also need the [shared resources](#shared-mcc-resources) below.
+
+If your Steam library is not detected, set its location under `[paths]` in `config.toml`:
+
+```toml
+[paths]
+steam = 'C:\Steam'
+```
+
+### Android
+
+1. Copy the complete Workshop package folder, or a ZIP of it, to your phone. Find it on your computer under `steamapps/workshop/content/976730/<workshop ID>`.
+2. Keep its maps, resources, JSON files and artwork together.
+3. Quit OpenCE, long-press its launcher icon and select **Import MCC maps**.
+4. Choose **Workshop package**, then **Choose folder** or **Choose ZIP**, and follow the prompts.
+5. Import any required shared resources separately. Enable **CAMPAIGN MISSIONS** in MCC Packages for campaign ordering and progression.
+
+Steam is not needed on Android. See the [Android import guide](port/android/README.md#importing-mcc-packages).
+
+### Manual installation
+
+Create a folder such as `mcc_maps/MercuryRising` beside your existing `maps` and `custom_maps` folders.
+
+- Place the package’s level `.map` files directly inside it.
+- Keep any supplied `bitmaps.map` and `sounds.map` beside those levels. **Do not mix resources from different packages.**
+- Keep the package’s JSON files and PNG previews, preserving their metadata and image subfolders.
+- Enable **CAMPAIGN MISSIONS** for campaign ordering and progression.
+
+Map-only packages are valid, but copying only the maps from a complete package loses its metadata features. See the [package layout guide](docs/mcc_maps.md#installation-and-menus).
+
+### Shared MCC resources
+
+Some maps need MCC’s standard resources. Copy these files once into your game data folder:
+
+| File in your MCC installation | Destination in OpenCE |
+| --- | --- |
+| `halo1/maps/bitmaps.map` | `mcc_maps/_shared/singleplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/bitmaps.map` | `mcc_maps/_shared/multiplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/sounds.map` | `mcc_maps/_shared/multiplayer/sounds.map` |
+
+**Use MCC’s files, not those from a standalone Custom Edition installation.** Steam discovery does not install these resources. On Android, use the **Singleplayer shared resources** and **Multiplayer shared resources** import options.
+
+Keep package-supplied resources inside their package folder; they take priority over shared resources. Self-contained maps need no shared files. OpenCE reports missing or incompatible resources when loading.
+
+### MCC map support disclaimer
+
+Halo 1 MCC version-13 packages use an independent loader and `mcc_maps` root.
+The stock menus support package selection, optional campaign missions, previews
+and host-only downloads when both host and client opt in. Desktop Workshop
+discovery, Android package imports and browser imports keep package resources
+separate from Xbox and Custom Edition data. Retail game data is not distributed.
+See the [MCC reading guide](docs/reading/README.md) for setup, limits and evidence.
 
 ## Mods
 

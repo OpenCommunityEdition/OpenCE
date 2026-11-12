@@ -75,7 +75,7 @@ struct allocation {struct allocation *next;size_t bytes;unsigned long pad[2];};
 static struct allocation *allocations;
 static unsigned malloc_calls,live_allocations,fail_malloc;
 static unsigned gpu_calls,gpu_live,fail_gpu;
-static unsigned published;
+static unsigned published,gpu_deleted,gpu_changed,restored,logs;
 static boolean active=TRUE,null_renderer;
 static int connection;
 static int borrowed_failure;
@@ -134,11 +134,12 @@ void hud_hires_register_placeholder(long a,unsigned long const *p){
 }
 int config_boolean(char const *name){assert(!strcmp(name,"network.coop_own_friendly_fire"));return TRUE;}
 char const *config_string(char const *name){assert(!strcmp(name,"display.menus"));return "pc";}
-void platform_log(char const *format,...){assert(format);}
+void platform_log(char const *format,...){assert(format);logs++;}
 void *cache_files_tag_instances(long *count){*count=live_count;return live_table;}
 void cache_files_set_tag_instances(void *instances,long count) {
     assert(instances&&count>=2);
     if(instances!=original_table){assert(live_table==original_table&&mcc_pause_tag_count()>24);published++;}
+    if(instances==original_table)restored++;
     live_table=instances;live_count=count;
 }
 static boolean rasterizer_bitmap_new(struct bitmap_data *bitmap) {
@@ -154,7 +155,7 @@ static boolean rasterizer_bitmap_new(struct bitmap_data *bitmap) {
     gpu_live++;return TRUE;
 }
 static void rasterizer_bitmap_changed(struct bitmap_data *bitmap) {
-    assert(bitmap->base_address&&(bitmap->hardware_format||null_renderer));check_guards();
+    assert(bitmap->base_address&&(bitmap->hardware_format||null_renderer));check_guards();gpu_changed++;
 }
 static void rasterizer_bitmap_delete(struct bitmap_data *bitmap) {
     unsigned stage;
@@ -162,7 +163,7 @@ static void rasterizer_bitmap_delete(struct bitmap_data *bitmap) {
     for(stage=0;stage<D3DTSS_MAXSTAGES;stage++)if(device.textures[stage]==bitmap->hardware_format) {
         fputs("texture header released while still bound\n",stderr);exit(88);
     }
-    test_free(bitmap->hardware_format);bitmap->hardware_format=NULL;gpu_live--;
+    test_free(bitmap->hardware_format);bitmap->hardware_format=NULL;gpu_live--;gpu_deleted++;
 }
 #define malloc test_malloc
 #define free test_free
@@ -187,7 +188,11 @@ static void setup(void) {
     device.textures[3]=&scenario; /* An unrelated texture identity must survive. */
 }
 static int clean(void) {
+    unsigned textures=gpu_live,deletions=gpu_deleted,restores=restored;
+    boolean table_published=live_table!=original_table;
     mcc_pause_runtime_unload();
+    CHECK(gpu_deleted==deletions+textures&&restored==restores+table_published);
+    CHECK(null_renderer ? !gpu_deleted : gpu_changed==gpu_deleted);
     CHECK(live_table==original_table&&live_count==2&&!live_allocations&&!gpu_live&&!mcc_pause_tag_count());
     CHECK(!device.textures[0]&&!device.textures[1]&&!device.textures[2]&&device.textures[3]==&scenario);
     CHECK(!placeholders[0]&&!placeholders[1]);
@@ -280,7 +285,7 @@ int main(int argc,char **argv) {
     }
     if(!strcmp(argv[1],"inactive")) {
         active=FALSE;CHECK(!mcc_pause_runtime_load());
-        CHECK(!malloc_calls&&!gpu_calls&&!published&&!mcc_pause_runtime_active());
+        CHECK(!malloc_calls&&!gpu_calls&&!published&&!logs&&!mcc_pause_runtime_active());
         CHECK(mcc_pause_runtime_screen(1,TRUE)==NONE);CHECK(!clean());return 0;
     }
     if(!strcmp(argv[1],"fonts")) {
@@ -296,6 +301,7 @@ int main(int argc,char **argv) {
         live_count=-1;CHECK(!mcc_pause_runtime_load()&&!published&&!live_allocations);setup();
         live_count=63001;CHECK(!mcc_pause_runtime_load()&&!published&&!live_allocations);setup();
         live_table=NULL;CHECK(!mcc_pause_runtime_load()&&!published&&!live_allocations);setup();
+        CHECK(logs==3);
         CHECK(!clean());return 0;
     }
     if(!strcmp(argv[1],"art-bounds")) {
@@ -314,9 +320,11 @@ int main(int argc,char **argv) {
     }
     if(!strcmp(argv[1],"null-renderer"))null_renderer=TRUE;
     CHECK(mcc_pause_runtime_load());calls=malloc_calls;textures=gpu_calls;
+    CHECK(gpu_changed==textures&&logs==1);
     CHECK(!inventory());
     if(!strcmp(argv[1],"publish")) {
         CHECK(mcc_pause_runtime_load()&&published==1&&malloc_calls==calls&&gpu_calls==textures);
+        CHECK(gpu_changed==textures&&logs==1);
         CHECK(mcc_pause_runtime_screen(1,TRUE)!=NONE);
     } else if(!strcmp(argv[1],"pixels")||!strcmp(argv[1],"null-renderer")) {
         CHECK(!pixel_check());

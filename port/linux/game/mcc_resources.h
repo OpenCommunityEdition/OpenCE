@@ -10,6 +10,9 @@ struct mcc_resource_check *mcc_resources_check_begin(char const *name,
     struct mcc_cache_source const *source, char *reason, size_t size);
 int mcc_resources_check_step(struct mcc_resource_check *check, uint32_t *checksum,
     unsigned char digest[32]);
+/* Selected virtual paths belong to this check's validated references. Empty
+ * entries mean the map does not use that resource kind. */
+int mcc_resources_check_paths(struct mcc_resource_check const *check, char paths[2][128]);
 void mcc_resources_check_end(struct mcc_resource_check *check);
 int mcc_resources_select(struct mcc_runtime *runtime, void *raw);
 int mcc_resources_checksum(struct mcc_runtime *runtime, unsigned mask, uint32_t *checksum);

@@ -410,11 +410,13 @@ def test_mcc_owned_pixels_survive_pressure_without_legacy_cache(tmp_path):
         pytest.skip("clang is needed for MCC bitmap ownership tests")
     bitmap = (ROOT / "port/linux/game/mcc_bitmaps.c").read_text()
     declarations = "\n".join(structure(bitmap, n) for n in ["mcc_texture", "mcc_bitmap_clone", "mcc_textures"])
-    routines = "\n".join(function(bitmap, n) for n in ["mcc_bitmaps_valid", "mcc_bitmaps_pixels", "mcc_bitmaps_dispose"])
+    routines = "\n".join(function(bitmap, n) for n in [
+        "mcc_bitmap_valid_texture", "mcc_bitmaps_valid", "mcc_bitmaps_pixels", "mcc_bitmaps_dispose"])
     source = r'''
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "halo_port_capacity.h"
 #define FALSE 0
 #define NONE (-1)
@@ -424,15 +426,39 @@ struct bitmap_data {
     void *base_address;
 };
 struct mcc_runtime {void *bitmaps;};
+static int verify_calls,size_calls;
 static int bitmap_verify(struct bitmap_data *bitmap,int import) {
     (void)import;
+    verify_calls++;
     return bitmap->width==2048 && bitmap->height==2048 && bitmap->depth==1 &&
         bitmap->format==11 && bitmap->mipmap_count==11;
 }
 static long rasterizer_xbox_bitmap_get_pixel_data_size(struct bitmap_data *bitmap) {
-    (void)bitmap;return 22369664;
+    (void)bitmap;size_calls++;return 22369664;
 }
 ''' + declarations + '\n' + routines + r'''
+static void check_lookup(struct mcc_runtime *runtime,struct bitmap_data *bitmap,
+    struct mcc_texture const *expected,int verify_count,int size_count) {
+    struct bitmap_data before;
+    uint32_t bytes=123;
+    int coverage=99;
+    void const *pixels;
+    if(bitmap)memcpy(&before,bitmap,sizeof(before));
+    verify_calls=size_calls=0;
+    pixels=mcc_bitmaps_pixels(runtime,bitmap,&bytes,&coverage);
+    assert(pixels==(expected ? expected->pixels : NULL));
+    assert(bytes==(expected ? expected->size : 0));
+    assert(coverage==(expected ? expected->channels==4 : 0));
+    assert(verify_calls==verify_count && size_calls==size_count);
+    if(bitmap)assert(!memcmp(bitmap,&before,sizeof(before)));
+    /* valid requires a runtime; pixels also accepts a missing runtime. */
+    if(runtime) {
+        verify_calls=size_calls=0;
+        assert(mcc_bitmaps_valid(runtime,bitmap)==(expected!=NULL));
+        assert(verify_calls==verify_count && size_calls==size_count);
+        if(bitmap)assert(!memcmp(bitmap,&before,sizeof(before)));
+    }
+}
 int main(void) {
     enum {count=13,chain_bytes=22369664};
     struct bitmap_data bitmaps[count],copy;
@@ -460,35 +486,58 @@ int main(void) {
         unsigned char const *pixels=mcc_bitmaps_pixels(&runtime,&bitmaps[n],&bytes,NULL);
         if(pixels!=items[n].pixels || bytes!=chain_bytes || pixels[0]!=n || pixels[bytes-1]!=255-n)return 3;
     }
+    /* Descriptor identity, validation order and failure outputs are part of
+     * the binding contract, including a rejected first duplicate entry. */
+    for(i=0;i<count;i++)check_lookup(&runtime,&bitmaps[i],&items[i],1,1);
+    check_lookup(NULL,&bitmaps[0],NULL,0,0);
+    check_lookup(&runtime,NULL,NULL,0,0);
+    copy=bitmaps[0];
+    check_lookup(&runtime,&copy,NULL,0,0);
     {
-        int coverage=99;
-        items[0].channels=4;
-        if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,&coverage)!=items[0].pixels || coverage!=1)return 15;
-        items[0].channels=1;
-        if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,&coverage)!=items[0].pixels || coverage)return 16;
-        coverage=99;copy=bitmaps[0];
-        if(mcc_bitmaps_pixels(&runtime,&copy,&bytes,&coverage) || coverage || bytes)return 17;
-        coverage=99;
-        if(mcc_bitmaps_pixels(NULL,&bitmaps[0],&bytes,&coverage) || coverage || bytes)return 18;
+        struct mcc_textures foreign_textures={0};
+        struct mcc_texture foreign_item=items[0];
+        struct mcc_runtime foreign_runtime;
+        foreign_item.bitmap=&copy;
+        foreign_textures.items=&foreign_item;foreign_textures.count=1;
+        foreign_runtime.bitmaps=&foreign_textures;
+        check_lookup(&foreign_runtime,&bitmaps[0],NULL,0,0);
     }
-    copy=bitmaps[0];bytes=123;
-    if(mcc_bitmaps_pixels(&runtime,&copy,&bytes,NULL) || bytes)return 4;
-    bitmaps[0].tag_index++;bytes=123;
-    if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,NULL) || bytes)return 5;
-    bitmaps[0]=copy;bitmaps[0].pixels_offset++;bytes=123;
-    if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,NULL) || bytes)return 6;
-    bitmaps[0]=copy;bitmaps[0].pixels_size--;bytes=123;
-    if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,NULL) || bytes)return 7;
-    bitmaps[0]=copy;bitmaps[0].width=0;bytes=123;
-    if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,NULL) || bytes)return 8;
-    bitmaps[0]=copy;items[0].size=bitmaps[0].pixels_size=chain_bytes-1;bytes=123;
-    if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,NULL) || bytes)return 9;
+    {
+        unsigned char *owned_pixels=items[0].pixels;
+        items[0].pixels=NULL;
+        check_lookup(&runtime,&bitmaps[0],NULL,0,0);
+        items[0].pixels=owned_pixels;
+    }
+    bitmaps[0].tag_index++;
+    check_lookup(&runtime,&bitmaps[0],NULL,0,0);
+    bitmaps[0]=copy;bitmaps[0].pixels_offset++;
+    check_lookup(&runtime,&bitmaps[0],NULL,0,0);
+    bitmaps[0]=copy;bitmaps[0].pixels_size--;
+    check_lookup(&runtime,&bitmaps[0],NULL,0,0);
+    bitmaps[0]=copy;bitmaps[0].width=0;
+    check_lookup(&runtime,&bitmaps[0],NULL,1,0);
+    bitmaps[0]=copy;items[0].size=bitmaps[0].pixels_size=chain_bytes-1;
+    check_lookup(&runtime,&bitmaps[0],NULL,1,1);
     items[0].size=bitmaps[0].pixels_size=chain_bytes;
+    {
+        struct mcc_texture duplicates[2]={items[0],items[0]};
+        struct mcc_textures duplicate_textures={0};
+        struct mcc_runtime duplicate_runtime;
+        duplicate_textures.items=duplicates;duplicate_textures.count=2;
+        duplicate_runtime.bitmaps=&duplicate_textures;
+        duplicates[0].handle++;
+        check_lookup(&duplicate_runtime,&bitmaps[0],NULL,0,0);
+        duplicates[0]=items[0];duplicates[1].channels=4;
+        check_lookup(&duplicate_runtime,&bitmaps[0],&duplicates[0],1,1);
+    }
+    items[0].channels=4;
+    check_lookup(&runtime,&bitmaps[0],&items[0],1,1);
+    items[0].channels=1;
+    check_lookup(&runtime,&bitmaps[0],&items[0],1,1);
     if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],NULL,NULL)!=items[0].pixels)return 10;
-    bytes=123;if(mcc_bitmaps_pixels(NULL,&bitmaps[0],&bytes,NULL) || bytes)return 11;
-    bytes=123;if(mcc_bitmaps_pixels(&runtime,NULL,&bytes,NULL) || bytes)return 12;
-    runtime.bitmaps=NULL;bytes=123;
-    if(mcc_bitmaps_pixels(&runtime,&bitmaps[0],&bytes,NULL) || bytes)return 13;
+    if(mcc_bitmaps_pixels(&runtime,&copy,NULL,NULL))return 11;
+    runtime.bitmaps=NULL;
+    check_lookup(&runtime,&bitmaps[0],NULL,0,0);
     for(i=0;i<count;i++)free(items[i].pixels);
     {
         struct mcc_textures *owned=calloc(1,sizeof(*owned));

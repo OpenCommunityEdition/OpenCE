@@ -80,7 +80,7 @@ static short controller_glyph_asset_index(short style, short slot)
     return (short)(32 + family * 10 + slot - 4);
 }
 
-/* PC legends and modern footers share the registered artwork with gameplay. */
+/* Menu and gameplay draws must share the one placeholder registered per asset. */
 struct bitmap_data *controller_glyph_bitmap(short style, short slot, real_rectangle2d *uv)
 {
     short key = controller_glyph_asset_index(style, slot);
@@ -128,9 +128,9 @@ static boolean controller_glyph_draw_internal(short style, short index,
     if (key == NONE) return FALSE;
     entry = &controller_glyph_assets[key];
     bitmap = controller_glyph_bitmap(style, slot, &uv);
-    /* A menu allocation may acquire an MCC binding on a later gameplay draw. */
-    if (bitmap && unbind) controller_glyph_cache[key].unbind = unbind;
     if (!bitmap) return FALSE;
+    /* Cached artwork can acquire an external binding on a later draw. */
+    if (unbind) controller_glyph_cache[key].unbind = unbind;
     scale = local_player_count() > 1 ? 0.75f : 1.0f;
     cell_width = (slot < 6 ? 21.0f : slot < 8 ? 44.0f : 32.0f) * scale;
     cell_height = (slot < 6 ? 26.0f : slot < 8 ? 33.0f : 34.0f) * scale;
@@ -171,7 +171,7 @@ static boolean controller_glyph_draw_internal(short style, short index,
     return TRUE;
 }
 
-boolean controller_glyph_draw(short style, short index,
+boolean controller_glyph_draw_with_release(short style, short index,
     struct icon_hud_element_definition const *icon, rectangle2d *cursor, pixel32 color,
     void (*unbind)(unsigned long const *))
 {
@@ -183,4 +183,10 @@ boolean controller_glyph_draw_menu(short style, short index, rectangle2d *cursor
     struct icon_hud_element_definition icon;
     memset(&icon, 0, sizeof(icon));
     return controller_glyph_draw_internal(style, index, &icon, cursor, color, NULL, TRUE);
+}
+
+boolean controller_glyph_draw(short style, short index,
+    struct icon_hud_element_definition const *icon, rectangle2d *cursor, pixel32 color)
+{
+    return controller_glyph_draw_with_release(style, index, icon, cursor, color, NULL);
 }

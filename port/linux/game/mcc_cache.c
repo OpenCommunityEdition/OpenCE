@@ -203,18 +203,6 @@ unsigned long mcc_cache_checksum(char const *name)
     return checksum;
 }
 
-int mcc_content_probe(char const *name,unsigned char digest[32])
-{
-    struct mcc_cache_identity identity;
-    struct mcc_cache_source source;
-    FILE *stream=mcc_open(name,&source,&identity);
-    int ok;
-    if (!stream) return 0;
-    ok=mcc_resources_fingerprint_probe(name,&source,digest);
-    fclose(stream);
-    return ok;
-}
-
 boolean mcc_cache_present(char const *name, unsigned long checksum, char *message, long size)
 {
     struct mcc_cache_identity identity;
@@ -374,7 +362,7 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
             (unsigned long)(runtime->capacity >> 20), strerror(errno));
         problem = memory_problem;
         snprintf(runtime->failure,sizeof(runtime->failure),
-            "The memory address range needed by this MCC map is unavailable. Restart GulchCE and try again.");
+            "The memory address range needed by this MCC map is unavailable. Restart OpenCE and try again.");
         goto failed;
     }
     memcpy(runtime->tags, raw, identity.tag_data_size);

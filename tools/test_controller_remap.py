@@ -363,7 +363,8 @@ def test_generated_controller_submenu_and_stock_keyboard_menu():
     modern = ET.fromstring(frontend_menu.document())
     row = modern.find("widget[@name='modern/controls/row_gamepad']")
     assert row.find("on[@event='a']").get('run') == 'port frontend editor'
-    assert 'Camera Perspective' in frontend_menu.EDITORS[2][1][2]
+    gamepad_editor = next(editor for editor in frontend_menu.EDITORS[2] if editor[0] == 'gamepad')
+    assert 'Camera Perspective' in gamepad_editor[2]
 
 
 def test_profile_fallback_context_and_viewport_prompt_mapping(tmp_path):

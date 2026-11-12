@@ -32,7 +32,7 @@ symbols in this file:
 
 #include "tag_files/tag_files.h"
 #include "custom_edition_maps.h"
-#include "mcc_maps.h"
+#include "mcc_maps.h" /* port: port/linux/game/mcc_maps.h */
 
 #define MULTIPLAYER_GAME_TEXT_TAG_NAME "ui\\multiplayer_game_text"
 #define FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING 36
@@ -214,8 +214,8 @@ static wchar_t *fallback_string(long tag_index, short string_index)
 {
 	char const *tag_name = tag_get_name(tag_index);
 	short fallback_index = string_index - FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING;
-	/* MCC owns a separate display-index range; existing map lookups below
-	are unchanged for every Xbox and Custom Edition index. */
+	/* port: MCC's maps have display indices of their own; those of the Xbox's
+	and Custom Edition's maps are looked up as before */
 	if (string_index >= MCC_MAPS_FIRST_DISPLAY_INDEX &&
 		string_index < MCC_MAPS_FIRST_DISPLAY_INDEX + MCC_MAPS_MAXIMUM)
 	{

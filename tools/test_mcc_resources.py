@@ -5,9 +5,88 @@ import struct
 import subprocess
 import sys
 import hashlib
+import zlib
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+ZLIB = ROOT / "port/third_party/zlib"
+
+
+def identity_fixture(mask, resource_size, seed):
+    from test_mcc_cache_format import resource_dependency_map, TAG_OFFSET, BASE, fourcc
+    data = resource_dependency_map("snd!" if mask == 2 else "bitm", int(bool(mask)), 4)
+    struct.pack_into("<I", data, TAG_OFFSET + (0x898 if mask == 2 else 0x818), 16)
+    if mask == 3:
+        # Add a separately owned sound tag beside the existing bitmap tag.
+        sound = resource_dependency_map("snd!")
+        data.extend(bytes(0x200))
+        data[TAG_OFFSET+0x940:TAG_OFFSET+0xB00] = sound[TAG_OFFSET+0x740:TAG_OFFSET+0x900]
+        for offset, value in {8: len(data), 20: 0xB00, TAG_OFFSET+12: 4,
+                              TAG_OFFSET+0x9DC: BASE+0xA00,
+                              TAG_OFFSET+0xA40: BASE+0xA50,
+                              TAG_OFFSET+0xA98: 16}.items():
+            struct.pack_into("<I", data, offset, value)
+        for index, name in enumerate((0xD0, 0xD5, 0xD9)):
+            struct.pack_into("<I", data, TAG_OFFSET+40+index*32+16, BASE+name)
+        data[TAG_OFFSET+0xD0:TAG_OFFSET+0xDD] = b"scnr\0bsp\0res\0"
+        struct.pack_into("<8I", data, TAG_OFFSET+136, fourcc("snd!"), 0xFFFFFFFF, 0xFFFFFFFF,
+                         0xE1770003, BASE+0xD9, BASE+0x940, 0, 0)
+    struct.pack_into("<I", data, 0x64, seed)
+    resources = {}
+    for kind in (1, 2):
+        if not mask & (1 << (kind-1)):
+            continue
+        names = b"res_0\0" if kind == 1 else b"res__0__0\0"
+        blob = struct.pack("<4I", kind, 20, 20+len(names), 1) + b"data" + names + struct.pack("<3I", 0, 4, 16)
+        resources[kind] = blob + (bytes(range(256))*((resource_size-len(blob)+255)//256))[:resource_size-len(blob)]
+    return data, resources
+
+
+@pytest.mark.parametrize("mask,seed,size", [
+    (0, 0, 0), (0, 0xFFFFFFFF, 0), (0, 0x89ABCDEF, 0),
+    (1, 0, 16383), (2, 0x80000000, 16384), (3, 0xFFFFFFFF, 16385),
+    (1, 0x89ABCDEF, 32767), (2, 0, 32768), (3, 0x80000000, 32769),
+    (1, 0x89ABCDEF, 65535), (2, 0, 65536), (3, 0x80000000, 65537),
+    (1, 0xFFFFFFFF, 131071), (2, 0x89ABCDEF, 131072), (3, 0, 131073),
+    # This seed produces CRC zero after the first complete resource. Only the
+    # final published value is remapped, never a value chained into file two.
+    (1, 0x9484ECB9, 32768), (3, 0x9484ECB9, 32768),
+])
+def test_crc_framing_seed_and_chunk_boundaries(resource_tool, tmp_path, mask, seed, size):
+    data, resources = identity_fixture(mask, size, seed)
+    folder = tmp_path / "mcc_maps/package"
+    folder.mkdir(parents=True)
+    path = folder / "a10.map"
+    path.write_bytes(data)
+    expected = seed
+    framed = b"GulchCE MCC content v1" + struct.pack("<BQ", 0, len(data)) + data
+    for kind, resource in resources.items():
+        (folder / ("bitmaps.map" if kind == 1 else "sounds.map")).write_bytes(resource)
+        expected = zlib.crc32(bytes([kind]) + resource + b"\xff", expected)
+        if seed == 0x9484ECB9 and kind == 1:
+            assert expected == 0
+        framed += struct.pack("<BQ", kind, len(resource)) + resource
+    result = subprocess.run([str(resource_tool), "incremental_crc", str(path), "mcc_maps/package/a10"],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    checksum, digest = result.stdout.split()
+    assert int(checksum) == (expected or 1)
+    assert digest == hashlib.sha256(framed).hexdigest()
+
+
+def test_incremental_read_failure_does_not_publish_partial_identity(resource_tool, tmp_path):
+    data, _ = identity_fixture(0, 0, 0x89ABCDEF)
+    data.extend(bytes(4*1024*1024+131075))
+    struct.pack_into("<I", data, 8, len(data))
+    folder = tmp_path / "mcc_maps/package"
+    folder.mkdir(parents=True)
+    path = folder / "a10.map"
+    path.write_bytes(data)
+    result = subprocess.run([str(resource_tool), "incremental_failure", str(path), "mcc_maps/package/a10"],
+                            cwd=tmp_path, capture_output=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    framed = b"GulchCE MCC content v1" + struct.pack("<BQ", 0, len(data)) + data
+    assert result.stdout.decode() == hashlib.sha256(framed).hexdigest()
 
 
 @pytest.mark.parametrize("kind", [0, 1, 2])
@@ -18,8 +97,10 @@ def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_pa
     name = b"res_0\0" if kind == 1 else b"res__0__0\0"
     offset = 0x818 if kind == 1 else 0x898
     struct.pack_into("<I", data, TAG_OFFSET+offset, 16)
-    resource = bytearray(struct.pack("<4I", kind, 20, 20+len(name), 1)+b"abcd"+name+
-                         struct.pack("<3I", 0, 4, 16))
+    names = name + b"unrelated\0"
+    # Identity covers the original bytes, including an unsorted directory.
+    resource = bytearray(struct.pack("<4I", kind, 24, 24+len(names), 2)+b"abcdefgh"+names+
+                         struct.pack("<6I", len(name), 4, 20, 0, 4, 16))
     resource.extend(bytes(range(256))*32768)  # More than one bounded validation slice.
     filename = "bitmaps.map" if kind == 1 else "sounds.map"
     def digest(package):
@@ -55,8 +136,8 @@ def test_sha256_covers_complete_map_and_required_resources(resource_tool, tmp_pa
         assert digest("client") == original
 
 
-@pytest.fixture(scope="module")
-def resource_tool(tmp_path_factory):
+@pytest.fixture(scope="module", params=["native", "web-reader"])
+def resource_tool(tmp_path_factory, request):
     clang = shutil.which("clang")
     if not clang:
         pytest.skip("clang required")
@@ -74,8 +155,9 @@ def resource_tool(tmp_path_factory):
 #include <string.h>
 #include <stdlib.h>
 void error(short level,const char *format,...) {(void)level;(void)format;}
+static int fail_read;
 static int read_map(void *context,uint32_t offset,uint32_t size,void *out) {
-    return !fseek(context,(long)offset,SEEK_SET) && fread(out,1,size,context)==size;
+    return !fail_read && !fseek(context,(long)offset,SEEK_SET) && fread(out,1,size,context)==size;
 }
 int main(int argc,char **argv) {
     struct mcc_runtime runtime={0};unsigned char bytes[32]={0};int ok;
@@ -88,19 +170,46 @@ int main(int argc,char **argv) {
         printf("%s",reason);
         return ok==atoi(argv[3]) ? 0 : 9;
     }
-    if(argc==4 && !strcmp(argv[1],"incremental")) {
+    if(argc==4 && (!strcmp(argv[1],"incremental") || !strcmp(argv[1],"incremental_crc") ||
+                  !strcmp(argv[1],"incremental_failure"))) {
         struct mcc_cache_source source;struct mcc_resource_check *check;
-        uint32_t sum,expected;unsigned i,steps=0;char reason[320];
+        uint32_t sum=0x12345678,expected;unsigned i,steps=0;char reason[320];
         FILE *f=fopen(argv[2],"rb");if(!f)return 8;
         fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
-        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 10;
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));
+        if(!check){fprintf(stderr,"%s",reason);return 10;}
         /* Cancelling a partial check releases only its own resources. */
-        mcc_resources_check_step(check,&sum,bytes);mcc_resources_check_end(check);
+        memset(bytes,0xA5,sizeof(bytes));
+        ok=mcc_resources_check_step(check,&sum,bytes);
+        if(!ok) {
+            if(sum!=0x12345678)return 13;
+            for(i=0;i<sizeof(bytes);i++)if(bytes[i]!=0xA5)return 14;
+        }
+        if(!strcmp(argv[1],"incremental_failure")) {
+            if(ok)return 15;
+            fail_read=1;
+            if(mcc_resources_check_step(check,&sum,bytes)!=-1 || sum!=0x12345678)return 16;
+            for(i=0;i<sizeof(bytes);i++)if(bytes[i]!=0xA5)return 17;
+            fail_read=0;
+        }
+        mcc_resources_check_end(check);
         check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));if(!check)return 11;
         do {ok=mcc_resources_check_step(check,&sum,bytes);steps++;} while(!ok && steps<100);
         mcc_resources_check_end(check);
         if(ok!=1 || !mcc_resources_probe(argv[3],&source,&expected) || sum!=expected)return 12;
-        fclose(f);for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
+        fclose(f);
+        if(!strcmp(argv[1],"incremental_crc"))printf("%u ",sum);
+        for(i=0;i<32;i++)printf("%02x",bytes[i]);return 0;
+    }
+    if(argc==4 && !strcmp(argv[1],"selected")) {
+        struct mcc_cache_source source;struct mcc_resource_check *check;char paths[2][128],reason[320];
+        FILE *f=fopen(argv[2],"rb");if(!f)return 8;
+        fseek(f,0,SEEK_END);source.size=(uint64_t)ftell(f);source.context=f;source.read=read_map;
+        check=mcc_resources_check_begin(argv[3],&source,reason,sizeof(reason));
+        if(!check){fprintf(stderr,"%s",reason);fclose(f);return 10;}
+        ok=mcc_resources_check_paths(check,paths);mcc_resources_check_end(check);fclose(f);
+        if(!ok)return 11;
+        printf("%s\n%s\n",paths[0],paths[1]);return 0;
     }
     if(argc==4 && !strcmp(argv[1],"fingerprint")) {
         struct mcc_cache_source source;unsigned i;
@@ -148,36 +257,52 @@ int main(int argc,char **argv) {
 ''')
     exe = work / "resources.exe"
     target = ["--target=i686-pc-windows-msvc", "-fuse-ld=lld"] if sys.platform == "win32" else []
+    # Select the production browser reader without substituting browser
+    # filesystem services into these native, asset-free fixtures.
+    reader = work / "resources.o"
+    compile_target = ["--target=i686-pc-windows-msvc"] if sys.platform == "win32" else []
+    web = ["-DHALO_WEB"] if request.param == "web-reader" else []
+    result = subprocess.run([clang] + compile_target + web + ["-std=gnu89", "-Wall", "-Wextra", "-Werror",
+        "-D_CRT_SECURE_NO_WARNINGS", "-DZ_PREFIX", "-I"+str(ZLIB), "-I"+str(ROOT / "port/linux/game"),
+        "-I"+str(work), "-c", str(ROOT / "port/linux/game/mcc_resources.c"), "-o", str(reader)],
+        capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
     # Match the game's GNU89 mode, including libc's snprintf declaration on Linux.
-    result = subprocess.run([clang] + target + [str(ROOT / "tools/mcc_loading_stub.c"), "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-D_CRT_SECURE_NO_WARNINGS", "-I"+str(ROOT / "port/linux/game"),
-                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(ROOT / "port/linux/game/mcc_resources.c"), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), "-o", str(exe)], capture_output=True, text=True)
+    result = subprocess.run([clang] + target + [str(ROOT / "tools/mcc_loading_stub.c"), "-std=gnu89", "-Wall", "-Wextra", "-Werror", "-D_CRT_SECURE_NO_WARNINGS", "-DZ_PREFIX", "-I"+str(ZLIB), "-I"+str(ROOT / "port/linux/game"),
+                    "-I"+str(work), str(source), str(ROOT / "port/linux/game/mcc_package.c"), str(reader), str(ROOT / "port/linux/game/mcc_errors.c"), str(ROOT / "port/linux/game/mcc_sha256.c"), str(ROOT / "port/linux/game/mcc_cache_format.c"), str(ZLIB / "crc32.c"), "-o", str(exe)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return exe
 
 
-def fixture_blob(kind=2):
+def fixture_blob(kind=2, reverse=False):
     names = b"sound\\test__0__0\0second\0"
-    # Deliberately reverse the directory's offset order.
+    entries = [(17, 4, 20), (0, 4, 16)]
+    if reverse:
+        entries.reverse()
     return bytearray(struct.pack("<4I", kind, 24, 24+len(names), 2) + b"abcdefgh" + names +
-                     struct.pack("<6I", 17, 4, 20, 0, 4, 16))
+                     b"".join(struct.pack("<3I", *entry) for entry in entries))
 
+@pytest.mark.parametrize("reverse", [False, True], ids=["descending-offsets", "ascending-offsets"])
 @pytest.mark.parametrize("case", ["valid", "bitmap", "prefix", "wrong_name", "wrong_type", "truncated",
     "metadata_overlap", "past_end", "names_outside", "unterminated", "large_count", "inner_offset",
-    "too_long", "missing", "ce_only", "wrap_offset", "relocated", "relocated_prefix", "ambiguous"])
-def test_resource_reader(resource_tool, tmp_path, case):
+    "too_long", "missing", "ce_only", "wrap_offset", "relocated", "relocated_prefix", "ambiguous",
+    "equal_offsets", "duplicate_equal_offsets"])
+def test_resource_reader(resource_tool, tmp_path, case, reverse):
     folder = tmp_path / ("custom_maps" if case == "ce_only" else "mcc_maps")
     folder.mkdir()
     kind = 1 if case == "bitmap" else 2
-    blob = fixture_blob(kind)
-    expected = case in {"valid", "bitmap", "prefix", "inner_offset", "relocated"}
+    blob = fixture_blob(kind, reverse)
+    expected = case in {"valid", "bitmap", "prefix", "inner_offset", "relocated", "equal_offsets"}
     offset, length, name = 16, 4, r"sound\test__0__0"
     index = struct.unpack_from("<I", blob, 8)[0]
+    other_entry = index + (12 if reverse else 0)
+    target_entry = index + (0 if reverse else 12)
     if case == "wrong_name": name = "different"
     if case == "wrong_type": struct.pack_into("<I", blob, 0, 1)
     if case == "truncated": blob = blob[:-1]
-    if case == "metadata_overlap": struct.pack_into("<I", blob, index+20, 24)
+    if case == "metadata_overlap": struct.pack_into("<I", blob, target_entry+8, 24)
     if case == "past_end": struct.pack_into("<I", blob, 8, 0x7fffffff)
-    if case == "names_outside": struct.pack_into("<I", blob, index, 0xffffffff)
+    if case == "names_outside": struct.pack_into("<I", blob, other_entry, 0xffffffff)
     if case == "unterminated": blob[24:index] = b"x"*(index-24)
     if case == "large_count": struct.pack_into("<I", blob, 12, 0xffffffff)
     if case == "inner_offset": offset = 17
@@ -188,7 +313,10 @@ def test_resource_reader(resource_tool, tmp_path, case):
     if case == "relocated_prefix": offset, length = 20, 2
     if case == "ambiguous":
         offset = 18
-        struct.pack_into("<I", blob, index, 0)
+        struct.pack_into("<I", blob, other_entry, 0)
+    if case in {"equal_offsets", "duplicate_equal_offsets"}:
+        struct.pack_into("<I", blob, other_entry+8, 16)
+        if case == "duplicate_equal_offsets": struct.pack_into("<I", blob, other_entry, 0)
     if case != "missing": (folder / ("bitmaps.map" if kind == 1 else "sounds.map")).write_bytes(blob)
     result = subprocess.run([str(resource_tool), str(kind), name, str(offset), str(length), str(int(expected))],
                             cwd=tmp_path, capture_output=True, timeout=10)
@@ -230,6 +358,7 @@ def test_package_fingerprints_cover_contents_not_paths(resource_tool, tmp_path):
         assert result.returncode == 0, result.stderr
         return int(result.stdout)
     initial = checksum("one/a10")
+    assert initial == (zlib.crc32(b"\x02" + fixture_blob() + b"\xff", 1234) or 1)
     assert initial == checksum("two/a10")
     assert initial != checksum("one/a10", "1235")
     blob = fixture_blob()
@@ -307,15 +436,17 @@ def test_effective_resources_determine_fingerprint(resource_tool, tmp_path):
 
 
 @pytest.mark.parametrize("kind,suffix", [(1, "__pixels"), (2, "__permutations")])
+@pytest.mark.parametrize("reverse", [False, True], ids=["directory-order", "reversed-directory"])
 @pytest.mark.parametrize("case", ["whole", "slice", "past_end", "before", "wrong_group", "duplicate", "member_conflict"])
-def test_standard_grouped_payloads(resource_tool, tmp_path, kind, suffix, case):
+def test_standard_grouped_payloads(resource_tool, tmp_path, kind, suffix, case, reverse):
     root = tmp_path / "mcc_maps"
     (root / "package").mkdir(parents=True)
     group = "tag"+suffix
-    names = (group+"\0member\0").encode()
-    entries = [(0, 8, 16)]
+    names = (group+"\0member\0unrelated\0").encode()
+    entries = [(len(group)+8, 4, 20), (0, 8, 16)]
     if case == "duplicate": entries.append((0, 8, 16))
     if case == "member_conflict": entries.append((len(group)+1, 1, 16))
+    if reverse: entries.reverse()
     blob = struct.pack("<4I", kind, 24, 24+len(names), len(entries))+b"abcdefgh"+names
     blob += b"".join(struct.pack("<3I", *entry) for entry in entries)
     (root / ("bitmaps.map" if kind == 1 else "sounds.map")).write_bytes(blob)
@@ -408,3 +539,34 @@ def test_shared_set_selection(resource_tool, tmp_path, kind, case):
                                  cwd=tmp_path, capture_output=True, timeout=10)
         assert override.returncode == 0
         assert override.stdout == result.stdout
+
+
+@pytest.mark.parametrize("mask,location,invalid", [
+    (0, "package", True), (1, "package", False), (2, "package", False),
+    (3, "package", False), (1, "root", False), (2, "shared", False),
+    (1, "root", True),
+])
+def test_selected_resource_paths_follow_validated_references(resource_tool, tmp_path, mask, location, invalid):
+    data, resources = identity_fixture(mask, 80, 0)
+    package = tmp_path / "mcc_maps/package"
+    package.mkdir(parents=True)
+    path = package / "a10.map"
+    path.write_bytes(data)
+    selected = package if location == "package" else tmp_path / ("mcc_maps" if location == "root" else "mcc_maps/_shared/singleplayer")
+    selected.mkdir(parents=True, exist_ok=True)
+    expected = ["", ""]
+    for kind, resource in resources.items():
+        filename = "bitmaps.map" if kind == 1 else "sounds.map"
+        (selected / filename).write_bytes(resource)
+        expected[kind-1] = (selected / filename).relative_to(tmp_path).as_posix()
+    if invalid:
+        # An unused invalid sibling is irrelevant; a used override is authoritative.
+        (package / "bitmaps.map").write_bytes(b"invalid package override")
+    result = subprocess.run([str(resource_tool), "selected", str(path), "mcc_maps/package/a10"],
+                            cwd=tmp_path, capture_output=True, text=True, timeout=10)
+    if invalid and mask:
+        assert result.returncode != 0
+        assert "invalid" in result.stderr.lower()
+    else:
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.splitlines() == expected

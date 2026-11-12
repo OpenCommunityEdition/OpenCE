@@ -74,7 +74,7 @@ def test_semantic_actions_live_rebinds_secondary_unbound_and_custom_icons(tmp_pa
 #define TRUE 1
 #define FALSE 0
 #define NONE -1
-typedef unsigned long pixel32;
+typedef unsigned int pixel32;
 typedef struct {short x0,y0,x1,y1;}rectangle2d;
 static struct {short local_player_index;} test_player={0};
 static int enabled=1,seen=-1,calls,absent;
@@ -85,8 +85,8 @@ static int keyboard_prompt_enabled(short port){return enabled&&port==0;}
 static int halo_keyboard_binding_label(int action,int slot,char *out,unsigned int size){
  (void)size;seen=action;if(absent==2 || (absent==1&&slot==0))return 0;strcpy(out,binding);return 1;
 }
-static void keyboard_glyph_draw(char const *s,rectangle2d *r,pixel32 c,int menu){
- (void)c;assert(!menu);strcpy(drawn,s);r->x0+=24;calls++;
+static void keyboard_glyph_draw(char const *s,rectangle2d *r,pixel32 c,int menu){assert(!menu);
+ (void)c;strcpy(drawn,s);r->x0+=24;calls++;
 }
 ''' + actions + function(source,'keyboard_hud_action') + function(source,'keyboard_hud_prompt') + r'''
 int main(void){
@@ -266,4 +266,32 @@ int main(void){rectangle2d r={0};real_rectangle2d ink;
  assert(text_scale==1.5f&&text_scale_origin_x==17&&text_scale_origin_y==23&&text_offset_x==2&&text_offset_y==3);
  rasterizer_draw_unicode_string_scaled_offset(&r,L"",.85f,.25f,-.5f);
  assert(text_scale==1.5f&&text_scale_origin_x==17&&text_scale_origin_y==23&&text_offset_x==2&&text_offset_y==3);return 0;}
+''')
+
+
+def test_keyboard_labels_read_actual_binding_cache(tmp_path):
+    text = (ROOT / 'port/linux/src/xinput_sdl.c').read_text()
+    body = function(text, 'halo_keyboard_binding_label')
+    run_c(tmp_path, r'''
+#include <assert.h>
+#include <string.h>
+#include <stdio.h>
+#define NUMBER_OF_HALO_KEYBOARD_ACTIONS 2
+#define MAXIMUM_BINDINGS 2
+static int bindings[2][2]={{4,5},{-1,6}},reads;
+static void bindings_read(void) {reads++;}
+static void halo_input_name(int input,char *name,unsigned int size) {snprintf(name,size,"%s",input==4?"Z":input==5?"Mouse Left":"Wheel Up");}
+static void halo_input_shown_name(char const *name,char *shown,unsigned int size) {snprintf(shown,size,"%s",!strcmp(name,"Z")?"Y":name);}
+''' + body + r'''
+int main(void) {
+    char label[64];
+    assert(halo_keyboard_binding_label(0,0,label,sizeof(label))&&!strcmp(label,"Y"));
+    assert(halo_keyboard_binding_label(0,1,label,sizeof(label))&&!strcmp(label,"Mouse Left"));
+    assert(!halo_keyboard_binding_label(1,0,label,sizeof(label))&&!label[0]);
+    assert(halo_keyboard_binding_label(1,1,label,sizeof(label))&&!strcmp(label,"Wheel Up"));
+    bindings[0][0]=5;assert(halo_keyboard_binding_label(0,0,label,sizeof(label))&&!strcmp(label,"Mouse Left"));
+    assert(reads==5);assert(!halo_keyboard_binding_label(-1,0,label,sizeof(label))&&!label[0]);
+    assert(!halo_keyboard_binding_label(0,2,label,sizeof(label))&&!label[0]);
+    assert(!halo_keyboard_binding_label(0,0,0,0));return 0;
+}
 ''')

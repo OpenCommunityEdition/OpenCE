@@ -16,7 +16,7 @@ static pixel32 drawn_color;
 #define bitmap_group_get(index) (&test_group)
 #define local_player_count() players
 #define config_boolean(name) FALSE
-#define controller_glyph_draw(a,b,c,d,e,f) FALSE
+#define controller_glyph_draw_with_release(a,b,c,d,e,f) FALSE
 #define mcc_hud_button_index(icon) 0
 #define mcc_hud_button_bitmap(index) (replacement ? &test_bitmap : NULL)
 #define draw_unicode_string_capital_middle(cursor,text) 80

@@ -22,7 +22,7 @@ def pause_tool(tmp_path_factory):
         pytest.skip("clang is needed for the MCC pause builder tests")
     work = tmp_path_factory.mktemp("mcc-pause")
     native = (ROOT / "source/interface/ui_widget.c").read_text()
-    wrap_hook_start = native.index("\n\t{\n\t\textern boolean mcc_pause_text_wrap_needed(long);")
+    wrap_hook_start = native.index("\n\t{\n\t\tif (mcc_pause_text_wrap_needed")
     # Extract only the MCC-owned block, not adjacent optional frontend hooks.
     wrap_hook_end = native.index("\n\t}\n", wrap_hook_start) + len("\n\t}")
     wrap_hook = native[wrap_hook_start:wrap_hook_end]

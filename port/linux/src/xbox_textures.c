@@ -1141,6 +1141,12 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 #ifdef HALO_GLES
 	decode_compressed = description->compressed && !xgpu_capabilities.s3tc;
 #endif
+#ifdef HALO_WEB
+	/* WebGL S3TC accepts only 2D faces with block-aligned dimensions.
+	 * Decode other MCC shapes before uploading them as ordinary RGBA. */
+	decode_compressed |= description->compressed &&
+		(target == GL_TEXTURE_3D || (description->width & 3) || (description->height & 3));
+#endif
 	converted = description->compressed && !decode_compressed ? NULL : malloc(largest * sizeof(unsigned long));
 	if (!converted && !(description->compressed && !decode_compressed))
 	{
@@ -1150,8 +1156,8 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 	}
 	glBindTexture(target, texture);
 	xgpu_gl_state_invalidate();
-	/* the channel of the texels each channel is sampled from, set on every
-	upload: a texture object can be reused for other texels */
+	/* WebGL has no texture swizzle; converted channels are ordered below. */
+#ifndef HALO_WEB
 	{
 		GLint channels[4] = { GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA };
 
@@ -1170,6 +1176,7 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 		glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, channels[2]);
 		glTexParameteri(target, GL_TEXTURE_SWIZZLE_A, channels[3]);
 	}
+#endif
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, (GLint)description->levels - 1);
@@ -1208,6 +1215,19 @@ BOOL xgpu_mcc_texture_upload(GLuint texture, GLenum target, const struct xgpu_te
 					free(converted);
 					return FALSE;
 				}
+#ifdef HALO_WEB
+				/* Decoders produce ARGB words (BGRA bytes). Change only our
+				 * upload buffer, including every mip and volume slice. */
+				{
+					unsigned long texel, count = (unsigned long)width * height * depth;
+					for (texel = 0; texel < count; texel++)
+					{
+						unsigned long value = converted[texel];
+						converted[texel] = (value & 0xff00ff00UL) |
+							((value >> 16) & 0xffUL) | ((value & 0xffUL) << 16);
+					}
+				}
+#endif
 				if (target == GL_TEXTURE_3D)
 					glTexImage3D(image_target, (GLint)level, GL_RGBA8, width, height, depth, 0, GL_BGRA, GL_UNSIGNED_BYTE, converted);
 				else
@@ -1367,6 +1387,15 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 {
 	*target = entry->target;
 	*description = entry->description;
+
+	/* port: a Custom Edition bitmap whose Size word gives sides that are
+	any uncompressed linear bitmap: sampled with normalized
+	coordinates like any other texture, not in texels as an Xbox's linear
+	texture is. Decoding keeps the entry's own description (its pitch). */
+	if (entry->description.linear && !entry->description.compressed)
+	{
+		description->linear = FALSE;
+	}
 	/* (the high-res text's atlas, for its placeholder bitmap: text_hires.h) */
 	{
 		GLuint atlas = text_hires_atlas_texture(entry->data);
@@ -1457,25 +1486,36 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	struct xgpu_texture_description *description)
 {
 	GLuint mcc_texture;
-	if (xgpu_mcc_texture_get(resource, palette, &mcc_texture, target, description))
-		return mcc_texture;
-
-	DWORD data = resource[1], format_word = resource[3], size_word = resource[4];
-	struct texture_entry **bucket = &texture_buckets[bucket_index(data, format_word, size_word)];
+	DWORD data, format_word, size_word;
+	struct texture_entry **bucket;
 	struct texture_entry *entry;
 	unsigned long generation;
-	BOOL palettized = ((format_word & D3DFORMAT_FORMAT_MASK) >> D3DFORMAT_FORMAT_SHIFT) == 0x0b;
-	unsigned long hash = palettized ? palette_hash(palette) : 0;
+	BOOL palettized;
+	unsigned long hash;
 
 	struct texture_entry *oldest_variant = NULL;
 	unsigned long variant_count = 0;
 	static int no_cache = -1;
-	unsigned long recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
-	unsigned long watch_serial = memory_watch_serial();
+	unsigned long recent;
+	unsigned long watch_serial;
 #ifdef HALO_ANDROID
 	unsigned long ce_bytes;
-	const void *ce_pixels = android_texture_fixes ? android_ce_texture_pixels(resource, &ce_bytes) : NULL;
-	const void *ce_resource = ce_pixels ? resource : NULL;
+	const void *ce_pixels;
+	const void *ce_resource;
+#endif
+
+	/* Registered MCC headers bypass the native texture and memory-watch caches. */
+	if (xgpu_mcc_texture_get(resource, palette, &mcc_texture, target, description))
+		return mcc_texture;
+	data = resource[1]; format_word = resource[3]; size_word = resource[4];
+	bucket = &texture_buckets[bucket_index(data, format_word, size_word)];
+	palettized = ((format_word & D3DFORMAT_FORMAT_MASK) >> D3DFORMAT_FORMAT_SHIFT) == 0x0b;
+	hash = palettized ? palette_hash(palette) : 0;
+	recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
+	watch_serial = memory_watch_serial();
+#ifdef HALO_ANDROID
+	ce_pixels = android_texture_fixes ? android_ce_texture_pixels(resource, &ce_bytes) : NULL;
+	ce_resource = ce_pixels ? resource : NULL;
 #endif
 
 	/* (a texture that is not palettized has the one entry, until one is

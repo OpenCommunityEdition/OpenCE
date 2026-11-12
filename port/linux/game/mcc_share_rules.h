@@ -1,6 +1,5 @@
-/* Preliminary offer policy only; no files, network or download admission.
- * Hand-placed packages only for this phase. Eligibility is not a statement
- * about redistribution rights or the safety of map bytes. */
+/* Host-established eligibility for local and Workshop MCC packages.
+ * Content origin alone establishes neither permission nor byte safety. */
 #ifndef MCC_SHARE_RULES_H
 #define MCC_SHARE_RULES_H
 #include <stddef.h>
@@ -24,7 +23,6 @@ enum mcc_share_reason {
     MCC_SHARE_NOT_A_PACKAGE,       /* a loose map: never offered */
     MCC_SHARE_SHARED_RESOURCES,    /* the _shared resource folder: never offered */
     MCC_SHARE_STOCK,               /* identified stock content: never offered */
-    MCC_SHARE_WORKSHOP,            /* a Workshop item: the joiner is pointed to Steam */
     MCC_SHARE_UNKNOWN_ORIGIN,      /* the origin cannot be read: treated as unknown, not offered */
     MCC_SHARE_UNKNOWN_CONTENT      /* no classification or fingerprint: not offered */
 };
@@ -43,7 +41,7 @@ struct mcc_share_package {
 
 enum mcc_share_reason mcc_share_decide(struct mcc_share_package const *package);
 int mcc_share_eligible(struct mcc_share_package const *package);
-/* A short stable word for logs and tests, such as "workshop". */
+/* A short stable word for logs and tests, such as "not-opted-in". */
 char const *mcc_share_reason_word(enum mcc_share_reason reason);
 /* Preliminary resource leaf allowlist, not file validation or path containment.
  * Buffers must contain the declared number of readable bytes; no terminator

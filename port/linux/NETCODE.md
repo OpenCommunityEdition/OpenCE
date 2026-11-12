@@ -16,7 +16,14 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   client no longer runs only the ticks the host has sent. A client's clock
   starts with the host's first game update and takes the host's time from
   it (at a game's start as at a late join), so every machine reads the
-  game's timers alike.
+  game's timers alike. A smaller delay after a stall is recovered by running
+  extra simulation ticks toward a validated reliable host timestamp. Each
+  frame runs at most as many extra ticks as its normal time budget, with the
+  existing cap of 30 total ticks. Fractional frame time is preserved; the
+  target is never extrapolated. Paused, held and menu clocks do not catch up,
+  and MCC's host-approved speed still controls the normal budget. Initial
+  synchronization and the existing clock jump for deficits over 30 ticks
+  retain their separate paths.
 - **Own player predicted.** A client drives its own player (and the
   vehicle it drives) from its local input at once. Remote players are
   driven by the inputs the host relays every tick, the latest one held
@@ -46,6 +53,19 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     position and power as it changes: a client puts its device where the
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
+
+  The scripts' looping sounds (music, ambience, a cutscene's music and
+  dialogue) are resent every two seconds, so a machine that joins hears
+  them. The resends of one that plays once (a fake impulse looping sound)
+  say how many milliseconds ago the host started it (the event's `target`),
+  and a machine that starts it from a resend starts it there
+  (`coop_sound_sync.c`): a start sound that has played out is skipped, the
+  part playing starts at the permutation and block that time falls in, and a
+  sound that has played out does not start. Each machine still picks its own
+  pitches and permutations. A start with no time (`NONE`: the scripts' own
+  start, and every start from a host built before this) plays from the
+  beginning, and a client built before this ignores the time, so neither
+  needs a new network version.
 
   Script actions naming player0 also reach the players beyond player1.
   They use the same reverse datum order as the script's `(players)` list,
@@ -84,19 +104,63 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   threads' wake times along with it. The object, device and name syncs
   bring the clients up to date.
 
-  In GulchCE Third Person sessions, checkpoint loading retains the host's current session
+  Checkpoint loading retains the host's current session
   roster (`network_coop_restore_players`), before rebuilding view and input
   caches. Saved players who left lose their restored units and remain quit;
   current players missing from the save are created in their authoritative
   slots and use the normal co-op spawn rules. The machine-to-player table
   is rebuilt too: it lives outside the checkpoint, whose datum identifiers
   may differ. This fixes restores after reconnects, with either camera perspective.
-  OpenCE Crossplay retains the upstream checkpoint behavior.
   If an authoritative sample says a unit is alive but the client's copy is
   dead, the client requests the existing full object description, with the
   existing retry backoff and host rate limit. A validated create replaces
   that dead co-op copy instead of reusing it. This also handles a restored
   object keeping its checkpoint handle; no client decides to resurrect it.
+  Recovery is independent of camera mode. Each distributed gameplay header
+  carries the host's checkpoint epoch, a 32-bit world generation outside the
+  saved game. It advances on new maps and host reverts, including two restores
+  at the same tick. Before any fresh object descriptions, the host sends a
+  reliable checkpoint boundary to every loaded client. Only this exact,
+  nonbatched host message can advance a client's epoch. Old-generation damage,
+  object descriptions, inventories, input and prediction are refused before
+  clock or gameplay processing. New-generation datagrams that overtake the
+  boundary are also refused; their periodic updates arrive again.
+
+  Until the reliable snapshot end marker arrives, clients accept only its
+  ordered object descriptions and ordinary inventories. Gameplay sends are
+  held too, so surviving old replicas cannot generate new-world predictions
+  or hit reports during a partial snapshot. Client chat/vote actions during
+  that brief interval are not sent. The snapshot includes empty ordinary
+  inventories, which the normal periodic sender eventually stops repeating.
+  MCC extra grenade slots retain their separate periodic snapshots. The end
+  marker establishes ordering, not successful construction of every object;
+  failed creations retain the existing retry path. Only the first validated
+  description of a slot in an epoch may reconstruct an old corpse: a later
+  resend cannot revive a unit already killed in the current world.
+
+  Client simulation continues during transfer. On the first validated ordered
+  end marker for the current epoch, `distributed_message_epoch_valid` retires
+  client projectiles and delayed gameplay effects created while the snapshot
+  was incomplete, clears queued hits through `network_damage_new_game`, and
+  resets provisional input, prediction and send histories through
+  `distributed_reset_checkpoint_state(FALSE)` before ordinary gameplay messages
+  resume. Already applied objects and inventories remain intact. Sender and per-message receive
+  times also remain, so older same-epoch datagrams cannot overwrite the ordered
+  snapshot. Duplicate end markers do not erase current gameplay or its histories.
+
+  Adoption clears transient prediction, death, inventory, animation, input and
+  queued-effect histories. Client projectiles from the discarded prediction
+  and delayed effects capable of damage/object creation are deleted through
+  their normal lifecycle; host checkpoint projectiles and effects are
+  preserved. Existing live replicas and identity tracking remain, so a valid
+  description rebuilds a corpse without replacing healthy units unnecessarily.
+  Connection identity, authority and the current roster survive. A late joiner's
+  reliable ready request may carry epoch zero; the rate-limited snapshot reply
+  supplies the current boundary first. Duplicate boundaries do not reset state.
+  The [checkpoint regression](../../tools/test_coop_checkpoint_recovery.py) and
+  [dispatcher regression](../../tools/test_checkpoint_epoch.py) cover the earlier
+  dead-replica and old-life-kill failures. Actual runtime checks and their limits
+  are recorded in the [Milestone 10 fix evidence](../../docs/mcc_refactor_validation.md#stage-10-shared-checkpoint-recovery-fix).
 
   The host's EXTRA ENEMIES (`coop_enemies.c`, `network.coop_enemies_mode`)
   give each squad of enemies a level places more of itself: PER PLAYER, a
@@ -181,146 +245,46 @@ A host's game advertisement says that it plays this netcode. A client does
 not join a host that does not (one of network version 4 built before the
 lockstep netcode was removed, set to play it): it tells the player why.
 
-## GulchCE crossplay boundary
+## OpenCE network agreement
 
-Xbox and Custom Edition sessions use OpenCE network version 41, pinned to
-OpenCommunityEdition/OpenCE commit `c507cb26b6ea7e89c7669fb7c911e27b80d5d779`.
-This is an explicit protocol baseline, not automatic compatibility with future
-OpenCE releases. Do not change the base version without auditing its wire format,
-simulation rules and admission behavior and testing unmodified upstream clients.
-The pinned fixture and settings-prefix check are in `tools/test_mcc_protocol.py`.
+OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
+version 43 (below, "Versions") replaces it.
+Advertisements and ordinary join requests carry this one version; mismatched
+versions are rejected before admission. There is no separate MCC capability
+envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
+102 remain unused. The historical version-41 record is retained as a test fixture,
+not a crossplay promise.
 
-The f2597b70 merge retains upstream's protocol 39: Force Team Spawns uses
-one reserved options byte without moving the settings prefix. CTF kill
-scoring and Multi-Hill use existing variant storage; the host decides scores
-and spawns. Multi-Hill appends extra hill IDs to its engine-state payload
-only when several hills are active. Both peers need this implementation for
-the new multi-hill presentation; an unchanged version number alone does not
-establish support for that optional mode. MCC admission and its separate
-protocol remain unchanged. The pinned fixture is upstream's complete
-manifest; the combined manifest retains the MCC entries.
+Every settings transfer sends the complete shared `network_game` record, including
+the two 32-byte MCC digests (zero for Xbox/CE). The reassembler pins its total size,
+checks offsets and the terminated map name, and clears interrupted staging before
+accepting another record. MCC identity resolution and content validation remain
+MCC-owned and run only for MCC map names.
 
-The 22947203 integration was checked on Windows against official OpenCE
-build 309. Xbox Blood Gulch passed both host/client directions. Custom Edition
-Death Island passed with GulchCE hosting and with OpenCE hosting a movement
-run. An earlier CE pickup probe diverged during its forced startup teleports;
-that evidence is retained separately. MCC Mercury Falling admitted two peers
-with different package folder names and reached gameplay. Its comparator had
-only one matching gameplay second, so this is a co-op smoke check rather than
-full synchronization coverage. Public internet transport was not validated on
-this Windows host; the native/browser harness requires Unix path handling.
+The distributed header adds a checkpoint epoch. The host controls checkpoint
+recovery; stale updates from an earlier epoch cannot mutate the restored world.
+Shared co-op recovery restores the current roster and resets replica state.
+Small client-clock deficits recover through bounded actual simulation ticks.
 
-The OpenCE 36 integration was checked on Windows against the official build
-of the pinned commit. Xbox Blood Gulch passed in both host/client directions
-(Slayer and Gun Game, with shooting and pickups). Custom Edition Death Island
-passed with the OpenCE host. The log comparator found no divergent seconds.
-MCC Mercury Falling admitted two GulchCE peers with different package folder
-names and synchronized its opening sequence; the short run did not provide
-enough on-foot samples for the comparator's full drift verdict. These checks
-do not establish full campaign or public internet transport compatibility.
+Scripted player poses carry five signed-16-bit direction vectors (30 bytes) for
+desired facing/aim/look and current aim/look, plus suspension in the unit flags.
+The host sends this extension when input is inhibited or a unit is suspended.
+Clients validate the entire extension (a pose that is not unit vectors is
+left out, the unit's other state and the message's other units kept); normal
+input keeps local prediction and omits the vectors. Matching position does
+not suppress orientation correction.
 
-MCC sessions use separate MCC protocol version 65 for camera-relative projectile
-simulation. Version 64 reserves bytes
-64-127 of the 128-byte MCC map name for advisory Workshop metadata. Valid MCC
-paths occupy at most 63 characters plus their NUL. The tail contains `WS`,
-record version 1, a 1-20 digit item id and NUL, then an ASCII title and NUL;
-the remaining bytes are zero. The title is at most 39 characters. Missing or
-malformed metadata falls back to the fingerprint diagnostic. The metadata
-never substitutes for the level filename or SHA-256 admission checks.
+Version 42 also requires initialized three-point boat controls and the corrected
+shared console-syntax/checkpoint lifetime. MCC snapshots include extra grenades,
+campaign state, named objects and game speed (messages 97-100). Package sharing,
+installed-content validation and conversion progress use messages 103-106, with
+their own bounds, host authority and map-family checks described below.
 
-Only `mcc_identity_host_settings` writes this tail in the outgoing MCC copy;
-the host's original settings and Xbox/CE settings are untouched. The record's
-size is unchanged, but its transmitted meaning is new, so MCC 63 peers are
-rejected by the existing version gates. Xbox/CE retain OpenCE protocol 41.
-`tools/test_mcc_workshop.py` checks the bounded record and sidecar reads;
-`tools/test_mcc_identity.py` checks host publication, refusal classification
-and lifecycle; `tools/test_mcc_protocol.py` checks admission and legacy layout.
-These harness checks do not establish full runtime or browser compatibility.
-
-Version 63 extends campaign
-snapshots from 768 to 772 bytes (state version 6) to replicate the host's
-`rasterizer_model_lighting_ambient` value for Mission Z9. Older MCC peers are
-rejected. Xbox/Custom Edition retain the pinned upstream 41 contract and
-`HALO_PORT_NETWORK_VERSION`; the MCC-only version carries this agreement change.
-Version 62 retains OpenCE
-41 map-vote messages 94-95 and moves MCC gameplay messages to 96-99 and its
-join envelope to 100. Its bounded buffer grows to 512 bytes to carry upstream
-41 link credentials, including the local host connection. Older MCC peers are rejected; Xbox and Custom Edition
-keep the exact upstream 41 contract. The pinned upstream manifest covers the
-new voting fields and cooperative settings byte. Version 61 required the
-MCC-only equipment reset that removes the held weapon before assigning a
-scripted starting profile, fixing Meincrap's dummy-weapon selector. The host
-still owns equipment changes and replicates them through existing messages;
-packet layouts and the then-current Xbox/Custom Edition protocol 39 were unchanged.
-Version 60 moves MCC
-gameplay messages to 94-97 and the join envelope to 98, reserving message 93
-for OpenCE 39's optional client fire origins. At that revision Xbox and Custom Edition retained OpenCE protocol 39.
-Version 59 moved the MCC
-capability to flag `0x08`, gameplay messages to 93-96 and the join envelope to
-97, leaving OpenCE 39's dedicated flag `0x04` and client-build message 92 intact.
-Version 58 remains reserved for the older third-person branch. Version 56 adds music gain
-to campaign snapshots; version 57 requires the MCC-only 4 KiB script-stack
-capacity. These revisions leave the OpenCE 38 contract unchanged. Version 55
-incorporated OpenCE 38, which adds the
-players-own shield effects policy and uses advertisement byte 3 for the game
-kind; MCC capability moves from bytes 3-4 to bytes 4-5. Version 54 was used
-by the experimental third-person branch and is not reused here. Older MCC
-peers cannot negotiate this revision. Version 53 incorporates OpenCE 36's extended gametype settings, shield
-effects policy and simulation fixes. MCC messages move to IDs 92-95 to reserve
-91 for upstream shield effects; the settings prefix grows by 16 bytes before
-the MCC-only digest. The admission envelope kind moves to 92. Xbox and Custom
-Edition still send only the exact upstream prefix. GulchCE restores upstream shield glow and accepts every host-selected
-shield-effects choice.
-
-Version 52 incorporates OpenCE 32's elevator carry, datagram tick window
-and host aim-assist policy. MCC data messages move to IDs 91-94 to reserve
-90 for upstream aim assist; older MCC peers are rejected before admission. Version 50 requires peers to agree on bounded conditional execution for
-MCC equipment scripts. It releases completed same-type conditional frames
-before entering their selected branch while retaining lexical call scopes and
-the checkpointed thread stack. Version 49 requires weapon-authored movement
-penalties on every MCC peer and campaign snapshot version 4, which carries the
-map's screen-flash setting.
-It also corrects named sleep_forever resets and online cooperative script queries.
-It retains signed/vector damage impulses from version 48 and initialized
-three-point boat controls from version 47. Packet sizes are unchanged.
-At version 52, Xbox/Custom Edition retained OpenCE protocol 32; the current
-baseline and this camera branch's separate protocol are described above.
-Discovery advertises the selected map family's protocol and, separately,
-the host's MCC capability version. A GulchCE client sends a bounded reliable join
-envelope only to a host advertising the same MCC capability. The envelope wraps
-an unchanged OpenCE join packet. The normal host admission still checks the join
-token, bans, slots and session state; capability does not grant any authority.
-An unmodified OpenCE host receives only the original join packet.
-Capability is an untrusted compatibility claim, not proof of client identity or
-honest execution. A modified client can claim support, but still passes all
-ordinary admission, ownership, message-direction and host-authority checks.
-
-An MCC host refuses ordinary joins before acceptance or settings transfer. When
-a lobby switches to MCC, it disconnects peers without the negotiated capability
-before broadcasting MCC settings. OpenCE's existing UI reports the incompatible
-network version when joining an MCC advertisement; GulchCE gives an MCC-specific
-explanation. Capability belongs to a connection and is cleared on removal or
-server disposal, including reused slots.
-
-Legacy settings transmit exactly OpenCE's prefix through `local_data`. Only MCC
-settings carry the additional SHA-256 digest. Receivers check the complete record's
-map family and negotiated capability, pin fragment lengths, clear the staging
-record on a new connection, and preserve host-source validation. MCC map matching
-and precache admission still use the SHA-256 identity and the local package binding.
-MCC gameplay messages do not execute on Xbox or Custom Edition maps.
-The shared hooks are necessary at discovery, join admission, settings framing
-and connection teardown: MCC modules cannot select these wire boundaries after
-the generic engine has already sent or accepted a message. Capability and
-map-family policy remain in `mcc_protocol.c`; existing gameplay authority and
-transport checks are not bypassed.
-
-The public internet listing uses the common OpenCE version 29 discovery format.
-This lets GulchCE discover both families without modifying the relay, signalling,
-WebRTC or signed listing formats. OpenCE can therefore see an MCC listing, but
-its subsequent game advertisement rejects the join. Direct invitations pass the
-same game discovery and host admission checks. The listing is not permission to
-join or load a map. Every MCC simulation or message change increments
-`MCC_PROTOCOL_VERSION`; the combined wire manifest follows that version.
+The version increase is necessary for both changed wire layouts and simulation
+behavior peers must agree on. Tests cover ordinary join admission, exact settings
+round trips, message direction, checkpoint epochs, recovery and scripted poses.
+Runtime validation and its limits are recorded in the MCC upstream validation log;
+passing unit checks alone does not establish every-map compatibility.
 
 ## Versions
 
@@ -484,6 +448,78 @@ game's flags also tell its clients whether the host is a dedicated server
 (`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
 most of the living players).
 
+OpenCE network version 42 adds MCC package identity, admission and host-only
+sharing to the shared agreement. Join requests carry this version explicitly;
+settings carry a zero MCC identity for Xbox/CE. Checkpoint epochs, recovery,
+scripted poses and shared boat/console fixes require matching peers.
+
+Then version 43 changes what the machines simulate and send: on an MCC map a
+vector damage impulse follows the damage's direction (`mcc_damage.c`), and on
+every map a vehicle on its side (`vehicle_is_flipped`: its up below 0.2)
+throws its riders, as the retail game does, not only one upside down. Chat
+lines carry `_chat_line_host_bit`, and the chat settings the host's machine
+(`_chat_config_host_machine_bit`, `network_chat.c`), so every machine draws
+the host's name white; a co-op cutscene's sound event carries in `target` the
+milliseconds the host has played of it, so a machine that joins during it
+starts it there (`coop_sound_sync.c`). A host now waits for a machine's MCC
+conversion (message 106) out of that machine's allowance: holding a round's
+start beyond the ordinary wait spends it, time not holding earns it back at a
+third of the rate, up to the round's limit (`mcc_load_network.h`), so a
+machine that pulses without converting cannot hold every round's start. A
+version 42 build computes MCC impulses the other way, and its scripted poses'
+validation drops the message's other units with a bad pose.
+
+Version 43 also carries a rider standing on a vehicle: the deck part of a unit's
+state and the host's riding decision for the game, made at its start and
+kept until the map ends, a co-op flag of the game's settings
+(`_network_game_cooperative_vehicle_riding_bit`, bit 3;
+`port/linux/game/vehicle_riding.c`).
+It also carries a rider's cabin: its enclosure verdict while it stands as
+well as in the air. It ships with the rest of version 43, which no released
+build has.
+The deck part's verdict bits (1 open, 2 enclosed, 0 unknown) are sent in
+every window tick, riding included. Riding, they carry the standing cabin
+verdict (its grace counted by the sender: the host for its broadcast, a
+client for its own riders' predictions); in a protected jump,
+its raw sample; in a shallow jump, the air verdict as before. Bit 3 of the
+flags (the part stays 28 bytes) says that a verdict in the air is cabin
+evidence, a protected jump's sample or the host's word for it, rather than
+that legacy one. A client takes the host's verdict for the cabin of its own
+player and of every other rider, whatever its own samples say.
+
+The host takes a rider's word in its vehicle's frame and checks it there; a
+client places riders on its own copy of the deck. The host takes the words of
+the players riding in a second pass, after the vehicles of the tick have moved
+(the first takes those on foot), so a word naming a place on the deck is
+checked against the deck where it now is.
+For a round trip and a jitter after the host's copy or the client's changed
+between riding and not (a take-off or a landing the two disagree about), a
+word within `debug.riding_transition_leash` (0.25 world units, host only) of
+where the host's copy stands is taken as the place it names in the world
+rather than as a deck place: a position allowance during the disagreement,
+never a speed. A vehicle's netcode writes (the host's snaps, a client's corrections)
+carry its riders along but are recorded apart from its motion, in a
+correction each vehicle keeps, so they never count as the deck's speed. A
+vehicle a client follows (the host's word is its place, not its updates) is
+measured by the time elapsed since the rider's last tick, and a change of the
+vehicle's role (simulated or followed) takes no correction across it.
+None of this adds a byte: the cabin bit (bit 3 of the flags) is the only change to the deck part,
+which stays 28 bytes, and the version stays 43.
+
+Message 107 carries the host's riding rules: the map's choice (its boolean
+`vehicle_riding` global or startup call; none when the map makes none) and
+the host's latched `debug.riding_` values (damage speed, teleport step, moved
+alone, air grip, look carry, enclosure grace ticks; not the transition
+leash, which only the host uses). The host sends it reliably to every client
+at each map start, again when either changes, and to a late joiner at its
+ready. A client prefers the choice to the cooperative bit and takes the
+values over its own config (clamped as its own latch clamps them) until the
+next game; before the message it keeps its own. The values are the latched
+ones, so a config change on the host waits for the next map; a co-op host's
+revert or saved-game load reads the config again, and the new values are
+sent again then. It ships with
+the rest of version 43, which stays 43.
+
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
 sources' messages, kinds, bits, structs sent whole or the sizes of their
@@ -604,7 +640,7 @@ hack, which speeds up the machine's own clock, so that nothing on it can
 tell): every two seconds it measures how fast the ticks the client's
 messages are stamped with go by against its own clock's time, and how far
 ahead of its own time they are. A client's clock starts at the host's and
-only ever jumps forward to it when behind, so an honest one is never ahead
+recovers toward a reliable timestamp only when behind, so an honest one is never ahead
 while going faster (one that caught up, or a host that stalled, is one or
 the other, not both). One more than a tenth faster and half a second ahead
 has its players' predictions refused at once (the host's copies go as its
@@ -695,6 +731,12 @@ the host's lines, its own too, so every machine shows them in one order,
 and takes them (and the chat settings below) only over the host's
 connection's stream: a datagram from the host's address could be anyone's.
 Each local player's view shows the lines that player hears.
+A person on the machine running the game has their name drawn white, on
+that machine and on each client. The host marks the line (the next flag
+after the notice). Other names keep their team's colors, and the words
+stay pale blue. The line is still 68 bytes. A client whose host does not
+mark the line still draws white for a person on the machine the chat
+settings name, or on the first machine.
 The host's own `/mute <player> [minutes]` and `/unmute <player>` are
 commands, not lines: it keeps a mute by the player's name (in ASCII,
 matched in either case, as the host keeps names apart) and its minutes by
@@ -947,6 +989,143 @@ its name alone beside it, has its name given back as the map lists find it.
   A download that brings nothing for a minute, or a host that does not
   answer in 30 seconds, leaves the game, saying why.
 - The download's progress is drawn at the top of the screen.
+
+## MCC package sharing
+
+MCC supports host-only delivery for eligible local and Workshop packages.
+It uses MCC-owned messages **103** (request) and **104** (response),
+separate from CE sharing 83-86. Every map family uses OpenCE version **43**.
+The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
+the gameplay/resource identity and the required-JSON identity. The distributed
+header is 12 bytes, including its checkpoint epoch.
+
+- **Permission and admission.** `network.mcc_map_share` defaults off. The host
+  offers only its current map package, classified by its locally maintained
+  `mcc_share.txt`: `<gameplay SHA-256> <maker>`. Unknown content, missing credit,
+  known stock, loose maps and `_shared` are refused. Eligible Workshop and local
+  packages use the same policy. The client requires `network.map_download`
+  (existing default on) and explicit acceptance of the size/maker prompt.
+  Before acceptance it receives only an offer; it creates no stage and requests
+  no file chunks. If either setting is off, the download action is absent.
+  Valid Workshop IDs offer a Workshop page; other content requires manual
+  installation. A Workshop page alone does not install anything in a browser.
+  Manual-install and failed-download guidance leaves the unjoinable session
+  before displaying at the main menu. Only its copied text and Workshop origin
+  survive that deliberate disconnect; it holds no host slot or transfer alive.
+  Dismissal, another session or leaving the menu clears it. Live download
+  consent still requires the current host's exact content identity.
+- **Messages and bounds.** `MANIFEST` responses carry up to 16 file entries per
+  page. The full offer has at most 168 entries, each with kind, a 128-byte path
+  buffer, size and SHA-256. Exactly one map is required. `CHUNK` requests up to
+  3072 bytes; the client window is 16 and the host supports four transfers.
+  Reserved fields, counts, lengths, session IDs, offsets and sender roles are
+  checked. Only the sender's established reliable stream is accepted; datagrams
+  and responses from other peers cannot supply content. Backpressure retries
+  preserve pending responses, and manifest/data traffic consumes the shared
+  `network.map_share_upload` allowance.
+- **Selected files.** `mcc_share_package_build` uses the validated resource
+  selection cached by `mcc_validation_resources`; it does not scan arbitrary
+  siblings. Only used package `bitmaps.map`/`sounds.map` are eligible, including
+  their resolved Workshop fallback paths. A required root/shared resource
+  refuses the offer with a host diagnostic naming the dependency. Recognized
+  package/campaign/mission JSON and referenced supported PNG previews travel
+  with the map; `credits.txt`, `readme.txt`, `license.txt` and a valid bounded
+  Workshop sidecar preserve attribution. `ModInfo.json` is parsed metadata,
+  not an unchecked credit file. Map-only local packages are supported.
+- **Metadata and size checks.** JSON is limited to 256 KiB per file; PNG to
+  8 MiB and 2048 by 2048 pixels, using the existing supported decoder subset.
+  The metadata planner allows at most 160 entries and 24 MiB; the staging
+  envelope independently caps metadata at 32 MiB, each map/resource at 768 MiB
+  and the whole offer at 1 GiB. Credit text is capped at 64 KiB. The client
+  checks free space for the offer plus 64 MiB before writing. Nested paths are
+  allowed only for recognized JSON/PNG; devices, traversal, duplicate names
+  and file/directory collisions are refused. Required JSON is reparsed and
+  hashed separately from gameplay. Unreferenced files fail validation; invalid
+  optional PNGs are discarded before publication, retaining placeholder art.
+- **Staging and identity.** Files are exclusively created in an owned
+  `mcc_staging/dl_<digest>` directory and checked in order. The staged gameplay
+  and required-metadata identities must match the advertised values. Native
+  publication atomically moves the complete directory to a separate
+  `mcc_maps/dl_<digest>` without replacing any destination. The exact installed
+  snapshot is rechecked before successful `DONE` and joining resumes; existing local and Steam
+  packages remain untouched. Cleanup is limited to owned staging entries.
+  Native path checks refuse symlinks/reparse points and special files. These
+  checks address untrusted remote paths, not concurrent filesystem replacement
+  by another process with the same local user's authority.
+- **Lifecycle.** The offer expires after two minutes; a waiting client sends
+  bounded heartbeats. Initial unanswered requests time out after 30 seconds,
+  stalled downloads after 60 seconds. Leaving, map/identity changes, disabling
+  downloads and host preparation revision changes invalidate stale transfers
+  and consent. Requests remain bound to the host's current package. Required
+  campaign JSON is delivered upfront; subsequent mission maps/resources are
+  obtained before their own admission, under the same host-only policy.
+  A validated successful `DONE` releases its transfer slot and grants at most
+  15 seconds for the client's following player-add request. That admission
+  grace protects against the host's older playerless-machine deadline, but
+  does not report content as still missing or hold players out of the game.
+  Player admission, peer/session removal, map/identity changes, host opt-out
+  or expiry clears it. Cancelled, expired, premature or replayed `DONE`
+  messages cannot grant or renew the grace period.
+
+Installed packages use a separate bounded validation hold, even when both
+sharing preferences are off. Reliable MCC message **105** binds a client
+generation to the exact advertised map name/origin, checksum, gameplay digest
+and metadata digest. The host acknowledges before the client begins its
+asynchronous file checks. Five-second heartbeats keep a twenty-second liveness
+window, but never extend the absolute two-minute validation deadline. Expired
+or completed holds cannot be restarted by replaying `BEGIN` on the same
+connection and host revision. `READY` grants only the existing fifteen-second
+player-add grace; it does not prove that an untrusted client checked its files.
+Actual map loading still fingerprints content independently.
+
+After admission, synchronous MCC conversion has a separate bounded progress
+contract in `mcc_load_network.c` and `mcc_load_network_game.c`. Reliable message
+**106** carries the exact admitted name/origin, checksum and both digests,
+the game round, and an increasing work sequence (204 bytes after the unchanged
+12-byte distributed header). Both sending and accepted state advancement are
+limited to once per five seconds. A host waits for a progressing joined peer
+for at most thirty seconds without new progress and at most four minutes from
+the original round binding. Replays cannot restart either expired hold. The
+client also has the four-minute absolute bound; its existing 75-second
+pre-start transport-silence timeout remains unchanged. Progress never marks a
+machine loaded, bypasses file identity checks or reuses the missing-map state.
+
+The server's ordinary distributed-data gate requires an already loaded player,
+so minimal MCC-only routes in `network_server_message_handler.c` admit messages
+105/106 from joined reliable connections before that gate. Their MCC handlers
+still check joined-peer state, exact framing, identity and sender roles; datagrams
+cannot establish these holds. The small start, timeout and loaded-ack hooks in
+the server/client managers connect the MCC state to the existing lifecycle.
+Terminal loaded acknowledgement retires the peer, all-loaded clears the host
+binding, and the client's first game update clears its binding. Disconnect,
+peer departure, changed identity/revision and round changes invalidate stale
+state. Xbox/CE retain their established loading and timeout paths.
+
+`mcc_loading` feeds this contract independently of its visual feedback: null
+renderers and disabled loading presentation still begin/end the network work
+lifecycle. Conversion pulses only write bounded reliable transport messages.
+They never idle or dispatch the network, advance simulation, run widgets or
+invoke normal frame callbacks while tags are incomplete.
+
+Downloaded-file verification stays within its existing transfer. Manifest
+heartbeats keep the connection responsive while the bounded checker runs,
+without resetting the eighty-second last-data-progress bound. Publication
+promotes SHA, CRC and selected-resource facts only after the complete file
+snapshot remains unchanged. Local installed identity is established before
+successful `DONE`, avoiding a second full-content pass. Cancellation joins the
+owned checker and closes its readers before any stage cleanup. A package
+already published survives a subsequent admission failure.
+
+Implementation lives in `mcc_share.c`, `mcc_share_package.c`,
+`mcc_share_session.c`, `mcc_share_stage.c` and the MCC metadata helpers.
+Managed-copy receipts and the removal UI preserve separate ownership of
+downloaded snapshots. Native platform, transport, real-map and follow-on-mission
+checks and their limits are recorded in
+[Milestone 13](../../docs/mcc_refactor_validation.md#milestone-13-implementation-evidence).
+Browser publication uses an owned OPFS journal and commit record instead of a
+directory rename; see [browser storage](../../docs/reading/browser_imports.md).
+Browser gameplay, downloads and persistence have their own Milestone 14
+validation gates; native results do not establish browser compatibility.
 
 ## Stages
 
@@ -1279,7 +1458,7 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
 ## Testing
 
 In GulchCE Third Person sessions, the host's camera policy travels in the reliable game settings
-record (bits 3-4 of `network_game.cooperative_flags`), for every transport
+record (bits 4-5 of `network_game.cooperative_flags`), for every transport
 and game type. Zero allows player choice, one forces third person, and two
 disables it. Receivers reject the reserved value and unknown flag bits.
 Pregame edits are host-only; late joiners receive the same record. Camera
@@ -1298,10 +1477,9 @@ so a legitimate shot from beside cover is not judged only from the head.
 Both the eye-to-muzzle and muzzle-to-impact routes must be clear; weapon
 ownership, rate, target history and damage limits still apply. Scoped, dead,
 seated, Forced Off and ordinary first-person paths do not add this history.
-These rules, current-roster checkpoint restoration and immediate host object
-refresh after a restore use experimental
-camera agreement versions 32712/32713. The latter changes simulation agreement, so older
-camera builds are excluded too; it adds no packet fields or client authority.
+The camera rules use agreement version 32744. Shared checkpoint recovery
+also applies in Crossplay sessions through upstream protocol 43. Older camera
+builds are excluded; camera policy bits leave upstream vehicle riding intact.
 The host independently excludes weapon-authored following cameras from the
 shoulder solver; stale or forged input bits cannot override that priority.
 The relay rejects non-boolean shoulder values and truncated messages.
@@ -1330,7 +1508,14 @@ down); each machine logs every player's position, health and shields,
 where they aim and face, their animation state and how hard they move,
 weapons, grenades, score, kills and deaths every second, with the objects
 made and removed and the hits reported, dealt, rejected and replayed, so
-two machines' views of one game can be compared. `debug.network_test_kill`,
+two machines' views of one game can be compared. Observation uses the first
+frame in each absolute 30-tick simulation second and records its actual tick. A late
+first sample does not offset every following sample; missed states are never
+invented or backfilled. The comparison still requires samples within two ticks.
+The reported drift counters accumulate since the preceding observation and
+are reset when read; they do not drive simulation or correction. Scripted test
+actions keep their separate established cadence.
+`debug.network_test_kill`,
 `debug.network_test_shoot`, `debug.network_test_vehicle` and
 `debug.network_test_pickup` script kills, hits, a vehicle ride and a weapon
 swap the bots' wandering does not reach (`debug.network_test_pickup_weapon`
@@ -1375,20 +1560,18 @@ action button where the host has nothing for them to pick up, with where it
 has them and the nearest item: a client that sees a pickup the host does
 not.
 
-The host's Session Compatibility selector defaults to OpenCE Crossplay.
-Xbox/CE use the exact pinned OpenCE 41 contract; MCC remains independently
-versioned at 65. MCC 65 changes player projectile simulation: camera-relative
-origins and crosshair convergence replace projected world-muzzle rays unless
-the trigger selects original Halo behavior. No packet layout changes. Older
-MCC clients are excluded because their shot origins and directions differ.
-Xbox/CE remain on 41. In this mode the optional shoulder camera, its input and
-muzzle behavior, and its checkpoint recovery extensions do not execute.
-GulchCE Third Person instead advertises camera agreement 32712 (Xbox/CE) or
-32714 (MCC, including the new projectile agreement), requires a kind 101 envelope before admission and adds the
-shoulder byte to relayed actions. The envelope's bound is 520 bytes, including
-MCC's optional 512-byte inner envelope and upstream account-link credentials.
-Its header carries revision 1, camera base version 32712 and zero reserved
-bytes. Ordinary authorization and map-family checks still apply.
+The host's Session Compatibility selector defaults to Crossplay
+(`opence_crossplay`). Xbox, Custom Edition and MCC maps all use OpenCE protocol
+43, including its shared checkpoint, loading and content identity messages.
+There is no separate MCC capability or join envelope. The optional shoulder
+camera, its input and muzzle behavior remain disabled in Crossplay mode.
+GulchCE Only (`gulchce_third_person`) advertises camera protocol 32744 for every
+map family, requires a kind 102 envelope before admission and adds the shoulder
+byte to relayed actions. The envelope's bound is 520 bytes: an eight-byte camera
+header plus at most 512 bytes of ordinary join data, including account-link
+credentials. Its header carries revision 1, camera version 32744 and zero
+reserved bytes. Nested envelopes are rejected. Ordinary authorization and
+map-family checks still apply.
 
 Session mode is selected before opening the lobby and locked until disposal,
 including across rounds. The client binds camera permission to the selected
@@ -1518,3 +1701,6 @@ changes only the ticks in the air, as gravity does, is within what
 identical builds show, and not caught. Positions agree to 0.04 world units
 on average, 0.24 at most, in every game, perturbed or not: the netcode
 corrects them.
+
+MCC camera-relative projectile rays use upstream agreement 43 (camera mode 32744).
+Xbox/CE agreement versions are unchanged. Firing and preview share `mcc_projectiles.c`.

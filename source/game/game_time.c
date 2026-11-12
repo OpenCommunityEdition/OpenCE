@@ -119,6 +119,8 @@ struct game_time_globals_struct
 /* ---------- globals */
 
 static struct game_time_globals_struct *game_time_globals;
+/* port: a reliable host update's time, not part of the saved world. */
+static long game_time_distributed_target = NONE;
 
 /* ---------- public code */
 
@@ -133,6 +135,7 @@ void game_time_initialize(
 {
 	game_time_globals = (struct game_time_globals_struct *)game_state_malloc("game time globals", NULL, sizeof(*game_time_globals));
 	memset(game_time_globals, 0, sizeof(*game_time_globals));
+	game_time_distributed_target = NONE; /* port: no previous session's target */
 
 	return;
 }
@@ -143,6 +146,7 @@ void game_time_initialize_for_new_map(
 	match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 131, game_time_globals && !game_time_globals->initialized);
 	memset(game_time_globals, 0, sizeof(*game_time_globals));
 	game_time_globals->initialized = TRUE;
+	game_time_distributed_target = NONE; /* port: no previous map's target */
 
 	return;
 }
@@ -150,6 +154,7 @@ void game_time_initialize_for_new_map(
 void game_time_dispose_from_old_map(
 	void)
 {
+	game_time_distributed_target = NONE; /* port: discard the departing map's target */
 	if (game_time_globals)
 	{
 		game_time_globals->initialized = FALSE;
@@ -170,6 +175,7 @@ void game_time_end(
 {
 	match_assert("c:\\halo\\SOURCE\\game\\game_time.c", 196, game_time_globals);
 	game_time_globals->active = FALSE;
+	game_time_distributed_target = NONE; /* port: discard the finished game's target */
 
 	return;
 }
@@ -182,6 +188,22 @@ void game_time_set_distributed(
 	game_time_globals->local_time = time;
 	game_time_globals->server_time = time;
 	game_time_globals->leftover_dt = 0.f;
+	game_time_distributed_target = NONE; /* port: a new clock invalidates its target */
+
+	return;
+}
+
+/* port: remember only validated reliable host time. Small stalls used to
+leave clients behind indefinitely; game_time_update runs the missing ticks. */
+void game_time_synchronize_distributed(
+	long time)
+{
+	if (!game_time_globals || !game_time_globals->initialized ||
+		!game_time_globals->active || !network_game_distributed_client() ||
+		game_time_menu_scene() || time < 0 || time > 0x3FFFFFFF)
+		return;
+	if (time > game_time_globals->local_time && time > game_time_distributed_target)
+		game_time_distributed_target = time;
 
 	return;
 }
@@ -479,6 +501,19 @@ void game_time_update(
 			{
 				long final_local_time;
 				long maximum_possible_server_time;
+
+				/* port: recover a small clock deficit by simulating, not skipping,
+				ticks. Keep the fractional time above and the frame's existing cap;
+				at most double its normal work, never extrapolating the host's time. */
+				if (network_game_distributed_client() && !game_time_held() &&
+					!game_time_menu_scene() && game_time_globals->local_time >= 0 &&
+					game_time_distributed_target > game_time_globals->local_time)
+				{
+					long ticks_behind = game_time_distributed_target - game_time_globals->local_time;
+					long extra_ticks = MIN(ticks_elapsed, ticks_behind - ticks_elapsed);
+					if (extra_ticks > 0)
+						ticks_elapsed += MIN(extra_ticks, TICKS_PER_SECOND - ticks_elapsed);
+				}
 
 				final_local_time = game_time_globals->local_time + ticks_elapsed;
 				switch (game_connection())

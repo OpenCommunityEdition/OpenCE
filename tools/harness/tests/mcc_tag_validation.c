@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef MCC_HUD_VALIDATION
+#include "hud_test_types.h"
+#include "hud_test_schemas.inc"
+#endif
+
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "line %d: %s\n", __LINE__, #c); return 1; } } while (0)
 
 struct test_instance { unsigned long group, parent[2]; long handle; char *name; void *root; unsigned long unused[2]; };
@@ -196,7 +201,38 @@ static struct tag_schema_field const particle_fields[]={
     TAG_SCHEMA_BLOCK(struct test_particle,type_states,particle_state_schema,8),
     TAG_SCHEMA_CHECK(particle_system_type_check),TAG_SCHEMA_END};
 static struct tag_schema_definition const particle_schema=TAG_SCHEMA_DEFINITION(particle,struct test_particle,particle_fields);
+#ifdef MCC_HUD_VALIDATION
+/* The actual overlay/crosshair schemas are extracted by the Python fixture.
+ * Other weapon blocks are empty here; this root projects just the used fields. */
+static struct tag_schema_field const hud_test_fields[]={
+    TAG_SCHEMA_REFERENCE(struct weapon_hud_interface_definition,parent_hud,TAG_SCHEMA_GROUPS('wphi')),
+    TAG_SCHEMA_BLOCK(struct weapon_hud_interface_definition,crosshairs,weapon_hud_crosshairs_element_schema,
+        MAXIMUM_CROSSHAIRS_PER_WEAPON_HUD),
+    TAG_SCHEMA_BLOCK(struct weapon_hud_interface_definition,overlays,weapon_hud_overlays_element_schema,
+        MAXIMUM_ELEMENTS_PER_WEAPON_HUD),
+    TAG_SCHEMA_END
+};
+static struct tag_schema_definition const hud_test_schema=
+    TAG_SCHEMA_DEFINITION(weapon_hud_interface,struct weapon_hud_interface_definition,hud_test_fields);
+/* A pointer-bearing allocation whose value bytes are also an authored HUD
+ * item. Neither the outer reference nor its ownership may be hidden by COW. */
+struct test_hud_values {struct weapon_hud_overlay_item values;struct tag_reference reference;};
+static struct tag_schema_field const hud_values_fields[]={
+    TAG_SCHEMA_REFERENCE(struct test_hud_values,reference,TAG_SCHEMA_GROUPS('scnr')),TAG_SCHEMA_END
+};
+static struct tag_schema_definition const hud_values_schema=
+    TAG_SCHEMA_DEFINITION(hud_values,struct test_hud_values,hud_values_fields);
+static struct tag_schema_field const hud_storage_fields[]={
+    TAG_SCHEMA_BLOCK(struct test_root,children,hud_values_schema,4),TAG_SCHEMA_END
+};
+static struct tag_schema_definition const hud_storage_schema=
+    TAG_SCHEMA_DEFINITION(hud_storage,struct test_root,hud_storage_fields);
+#endif
 static struct tag_schema_group const groups[] = {
+#ifdef MCC_HUD_VALIDATION
+    {'wphi',{NONE,NONE},&hud_test_schema},
+    {'hsto',{NONE,NONE},&hud_storage_schema},
+#endif
     {'mpck',{NONE,NONE},&model_part_schema},
     {'pctl',{NONE,NONE},&particle_schema},
     {'coll',{NONE,NONE},&collision_schema},
@@ -215,7 +251,17 @@ static struct tag_schema_group const groups[] = {
 struct tag_schema_group const *const tag_schema_group_lists[] = {groups, NULL};
 struct tag_schema_group const tag_schema_custom_edition_groups[] = {{0, {0, 0}, NULL}};
 
-void tag_validate_report(char const *message) { (void)message; }
+#ifdef MCC_HUD_VALIDATION
+static char hud_validation_message[512];
+#endif
+void tag_validate_report(char const *message)
+{
+#ifdef MCC_HUD_VALIDATION
+    snprintf(hud_validation_message,sizeof(hud_validation_message),"%s",message);
+#else
+    (void)message;
+#endif
+}
 uint32_t mcc_audio_stream_end(struct mcc_runtime *runtime) { (void)runtime; return 1024; }
 uint32_t mcc_bitmaps_stream_end(struct mcc_runtime *runtime) { (void)runtime; return 1024; }
 int mcc_audio_contains(struct mcc_runtime *runtime, long tag, uint32_t offset, uint32_t size)
@@ -250,6 +296,118 @@ void *mcc_runtime_allocate(struct mcc_runtime *runtime,uint32_t bytes)
     return runtime->tags+start;
 }
 
+#ifdef MCC_HUD_VALIDATION
+void *mcc_runtime_pointer(struct mcc_runtime *runtime,uint32_t address,uint32_t bytes)
+{
+    uintptr_t start=(uintptr_t)runtime->tags;
+    return address>=start && address-start<=runtime->used && bytes<=runtime->used-(address-start) ?
+        (void *)(uintptr_t)address : NULL;
+}
+void error(short level,char const *text,...) {(void)level;(void)text;}
+char const *config_string(char const *name) {(void)name;return "tab";}
+
+static void hud_test_overlay(struct weapon_hud_overlays_element *owner,void *items,long count)
+{
+    owner->overlays.bitmap.group_tag='bitm';owner->overlays.bitmap.index=NONE;
+    owner->overlays.items.count=count;owner->overlays.items.address=items;
+}
+
+static int hud_test(struct mcc_runtime *runtime,char const *name)
+{
+    struct test_header *header=(void *)runtime->tags;
+    struct test_instance *instances=header->instances;
+    struct weapon_hud_interface_definition *hud[3];
+    struct weapon_hud_overlays_element *owners=(void *)(runtime->tags+0xC00);
+    struct weapon_hud_overlay_item *items[2],*converted;
+    struct test_hud_values *storage=(void *)(runtime->tags+0xE00);
+    struct test_root *storage_root=(void *)(runtime->tags+0x900);
+    struct hud_placement_definition pristine;
+    int i,result,expected=1,raw=strstr(name,"raw_scalar")!=NULL;
+    int scalar=strstr(name,"scalar")!=NULL,prefix=strstr(name,"prefix")!=NULL;
+    int tail=strstr(name,"tail")!=NULL;
+    CHECK(sizeof(*hud[0])==0x17C && sizeof(*owners)==0x68 && sizeof(*items[0])==0x88);
+    header->count=3;
+    runtime->tag_index=(void *)instances;
+    for(i=0;i<3;i++) {
+        hud[i]=(void *)(runtime->tags+0x500+i*0x200);
+        hud[i]->parent_hud.group_tag='wphi';hud[i]->parent_hud.index=NONE;
+        if(i<2) {
+            instances[i+1]=instances[0];instances[i+1].handle+=(i+1);
+            instances[i+1].group='wphi';instances[i+1].root=hud[i];
+            items[i]=(void *)(runtime->tags+0xE00+i*0x100);
+            items[i]->placement.offset.x=20;items[i]->placement.offset.y=40;
+            items[i]->placement.scale.i=1.0f;items[i]->placement.scale.j=2.0f;
+            hud_test_overlay(owners+i,items[i],1);
+        }
+    }
+    hud[0]->overlays.count=1;hud[0]->overlays.address=owners;
+    memcpy(&pristine,&items[0]->placement,sizeof(pristine));
+    if(scalar) {
+        int scalar_first=strstr(name,"first")!=NULL;
+        int hud_slot=scalar_first ? 1 : 2,storage_slot=scalar_first ? 2 : 1;
+        instances[hud_slot].group='wphi';instances[hud_slot].root=hud[0];
+        instances[storage_slot].group='hsto';instances[storage_slot].root=storage_root;
+        storage_root->children.count=1;storage_root->children.address=storage;
+        storage->reference.group_tag='scnr';storage->reference.index=header->scenario;
+        if(raw) expected=!scalar_first;
+    } else if(!strcmp(name,"hud_root_alias")) {
+        instances[2].root=hud[0];
+    } else if(!strcmp(name,"hud_root_partial")) {
+        hud[0]->overlays.count=0;hud[0]->overlays.address=NULL;
+        instances[2].root=(byte *)hud[0]+4;expected=0;
+    } else if(!strcmp(name,"hud_root_schema")) {
+        instances[2].root=hud[0];instances[2].group='alrt';expected=0;
+    } else if(!strcmp(name,"hud_owner_schema")) {
+        hud_test_overlay(owners,NULL,0);
+        hud[1]->crosshairs.count=1;hud[1]->crosshairs.address=owners;expected=0;
+    } else if(!strcmp(name,"hud_owner_partial")) {
+        struct weapon_hud_overlays_element *other=(void *)((byte *)owners+0x40);
+        hud_test_overlay(owners,NULL,0);hud_test_overlay(other,NULL,0);
+        hud[1]->overlays.count=1;hud[1]->overlays.address=other;expected=0;
+    } else if(prefix || tail) {
+        int short_first=strstr(name,"short")!=NULL;
+        hud[0]->overlays.count=short_first ? 1 : 2;
+        hud[1]->overlays.count=short_first ? 2 : 1;hud[1]->overlays.address=owners;
+        if(tail) {
+            struct weapon_hud_overlays_element *other=(void *)((byte *)(owners+1)+0x40);
+            hud_test_overlay(owners,NULL,0);hud_test_overlay(owners+1,NULL,0);hud_test_overlay(other,NULL,0);
+            header->count=4;instances[3]=instances[0];instances[3].handle+=3;
+            instances[3].group='wphi';instances[3].root=hud[2];
+            hud[2]->crosshairs.count=1;hud[2]->crosshairs.address=other;expected=0;
+        }
+    } else CHECK(0);
+    runtime->report.tag_count=header->count;
+    if(!raw) CHECK(mcc_hud_bitmaps_prepare(runtime));
+    result=mcc_tags_validate(runtime);
+    CHECK(result==expected);
+    if(!result) CHECK(strstr(hud_validation_message,"overlap")!=NULL);
+    if(result && scalar) {
+        struct weapon_hud_overlays_element *owner=hud[0]->overlays.address;
+        converted=owner->overlays.items.address;
+        CHECK(!memcmp(&storage->values.placement,&pristine,sizeof(pristine)));
+        CHECK(converted!=&storage->values);
+        CHECK(converted->placement.offset.x==(raw ? 20 : 10));
+        CHECK(converted->placement.offset.y==(raw ? 40 : 20));
+        CHECK(converted->placement.scale.i==(raw ? 1.0f : 0.5f));
+        CHECK(converted->placement.scale.j==(raw ? 2.0f : 1.0f));
+        CHECK(storage->reference.index==header->scenario);
+    } else if(result && !raw) {
+        for(i=0;i<2;i++) {
+            long n;
+            struct weapon_hud_interface_definition *root=instances[i+1].root;
+            struct weapon_hud_overlays_element *owned=root->overlays.address;
+            for(n=0;n<root->overlays.count;n++) {
+                converted=owned[n].overlays.items.address;
+                CHECK(converted->placement.offset.x==10 && converted->placement.offset.y==20);
+                CHECK(converted->placement.scale.i==0.5f && converted->placement.scale.j==1.0f);
+            }
+        }
+    }
+    mcc_validation_dispose(runtime);free(runtime->tags);
+    return 0;
+}
+#endif
+
 int main(int argc, char **argv)
 {
     struct mcc_runtime runtime;
@@ -279,6 +437,9 @@ int main(int argc, char **argv)
     root->file.file_offset = 100; root->file.size = 8;
     child->data.address = runtime.tags + 0x300; child->data.size = 16;
     child->reference.group_tag = 'scnr'; child->reference.index = header->scenario; child->reference.name = NULL;
+#ifdef MCC_HUD_VALIDATION
+    if(!strncmp(argv[1],"hud_",4)) return hud_test(&runtime,argv[1]);
+#endif
     if (!strncmp(argv[1],"jet_",4)) {
         struct test_particle *particle=(void *)(runtime.tags+0x500);
         struct test_particle_state *state=(void *)(runtime.tags+0x600);

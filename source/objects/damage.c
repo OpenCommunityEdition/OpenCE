@@ -140,6 +140,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "mcc_damage.h" /* port: port/linux/game/mcc_damage.c */
+#include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1146,9 +1147,8 @@ static void object_damage_aftermath(
 		no statistics on a machine that joined after, is no player's) */
 		if (player_index != NONE)
 		{
-			/* An MCC team-change death must come from this exact no-statistics
-			 * cause, not a real suicide racing the pending unit flag. */
-			extern void mcc_ui_team_respawn_damage(long, long, boolean);
+			/* port: an MCC team change's death is this no-statistics one, not a
+			suicide at the same time (mcc_ui_teams.c) */
 			mcc_ui_team_respawn_damage(player_index, object_index,
 				TEST_FLAG(damage->flags, _damage_no_statistics_bit) != 0);
 			game_engine_player_killed(

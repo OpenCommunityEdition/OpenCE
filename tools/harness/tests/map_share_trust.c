@@ -9,9 +9,12 @@ seconds apart at most. test_map_share_trust.py takes the constants and
 structures (config.inc) and the code (under_test.inc).
 */
 
+#define _CRT_SECURE_NO_WARNINGS
 #include "harness.h"
 
 typedef unsigned short word;
+typedef word message_header;
+#include "message_header.inc"
 
 #include "config.inc"
 
@@ -29,14 +32,6 @@ typedef unsigned short word;
 
 /* the fake world: a clock, the host's game and its machines, a catalog of one
 file, and what the code under test did */
-struct distributed_message_header
-{
-	word header;
-	byte type;
-	byte count;
-	long game_time;
-};
-
 struct network_game
 {
 	struct
@@ -117,6 +112,9 @@ static char const *tag_name_strip_path(char const *name)
 }
 
 #define config_boolean(name) 1
+/* (MCC package sharing's, a map of mcc_maps: none in this world) */
+#define mcc_share_game_machine_active(machine_index) 0
+#define mcc_share_game_machine_needs_map(machine_index) 0
 #define custom_edition_level_name(level_name) (!strncmp(level_name, "custom_maps\\", 12))
 #define custom_edition_map_file_path(level_name, path) (strcpy(path, "d:\\custom_maps\\hugeass.map"), 1)
 #define custom_edition_resource_map_file_path(kind, path) 0
