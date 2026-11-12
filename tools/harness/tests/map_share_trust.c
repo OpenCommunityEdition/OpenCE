@@ -117,6 +117,9 @@ static char const *tag_name_strip_path(char const *name)
 }
 
 #define config_boolean(name) 1
+/* (MCC package sharing's, a map of mcc_maps: none in this world) */
+#define mcc_share_game_machine_active(machine_index) 0
+#define mcc_share_game_machine_needs_map(machine_index) 0
 #define custom_edition_level_name(level_name) (!strncmp(level_name, "custom_maps\\", 12))
 #define custom_edition_map_file_path(level_name, path) (strcpy(path, "d:\\custom_maps\\hugeass.map"), 1)
 #define custom_edition_resource_map_file_path(kind, path) 0

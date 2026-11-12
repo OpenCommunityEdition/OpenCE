@@ -79,6 +79,22 @@ copies the on-disk spelling into result and returns nonzero if found */
 int posix_find_entry_case_insensitive(const char *directory, const char *name,
 	char *result, posix_ulong result_size);
 
+/* MCC-owned bounded package reads (posix_mcc_preview.c). Returns bytes read,
+ * or zero; metadata paths cannot escape root or traverse links. */
+int posix_mcc_preview_read(const char *root, const char *relative, void *buffer, posix_ulong capacity);
+/* Managed MCC downloads: native paths only, no links/special files from the
+ * first mcc_maps, mcc_staging or steamapps folder down (the folders above it
+ * are the user's own), and an atomic directory publication that never
+ * replaces an existing destination. */
+int posix_mcc_share_path_safe(const char *path);
+int posix_mcc_share_publish(const char *from, const char *to);
+/* Native path reads return an OS descriptor, never a host FILE across Android's
+ * ABI boundary. The game/guest wraps it with its own fdopen and owns the stream. */
+int posix_mcc_share_open(const char *path);
+void posix_mcc_share_close(int descriptor);
+/* Remove one safe native file (directory=0) or empty directory (directory=1). */
+int posix_mcc_share_remove(const char *path, int directory);
+
 /* ---------- sockets
 
 Winsock and BSD share the sockaddr_in layout, so addresses pass through as
@@ -141,6 +157,9 @@ int posix_upnp_forward_udp(unsigned short port, unsigned short preferred_port, p
 /* stops the router forwarding that port (network byte order) of its, which
 posix_upnp_forward_udp set up; blocks */
 void posix_upnp_stop_forwarding_udp(unsigned short external_port);
+/* Process shutdown only: stop starting further router requests. Safe to
+call while forwarding runs; it cannot interrupt a library call in progress. */
+void posix_upnp_cancel(void);
 
 /* ---------- DTLS for WebRTC (internet play with browsers, p2p_webrtc.c;
 posix_dtls.c, with port/third_party/mbedtls) */

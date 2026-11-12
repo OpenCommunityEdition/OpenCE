@@ -54,7 +54,7 @@ jobs:
     # 32-bit glibc is for the tests.
     runs-on: ubuntu-24.04
     container: archlinux:latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - name: Install the toolchain
         run: |
@@ -91,12 +91,19 @@ jobs:
 
       - name: Test
         run: |
-          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
+          python -m pytest -q tools/test_loading_widescreen.py tools/test_loading_chant.py
+          python -m pytest -q tools/test_linux_port.py tools/test_android_asm_convert.py tools/test_android_mirror_uploads.py tools/test_android_frame_fences.py tools/test_android_static_geometry.py tools/test_android_render_policy.py tools/test_android_ce_texture_cache.py tools/test_host_watch_hash.py tools/test_touch_menu.py tools/harness tools/test_profile.py tools/stagekit/tests tools/test_net_compare.py tools/test_server_sim.py tools/test_egg.py tools/test_deploy_gametypes.py
           # the dedicated server: --version, and --server without maps refused (exit code 2); its cases with
           # clients need the retail maps, and are skipped
           python -m pytest -q tools/test_dedicated_server.py
           python tools/test_light_storage.py
-          python -m pytest -q tools/test_controller_buttons.py tools/test_controller_remap.py tools/test_controller_remap_context.py tools/test_hud_button_style.py tools/test_hud_corrections.py
+          python -m pytest -q \
+            tools/test_mcc_cache_format.py tools/test_mcc_projectiles.py tools/test_mcc_tag_validation.py \
+            tools/test_mcc_share.py tools/test_mcc_share_rules.py tools/test_mcc_share_stage.py \
+            tools/test_mcc_share_storage.py tools/test_mcc_share_metadata.py tools/test_mcc_load_network.py \
+            tools/test_checkpoint_epoch.py tools/test_coop_checkpoint.py tools/test_coop_checkpoint_recovery.py \
+            tools/test_mcc_checkpoint.py
+          python -m pytest -q tools/test_keyboard_glyphs.py tools/test_menu_button_glyphs.py tools/test_mcc_keyboard_glyphs.py tools/test_controller_buttons.py tools/test_controller_remap.py tools/test_controller_remap_context.py tools/test_hud_button_style.py tools/test_hud_corrections.py
 
       - name: Compile cache
         run: ccache --show-stats
@@ -180,8 +187,10 @@ jobs:
         run: python3 tools/ci_build.py android release
 
       # the touch controls' layout and gyroscope maths (the runner's JDK)
-      - name: Test the touch layout
-        run: python3 tools/test_touch_layout.py
+      - name: Test the touch layout and MCC importer
+        run: |
+          python3 tools/test_touch_layout.py
+          python3 tools/test_mcc_metadata_importer.py
 
       - name: Compile cache
         run: ccache --show-stats
@@ -240,6 +249,13 @@ jobs:
 
       - name: Release
         run: python tools/ci_build.py windows release
+
+      - name: Test MCC model geometry
+        shell: pwsh
+        run: |
+          python -m pip install pytest
+          python -m pytest -q tools/test_mcc_geometry.py tools/test_mcc_projectiles.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Test light storage
         run: python tools/test_light_storage.py
@@ -333,6 +349,8 @@ jobs:
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/rooms.mjs dist/halo-web-release
           # (the native builds' WebRTC, port/linux/src/p2p_webrtc.c, with both)
           NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/webrtc_native.mjs chromium firefox
+          source ~/emsdk/emsdk_env.sh
+          NODE_PATH="$RUNNER_TEMP/playwright/node_modules" node port/web/tests/mcc_storage.mjs chromium firefox
 
       - name: Compile cache
         run: ccache --show-stats

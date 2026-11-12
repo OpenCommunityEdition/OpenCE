@@ -43,6 +43,7 @@ in `networkPolicy.webFrom`).
 | `server.logFormat` | `HALO_SERVER_LOG_FORMAT` |
 | `server.instance`, `server.region` | `HALO_SERVER_INSTANCE`, `HALO_SERVER_REGION` |
 | `server.masterPublish` | `HALO_SERVER_MASTER_PUBLISH` |
+| `server.vehicleRidingOverrideGametype` | `HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE` |
 | `server.password` | `HALO_SERVER_PASSWORD` (from a Secret) |
 | `publisherKey` | `HALO_SERVER_PUBLISHER_KEY` (from a Secret) |
 | `web.port` | `HALO_SERVER_WEB_PORT` (0: none, and no probes) |
@@ -50,6 +51,7 @@ in `networkPolicy.webFrom`).
 | `web.moderatorPassword` | `HALO_SERVER_WEB_MODERATOR_PASSWORD` (from a Secret) |
 | `network.tunnelPort` | `HALO_NET_TUNNEL_PORT` |
 | `network.publicAddress` | `HALO_NET_PUBLIC_ADDRESS` |
+| `network.vehicleRiding` | `HALO_NET_VEHICLE_RIDING` |
 | `customMaps` | `HALO_CUSTOM_MAPS_ROOT=/custom_maps` |
 
 The chart also sets `HALO_SERVER=1`, `HALO_CONFIG_FILE=/state/config.toml`,
@@ -65,6 +67,13 @@ unset by default (empty, `[]` or `null`): the chart then sets no variable,
 and the setting is `config.toml`'s (or the server's default, which
 `values.yaml` names), changeable from the web page and kept in the state
 volume. Give a value only for a setting you want fixed.
+
+`network.vehicleRiding` and `server.vehicleRidingOverrideGametype` are
+also unset (`null`); both game settings default to `false`. The first is
+the base setting; in multiplayer each gametype's riding rule overrides it (a gametype
+without the rule is off),
+and the second, set to `true`, turns that override off. A co-op entry's `+riding` rule or a map's own choice takes
+precedence (docs/dedicated_server.md, "Vehicle riding").
 
 ## Web password
 
