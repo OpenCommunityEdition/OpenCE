@@ -5111,7 +5111,8 @@ void game_engine_player_killed(
 	if (!game_engine)
 		return;
 
-	/* port: the death of an MCC team change is no one's kill (mcc_ui_teams.c) */
+	/* port: the death of a team change (MCC's picker, a dedicated server's
+	!switch) is no one's kill (mcc_ui_teams.c) */
 	mcc_ui_team_respawn_death(&killing_player_index, &killing_object_index, dead_player_index, &friendly_fire);
 
 	/* the distributed netcode: a client's copy of a death has the host's

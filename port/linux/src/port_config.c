@@ -930,6 +930,14 @@ static const struct config_setting config_settings[] =
 		"A team game: \"one\" starts with one team's players (the next joiners\n"
 		"balance), \"both\" waits for a player on each team, \"skip\" skips team\n"
 		"games while one player waits." },
+	{ "server.team_switch", _config_boolean, "true", "HALO_SERVER_TEAM_SWITCH", _environment_value,
+		_platform_server,
+		"A player in a team game may say \"!switch\" (or \"!team\") in the chat to\n"
+		"change teams: not in Infection, and with the gametype's auto team\n"
+		"balance only to the smaller team." },
+	{ "server.team_switch_cooldown_seconds", _config_integer, "30", "HALO_SERVER_TEAM_SWITCH_COOLDOWN_SECONDS",
+		_environment_value, _platform_server,
+		"Seconds a player waits after a !switch before another (0 to 3600)." },
 	{ "server.motd", _config_string, "\"\"", "HALO_SERVER_MOTD", _environment_value, _platform_server,
 		"A notice each machine is shown as it joins (127 characters); empty for\n"
 		"none." },

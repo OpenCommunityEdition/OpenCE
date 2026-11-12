@@ -733,7 +733,8 @@ static char const *const settable_settings[] =
 {
 	"server.name", "server.max_players", "server.min_players", "server.password", "server.public",
 	"server.rotation_fallback", "server.lobby_seconds", "server.postgame_seconds", "server.empty_seconds",
-	"server.idle_minutes", "server.team_start", "server.motd", "server.frame_rate", "server.web_password",
+	"server.idle_minutes", "server.team_start", "server.team_switch",
+	"server.team_switch_cooldown_seconds", "server.motd", "server.frame_rate", "server.web_password",
 	"server.web_moderator_password", "server.log_format", "server.log_addresses", "server.status_file",
 	"server.auto_update", "server.coop_difficulty", "server.region", "server.master_publish",
 	"server.master_publish_address", "server.metrics", "server.chat_filter", "server.chat_filter_slurs",
@@ -803,6 +804,7 @@ static struct
 	{ "server.idle_minutes", NULL, "0", NULL },
 	{ "server.frame_rate", NULL, "30", "120" },
 	{ "server.team_start", "one|both|skip", NULL, NULL },
+	{ "server.team_switch_cooldown_seconds", NULL, "0", "3600" },
 	{ "server.log_format", "text|json", NULL, NULL },
 	{ "server.auto_update", "off|check|install", NULL, NULL },
 	{ "server.coop_difficulty", "easy|normal|hard|impossible", NULL, NULL },

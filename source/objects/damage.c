@@ -1147,8 +1147,9 @@ static void object_damage_aftermath(
 		no statistics on a machine that joined after, is no player's) */
 		if (player_index != NONE)
 		{
-			/* port: an MCC team change's death is this no-statistics one, not a
-			suicide at the same time (mcc_ui_teams.c) */
+			/* port: a team change's death (MCC's picker, a dedicated server's
+			!switch) is this no-statistics one, not a suicide at the same
+			time (mcc_ui_teams.c) */
 			mcc_ui_team_respawn_damage(player_index, object_index,
 				TEST_FLAG(damage->flags, _damage_no_statistics_bit) != 0);
 			game_engine_player_killed(
