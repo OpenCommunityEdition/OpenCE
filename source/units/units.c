@@ -699,6 +699,7 @@ symbols in this file:
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 #include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
+#include "captain_mouth.h" /* port: port/linux/game/captain_mouth.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -11449,6 +11450,8 @@ void unit_preprocess_node_orientations(
 	struct unit_definition *unit_definition;
 	struct animation *animation;
 	short model_node_count;
+	/* port: whether an emotion's frame was laid over the pose (captain_mouth.c) */
+	boolean emotion_applied = FALSE;
 
 	unit = unit_get(unit_index);
 	unit_definition = unit_definition_get(unit->definition_index);
@@ -11531,9 +11534,13 @@ void unit_preprocess_node_orientations(
 						animation,
 						unit->unit.animation.emotion_index,
 						node_orientations);
+					emotion_applied = TRUE; /* port: (captain_mouth.c) */
 				}
 			}
 		}
+		/* port: Captain Keyes's lower lip, which each of his emotions' frames
+		levels, level with no emotion too (port/linux/game/captain_mouth.c) */
+		captain_mouth_node_orientations(unit_index, emotion_applied, node_orientations);
 
 		if (unit->unit.mouth_aperture > 0.f &&
 			_unit_seat_animation_mouth_aperture < unit_seat->animations.count)
