@@ -3187,6 +3187,18 @@ void forge_apply_instance_light_settings(int32_t live_idx)
 	if (!obj)
 		return;
 
+	if (!inst->is_default_scenario_object && obj->definition_index != NONE)
+	{
+		char const *oname = tag_get_name(obj->definition_index);
+		if (oname && oname[0] &&
+			_stricmp(oname, inst->tag_path) != 0 &&
+			_strnicmp(oname, "forge\\vehicles\\placed_unit_", 27) != 0)
+		{
+			/* Never apply light overrides to a mismatched stock scenario object */
+			return;
+		}
+	}
+
 	if (obj->definition_index != NONE)
 	{
 		obuf = (uint8_t *)tag_get((long)inst->group_tag, obj->definition_index);
@@ -3242,7 +3254,12 @@ void forge_apply_instance_light_settings(int32_t live_idx)
 					uint8_t const *att = att_base + (size_t)ld->attachment_marker_index * 72u;
 					if (*(uint32_t const *)(att + 0x00u) == 'ligh' && *(int32_t const *)(att + 0x0Cu) != NONE)
 					{
-						orig_def_idx = *(int32_t const *)(att + 0x0Cu);
+						long cand_def = *(int32_t const *)(att + 0x0Cu);
+						char const *cand_name = tag_get_name(cand_def);
+						if (!cand_name || _strnicmp(cand_name, "forge\\lights\\preset_", 20) != 0)
+							orig_def_idx = cand_def;
+						else
+							orig_def_idx = NONE;
 						orig_color_fn = *(int16_t const *)(att + 0x34u);
 						if (orig_color_fn < 0 || orig_color_fn >= 4)
 							orig_color_fn = NONE;
@@ -3300,8 +3317,9 @@ void forge_apply_instance_light_settings(int32_t live_idx)
 					uint8_t *new_att = (uint8_t *)forge_session_calloc(72u);
 					if (new_att)
 					{
+						long base_synth_def = forge_get_or_clone_light_preset_tag(NONE, 0, 0, 0);
 						*(uint32_t *)(new_att + 0x00u) = 'ligh';
-						*(int32_t *)(new_att + 0x0Cu) = synth_def;
+						*(int32_t *)(new_att + 0x0Cu) = (base_synth_def != NONE) ? base_synth_def : synth_def;
 						*(int16_t *)(new_att + 0x30u) = NONE;
 						*(int16_t *)(new_att + 0x32u) = NONE;
 						*(int16_t *)(new_att + 0x34u) = NONE;
@@ -3319,9 +3337,20 @@ void forge_apply_instance_light_settings(int32_t live_idx)
 					long new_lidx = light_new(synth_def, inst->object_index, marker_att_idx, NONE, NONE);
 					if (new_lidx != NONE)
 					{
+						struct forge_engine_light_datum_view *ld =
+							(struct forge_engine_light_datum_view *)datum_try_and_get(light_data, new_lidx);
 						obj->object.attachment_types[slot] = 0;
 						obj->object.attachment_indices[slot] = new_lidx;
 						SET_FLAG(obj->object.flags, _object_has_attached_lights_bit, TRUE);
+						if (ld)
+						{
+							ld->definition_index = synth_def;
+							if (inst->light_color_preset != 0)
+								ld->color_function_index = NONE;
+							ld->flags |= 3u;
+							light_disconnect_from_map(new_lidx);
+							light_reconnect_to_map(new_lidx);
+						}
 					}
 				}
 			}
@@ -6170,15 +6199,17 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 		{
 			unsigned int grp = 0;
 			int src_cache = 0, baked = 0, team = 0;
+			int is_baked_flg1 = is_existing_custom_map_file_flg1(leaf, NULL);
 			float x = 0, y = 0, z = 0, yaw = 0, pitch = 0, roll = 0;
 			char tpath[256];
 			tpath[0] = 0;
 			if (sscanf(line + 7, "%u|%d|%d|%f|%f|%f|%f|%f|%f|%d|%255[^\r\n]",
 					&grp, &src_cache, &baked, &x, &y, &z, &yaw, &pitch, &roll, &team, tpath) == 11 && tpath[0])
 			{
-				if (!baked)
+				if (!baked || !is_baked_flg1 || grp == 'lifi' || grp == 'mach' || grp == 'ctrl')
 				{
-					/* Cached tag object not baked into base_map: spawn live now! */
+					/* Sidecar-only map, device/light fixture, or cached tag object not baked into base_map:
+					 * always spawn live now so placed objects never claim or hijack nearby stock scenario objects! */
 					last_object_li = forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
 					last_object_po = (last_object_li >= 0) ? g_forge.live_instances[last_object_li].edit_entry_index : -1;
 					if (last_object_po >= 0 && last_object_po < FORGE_MAX_PLACED_OBJECTS)
@@ -6190,7 +6221,9 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 					struct object_datum *obj;
 					long found_oidx = NONE;
 					int32_t existing_default_li = -1;
-					float best_d2 = 100.0f;
+					float max_xy_d2 = (grp == 'vehi' || grp == 'weap' || grp == 'eqip') ? 4.0f : 0.25f;
+					float max_dz = (grp == 'vehi' || grp == 'weap' || grp == 'eqip') ? 10.0f : 1.0f;
+					float best_d2 = max_xy_d2;
 
 					object_iterator_new(&iter, (unsigned long)-1, 0);
 					while ((obj = object_iterator_next(&iter)) != NULL)
@@ -6236,7 +6269,7 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 						dy = obj->object.position.y - y;
 						dz = obj->object.position.z - z;
 						/* Physics objects (vehicles/weapons) spawn with +bounding_sphere_radius*0.5f on Z */
-						if (dx * dx + dy * dy > 16.0f || (float)fabs((double)dz) > 15.0f)
+						if (dx * dx + dy * dy > max_xy_d2 || (float)fabs((double)dz) > max_dz)
 							continue;
 						d2 = dx * dx + dy * dy + dz * dz * 0.25f;
 						if (d2 < best_d2)
