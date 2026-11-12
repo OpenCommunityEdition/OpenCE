@@ -1989,6 +1989,10 @@ static void update_human_boat_physics(
 		real *rotation;
 		real const *forward;
 
+		/* port: the original left inactive controls uninitialized. Both physics
+		paths can read them for valid powered-point flags. */
+		csmemset(state, 0, 3 * sizeof(*state));
+
 		speed = (real)fabs(magnitude3d(&vehicle->object.translational_velocity)*2.5f);
 		maximum_angle = vehicle->vehicle.turn*0.5f;
 		angle = 1.0f-CEILING(speed, 1.0f);

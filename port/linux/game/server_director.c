@@ -36,6 +36,7 @@ Called from the main loop every frame (main.c).
 #include "text/unicode.h"
 #include "game_modes.h"
 #include "network_distributed.h"
+#include "network_coop.h"
 #include "network_map_vote.h"
 #include "server_director.h"
 #include "server_gametypes.h"
@@ -542,6 +543,20 @@ void server_director_apply_settings(
 
 /* ---------- setting a game up */
 
+/* the riding rule an entry gives (NONE: it gives none) */
+static short server_entry_riding_rule(
+	struct server_entry const *entry)
+{
+	long index;
+
+	for (index = 0; index < entry->rule_count; index++)
+	{
+		if (!strcmp(entry->rules[index].key, "vehicle_riding"))
+			return entry->rules[index].value ? TRUE : FALSE;
+	}
+	return NONE;
+}
+
 /* the lobby's map and gametype set to the entry's (the rotation's at index;
 NONE: the interposed one): TRUE, else FALSE (said) */
 static boolean server_apply_entry(
@@ -596,6 +611,8 @@ static boolean server_apply_entry(
 		network_game_server_change_game_variant(network_server, &variant);
 		server_variant_name(&variant, variant_name, sizeof(variant_name));
 	}
+	/* (every applied entry sets it, NONE without a riding rule: a co-op entry's own, which no later entry inherits) */
+	network_game_port_vehicle_riding_entry(server_entry_riding_rule(entry));
 	server.current = *entry;
 	server.current_set = TRUE;
 	server.current_index = index;

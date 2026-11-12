@@ -2784,6 +2784,7 @@ symbols in this file:
 #include "hs_library_internal.h"
 #include "object_lists.h"
 #include "hs_scenario_definitions.h"
+#include "hs_console_state.h" /* port: port/linux/game/hs_console_state.inl */
 #include "ai/ai.h"
 #include "ai/ai_debug.h"
 #include "cache/cache_files.h"
@@ -2847,6 +2848,9 @@ symbols in this file:
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
 #include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
+#include "mcc_script_parameters.h" /* port: port/linux/game/mcc_script_parameters.h */
+#include "mcc_syntax.h" /* port: port/linux/game/mcc_syntax.h */
+#include "mcc_scripts.h" /* port: port/linux/game/mcc_scripts.c */
 
 /* ---------- constants */
 
@@ -3385,7 +3389,7 @@ typedef void (*hs_token_enumerator)(
 
 struct hs_function_table_storage
 {
-	struct hs_function_definition const *functions[418 + 7];
+	struct hs_function_definition const *functions[418 + 8]; /* port: append the map's riding call */
 	struct profile_section profile;
 	hs_token_enumerator token_enumerators[18];
 };
@@ -11793,7 +11797,27 @@ static struct hs_function_definition_with_1_parameter const debug_structure_cull
 	},
 };
 
-long const hs_function_table_count= 418 + 7;
+/* port: a map's own riding choice (port/linux/game/vehicle_riding.c), at the end of the table as the port's others are */
+void vehicle_riding_map_script(boolean on);
+
+HS_EVALUATE_VOID_BOOLEAN(hs_vehicle_riding_evaluate, vehicle_riding_map_script)
+
+static struct hs_function_definition_with_1_parameter const vehicle_riding_definition=
+{
+	{
+		_hs_type_void,
+		0,
+		"vehicle_riding",
+		hs_macro_function_parse,
+		hs_vehicle_riding_evaluate,
+		"sets whether players standing on a moving vehicle are carried by it for this map, over the players' and host's setting; only a startup script's call, on the map's first tick, counts.",
+		NULL,
+		1,
+		{ _hs_type_boolean },
+	},
+};
+
+long const hs_function_table_count= 418 + 8; /* port: append the map's riding call */
 
 struct hs_enum_definition const hs_enum_table[]=
 {
@@ -12232,6 +12256,8 @@ struct hs_function_table_storage hs_function_table=
 		&mods_list_definition,
 		&structure_culling_definition.definition, /* port: local structure culling switch */
 		&debug_structure_culling_definition.definition, /* port: local culling debug view */
+		/* port: the map's riding call follows all existing indices */
+		&vehicle_riding_definition.definition,
 	},
 	{
 		"hs_update",
@@ -12742,6 +12768,9 @@ static boolean const hs_function_allowed_in_maps[]=
 	/* port: local structure rendering */
 	FALSE, /* structure_culling: this machine's rendering */
 	FALSE, /* debug_structure_culling: this machine's rendering */
+
+	/* port: the map's vehicle riding */
+	TRUE, /* vehicle_riding */
 };
 typedef char verify_hs_function_allowed_in_maps_size[
 	NUMBEROF(hs_function_allowed_in_maps) == NUMBEROF(hs_function_table.functions) ? 1 : -1];
@@ -12859,6 +12888,14 @@ static boolean hs_scenario_syntax_data_valid(
 	byte const *address = (byte const *)scenario->hs_syntax_data.address;
 	struct data_array const *data = (struct data_array const *)address;
 
+	/* port: an MCC map's syntax has its own layout and limits (mcc_syntax.c) */
+	{
+		int mcc_valid = mcc_syntax_scenario_valid(scenario);
+
+		if (mcc_valid >= 0)
+			return mcc_valid != 0;
+	}
+
 	/* (in the loaded map's tag cache: this build's, or a Custom Edition
 	map's, cache_file_tag_cache_contains) */
 	if (scenario->hs_syntax_data.size != syntax_data_size ||
@@ -12882,9 +12919,8 @@ static boolean hs_scenario_syntax_data_valid(
 }
 
 /* port: the scenario's script strings as the map holds them (the names
-and strings its nodes point into): inside the tag cache, with the 0x400
-bytes at their end that the console's expressions are written to
-(hs_compile_expression). The shipped maps' all are */
+and strings its nodes point into): inside the tag cache, including the
+format's reserved 0x400-byte tail. Console text has separate saved storage. */
 static boolean hs_scenario_string_constants_valid(
 	struct scenario const *scenario)
 {
@@ -12994,9 +13030,12 @@ from the node as it is), or names an external global a map may not set
 Only a node with a value's type that is neither a constant nor a script's
 call is a function's call (hs_evaluate, hs_thread_main); its function's and
 its globals' indices are the ones hs_compile_postprocess found by name */
-static short hs_syntax_node_refusal(
+/* port: the same structural checks apply to saved console expressions;
+only maps have permanent-node and command-permission restrictions. */
+static short hs_syntax_node_check(
 	struct hs_syntax_node const *expression,
-	char const **name)
+	char const **name,
+	boolean from_map)
 {
 	struct hs_syntax_node const *predicate;
 	struct hs_syntax_node const *first_argument = NULL;
@@ -13008,7 +13047,7 @@ static short hs_syntax_node_refusal(
 	*name = NULL;
 	/* (a node that isn't permanent is a console expression's, which
 	hs_node_gc deletes from under the script) */
-	if (!TEST_FLAG(expression->flags, _hs_syntax_node_permanent_bit))
+	if (from_map && !TEST_FLAG(expression->flags, _hs_syntax_node_permanent_bit))
 		return _hs_node_refusal_damaged;
 	if (expression->next_node_index != NONE && !hs_syntax_try_get(expression->next_node_index))
 		return _hs_node_refusal_damaged;
@@ -13021,14 +13060,25 @@ static short hs_syntax_node_refusal(
 		return _hs_node_refusal_none;
 
 	function_index = expression->function_index;
+	{
+		struct hs_function_definition *mcc_function = mcc_script_function(function_index);
+		if (mcc_function)
+		{
+			*name = mcc_function->name;
+			/* port: saved console calls share MCC's grammar, not map ownership. */
+			return (from_map ? mcc_script_call_valid(expression, hs_syntax_data) :
+				mcc_script_call_arguments_valid(expression, hs_syntax_data)) ?
+				_hs_node_refusal_none : _hs_node_refusal_damaged;
+		}
+	}
 	if (function_index<0 || function_index>=(short)NUMBEROF(hs_function_allowed_in_maps))
 		return _hs_node_refusal_damaged;
 	function = hs_function_get(function_index);
 	*name = function->name;
-	if (!hs_function_allowed_in_maps[function_index])
+	if (from_map && !hs_function_allowed_in_maps[function_index])
 		return _hs_node_refusal_function;
 	/* port: a downloaded map's (hs_functions_denied_to_downloaded_maps) */
-	if (hs_scenario_downloaded && hs_name_listed(function->name, hs_functions_denied_to_downloaded_maps))
+	if (from_map && hs_scenario_downloaded && hs_name_listed(function->name, hs_functions_denied_to_downloaded_maps))
 		return _hs_node_refusal_downloaded_function;
 
 	if (function->parse == hs_macro_function_parse)
@@ -13079,6 +13129,14 @@ static short hs_syntax_node_refusal(
 	{
 		short designator = (short)first_argument->data;
 
+		/* port: a set of an MCC script's parameter (mcc_script_parameters.c) */
+		{
+			int mcc_parameter = mcc_parameter_set_valid(first_argument,
+				hs_syntax_try_get(first_argument->next_node_index));
+			if (mcc_parameter >= 0)
+				return mcc_parameter ? _hs_node_refusal_none : _hs_node_refusal_damaged;
+		}
+
 		if (!TEST_FLAG(first_argument->flags, _hs_syntax_node_primitive_bit) ||
 			!TEST_FLAG(first_argument->flags, _hs_syntax_node_variable_bit) ||
 			hs_global_get_type(designator) == _hs_unparsed)
@@ -13093,13 +13151,13 @@ static short hs_syntax_node_refusal(
 			if (!value || value->type != hs_global_get_type(designator))
 				return _hs_node_refusal_damaged;
 		}
-		if ((designator & 0x8000) && !hs_external_global_settable_by_maps(designator & 0x7FFF))
+		if (from_map && (designator & 0x8000) && !hs_external_global_settable_by_maps(designator & 0x7FFF))
 		{
 			*name = hs_global_external_get(designator & 0x7FFF)->name;
 			return _hs_node_refusal_global;
 		}
 		/* port: a downloaded map's (hs_globals_denied_to_downloaded_maps) */
-		if ((designator & 0x8000) && hs_scenario_downloaded &&
+		if (from_map && (designator & 0x8000) && hs_scenario_downloaded &&
 			hs_name_listed(hs_global_external_get(designator & 0x7FFF)->name, hs_globals_denied_to_downloaded_maps))
 		{
 			*name = hs_global_external_get(designator & 0x7FFF)->name;
@@ -13116,6 +13174,63 @@ static short hs_syntax_node_refusal(
 	}
 
 	return _hs_node_refusal_none;
+}
+
+/* port: preserve map admission while checking saved console call arity. */
+static short hs_syntax_node_refusal(
+	struct hs_syntax_node const *expression,
+	char const **name)
+{
+	return hs_syntax_node_check(expression, name, TRUE);
+}
+
+boolean hs_console_syntax_node_valid(
+	struct hs_syntax_node const *node)
+{
+	char const *name;
+	short actual_type;
+	if (TEST_FLAG(node->flags, _hs_syntax_node_primitive_bit))
+	{
+		if (TEST_FLAG(node->flags, _hs_syntax_node_script_bit))
+			return FALSE;
+		if (node->type == _hs_function_name)
+			return !TEST_FLAG(node->flags, _hs_syntax_node_variable_bit);
+		if (TEST_FLAG(node->flags, _hs_syntax_node_variable_bit))
+		{
+			if (global_scenario_index == NONE && !((short)node->data & 0x8000))
+				return FALSE;
+			actual_type = hs_global_get_type((short)node->data);
+		}
+		else
+			actual_type = node->constant_type;
+	}
+	else
+	{
+		struct hs_syntax_node const *predicate = hs_syntax_try_get(node->data);
+		if (!hs_type_valid(node->type) || TEST_FLAG(node->flags, _hs_syntax_node_variable_bit) ||
+			!predicate || !TEST_FLAG(predicate->flags, _hs_syntax_node_primitive_bit) ||
+			predicate->type != _hs_function_name ||
+			hs_syntax_node_check(node, &name, FALSE) != _hs_node_refusal_none)
+			return FALSE;
+		if (TEST_FLAG(node->flags, _hs_syntax_node_script_bit))
+		{
+			struct hs_script const *script;
+			if (global_scenario_index == NONE || node->script_index < 0 ||
+				node->script_index >= global_scenario_get()->hs_scripts.count)
+				return FALSE;
+			script = TAG_BLOCK_GET_ELEMENT(&global_scenario_get()->hs_scripts, node->script_index, struct hs_script);
+			if (script->script_type != _hs_script_static && script->script_type != _hs_script_stub)
+				return FALSE;
+			actual_type = script->return_type;
+		}
+		else
+			actual_type = hs_function_get(node->function_index)->return_type;
+	}
+	/* port: a saved expression must satisfy the compiler's cast contract
+	before the interpreter can use its value or return through its frame. */
+	return hs_type_valid(node->type) &&
+		(actual_type == _hs_passthrough || hs_type_valid(actual_type)) &&
+		hs_can_cast(actual_type, node->type);
 }
 
 /* port: whether a script's or global's root node is of the type the
@@ -13214,6 +13329,10 @@ static void hs_scenario_functions_check(
 	short disabled_global_count = 0;
 	char reason[128];
 
+	/* port: an MCC map's functions are checked by mcc_syntax.c */
+	if (mcc_syntax_functions_check(scenario, hs_syntax_data, hs_syntax_node_refusal,
+		hs_scenario_disabled_scripts, hs_scenario_disabled_globals))
+		return;
 	/* port: a downloaded map's are held to tighter rules (map_share.c's
 	map_share_map_downloaded) */
 	hs_scenario_downloaded = map_share_map_downloaded(cache_file_loaded_map_name());
@@ -13373,6 +13492,11 @@ static void hs_allocate(
 	struct scenario *scenario;
 
 	scenario = global_scenario_index != NONE ? global_scenario_get() : NULL;
+	{
+
+		if (mcc_syntax_scenario_valid(scenario) > 0)
+			return;
+	}
 	/* port: as the map holds it only when it is sound */
 	if (scenario &&
 		scenario->hs_syntax_data.size ==
@@ -13389,9 +13513,8 @@ static void hs_allocate(
 	if (scenario)
 	{
 		hs_scenario_scripts_disable(scenario);
-		/* port: strings that aren't sound aren't gone by either, the
-		console's expressions included (hs_compile_expression refuses a
-		scenario without room for them) */
+		/* port: damaged map strings are not used by scenario compilation.
+		Console expressions own separate text in hs_console_state.inl. */
 		if (!hs_scenario_string_constants_valid(scenario))
 			scenario->hs_string_constants.size = 0;
 		if (hs_syntax_data && hs_syntax_data_allocated)
@@ -13740,6 +13863,13 @@ void hs_recompile(
 struct hs_function_definition *hs_function_get(
 	short function_index)
 {
+	/* port: MCC's additional functions (mcc_scripts.c) */
+	{
+		struct hs_function_definition *mcc_function = mcc_script_function(function_index);
+
+		if (mcc_function)
+			return mcc_function;
+	}
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs.c",
 		522,
@@ -13874,6 +14004,14 @@ short hs_find_function_by_name(
 	char const *name)
 {
 	short function_index;
+
+	/* port: MCC's additional functions (mcc_scripts.c) */
+	{
+		short mcc_index = mcc_script_find(name);
+
+		if (mcc_index != NONE)
+			return mcc_index;
+	}
 
 	for (function_index = 0; function_index<hs_function_table_count; function_index++)
 	{
@@ -15556,6 +15694,7 @@ static boolean hs_compile_and_evaluate_command(
 		if (server_command_try(expression, &server_result))
 			return server_result;
 	}
+	/* port: typed bot controls, after the dedicated console's role check. */
 	/* port: the co-op host's bringto, which brings every player to the host
 	(players.c; a client is told it is the host's) */
 	if (hs_host_player_command(expression, "bringto"))

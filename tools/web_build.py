@@ -54,6 +54,7 @@ LINUX_DIR = Path("port/linux")
 ANDROID_DIR = Path("port/android")
 PORT_CONFIG = LINUX_DIR / "port.json"
 SDL_PORT = PORT_DIR / "halo_sdl3.py"
+BUILD_SUPPORT = Path("tools/web_build_support.py")
 # (the release port/web/halo_sdl3.py fetches, as the other builds')
 SDL_TAG = "release-3.4.16"
 # the game's functions the page (port/web/site) calls on its module, besides
@@ -136,7 +137,7 @@ WEB_EXCLUDE = {
 
 # the web runtime's units that, like posix_*.c, are the C library's side of
 # the platform layer, with its own ABI
-WEB_POSIX_SOURCES = {"web_main.c", "web_net.c", "web_stubs.c", "web_touch.c"}
+WEB_POSIX_SOURCES = {"web_main.c", "web_net.c", "web_stubs.c", "web_touch.c", "web_mcc_storage.c"}
 
 
 def _quote(path: Any) -> str:
@@ -153,8 +154,12 @@ def find_emcc(sln: Any) -> Optional[str]:
     if found:
         return found
     for root in (os.environ.get("EMSDK"), str(Path.home() / "emsdk")):
-        if root and (Path(root) / "upstream" / "emscripten" / "emcc").is_file():
-            return str(Path(root) / "upstream" / "emscripten" / "emcc")
+        if not root:
+            continue
+        for name in (("emcc.exe", "emcc.bat") if os.name == "nt" else ("emcc",)):
+            candidate = Path(root) / "upstream" / "emscripten" / name
+            if candidate.is_file():
+                return str(candidate)
     return None
 
 
@@ -164,7 +169,7 @@ def site_sources() -> List[Path]:
 
 
 def web_configure_inputs() -> List[Path]:
-    return [Path(__file__), PORT_DIR / "src", PORT_DIR / "site", PORT_DIR / "site" / "icons", SDL_PORT,
+    return [Path(__file__), BUILD_SUPPORT, PORT_DIR / "src", PORT_DIR / "site", PORT_DIR / "site" / "icons", SDL_PORT,
             *hud_configure_inputs()]
 
 
@@ -201,16 +206,14 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     # (and its license, from its source, for licenses.txt)
     sdl_stamp = build_dir / "sdl3.stamp"
     sdl_license = build_dir / "SDL3-LICENSE.txt"
-    em_config = Path(emcc).with_name("em-config")
     n.rule(
         name="web_sdl3",
-        command=f"echo '#include <SDL3/SDL.h>' > $out.c && $web_emcc {sdl_flag} -pthread -c $out.c -o $out.o && "
-                f"rm -f $out.c $out.o && cp \"$$({_quote(em_config)} CACHE)/ports/halo_sdl3/SDL-{SDL_TAG}/LICENSE.txt\" "
-                f"{sdl_license} && touch $out",
+        command=f'$python {BUILD_SUPPORT} sdl --emcc $web_emcc --port {SDL_PORT} '
+                f'--stamp $out --license {_quote(sdl_license)} --tag {SDL_TAG}',
         description="WEB SDL3 (Emscripten port, fetched and built once)",
         pool="console",
     )
-    n.build(outputs=sdl_stamp, implicit_outputs=[sdl_license], rule="web_sdl3", implicit=[SDL_PORT])
+    n.build(outputs=sdl_stamp, implicit_outputs=[sdl_license], rule="web_sdl3", implicit=[SDL_PORT, BUILD_SUPPORT])
 
     abi = " ".join(WEB_ABI_FLAGS + configuration_defines(sln))
     code = " ".join(WEB_CODE_FLAGS)
@@ -293,6 +296,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
     # ---------- the link
 
     library_js = PORT_DIR / "src" / "web_library.js"
+    mcc_library_js = PORT_DIR / "src" / "web_mcc_library.js"
     pre_js = PORT_DIR / "src" / "web_pre.js"
     halo_js = site_dir / "halo.js"
     halo_wasm = site_dir / "halo.wasm"
@@ -315,6 +319,9 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         "-lopfs.js",
         f"-sINITIAL_MEMORY={WEB_MEMORY_BYTES}",
         "-sALLOW_MEMORY_GROWTH=0",
+        # Bounded readers handle allocation failure; do not abort the browser
+        # before their normal load-failure cleanup can run.
+        "-sABORTING_MALLOC=0",
         # (the game recurses deeply in places: scripts, the BSP's walks)
         "-sSTACK_SIZE=8MB",
         "-sDEFAULT_PTHREAD_STACK_SIZE=2MB",
@@ -336,6 +343,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         # function names in stack traces (the name section only)
         "--profiling-funcs",
         f"--js-library {library_js}",
+        f"--js-library {mcc_library_js}",
         f"--pre-js {pre_js}",
     ]
     n.rule(
@@ -343,22 +351,25 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         command="$web_emcc $ldflags -o $out @$out.rsp",
         description="WEB LINK $out",
         rspfile="$out.rsp",
-        rspfile_content="$in_newline",
+        # Emscripten parses response files as shell words even on Windows.
+        # Native backslashes are escapes there; quote portable paths so both
+        # separators and source directories containing spaces survive.
+        rspfile_content=" ".join(f'"{obj.as_posix()}"' for obj in objects),
     )
     n.build(outputs=halo_js, implicit_outputs=[halo_wasm], rule="web_link", inputs=objects,
-            implicit=[library_js, pre_js, SDL_PORT, sdl_stamp], variables={"ldflags": " ".join(link_flags)})
+            implicit=[library_js, mcc_library_js, pre_js, SDL_PORT, sdl_stamp], variables={"ldflags": " ".join(link_flags)})
 
     # ---------- the site: the page, its service worker and the importer
 
-    n.rule(name="web_copy", command="cp $in $out", description="WEB STAGE $out")
+    n.rule(name="web_copy", command=f'$python {BUILD_SUPPORT} copy $in $out', description="WEB STAGE $out")
     site_files: List[Path] = []
     for source in site_sources():
         target = site_dir / source.relative_to(PORT_DIR / "site")
-        n.build(outputs=target, rule="web_copy", inputs=source)
+        n.build(outputs=target, rule="web_copy", inputs=source, implicit=[BUILD_SUPPORT])
         site_files.append(target)
     for name in SITE_FONTS:
         target = site_dir / "fonts" / name
-        n.build(outputs=target, rule="web_copy", inputs=Path("port/assets/fonts") / name)
+        n.build(outputs=target, rule="web_copy", inputs=Path("port/assets/fonts") / name, implicit=[BUILD_SUPPORT])
         site_files.append(target)
     licenses = site_dir / "licenses.txt"
     n.rule(
@@ -366,7 +377,8 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         command=f"$python {PORT_DIR}/licenses.py $out {sdl_license}",
         description="WEB LICENSES $out",
     )
-    n.build(outputs=licenses, rule="web_licenses", implicit=[PORT_DIR / "licenses.py", Path("LICENSE"), sdl_license])
+    n.build(outputs=licenses, rule="web_licenses", implicit=[PORT_DIR / "licenses.py", Path("LICENSE"), sdl_license,
+            Path("port/third_party/bcdec/LICENSE")])
     site_files.append(licenses)
     n.rule(
         name="web_version",

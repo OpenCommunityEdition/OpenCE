@@ -32,6 +32,7 @@
       <nav class="menu" aria-label="Launcher">
         <a href="#play-panel" class="menu-current">Play</a>
         <a href="#data-panel">Game data</a>
+        <a href="#maps-panel">Custom maps</a>
         <a href="#mods-panel">Mods</a>
         <a href="#room-panel">Play together</a>
         <a href="#servers-panel">Servers</a>
@@ -80,6 +81,34 @@
               <input type="file" id="folder-input" webkitdirectory multiple hidden>
             </label>
           </div>
+        </section>
+
+        <section class="screen" id="maps-panel" aria-labelledby="maps-title">
+          <h2 id="maps-title">Custom maps</h2>
+          <p class="help">Add your own Custom Edition maps and resources, or a Halo 1 MCC package folder.
+            Files stay in this browser. Your Xbox maps and saved games are kept separately.</p>
+          <p class="help">Custom Edition uses bitmaps.map, sounds.map and loc.map from your CE installation.
+            MCC package folders may include campaign metadata and previews; local map-only folders also work.</p>
+          <p id="custom-maps-list" class="help">Looking…</p>
+          <div class="button-bar">
+            <label class="button" id="ce-files-label">Add CE files…
+              <input type="file" id="ce-files-input" accept=".map" multiple hidden>
+            </label>
+            <label class="button" id="ce-folder-label">Add a CE folder…
+              <input type="file" id="ce-folder-input" webkitdirectory multiple hidden>
+            </label>
+          </div>
+          <label class="help" for="mcc-package-name">MCC package name (optional; defaults to its Workshop ID or folder)</label>
+          <input id="mcc-package-name" type="text" maxlength="40" autocomplete="off">
+          <div class="button-bar">
+            <label class="button" id="mcc-folder-label">Add an MCC package folder…
+              <input type="file" id="mcc-folder-input" webkitdirectory multiple hidden>
+            </label>
+            <button id="map-import-cancel" hidden>Cancel import</button>
+          </div>
+          <p id="map-import-status" class="help" role="status">Existing files are never replaced. Quit games in other tabs before importing.</p>
+          <p class="help note">Find imported maps in the game's Custom Edition or MCC menus. Campaign progression uses
+            the existing MCC Campaigns setting. A finished import is checked again by the game before loading.</p>
         </section>
 
         <section class="screen" id="mods-panel" aria-labelledby="mods-title">
@@ -229,6 +258,7 @@
 <script src="net.js"></script>
 <script src="p2p.js"></script>
 <script src="servers.js"></script>
+<script src="map-import-storage.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

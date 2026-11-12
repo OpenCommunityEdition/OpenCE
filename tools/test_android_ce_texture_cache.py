@@ -42,6 +42,7 @@ struct xgpu_texture_description {
  unsigned long width, height, depth, levels, format;
  BOOL cube_map;
 };
+static BOOL xgpu_mcc_texture_get(const DWORD *r,const D3DCOLOR *p,GLuint *t,GLenum *g,struct xgpu_texture_description *d) { return FALSE; }
 static int android_texture_fixes=1;
 static unsigned long serial=1, generation=1, uploads, next_texture;
 static unsigned long memory_watch_serial(void) { return serial; }
@@ -107,9 +108,8 @@ static void read_pixels(struct bitmap_data *b,void *h) {
 
 
 def gpu_lookup(source):
-    # Exercise the common texture lookup; other owners dispatch before it.
-    lookup = function(source, 'xgpu_texture_get')
-    return lookup[:lookup.index('{') + 1] + '\n' + lookup[lookup.index('\tDWORD data ='):]
+    # Exercise the complete lookup with MCC ownership inactive.
+    return function(source, 'xgpu_texture_get')
 
 
 
