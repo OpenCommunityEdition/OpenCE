@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_mcc_rotation_and_catalog(tmp_path):
     (tmp_path / "cseries.h").write_text(
-        "#include <stddef.h>\ntypedef unsigned char boolean;\n#define TRUE 1\n")
+        "#ifndef MCC_SERVER_TEST_CSERIES_H\n#define MCC_SERVER_TEST_CSERIES_H\n"
+        "#include <stddef.h>\ntypedef unsigned char boolean;\n#define TRUE 1\n#endif\n")
     source = tmp_path / "server.c"
     source.write_text(r'''
 #include <stdio.h>
