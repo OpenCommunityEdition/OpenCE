@@ -65,7 +65,7 @@ none), `open` whether it takes players now.
 The release has a `halo-server` script beside `halo`, which runs
 `halo --server` with its arguments.
 
-## MCC maps in GulchCE
+## MCC maps
 
 Use the same executable and `--server` workflow with an explicit MCC namespace:
 

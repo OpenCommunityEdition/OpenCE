@@ -45,7 +45,7 @@ their existing resolution. Direct manual files win over nested copies.
 the selected map's physical directory, keeping metadata and pictures at the
 correct root for both layouts. No new cache or persistent layout state is used.
 Virtual level names and transfer messages are unchanged; item five retains
-network protocol 44. The catalog and Workshop tests cover both local layouts,
+network protocol 44. The local-package regression tests cover both layouts,
 direct-file precedence, campaign metadata and refusal of linked nested paths.
 
 Android's folder and ZIP importer already retains PNG files and metadata
