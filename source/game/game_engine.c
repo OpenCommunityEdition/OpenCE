@@ -601,6 +601,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "mcc_objects.h" /* port: port/linux/game/mcc_objects.h */
 #include "mcc_player.h" /* port: port/linux/game/mcc_player.h */
 #include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
+#include "server_team_switch.h" /* port: port/linux/game/server_team_switch.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 #include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
 
@@ -5111,9 +5112,11 @@ void game_engine_player_killed(
 	if (!game_engine)
 		return;
 
-	/* port: the death of a team change (MCC's picker, a dedicated server's
-	!switch) is no one's kill (mcc_ui_teams.c) */
+	/* port: the death of an MCC team change is no one's kill (mcc_ui_teams.c) */
 	mcc_ui_team_respawn_death(&killing_player_index, &killing_object_index, dead_player_index, &friendly_fire);
+	/* port: and a dedicated server's !switch's (server_team_switch.c) */
+	server_team_switch_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
+		&friendly_fire);
 
 	/* the distributed netcode: a client's copy of a death has the host's
 	killer (port/linux/game/network_distributed.c) */
@@ -5169,6 +5172,11 @@ void game_engine_player_killed(
 
 	if (!player_kill)
 		dead_player->respawn_timer += global_variant.universal_variant.suicide_penalty;
+
+	/* port: a dedicated server's !switch moves the dead here, as the auto
+	team balance below does, once their unit has dropped what it carried
+	(server_team_switch.c) */
+	server_team_switch_player_dead(dead_player_index);
 
 	/* port: the gametype's auto team balance (game_variant_options): the host
 	moves the dead to the other team when his is two or more bigger (his

@@ -400,8 +400,13 @@ server decides, and moves a player only
 A living player dies as they switch, a death no one is credited with: no
 suicide is scored and no kill counted, what they carry (a flag, the ball)
 drops, and they respawn on the new team after the gametype's respawn time
-(and its suicide penalty). A dead player's respawn goes on as it was. The
-team scores stay as they were, the points a player scored staying with the
+(and its suicide penalty). They join the new team as they die, once what
+they carried has dropped, never while they still hold it; if another
+player kills them first, the kill is that player's and the switch is made
+all the same. While a switch waits for its death, the auto team balance's
+rule counts the player in the new team. A dead player changes team at once,
+and their respawn goes on as it was. The cooldowns start again with each
+map. The team scores stay as they were, the points a player scored staying with the
 team they scored them for, and the player's own score goes with them.
 Every machine sees the new team with the player's next life, as it does the
 auto team balance's moves, so a client of any network version takes it.

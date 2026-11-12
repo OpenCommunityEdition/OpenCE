@@ -47,7 +47,7 @@ static struct game_variant_options options = { TRUE };
 static struct network_game fake_game;
 static struct network_game_server fake_server;
 static boolean running = TRUE, can_score = TRUE, teams = TRUE, infection = FALSE, switch_on = TRUE;
-static long cooldown_seconds = 30, killed_player = NONE, killed_unit = NONE;
+static long cooldown_seconds = 30, killed_unit = NONE;
 static int kills;
 static unsigned long now_ms = 100000;
 /* (functions, so that a fault that reads one no more still compiles) */
@@ -63,6 +63,7 @@ static int config_boolean_value(void) { return switch_on; }
 #define global_network_game_server_get() (&fake_server)
 #define network_game_server_get_game(server) (&fake_game)
 #define server_log(level, category, ...) ((void)0)
+#define csmemset memset
 static long player_index_of(int slot)
 {
 	return ((long)(unsigned short)people[slot].identifier << 16) | slot;
@@ -90,13 +91,10 @@ static struct player_datum *data_iterator_next(struct data_iterator *iterator)
 	}
 	return NULL;
 }
-/* (as mcc_ui_teams.c's: a dead player has no unit to kill) */
-static void mcc_ui_team_change_kill(long player_index, long unit_index)
+/* (the death it asks for is dealt by the next objects update: dies) */
+static void unit_kill_no_statistics(long unit_index)
 {
-	if (unit_index == NONE)
-		return;
 	kills++;
-	killed_player = player_index;
 	killed_unit = unit_index;
 }
 #include "under_test.inc"
@@ -130,6 +128,45 @@ static boolean ask(int slot)
 	notice[0] = 0;
 	return server_team_switch(player_index_of(slot), "Chief", notice, (long)sizeof(notice));
 }
+/* a player's team everywhere it is kept: theirs, their network data's and
+the game's record's (NONE: they disagree) */
+static short team_of(int slot)
+{
+	short team = people[slot].team_index;
+	if (people[slot].network_player_data.team_index != team || fake_game.players[slot].team_index != team)
+		return NONE;
+	return team;
+}
+static long killer, killing_object;
+static boolean friendly;
+/* the next objects update deals a living switching player's unit the death
+the switch asked for: object_damage_aftermath's no-statistics death (around
+which it tells server_team_switch_damage), game_engine_player_killed's
+hooks; then they respawn */
+static void dies(int slot)
+{
+	long player_index = player_index_of(slot), unit = people[slot].unit_index;
+	killer = player_index;
+	killing_object = unit;
+	friendly = TRUE;
+	server_team_switch_damage(player_index, unit, TRUE);
+	server_team_switch_player_killed(&killer, &killing_object, player_index, &friendly);
+	server_team_switch_player_dead(player_index);
+	server_team_switch_damage(player_index, unit, FALSE);
+	people[slot].unit_index = 900 + slot;
+}
+/* another player (in slot by) kills a player first: an ordinary kill, which
+no no-statistics damage told of */
+static void killed_by(int slot, int by)
+{
+	long player_index = player_index_of(slot);
+	killer = player_index_of(by);
+	killing_object = people[by].unit_index;
+	friendly = FALSE;
+	server_team_switch_player_killed(&killer, &killing_object, player_index, &friendly);
+	server_team_switch_player_dead(player_index);
+	people[slot].unit_index = 900 + slot;
+}
 static void unmoved(int slot, char const *why)
 {
 	CHECK(people[slot].team_index == 0 && people[slot].network_player_data.team_index == 0 &&
@@ -147,20 +184,80 @@ int main(int argc, char **argv)
 	{
 		slot = teams_of(3, 2);
 		CHECK(ask(slot), "3 red against 2 blue: a red player may switch (%s)", notice);
-		CHECK(people[slot].team_index == 1, "the player is blue");
-		CHECK(people[slot].network_player_data.team_index == 1, "the player's network data is blue");
-		CHECK(fake_game.players[slot].team_index == 1, "the game's record is blue");
-		CHECK(kills == 1 && killed_player == player_index_of(slot) && killed_unit == 77,
-			"their living unit is killed as a team change's (no one's kill)");
 		CHECK(!strcmp(notice, "Chief switched to the Blue team"), "everyone is told: \"%s\"", notice);
+		CHECK(kills == 1 && killed_unit == 77, "their living unit is killed with no statistics");
+		/* (still red until the death: a flag carrier moved now would hold
+		their new team's flag) */
+		CHECK(team_of(slot) == 0, "red until their unit dies (%d)", team_of(slot));
+		dies(slot);
+		CHECK(team_of(slot) == 1, "blue once it has died (%d)", team_of(slot));
+		CHECK(killer == NONE && killing_object == NONE && !friendly, "the death is no one's: no suicide");
 		return 0;
 	}
 	CASE("dead")
 	{
 		slot = teams_of(3, 2);
 		people[slot].unit_index = NONE;
-		CHECK(ask(slot) && people[slot].team_index == 1, "a dead player switches");
+		CHECK(ask(slot) && team_of(slot) == 1, "a dead player switches at once (%s)", notice);
 		CHECK(kills == 0, "a dead player has no unit to kill");
+		return 0;
+	}
+	CASE("other-kill")
+	{
+		slot = teams_of(3, 2);
+		CHECK(ask(slot), "the switch (%s)", notice);
+		killed_by(slot, 4);
+		CHECK(killer == player_index_of(4) && killing_object == 201 && !friendly,
+			"another's kill, come first, stays theirs");
+		CHECK(team_of(slot) == 1, "and the player is moved all the same (%d)", team_of(slot));
+		return 0;
+	}
+	CASE("stale")
+	{
+		slot = teams_of(3, 2);
+		CHECK(ask(slot), "the switch (%s)", notice);
+		/* (their unit went without dying: deleted, and a new one theirs) */
+		people[slot].unit_index = 500;
+		dies(slot);
+		CHECK(team_of(slot) == 0, "a later unit's death does not move them (%d)", team_of(slot));
+		CHECK(killer == player_index_of(slot) && killing_object == 500 && friendly, "nor is it made no one's");
+		return 0;
+	}
+	CASE("waiting-counted")
+	{
+		slot = teams_of(3, 2);
+		CHECK(ask(slot), "the first red player's switch (%s)", notice);
+		CHECK(!ask(1), "3 against 2 with one moving is 2 against 3: a second may not");
+		CHECK(team_of(1) == 0 && strstr(notice, "Blue has 3 players, Red 2") != NULL, "\"%s\"", notice);
+		return 0;
+	}
+	CASE("waiting-again")
+	{
+		cooldown_seconds = 0;
+		options.auto_team_balance = FALSE;
+		slot = teams_of(2, 2);
+		CHECK(ask(slot), "the switch (%s)", notice);
+		CHECK(!ask(slot), "another before the death");
+		CHECK(kills == 1 && strstr(notice, "switching teams already") != NULL, "\"%s\"", notice);
+		dies(slot);
+		CHECK(team_of(slot) == 1, "the first is made (%d)", team_of(slot));
+		return 0;
+	}
+	CASE("new-map")
+	{
+		options.auto_team_balance = FALSE;
+		slot = teams_of(2, 2);
+		people[slot].unit_index = NONE;
+		CHECK(ask(slot) && team_of(slot) == 1, "a switch on the last map (%s)", notice);
+		/* (and another player's move, waiting) */
+		CHECK(ask(1), "a living player's switch (%s)", notice);
+		server_team_switch_initialize_for_new_map();
+		/* (the new map's players have the same indices) */
+		people[slot].team_index = people[slot].network_player_data.team_index = 0;
+		fake_game.players[slot].team_index = 0;
+		CHECK(ask(slot) && team_of(slot) == 1, "no cooldown kept from the last map (%s)", notice);
+		dies(1);
+		CHECK(team_of(1) == 0, "no move kept from the last map (%d)", team_of(1));
 		return 0;
 	}
 	CASE("balance-even")
@@ -182,7 +279,9 @@ int main(int argc, char **argv)
 	{
 		options.auto_team_balance = FALSE;
 		slot = teams_of(1, 4);
-		CHECK(ask(slot) && people[slot].team_index == 1, "without the balance, any switch (%s)", notice);
+		CHECK(ask(slot), "without the balance, any switch (%s)", notice);
+		dies(slot);
+		CHECK(team_of(slot) == 1, "1 red against 4 blue: moved to blue (%d)", team_of(slot));
 		return 0;
 	}
 	CASE("quit-not-counted")
@@ -259,11 +358,11 @@ int main(int argc, char **argv)
 	{
 		options.auto_team_balance = FALSE;
 		slot = teams_of(2, 2);
+		people[slot].unit_index = NONE;
 		CHECK(ask(slot), "the first switch");
 		now_ms += 29001;
-		kills = 0;
 		CHECK(!ask(slot), "again 29 seconds later");
-		CHECK(people[slot].team_index == 1 && kills == 0, "held: still blue");
+		CHECK(people[slot].team_index == 1, "held: still blue");
 		CHECK(!strcmp(notice, "You can switch teams again in 1 second"), "\"%s\"", notice);
 		now_ms += 999;
 		CHECK(ask(slot) && people[slot].team_index == 0, "again 30 seconds later (%s)", notice);
@@ -280,6 +379,7 @@ int main(int argc, char **argv)
 	{
 		options.auto_team_balance = FALSE;
 		slot = teams_of(2, 2);
+		people[slot].unit_index = NONE;
 		now_ms = 0xFFFFF000UL;
 		CHECK(ask(slot), "the first switch");
 		now_ms = 0x00001000UL;
@@ -292,6 +392,7 @@ int main(int argc, char **argv)
 		options.auto_team_balance = FALSE;
 		cooldown_seconds = 100000;
 		slot = teams_of(2, 2);
+		people[slot].unit_index = NONE;
 		CHECK(ask(slot), "the first switch");
 		now_ms += 3600 * 1000UL;
 		CHECK(ask(slot), "an hour later, the longest cooldown (%s)", notice);

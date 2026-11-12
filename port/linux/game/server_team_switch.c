@@ -17,13 +17,25 @@ moves them only
 The player is moved as the auto team balance moves the dead
 (game_engine_player_killed): the host sets their team (and its game's
 record, which late joins count and the lobby shows), and their next unit
-carries it to every machine (network_player_attach_unit). A living player's
-unit dies first, as MCC's team picker's does (mcc_ui_teams.c): a death no one
-is credited with, so no suicide is scored; what it carries (a flag, the
-ball) drops, and they respawn as after any death. A dead player's respawn
-goes on as it was. What a player scored stays with the team they scored it
-for, and their own score with them. Every machine is told in the chat, and
-the server's log has it; a refusal is told to the player alone.
+carries it to every machine (network_player_attach_unit). A dead player is
+moved at once, and their respawn goes on as it was. A living player's unit
+is killed with no statistics (unit_kill_no_statistics), a death no one is
+credited with, so no suicide is scored, and they respawn as after any
+death. Their move waits for that death, which the next objects update
+deals, and is made where the auto team balance makes its own, once the
+unit has dropped what it carried (a flag, the ball): moved before, a flag
+carrier would hold their new team's own flag until then, and the game
+engine's update, which runs ahead of the objects', would see it (a capture
+by the new team, near its base). While a move waits, the balance counts the
+player in their new team. A kill by another that comes first stays theirs,
+and the player is moved all the same.
+
+What a player scored stays with the team they scored it for, and their own
+score with them. Every machine is told in the chat, and the server's log
+has it; a refusal is told to the player alone. Each new map forgets every
+cooldown and waiting move (players_initialize_for_new_map): its players
+reuse the last map's player indices. Only the host makes moves; on a client
+the hooks find none.
 */
 
 #include "cseries.h"
@@ -37,8 +49,8 @@ the server's log has it; a refusal is told to the player alone.
 #include "networking/network_server_manager_internal.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "units/units.h"
 #include "infection.h"
-#include "mcc_ui_teams.h"
 #include "server_team_switch.h"
 #include "../src/port_config.h" /* port: port/linux/src/port_config.c */
 #include "../src/server_log.h" /* port: port/linux/src/server_log.c */
@@ -66,10 +78,25 @@ struct team_switch_record
 	unsigned long milliseconds;
 };
 
+/* a living player's move, waiting for their unit's death: the player, the
+unit, the team they go to; whether the death being dealt is the
+no-statistics one the switch asked for (server_team_switch_damage), and
+whether the unit has died (server_team_switch_player_killed) */
+struct team_switch_move
+{
+	boolean active;
+	boolean no_statistics;
+	boolean died;
+	short team;
+	long player_index;
+	long unit_index;
+};
+
 /* ---------- globals */
 
 /* each player's, by their absolute index */
 static struct team_switch_record team_switch_records[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static struct team_switch_move team_switch_moves[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
 
 static char const *const team_switch_team_names[2] = { "Red", "Blue" };
 
@@ -103,6 +130,47 @@ static long team_switch_seconds_left(
 	return (long)((cooldown - elapsed + 999) / 1000);
 }
 
+/* a player's waiting move, if they have one (NULL: none) */
+static struct team_switch_move *team_switch_move_get(
+	long player_index)
+{
+	unsigned long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+	if (slot >= NUMBEROF(team_switch_moves) || !team_switch_moves[slot].active ||
+		team_switch_moves[slot].player_index != player_index)
+	{
+		return NULL;
+	}
+	return &team_switch_moves[slot];
+}
+
+/* the team the balance counts a player in: the one they are moving to,
+while their move waits */
+static short team_switch_counted_team(
+	struct player_datum const *player,
+	long player_index)
+{
+	struct team_switch_move const *move = team_switch_move_get(player_index);
+
+	return move ? move->team : player->team_index;
+}
+
+/* moves a player: their team, their network data's (which their next unit
+carries to every machine) and the host's game record's */
+static void team_switch_move_player(
+	struct player_datum *player,
+	short team)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct network_game *game = server ? network_game_server_get_game(server) : NULL;
+	long list_index = player->network_player_data.player_list_index;
+
+	player->team_index = team;
+	player->network_player_data.team_index = (char)team;
+	if (game && VALID_INDEX(list_index, NUMBEROF(game->players)))
+		game->players[list_index].team_index = (char)team;
+}
+
 boolean server_team_switch(
 	long player_index,
 	char const *name,
@@ -114,12 +182,9 @@ boolean server_team_switch(
 	unsigned long now = system_milliseconds();
 	struct data_iterator iterator;
 	struct player_datum *other;
-	struct network_game_server *server;
-	struct network_game *game;
 	short counts[2] = { 0, 0 };
 	short team;
 	long seconds_left;
-	long list_index;
 
 	if (!player || player->quit_out_of_game || slot >= NUMBEROF(team_switch_records))
 	{
@@ -165,11 +230,19 @@ boolean server_team_switch(
 			seconds_left == 1 ? "" : "s");
 		return FALSE;
 	}
+	/* (with no cooldown, a second !switch before the first's death) */
+	if (team_switch_move_get(player_index))
+	{
+		snprintf(notice, (size_t)notice_size, "You are switching teams already");
+		return FALSE;
+	}
 	data_iterator_new(&iterator, player_data);
 	while ((other = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 	{
-		if (!other->quit_out_of_game && VALID_INDEX(other->team_index, 2))
-			counts[other->team_index]++;
+		short other_team = team_switch_counted_team(other, iterator.datum_index);
+
+		if (!other->quit_out_of_game && VALID_INDEX(other_team, 2))
+			counts[other_team]++;
 	}
 	if (game_variant_options_get()->auto_team_balance && !team_switch_balanced(counts, team))
 	{
@@ -179,19 +252,90 @@ boolean server_team_switch(
 	}
 
 	team = 1 - team;
-	player->team_index = team;
-	player->network_player_data.team_index = (char)team;
-	server = global_network_game_server_get();
-	game = server ? network_game_server_get_game(server) : NULL;
-	list_index = player->network_player_data.player_list_index;
-	if (game && VALID_INDEX(list_index, NUMBEROF(game->players)))
-		game->players[list_index].team_index = (char)team;
-	/* (a living player's unit dies, no one's kill; their next is the new
-	team's) */
-	mcc_ui_team_change_kill(player_index, player->unit_index);
+	if (player->unit_index == NONE)
+	{
+		/* (the dead carry nothing: they are moved now) */
+		team_switch_move_player(player, team);
+	}
+	else
+	{
+		/* (the living are moved after their unit's death, no one's kill) */
+		team_switch_moves[slot].active = TRUE;
+		team_switch_moves[slot].no_statistics = FALSE;
+		team_switch_moves[slot].died = FALSE;
+		team_switch_moves[slot].team = team;
+		team_switch_moves[slot].player_index = player_index;
+		team_switch_moves[slot].unit_index = player->unit_index;
+		unit_kill_no_statistics(player->unit_index);
+	}
 	team_switch_records[slot].player_index = player_index;
 	team_switch_records[slot].milliseconds = now;
 	server_log(_server_log_info, "player", "%s switched to the %s team (!switch)", name, team_switch_team_names[team]);
 	snprintf(notice, (size_t)notice_size, "%s switched to the %s team", name, team_switch_team_names[team]);
 	return TRUE;
+}
+
+void server_team_switch_initialize_for_new_map(
+	void)
+{
+	csmemset(team_switch_records, 0, sizeof(team_switch_records));
+	csmemset(team_switch_moves, 0, sizeof(team_switch_moves));
+}
+
+void server_team_switch_damage(
+	long player_index,
+	long unit_index,
+	boolean no_statistics)
+{
+	struct team_switch_move *move = team_switch_move_get(player_index);
+
+	if (move && move->unit_index == unit_index)
+		move->no_statistics = no_statistics;
+}
+
+void server_team_switch_player_killed(
+	long *killing_player_index,
+	long *killing_object_index,
+	long dead_player_index,
+	boolean *friendly_fire)
+{
+	unsigned long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(dead_player_index);
+	struct team_switch_move *move;
+	struct player_datum *player;
+
+	if (slot >= NUMBEROF(team_switch_moves) || !team_switch_moves[slot].active)
+		return;
+	move = &team_switch_moves[slot];
+	player = player_try_and_get(dead_player_index);
+	/* (a move left by a player who has gone, or for a unit of theirs that
+	went without dying, is dropped) */
+	if (move->player_index != dead_player_index || !player || player->unit_index != move->unit_index)
+	{
+		move->active = FALSE;
+		return;
+	}
+	move->died = TRUE;
+	/* (the death the switch asked for is no one's; another's kill, come
+	first, stays theirs) */
+	if (move->no_statistics && *killing_player_index == dead_player_index &&
+		*killing_object_index == move->unit_index)
+	{
+		*killing_player_index = NONE;
+		*killing_object_index = NONE;
+		*friendly_fire = FALSE;
+	}
+}
+
+void server_team_switch_player_dead(
+	long dead_player_index)
+{
+	struct team_switch_move *move = team_switch_move_get(dead_player_index);
+	struct player_datum *player;
+
+	if (!move || !move->died)
+		return;
+	move->active = FALSE;
+	player = player_try_and_get(dead_player_index);
+	if (player && !player->quit_out_of_game)
+		team_switch_move_player(player, move->team);
 }
