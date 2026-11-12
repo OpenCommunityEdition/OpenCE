@@ -54,6 +54,7 @@ machine (their datum identifiers need not be).
 */
 
 #include "cseries.h"
+#include "mcc_cache.h"
 #include "cseries/errors.h"
 #include "cache/cache_files.h"
 #include "devices/devices.h"
@@ -74,14 +75,23 @@ machine (their datum identifiers need not be).
 #include "units/units.h"
 #include "units/biped_definitions.h"
 #include "units/bipeds.h"
+#include "vehicle_riding.h"
 #include "network_coop.h"
 #include "network_distributed.h"
 #include "network_link.h"
 #include "network_voice.h"
+#include "mcc_network.h"
+#include "mcc_script_effects.h"
+#include "mcc_object_names_network.h"
+#include "mcc_game_speed.h"
 #include "network_chat.h"
 #include "network_aim_assist.h"
 #include "network_shield_effects.h"
+#include "network_riding_map.h"
 #include "map_share.h"
+#include "mcc_share.h"
+#include "mcc_admission.h"
+#include "mcc_load_network.h"
 #include "network_afk.h"
 #include "network_map_vote.h"
 #include "latency_meter.h"
@@ -131,7 +141,7 @@ void console_warning(const char *format, ...);
 speeds up the machine's own clock: nothing on it can tell), found by its
 ticks, which its messages are stamped with, going by faster than the
 host's own clock's time, and ahead of the host's (a client's clock never
-is: it starts at the host's, and only ever jumps forward to it, when it is
+is: it starts at the host's, and recovers toward reliable host time only when
 behind; a host that stalled has every client ahead, their ticks going by as
 fast as time). Measured over each window this long (milliseconds)... */
 #define CLIENT_CLOCK_WINDOW_MILLISECONDS 2000
@@ -258,6 +268,7 @@ enum
 	/* (alive) camouflaged, and doubly so */
 	_distributed_unit_camouflaged_bit = 0,
 	_distributed_unit_super_camouflaged_bit,
+	_distributed_unit_suspended_bit,
 };
 
 /* a unit state's parts on the wire: which of those that are not always
@@ -276,6 +287,25 @@ enum
 	_distributed_unit_part_camouflage_bit,
 	/* (dead) who killed it, when anyone */
 	_distributed_unit_part_killer_bit,
+	/* (alive) host-controlled facing, aim and look while input is inhibited */
+	_distributed_unit_part_scripted_pose_bit,
+	/* (alive, placed) where on a vehicle's deck it is, in that vehicle's
+	window (vehicle_riding.h's struct vehicle_riding_deck) */
+	_distributed_unit_part_deck_bit,
+	NUMBER_OF_DISTRIBUTED_UNIT_PARTS
+};
+
+/* the parts are the bits of one byte on the wire: a ninth would be lost without a word */
+typedef char distributed_unit_parts_assert[NUMBER_OF_DISTRIBUTED_UNIT_PARTS <= 8 ? 1 : -1];
+
+enum
+{
+	_distributed_pose_facing,
+	_distributed_pose_aiming,
+	_distributed_pose_looking,
+	_distributed_pose_current_aiming,
+	_distributed_pose_current_looking,
+	NUMBER_OF_DISTRIBUTED_POSE_VECTORS
 };
 
 /* world units: how far apart the host's run of a client's player and the
@@ -364,6 +394,12 @@ struct distributed_unit_state
 	word recent_shield_damage;
 	/* the player's powerups: how long each has left */
 	short powerup_durations[NUMBER_OF_PLAYER_POWERUPS];
+	boolean scripted_pose;
+	struct distributed_vector pose[NUMBER_OF_DISTRIBUTED_POSE_VECTORS];
+	/* (alive, placed) its player in a vehicle's window: the deck part, when
+	deck_present (never on the wire: distributed_deck_put) */
+	boolean deck_present;
+	struct vehicle_riding_deck deck;
 };
 
 /* a client's player's input at one of its ticks, with the buttons of the
@@ -421,8 +457,10 @@ enum
 	most it has, and a relayed action's (past the update each message has
 	first) */
 	DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE = 3,
-	DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE = 3 + 4 + (4 + 2) + (12 + 3 * 6) + 2 + 2 * 2 + 4 * 2 +
-		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1,
+	/* (its vehicle, node, place, velocity, ticks, flags and peak) */
+	DISTRIBUTED_DECK_SIZE = 4 + 2 + 12 + 6 + 1 + 1 + 2,
+	DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE = 3 + 4 + (4 + 2) + (12 + 3 * 6) + DISTRIBUTED_DECK_SIZE + 2 + 2 * 2 + 4 * 2 +
+		2 * NUMBER_OF_PLAYER_POWERUPS + 2 + 1 + NUMBER_OF_DISTRIBUTED_POSE_VECTORS * 6,
 	DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE = 14,
 	DISTRIBUTED_RELAYED_ACTION_MAXIMUM_SIZE = 14 + 2 * (DISTRIBUTED_INPUT_HISTORY - 1),
 };
@@ -566,7 +604,7 @@ static struct
 taken, a newer once a second: the next may be no further from it than the
 player moves in the client's ticks since), at which of the client's ticks
 and its own; and when it last took one, and where that left its unit */
-static struct
+static struct distributed_accepted_state
 {
 	boolean valid;
 	long unit_index;
@@ -575,7 +613,25 @@ static struct
 	real_point3d position;
 	long taken_host_time;
 	real_point3d taken_host_position;
+	long vehicle_index;
+	real_point3d place;
+	real_point3d taken_host_place;
+	boolean transition_sampled;
+	boolean transition_client_spent;
+	long transition_unit_index;
+	long transition_until;
+	short transition_host_ticks;
+	short transition_client_ticks;
+	long transition_host_vehicle;
+	long transition_client_vehicle;
+	long transition_leash_time;
+	long transition_board_vehicle;
+	long transition_board_until;
+	long taken_air_unit_index;
+	long taken_air_vehicle;
 } distributed_accepted[MAXIMUM_TRACKED_PLAYERS];
+/* fixed before either pass, since taking a word clears its valid bit */
+static boolean distributed_rider_pass[MAXIMUM_TRACKED_PLAYERS];
 /* ... what its own ticks did to its copy of each client's player's unit on
 foot, beyond the client's word it took (an explosion's throw, a jump): how
 fast they sent it, and how fast up, the most of this span of
@@ -594,8 +650,13 @@ static struct distributed_host_speed
 	real flight_rise;
 	long unit_index;
 	real_vector3d velocity;
+	real_vector3d frame_velocity;
+	boolean window;
+	long vehicle_index;
 	boolean grounded;
 	real ground_height;
+	real ground_frame_k;
+	real ground_place_height;
 	real top_height;
 	/* the last tick it had the unit on the ground (or where it started) */
 	long ground_time;
@@ -609,7 +670,14 @@ static struct distributed_own_position
 	real_point3d position;
 	/* local history only: NONE after jumping or walking off the platform */
 	long elevator_index;
+	boolean deck_present;
+	struct vehicle_riding_deck deck;
+	long window;
+	long air_episode;
+	boolean air_baseline_valid;
 } distributed_own_positions[MAXIMUM_LOCAL_PLAYERS][OWN_POSITION_TICKS];
+static long distributed_own_windows[MAXIMUM_LOCAL_PLAYERS];
+static long distributed_own_air_episodes[MAXIMUM_LOCAL_PLAYERS];
 static real distributed_own_round_trip;
 /* the host: the players each machine had when it last told the host that it
 had loaded (a machine new at its index has none of the old one's state) */
@@ -674,6 +742,12 @@ its clock for fast); a message over the sender's stream, which only it can
 send, is taken whatever its tick, and moves it
 (distributed_message_time_bounded) */
 static long distributed_sender_times[MAXIMUM_SENDERS];
+/* Outside saved game state. A restored handle may name a new life; packets
+from the world before the restore must not act on it. Zero means that a
+client is still waiting for the host's ordered boundary. */
+static unsigned long distributed_checkpoint_epoch;
+static unsigned long distributed_host_epoch;
+static boolean distributed_checkpoint_synchronized;
 /* the host: each client machine's clock, measured (CLIENT_CLOCK_WINDOW_MILLISECONDS):
 its latest tick, and its tick and the host's time as the window began
 (NONE: none begun); how many windows in a row it went fast, and whether
@@ -1011,6 +1085,7 @@ static void distributed_batch_flush(
 	header->type = _distributed_message_batch;
 	header->count = 0;
 	header->game_time = game_time_get();
+	header->checkpoint_epoch = distributed_checkpoint_epoch;
 	header->header = 0;
 	build_message_header(&header->header, batch->size, 2, 0);
 	if (sender == HOST_SENDER)
@@ -1120,7 +1195,7 @@ static void distributed_batches_flush(
 		distributed_batch_flush((short)((first + step) % MAXIMUM_SENDERS));
 }
 
-static void distributed_fill_header(
+static boolean distributed_fill_header(
 	void *message,
 	byte type,
 	short count,
@@ -1128,12 +1203,19 @@ static void distributed_fill_header(
 {
 	struct distributed_message_header *header = (struct distributed_message_header *)message;
 
+	/* Until the ordered snapshot finishes, surviving local replicas are
+	still being replaced. They cannot supply new-world input or hit reports. */
+	if (game_in_progress() && game_connection() == _game_connection_network_client &&
+		!distributed_checkpoint_synchronized && type != _distributed_message_client_ready)
+		return FALSE;
 	header->type = type;
 	header->count = (byte)count;
 	header->game_time = game_time_get();
+	header->checkpoint_epoch = distributed_checkpoint_epoch;
 	header->header = 0;
 	build_message_header(&header->header, size, 2, 0);
 	distributed_statistics.sent++;
+	return TRUE;
 }
 
 /* the size of each of a message's entries, when they are alike, else 0 */
@@ -1155,7 +1237,8 @@ void distributed_send(
 	word size,
 	short destination)
 {
-	distributed_fill_header(message, type, count, size);
+	if (!distributed_fill_header(message, type, count, size))
+		return;
 	switch (destination)
 	{
 	case _distributed_to_clients:
@@ -1185,7 +1268,8 @@ void distributed_send_to_machine(
 {
 	if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 		return;
-	distributed_fill_header(message, type, count, size);
+	if (!distributed_fill_header(message, type, count, size))
+		return;
 	distributed_batch_add((short)machine_index, message, size, distributed_entry_size(count, size));
 }
 
@@ -1196,8 +1280,24 @@ void distributed_send_to_machine_reliably(
 	short count,
 	word size)
 {
-	distributed_fill_header(message, type, count, size);
+	if (!distributed_fill_header(message, type, count, size))
+		return;
 	network_distributed_server_send_to_machine_reliably(machine_index, message, size);
+}
+
+void distributed_checkpoint_to_machine(long machine_index)
+{
+	struct distributed_message_header message;
+
+	if (game_connection() != _game_connection_network_server ||
+		machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+		return;
+	distributed_send_to_machine_reliably(machine_index, &message, _distributed_message_checkpoint, 0, sizeof(message));
+}
+
+boolean distributed_checkpoint_ready(void)
+{
+	return distributed_checkpoint_synchronized;
 }
 
 /* a packer's messages of the type, to the machine (or the host), each
@@ -1227,8 +1327,8 @@ static void distributed_packer_flush(
 
 	if (!packer->count)
 		return;
-	distributed_fill_header(&packer->message, packer->type, packer->count, size);
-	distributed_batch_add(packer->sender, &packer->message, size, 0);
+	if (distributed_fill_header(&packer->message, packer->type, packer->count, size))
+		distributed_batch_add(packer->sender, &packer->message, size, 0);
 	packer->count = 0;
 	packer->size = packer->prefix_size;
 }
@@ -1689,6 +1789,121 @@ boolean distributed_connection_problem(
 
 /* ---------- units */
 
+/* Relayed input does not describe a scripted pose. A late join can process
+input before the presentation disables it, and then retain that local aim
+indefinitely. Body orientation is not a substitute: the host's desired and
+current aim/look can differ from it and from each other. Ordinary input keeps
+its prediction path and sends none of these additional vectors. */
+static void distributed_scripted_pose_from_unit(struct unit_datum const *unit,
+	struct distributed_unit_state *state)
+{
+	if (game_connection() != _game_connection_network_server)
+		return;
+	SET_FLAG(state->unit_flags, _distributed_unit_suspended_bit,
+		TEST_FLAG(unit->unit.flags, _unit_suspended_bit));
+	state->scripted_pose = !player_input_enabled() || TEST_FLAG(unit->unit.flags, _unit_suspended_bit);
+	if (!state->scripted_pose)
+		return;
+	distributed_vector_pack(&unit->unit.desired_facing_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_facing]);
+	distributed_vector_pack(&unit->unit.desired_aiming_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_aiming]);
+	distributed_vector_pack(&unit->unit.desired_looking_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_looking]);
+	distributed_vector_pack(&unit->unit.aiming_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_current_aiming]);
+	distributed_vector_pack(&unit->unit.looking_vector, DISTRIBUTED_UNIT_SCALE, &state->pose[_distributed_pose_current_looking]);
+}
+
+static boolean distributed_scripted_pose_valid(struct distributed_unit_state const *state)
+{
+	short index;
+	for (index = 0; index < NUMBER_OF_DISTRIBUTED_POSE_VECTORS; index++)
+	{
+		real_vector3d vector;
+		real length_squared;
+		distributed_vector_unpack(&state->pose[index], DISTRIBUTED_UNIT_SCALE, &vector);
+		length_squared = vector.i * vector.i + vector.j * vector.j + vector.k * vector.k;
+		/* Unit normals quantized to signed 16-bit components; reject zero
+		and non-unit data before any of the decoded state is applied. */
+		if (length_squared < 0.99f || length_squared > 1.01f)
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static void distributed_scripted_pose_apply(struct unit_datum *unit,
+	struct distributed_unit_state const *state)
+{
+	SET_FLAG(unit->unit.flags, _unit_suspended_bit,
+		TEST_FLAG(state->unit_flags, _distributed_unit_suspended_bit));
+	if (!state->scripted_pose)
+		return;
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_facing], &unit->unit.desired_facing_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_aiming], &unit->unit.desired_aiming_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_looking], &unit->unit.desired_looking_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_current_aiming], &unit->unit.aiming_vector);
+	distributed_unit_vector_unpack(&state->pose[_distributed_pose_current_looking], &unit->unit.looking_vector);
+}
+
+/* a deck part's bytes (DISTRIBUTED_DECK_SIZE): its vehicle, node and
+place, its velocity, ticks and flags, and its peak, the velocity and the
+peak at the velocity's scale */
+static byte *distributed_deck_put(
+	byte *cursor,
+	struct vehicle_riding_deck const *deck)
+{
+	struct distributed_vector velocity;
+	struct distributed_vector peak;
+	real_vector3d peak_vector;
+
+	distributed_vector_pack(&deck->velocity, DISTRIBUTED_VELOCITY_SCALE, &velocity);
+	peak_vector.i = deck->peak;
+	peak_vector.j = 0.0f;
+	peak_vector.k = 0.0f;
+	distributed_vector_pack(&peak_vector, DISTRIBUTED_VELOCITY_SCALE, &peak);
+	cursor = distributed_put(cursor, &deck->vehicle_index, sizeof(deck->vehicle_index));
+	cursor = distributed_put(cursor, &deck->node_index, sizeof(deck->node_index));
+	cursor = distributed_put(cursor, &deck->place, sizeof(deck->place));
+	cursor = distributed_put(cursor, &velocity, sizeof(velocity));
+	cursor = distributed_put(cursor, &deck->ticks, sizeof(deck->ticks));
+	cursor = distributed_put(cursor, &deck->flags, sizeof(deck->flags));
+	return distributed_put(cursor, &peak.i, sizeof(peak.i));
+}
+
+/* a deck part from the wire: FALSE when it is cut short; present only
+whole, its vehicle one this machine has by the salted lookup and every
+value one it can be (vehicle_riding_deck_valid), else absent and the
+deck left as it was */
+static boolean distributed_deck_take(
+	byte const **cursor,
+	byte const *end,
+	boolean *present,
+	struct vehicle_riding_deck *deck)
+{
+	struct vehicle_riding_deck taken;
+	struct distributed_vector velocity;
+	struct distributed_vector peak;
+	real_vector3d peak_vector;
+
+	csmemset(&taken, 0, sizeof(taken));
+	csmemset(&peak, 0, sizeof(peak));
+	if (!distributed_take(cursor, end, &taken.vehicle_index, sizeof(taken.vehicle_index)) ||
+		!distributed_take(cursor, end, &taken.node_index, sizeof(taken.node_index)) ||
+		!distributed_take(cursor, end, &taken.place, sizeof(taken.place)) ||
+		!distributed_take(cursor, end, &velocity, sizeof(velocity)) ||
+		!distributed_take(cursor, end, &taken.ticks, sizeof(taken.ticks)) ||
+		!distributed_take(cursor, end, &taken.flags, sizeof(taken.flags)) ||
+		!distributed_take(cursor, end, &peak.i, sizeof(peak.i)))
+	{
+		return FALSE;
+	}
+	distributed_vector_unpack(&velocity, DISTRIBUTED_VELOCITY_SCALE, &taken.velocity);
+	distributed_vector_unpack(&peak, DISTRIBUTED_VELOCITY_SCALE, &peak_vector);
+	taken.peak = peak_vector.i;
+	*present = vehicle_riding_deck_vehicle_named(taken.vehicle_index) &&
+		vehicle_riding_deck_valid(&taken, biped_riding_vehicle_node_count(taken.vehicle_index));
+	if (*present)
+		*deck = taken;
+	return TRUE;
+}
+
 static void distributed_state_from_player(
 	short player_index,
 	struct distributed_unit_state *state)
@@ -1719,6 +1934,9 @@ static void distributed_state_from_player(
 		distributed_vector_pack(&unit->object.translational_velocity, DISTRIBUTED_VELOCITY_SCALE, &state->velocity);
 		distributed_vector_pack(&unit->object.forward, DISTRIBUTED_UNIT_SCALE, &state->forward);
 		distributed_vector_pack(&unit->object.up, DISTRIBUTED_UNIT_SCALE, &state->up);
+		/* (in a vehicle's window: where on its deck, as it is now) */
+		state->deck_present = TEST_FLAG(state->flags, _distributed_unit_placed_bit) &&
+			biped_riding_deck(unit_index, &state->deck);
 		damage_get_network_state(unit_index, &damage);
 		SET_FLAG(state->flags, _distributed_unit_shield_depleted_bit, damage.shield_depleted);
 		SET_FLAG(state->flags, _distributed_unit_shield_charging_bit, damage.shield_charging);
@@ -1736,6 +1954,7 @@ static void distributed_state_from_player(
 			TEST_FLAG(unit->unit.flags, _unit_super_camouflaged_bit));
 		camouflage = camouflage > 1.0f ? 1.0f : camouflage < 0.0f ? 0.0f : camouflage;
 		state->active_camouflage = (byte)(long)floor(camouflage * 255.0f + 0.5f);
+		distributed_scripted_pose_from_unit(unit, state);
 		/* (the host) a client's player where the client had them: at which of
 		its ticks (with the ticks run since) */
 		if (game_connection() == _game_connection_network_server && player_index < MAXIMUM_TRACKED_PLAYERS &&
@@ -1761,11 +1980,11 @@ static void distributed_state_from_player(
 
 /* the state's bytes on the wire (at most DISTRIBUTED_UNIT_STATE_MAXIMUM_SIZE):
 its player, flags and parts, then (alive) its unit, the vehicle and seat it
-rides, (placed) where it is, how fast it moves and which way it faces,
-(predicted) the client's tick, its shields and health, the damage they
-show, its powerups and camouflage, or (dead) who killed it; what is its
-default is left out (distributed_unit_state_read). The predicted tick is
-its own client's alone (own). */
+rides, (placed) where it is, how fast it moves and which way it faces, and
+where on a vehicle's deck, (predicted) the client's tick, its shields and
+health, the damage they show, its powerups and camouflage, or (dead) who
+killed it; what is its default is left out (distributed_unit_state_read). The
+predicted tick is its own client's alone (own). */
 static word distributed_unit_state_write(
 	struct distributed_unit_state const *state,
 	boolean own,
@@ -1795,6 +2014,12 @@ static word distributed_unit_state_write(
 			{
 				SET_FLAG(parts, _distributed_unit_part_up_bit, TRUE);
 				cursor = distributed_put(cursor, &state->up, sizeof(state->up));
+			}
+			/* (whole or not at all: never a value not finite) */
+			if (state->deck_present && vehicle_riding_deck_values_valid(&state->deck))
+			{
+				SET_FLAG(parts, _distributed_unit_part_deck_bit, TRUE);
+				cursor = distributed_deck_put(cursor, &state->deck);
 			}
 		}
 		if (TEST_FLAG(flags, _distributed_unit_predicted_bit))
@@ -1830,6 +2055,11 @@ static word distributed_unit_state_write(
 			cursor = distributed_put(cursor, &state->unit_flags, sizeof(state->unit_flags));
 			cursor = distributed_put(cursor, &state->active_camouflage, sizeof(state->active_camouflage));
 		}
+		if (state->scripted_pose)
+		{
+			SET_FLAG(parts, _distributed_unit_part_scripted_pose_bit, TRUE);
+			cursor = distributed_put(cursor, state->pose, sizeof(state->pose));
+		}
 	}
 	else if (state->killing_player_index != NO_PLAYER)
 	{
@@ -1864,6 +2094,16 @@ static word distributed_unit_state_read(
 	{
 		return 0;
 	}
+	if (TEST_FLAG(parts, _distributed_unit_part_scripted_pose_bit) &&
+		!TEST_FLAG(state->flags, _distributed_unit_alive_bit))
+		return 0;
+	/* (a deck part where no place is: the bytes after it cannot be read, so
+	neither can the state) */
+	if (TEST_FLAG(parts, _distributed_unit_part_deck_bit) &&
+		!(TEST_FLAG(state->flags, _distributed_unit_alive_bit) && TEST_FLAG(state->flags, _distributed_unit_placed_bit)))
+	{
+		return 0;
+	}
 	if (TEST_FLAG(state->flags, _distributed_unit_alive_bit))
 	{
 		if (!distributed_take(&cursor, end, &state->unit_index, sizeof(state->unit_index)))
@@ -1880,6 +2120,11 @@ static word distributed_unit_state_read(
 				!distributed_take(&cursor, end, &state->forward, sizeof(state->forward)) ||
 				(TEST_FLAG(parts, _distributed_unit_part_up_bit) &&
 					!distributed_take(&cursor, end, &state->up, sizeof(state->up)))))
+		{
+			return 0;
+		}
+		if (TEST_FLAG(parts, _distributed_unit_part_deck_bit) &&
+			!distributed_deck_take(&cursor, end, &state->deck_present, &state->deck))
 		{
 			return 0;
 		}
@@ -1912,6 +2157,15 @@ static word distributed_unit_state_read(
 		{
 			return 0;
 		}
+		if (TEST_FLAG(parts, _distributed_unit_part_scripted_pose_bit))
+		{
+			if (!distributed_take(&cursor, end, state->pose, sizeof(state->pose)))
+				return 0;
+			/* a pose that is not unit vectors (a unit's desired vectors are
+			not normalized, and may be zero) is left out: the unit's other
+			state, and the message's other units, are still taken */
+			state->scripted_pose = distributed_scripted_pose_valid(state);
+		}
 	}
 	else if (TEST_FLAG(parts, _distributed_unit_part_killer_bit) &&
 		!distributed_take(&cursor, end, &state->killing_player_index, sizeof(state->killing_player_index)))
@@ -1924,11 +2178,12 @@ static word distributed_unit_state_read(
 /* moves the unit toward the state (at position) if it is further than
 tolerance from it: within blend_distance part of the way, further all of it,
 no faster than maximum_speed across and up and maximum_fall_speed down (0
-for any); FALSE for a state that cannot be */
+for any); a negative tolerance always reconciles; FALSE for a state that cannot be */
 static boolean distributed_apply_state(
 	long unit_index,
 	struct distributed_unit_state const *state,
 	real_point3d const *position,
+	real_vector3d const *velocity,
 	real tolerance,
 	real blend_distance,
 	real maximum_speed,
@@ -1936,36 +2191,44 @@ static boolean distributed_apply_state(
 {
 	struct object_datum *object = object_get(unit_index);
 	real_vector3d error;
-	real_vector3d velocity;
+	real_vector3d taken_velocity;
 	real_vector3d forward;
 	real_vector3d up;
 
-	distributed_vector_unpack(&state->velocity, DISTRIBUTED_VELOCITY_SCALE, &velocity);
+	if (velocity)
+		taken_velocity = *velocity;
+	else
+		distributed_vector_unpack(&state->velocity, DISTRIBUTED_VELOCITY_SCALE, &taken_velocity);
 	distributed_vector_unpack(&state->forward, DISTRIBUTED_UNIT_SCALE, &forward);
 	distributed_vector_unpack(&state->up, DISTRIBUTED_UNIT_SCALE, &up);
 	if (!distributed_point_valid(position, UNIT_WORLD_BOUND) || !distributed_axes_make_valid(&forward, &up))
 		return FALSE;
 	if (maximum_speed > 0.0f)
 	{
-		real rise = velocity.k > 0.0f ? velocity.k : 0.0f;
-		real speed = (real)sqrt(velocity.i * velocity.i + velocity.j * velocity.j + rise * rise);
+		real rise = taken_velocity.k > 0.0f ? taken_velocity.k : 0.0f;
+		real speed = (real)sqrt(taken_velocity.i * taken_velocity.i + taken_velocity.j * taken_velocity.j + rise * rise);
 
 		if (speed > maximum_speed)
 		{
-			velocity.i *= maximum_speed / speed;
-			velocity.j *= maximum_speed / speed;
-			if (velocity.k > 0.0f)
-				velocity.k *= maximum_speed / speed;
+			taken_velocity.i *= maximum_speed / speed;
+			taken_velocity.j *= maximum_speed / speed;
+			if (taken_velocity.k > 0.0f)
+				taken_velocity.k *= maximum_speed / speed;
 		}
-		if (maximum_fall_speed > 0.0f && velocity.k < -maximum_fall_speed)
-			velocity.k = -maximum_fall_speed;
+		if (maximum_fall_speed > 0.0f && taken_velocity.k < -maximum_fall_speed)
+			taken_velocity.k = -maximum_fall_speed;
 	}
+	/* (a deck-frame take also commits velocity when the position is exact) */
+	if (velocity)
+		object->object.translational_velocity = *velocity;
 	error.i = position->x - object->object.position.x;
 	error.j = position->y - object->object.position.y;
 	error.k = position->z - object->object.position.z;
-	if (error.i * error.i + error.j * error.j + error.k * error.k <= tolerance * tolerance)
+	/* A scripted player can turn without moving. Input prediction cannot
+	recover that orientation, even when position already agrees. */
+	if (tolerance >= 0.0f && !state->scripted_pose && error.i * error.i + error.j * error.j + error.k * error.k <= tolerance * tolerance)
 		return TRUE;
-	if (network_objects_reconcile(unit_index, position, &forward, &up, &velocity, NULL, blend_distance))
+	if (network_objects_reconcile(unit_index, position, &forward, &up, &taken_velocity, NULL, blend_distance, _network_vehicle_write_state))
 		distributed_statistics.corrections++;
 	return TRUE;
 }
@@ -1990,6 +2253,92 @@ static long distributed_supported_elevator(
 	return elevator ? biped->biped.elevator_object_index : NONE;
 }
 
+/* whether a state's deck part is whole here: its vehicle one this machine has, its node one of that vehicle's */
+static boolean distributed_deck_whole(
+	struct distributed_unit_state const *state)
+{
+	return state->deck_present &&
+		vehicle_riding_deck_valid(&state->deck, biped_riding_vehicle_node_count(state->deck.vehicle_index));
+}
+
+/* a remote rider's place belongs to this machine's copy of its deck */
+static void distributed_apply_remote_unit(
+	long unit_index,
+	struct distributed_unit_state const *state)
+{
+	struct vehicle_riding_deck const *deck = &state->deck;
+	real_point3d target;
+	real_point3d base;
+	real_point3d target_base;
+	real_vector3d frame;
+	real_vector3d velocity;
+	real height;
+	real width;
+
+	/* (the host's cabin verdict is taken before any branch below can return: a rider within tolerance carries it too) */
+	biped_riding_cabin_host(unit_index, distributed_deck_whole(state) ? deck : NULL, TRUE);
+	if (state->deck_present && deck->ticks == RIDING_TICKS &&
+		vehicle_riding_deck_valid(deck, biped_riding_vehicle_node_count(deck->vehicle_index)) &&
+		biped_riding_deck_position(unit_index, deck, &target))
+	{
+		biped_get_physics_pill(unit_index, &base, &height, &width);
+		/* (the frame speed is measured at the target pill base, not the object origin) */
+		target_base.x = target.x + base.x - object_get(unit_index)->object.position.x;
+		target_base.y = target.y + base.y - object_get(unit_index)->object.position.y;
+		target_base.z = target.z + base.z - object_get(unit_index)->object.position.z;
+		if (biped_riding_frame_velocity(unit_index, deck, &target_base, &frame))
+		{
+			struct vehicle_riding_state riding;
+			real_point3d before = object_get(unit_index)->object.position;
+			real tolerance = REMOTE_CORRECTION_TOLERANCE;
+			boolean same_window = biped_riding_get_state(unit_index, &riding) && riding.ticks > 0 &&
+				riding.object_index == deck->vehicle_index && riding.node_index == deck->node_index;
+
+			if (same_window)
+			{
+				real_point3d place;
+
+				/* (only the saved-frame error decides a correction in this window) */
+				tolerance = -1.0f;
+				/* (the base has not yet taken the motion since this snapshot) */
+				vehicle_riding_point_to_local(&riding.vehicle_position, &riding.vehicle_forward,
+					&riding.vehicle_up, &base, &place);
+				if (distance_squared3d(&place, &deck->place) <=
+					REMOTE_CORRECTION_TOLERANCE * REMOTE_CORRECTION_TOLERANCE)
+				{
+					target = before;
+					tolerance = 0.0f;
+				}
+			}
+			add_vectors3d(&deck->velocity, &frame, &velocity);
+			/* (an unchanged unit keeps the carry its current window has not taken yet) */
+			if (distributed_apply_state(unit_index, state, &target, &velocity, tolerance,
+				REMOTE_BLEND_DISTANCE, 0.0f, 0.0f) &&
+				(!same_window || tolerance < 0.0f))
+			{
+				biped_riding_take_deck(unit_index, deck);
+				/* (a window this word opened has no cabin yet: the verdict seeds it) */
+				biped_riding_cabin_host(unit_index, deck, TRUE);
+			}
+			return;
+		}
+	}
+	else if (state->deck_present && deck->ticks < RIDING_TICKS &&
+		vehicle_riding_deck_valid(deck, biped_riding_vehicle_node_count(deck->vehicle_index)))
+	{
+		/* (in the air the host's own place stands: the window's anchor is the body's, taken after) */
+		distributed_vector_unpack(&state->velocity, DISTRIBUTED_VELOCITY_SCALE, &velocity);
+		distributed_apply_state(unit_index, state, &state->position, &velocity, REMOTE_CORRECTION_TOLERANCE,
+			REMOTE_BLEND_DISTANCE, 0.0f, 0.0f);
+		biped_riding_take_deck(unit_index, deck);
+		biped_riding_cabin_host(unit_index, deck, TRUE);
+		return;
+	}
+	biped_riding_drop(unit_index);
+	distributed_apply_state(unit_index, state, &state->position, NULL, REMOTE_CORRECTION_TOLERANCE,
+		REMOTE_BLEND_DISTANCE, 0.0f, 0.0f);
+}
+
 /* (a client) where its own players' units are this tick, noted */
 static void distributed_note_own_positions(
 	void)
@@ -2003,6 +2352,9 @@ static void distributed_note_own_positions(
 		long unit_index = distributed_living_unit(player);
 		struct distributed_own_position *own =
 			&distributed_own_positions[local_player_index][game_time_get() & (OWN_POSITION_TICKS - 1)];
+		struct distributed_own_position const *previous =
+			&distributed_own_positions[local_player_index][(game_time_get() - 1) & (OWN_POSITION_TICKS - 1)];
+		boolean continued;
 
 		/* (not riding: a rider's position is its seat's) */
 		if (unit_index != NONE && object_get(unit_index)->object.parent_object_index != NONE)
@@ -2010,9 +2362,116 @@ static void distributed_note_own_positions(
 		own->time = game_time_get();
 		own->unit_index = unit_index;
 		own->elevator_index = unit_index != NONE ? distributed_supported_elevator(unit_index) : NONE;
+		own->deck_present = unit_index != NONE && biped_riding_deck(unit_index, &own->deck);
+		continued = previous->time == game_time_get() - 1 && previous->unit_index == unit_index &&
+			previous->deck_present && own->deck_present && previous->deck.vehicle_index == own->deck.vehicle_index;
+		if (own->deck_present && !continued)
+			distributed_own_windows[local_player_index]++;
+		if (own->deck_present && own->deck.ticks < RIDING_TICKS &&
+			(!continued || previous->deck.ticks == RIDING_TICKS))
+			distributed_own_air_episodes[local_player_index]++;
+		own->window = distributed_own_windows[local_player_index];
+		own->air_episode = distributed_own_air_episodes[local_player_index];
+		own->air_baseline_valid = TRUE;
 		if (unit_index != NONE)
 			own->position = object_get(unit_index)->object.position;
 	}
+}
+
+/* (a client) whether the tick a host's word of its own player answers (the
+echoed one) was in the window the player is in now: a word of an older window
+of the same vehicle says nothing of this one, nor does a jump's word of an
+older air episode; none without an echoed tick */
+static boolean distributed_own_window_current(
+	struct player_datum const *player,
+	long unit_index,
+	struct distributed_unit_state const *state)
+{
+	short local_player_index = player->local_player_index;
+	struct vehicle_riding_deck current_deck;
+	struct distributed_own_position const *own;
+	long now = game_time_get();
+	long time;
+
+	if (!TEST_FLAG(state->flags, _distributed_unit_predicted_bit) ||
+		local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
+		return FALSE;
+	time = now - (long)(word)((word)now - (word)state->predicted_time);
+	own = &distributed_own_positions[local_player_index][time & (OWN_POSITION_TICKS - 1)];
+	if (own->time != time || own->unit_index != unit_index)
+		return FALSE;
+	return !own->deck_present || (own->window == distributed_own_windows[local_player_index] &&
+		(state->deck.ticks >= RIDING_TICKS ||
+		own->air_episode == distributed_own_air_episodes[local_player_index]) &&
+		biped_riding_deck(unit_index, &current_deck) && current_deck.vehicle_index == own->deck.vehicle_index);
+}
+
+/* an airborne word needs an actual deck capture, never the pre-acquisition shortcut */
+static boolean distributed_own_episode_current(
+	struct player_datum const *player,
+	long unit_index,
+	struct distributed_unit_state const *state)
+{
+	short local_player_index = player->local_player_index;
+	struct distributed_own_position const *own;
+	long now = game_time_get();
+	long time;
+
+	if (!state->deck_present || !distributed_own_window_current(player, unit_index, state))
+		return FALSE;
+	time = now - (long)(word)((word)now - (word)state->predicted_time);
+	own = &distributed_own_positions[local_player_index][time & (OWN_POSITION_TICKS - 1)];
+	return own->deck_present && own->deck.vehicle_index == state->deck.vehicle_index;
+}
+
+/* (a client) its own riding player's unit, where the host has it on the deck
+this machine has it riding too, when the state carries no tick of this
+machine's own to compare with: judged by its place on the deck, never by the
+world places of two copies of a moving vehicle, which a round trip's lag
+holds apart by more than the tolerance. False when the unit or the state is
+not of one deck (the world correction is then what is left) */
+static boolean distributed_correct_own_unechoed_rider(
+	long unit_index,
+	struct distributed_unit_state const *state)
+{
+	struct vehicle_riding_state riding;
+	struct vehicle_riding_deck current_deck;
+	struct vehicle_riding_deck target_deck;
+	struct object_datum *object = object_get(unit_index);
+	real_vector3d deck_error;
+	real_vector3d frame;
+	real_vector3d velocity;
+	real_point3d before = object->object.position;
+	real_point3d position;
+	real_point3d base;
+	real height;
+	real width;
+
+	if (!distributed_deck_whole(state) || state->deck.ticks != RIDING_TICKS ||
+		!biped_riding_get_state(unit_index, &riding) || !vehicle_riding_is_riding(&riding) ||
+		!biped_riding_deck(unit_index, &current_deck) || current_deck.ticks != RIDING_TICKS ||
+		current_deck.vehicle_index != state->deck.vehicle_index || current_deck.node_index != state->deck.node_index)
+		return FALSE;
+	vector_from_points3d(&current_deck.place, &state->deck.place, &deck_error);
+	if (!(magnitude_squared3d(&deck_error) > LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE))
+		return TRUE;
+	target_deck = current_deck;
+	target_deck.place.x += deck_error.i;
+	target_deck.place.y += deck_error.j;
+	target_deck.place.z += deck_error.k;
+	if (!biped_riding_deck_position(unit_index, &target_deck, &position))
+		return TRUE;
+	biped_get_physics_pill(unit_index, &base, &height, &width);
+	base.x += position.x - before.x;
+	base.y += position.y - before.y;
+	base.z += position.z - before.z;
+	if (!biped_riding_frame_velocity(unit_index, &target_deck, &base, &frame))
+		return TRUE;
+	add_vectors3d(&state->deck.velocity, &frame, &velocity);
+	if (!distributed_apply_state(unit_index, state, &position, &velocity, LOCAL_CORRECTION_TOLERANCE, 0.0f, 0.0f, 0.0f))
+		return TRUE;
+	biped_riding_rebase(unit_index);
+	return TRUE;
 }
 
 /* (a client) its own player's unit where the host has it, if that is
@@ -2027,6 +2486,23 @@ static void distributed_correct_own_unit(
 {
 	short local_player_index = player->local_player_index;
 	real_point3d position = state->position;
+	struct vehicle_riding_claim *claim = vehicle_riding_player_claim(state->player_index);
+	long host_vehicle = state->deck_present ? state->deck.vehicle_index : NONE;
+	short host_node = state->deck_present ? state->deck.node_index : NONE;
+	boolean current_episode = distributed_own_episode_current(player, unit_index, state);
+
+	/* (the host's cabin verdict is taken before any branch below can return: an echo within tolerance carries it too) */
+	biped_riding_cabin_host(unit_index, distributed_deck_whole(state) ? &state->deck : NULL,
+		state->deck_present && state->deck.ticks < RIDING_TICKS &&
+		!TEST_FLAG(state->deck.flags, _vehicle_riding_deck_cabin_bit) ? current_episode :
+		distributed_own_window_current(player, unit_index, state));
+	biped_riding_air_verdict_host(unit_index, distributed_deck_whole(state) ? &state->deck : NULL, current_episode);
+	/* (the host ended this claim, even when no standing-history branch will run) */
+	if (claim && claim->taken && (claim->vehicle_index != host_vehicle || claim->node_index != host_node))
+	{
+		claim->taken = FALSE;
+		claim->disagreement = 0;
+	}
 
 	/* (co-op: the host has its player in a BSP this machine hasn't loaded
 	yet, the switch still on its way. Moved there, it would fall with no
@@ -2047,7 +2523,7 @@ static void distributed_correct_own_unit(
 			return;
 		}
 	}
-	if (TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
+	if (!state->scripted_pose && TEST_FLAG(state->flags, _distributed_unit_predicted_bit) &&
 		local_player_index >= 0 && local_player_index < MAXIMUM_LOCAL_PLAYERS)
 	{
 		long now = game_time_get();
@@ -2060,6 +2536,16 @@ static void distributed_correct_own_unit(
 			struct object_datum *object = object_get(unit_index);
 			real_vector3d error;
 			short index;
+			struct vehicle_riding_deck current_deck;
+			boolean current_present = biped_riding_deck(unit_index, &current_deck);
+			boolean own_riding = own->deck_present && own->deck.ticks == RIDING_TICKS;
+			boolean host_riding = state->deck_present && state->deck.ticks == RIDING_TICKS;
+			boolean host_air = state->deck_present && state->deck.ticks > 0 && state->deck.ticks < RIDING_TICKS &&
+				vehicle_riding_deck_valid(&state->deck, biped_riding_vehicle_node_count(host_vehicle));
+			boolean dropping = FALSE;
+			boolean air_claim = FALSE;
+			boolean stale_window = own->deck_present && (own->window != distributed_own_windows[local_player_index] ||
+				!current_present || current_deck.vehicle_index != own->deck.vehicle_index);
 
 			/* (how long the host takes to have this machine's players, as
 			the round trip is smoothed on the host) */
@@ -2068,6 +2554,149 @@ static void distributed_correct_own_unit(
 			else
 				distributed_own_round_trip += ((real)(now - time) - distributed_own_round_trip) / 8.0f;
 			distributed_note_own_round_trip(time);
+			if (host_air && current_present && current_deck.ticks == RIDING_TICKS &&
+				current_episode && current_deck.vehicle_index == host_vehicle && claim && !claim->taken)
+			{
+				short grace = (short)MAX(SEAT_DISAGREEMENT_TICKS,
+					(short)ceil(distributed_own_round_trip) + SEAT_DISAGREEMENT_SLACK_TICKS);
+				struct vehicle_riding_claim pending;
+
+				pending = *claim;
+				/* (standing is not an air claim, even on the same vehicle and body node) */
+				air_claim = vehicle_riding_claim_grace(&pending, NONE, NONE, host_vehicle, host_node, grace);
+				if (air_claim)
+				{
+					pending.taken = FALSE;
+					pending.disagreement = grace;
+				}
+				*claim = pending;
+				if (!air_claim)
+					return;
+			}
+			if ((own_riding || host_riding) && !host_air)
+			{
+				struct vehicle_riding_state riding;
+				long own_vehicle = own->deck_present ? own->deck.vehicle_index : NONE;
+				short own_node = own->deck_present ? own->deck.node_index : NONE;
+				short grace = (short)MAX(SEAT_DISAGREEMENT_TICKS,
+					(short)ceil(distributed_own_round_trip) + SEAT_DISAGREEMENT_SLACK_TICKS);
+
+				/* (dead or seated units take no deck transaction) */
+				if (!biped_riding_get_state(unit_index, &riding))
+					return;
+				/* (an old window can judge only the claim held now, never its historical place) */
+				if (stale_window)
+				{
+					own_vehicle = current_present ? current_deck.vehicle_index : NONE;
+					own_node = current_present ? current_deck.node_index : NONE;
+					if (own_vehicle == host_vehicle && own_node == host_node)
+						vehicle_riding_claim_grace(claim, own_vehicle, own_node, host_vehicle, host_node, grace);
+				}
+				if (host_riding && (host_vehicle != own_vehicle || host_node != own_node))
+				{
+					real_point3d target;
+					real_point3d base;
+					real_vector3d frame;
+					real_vector3d velocity;
+					real height;
+					real width;
+					struct vehicle_riding_claim pending;
+					boolean taking;
+
+					/* (crossing claims are never distances between two world frames) */
+					if (!claim)
+						return;
+					pending = *claim;
+					taking = vehicle_riding_claim_grace(&pending, own_vehicle, own_node, host_vehicle, host_node, grace);
+					if (taking)
+					{
+						/* (expiry stays pending until both the position and riding state take) */
+						pending.taken = FALSE;
+						pending.disagreement = grace;
+					}
+					*claim = pending;
+					if (taking &&
+						vehicle_riding_deck_valid(&state->deck, biped_riding_vehicle_node_count(host_vehicle)) &&
+						biped_riding_deck_position(unit_index, &state->deck, &target))
+					{
+						biped_get_physics_pill(unit_index, &base, &height, &width);
+						base.x += target.x - object->object.position.x;
+						base.y += target.y - object->object.position.y;
+						base.z += target.z - object->object.position.z;
+						if (biped_riding_frame_velocity(unit_index, &state->deck, &base, &frame))
+						{
+							add_vectors3d(&state->deck.velocity, &frame, &velocity);
+							if (distributed_apply_state(unit_index, state, &target, &velocity, 0.0f, 0.0f, 0.0f, 0.0f) &&
+								biped_riding_take_deck(unit_index, &state->deck))
+							{
+								pending.taken = TRUE;
+								pending.disagreement = 0;
+								*claim = pending;
+							}
+						}
+					}
+					return;
+				}
+				/* (an old acquisition cannot move or seed the current window) */
+				if (stale_window)
+					return;
+				if (own_riding && host_riding && own_node == host_node)
+				{
+					struct vehicle_riding_deck target_deck = current_deck;
+					real_vector3d deck_error;
+					real_vector3d frame;
+					real_vector3d velocity;
+					real_point3d before = object->object.position;
+					real_point3d base;
+					real height;
+					real width;
+
+					vehicle_riding_claim_grace(claim, own_vehicle, own_node, host_vehicle, host_node, grace);
+					if (current_deck.ticks != RIDING_TICKS || current_deck.node_index != own_node)
+						return;
+					vector_from_points3d(&own->deck.place, &state->deck.place, &deck_error);
+					if (!(magnitude_squared3d(&deck_error) > LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE))
+						return;
+					target_deck.place.x += deck_error.i;
+					target_deck.place.y += deck_error.j;
+					target_deck.place.z += deck_error.k;
+					if (!biped_riding_deck_position(unit_index, &target_deck, &position))
+						return;
+					biped_get_physics_pill(unit_index, &base, &height, &width);
+					base.x += position.x - before.x;
+					base.y += position.y - before.y;
+					base.z += position.z - before.z;
+					if (!biped_riding_frame_velocity(unit_index, &target_deck, &base, &frame))
+						return;
+					add_vectors3d(&state->deck.velocity, &frame, &velocity);
+					if (!distributed_apply_state(unit_index, state, &position, &velocity, LOCAL_CORRECTION_TOLERANCE, 0.0f, 0.0f, 0.0f))
+						return;
+					biped_riding_rebase(unit_index);
+					vector_from_points3d(&before, &object->object.position, &error);
+					/* (both histories moved by this take, including ticks echoed later) */
+					for (index = 0; index < OWN_POSITION_TICKS; index++)
+					{
+						struct distributed_own_position *noted = &distributed_own_positions[local_player_index][index];
+						if (noted->unit_index != unit_index)
+							continue;
+						noted->position.x += error.i;
+						noted->position.y += error.j;
+						noted->position.z += error.k;
+						if (noted->deck_present && noted->window == own->window && noted->deck.vehicle_index == own_vehicle)
+						{
+							noted->deck.place.x += deck_error.i;
+							noted->deck.place.y += deck_error.j;
+							noted->deck.place.z += deck_error.k;
+						}
+					}
+					return;
+				}
+				if (own_riding && !state->deck_present)
+				{
+					biped_riding_drop(unit_index);
+					dropping = TRUE;
+				}
+			}
 			error.i = state->position.x - own->position.x;
 			error.j = state->position.y - own->position.y;
 			error.k = state->position.z - own->position.z;
@@ -2076,24 +2705,78 @@ static void distributed_correct_own_unit(
 			lag, not player motion. Keep local floor contact; teleports across,
 			a height error past the lag, a jump, a different platform and
 			unpredicted states correct normally. */
-			if (own->elevator_index != NONE &&
+			if (!dropping && !air_claim && own->elevator_index != NONE &&
 				own->elevator_index == distributed_supported_elevator(unit_index) &&
 				error.i * error.i + error.j * error.j <=
 					LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE &&
 				error.k >= -ELEVATOR_PHASE_TOLERANCE && error.k <= ELEVATOR_PHASE_TOLERANCE)
 				error.k = 0.0f;
-			if (!(error.i * error.i + error.j * error.j + error.k * error.k >
+			if (!dropping && !air_claim && !(error.i * error.i + error.j * error.j + error.k * error.k >
 				LOCAL_CORRECTION_TOLERANCE * LOCAL_CORRECTION_TOLERANCE))
 			{
 				return;
 			}
 			{
 				real_point3d before = object->object.position;
+				real_vector3d air_difference;
+				real_vector3d world_velocity = object->object.translational_velocity;
+				boolean air_rebased = FALSE;
+				boolean air_taken = FALSE;
 
 				position.x = before.x + error.i;
 				position.y = before.y + error.j;
 				position.z = before.z + error.k;
-				distributed_apply_state(unit_index, state, &position, LOCAL_CORRECTION_TOLERANCE, 0.0f, 0.0f, 0.0f);
+				if (dropping && current_present)
+				{
+					struct vehicle_riding_vehicle vehicle;
+					real_point3d base;
+					real height;
+					real width;
+					struct vehicle_riding_deck target_deck = current_deck;
+
+					if (biped_riding_vehicle(current_deck.vehicle_index, current_deck.node_index, &vehicle))
+					{
+						biped_get_physics_pill(unit_index, &base, &height, &width);
+						base.x += position.x - before.x;
+						base.y += position.y - before.y;
+						base.z += position.z - before.z;
+						vehicle_riding_point_to_local(&vehicle.position, &vehicle.forward, &vehicle.up, &base, &target_deck.place);
+						/* (a late drop cannot put the pill through a rising floor) */
+						if (target_deck.place.z < current_deck.place.z)
+							target_deck.place.z = current_deck.place.z;
+						biped_riding_deck_position(unit_index, &target_deck, &position);
+					}
+				}
+				if (!distributed_apply_state(unit_index, state, &position, host_air ? &world_velocity : NULL,
+					(dropping || air_claim) ? 0.0f : LOCAL_CORRECTION_TOLERANCE, 0.0f, 0.0f, 0.0f))
+					return;
+				if (air_claim)
+				{
+					/* (the host ends standing and supplies the whole air frame in one take) */
+					if (!biped_riding_air_take(unit_index, &state->deck))
+						return;
+					biped_riding_drop(unit_index);
+					if (!biped_riding_take_deck(unit_index, &state->deck))
+						return;
+					air_taken = TRUE;
+					claim->taken = TRUE;
+					claim->disagreement = 0;
+				}
+				else if (host_air)
+				{
+					/* (only one jump's airborne echo is a frame velocity, never a standing relative velocity) */
+					if (own->deck_present && own->deck.ticks > 0 && own->deck.ticks < RIDING_TICKS &&
+						own->air_baseline_valid &&
+						!stale_window && own->air_episode == distributed_own_air_episodes[local_player_index] &&
+						own->deck.vehicle_index == host_vehicle)
+					{
+						subtract_vectors3d(&state->deck.velocity, &own->deck.velocity, &air_difference);
+						air_rebased = biped_riding_air_correct(unit_index, &air_difference, state->deck.peak,
+							(short)((state->deck.flags >> VEHICLE_RIDING_DECK_VERDICT_SHIFT) & VEHICLE_RIDING_DECK_VERDICT_MASK));
+					}
+					else
+						air_taken = biped_riding_air_take(unit_index, &state->deck);
+				}
 				/* (the ticks noted since moved as it was, not corrected again) */
 				error.i = object->object.position.x - before.x;
 				error.j = object->object.position.y - before.y;
@@ -2107,13 +2790,29 @@ static void distributed_correct_own_unit(
 						noted->position.x += error.i;
 						noted->position.y += error.j;
 						noted->position.z += error.k;
+						if (air_rebased && noted->deck_present && noted->deck.ticks > 0 && noted->deck.ticks < RIDING_TICKS &&
+							noted->window == own->window && noted->air_episode == own->air_episode &&
+							noted->deck.vehicle_index == host_vehicle)
+							add_vectors3d(&noted->deck.velocity, &air_difference, &noted->deck.velocity);
+						/* (a whole take supersedes this jump's old differences, not its stored frame values) */
+						if (air_taken && current_present && noted->deck_present &&
+							(air_claim || (noted->deck.ticks > 0 && noted->deck.ticks < RIDING_TICKS)) &&
+							noted->window == distributed_own_windows[local_player_index] &&
+							noted->air_episode == distributed_own_air_episodes[local_player_index] &&
+							noted->deck.vehicle_index == current_deck.vehicle_index)
+							noted->air_baseline_valid = FALSE;
 					}
 				}
+				if (air_claim)
+					distributed_own_windows[local_player_index]++;
 				return;
 			}
 		}
 	}
-	distributed_apply_state(unit_index, state, &position, LOCAL_CORRECTION_TOLERANCE, 0.0f, 0.0f, 0.0f);
+	/* (no echoed tick to judge by: a rider is judged on its deck all the same) */
+	if (distributed_correct_own_unechoed_rider(unit_index, state))
+		return;
+	distributed_apply_state(unit_index, state, &position, NULL, LOCAL_CORRECTION_TOLERANCE, 0.0f, 0.0f, 0.0f);
 }
 
 /* (a client) its own players' units, to the host */
@@ -2162,8 +2861,11 @@ static void distributed_handle_predictions(
 		if (!size)
 			break;
 		data += size;
+		/* Scripted poses and suspension belong to the host, never predictions. */
 		if (state.player_index >= MAXIMUM_TRACKED_PLAYERS ||
 			!distributed_machine_has_player(machine_index, state.player_index) ||
+			state.scripted_pose ||
+			TEST_FLAG(state.unit_flags, _distributed_unit_suspended_bit) ||
 			!TEST_FLAG(state.flags, _distributed_unit_alive_bit) ||
 			!TEST_FLAG(state.flags, _distributed_unit_placed_bit))
 		{
@@ -2181,6 +2883,7 @@ struct distributed_on_foot_bound
 {
 	/* across and up (world units a tick) */
 	real speed;
+	real frame_speed;
 	/* the highest the host has had it since it last had it on the ground,
 	and how far above where it had it then it may be (world units) */
 	real top_height;
@@ -2208,9 +2911,12 @@ than the player goes of their own, and up what its tick added to that, but
 a jump's: a client that says it goes faster than that gains nothing by it
 (its gravity on a copy said to hover and fall, its turn at a wall), nor
 any height. */
+static void distributed_riding_transition(short player_index, long unit_index, struct vehicle_riding_state const *host);
+
 static void distributed_on_foot_bound(
 	short player_index,
 	long unit_index,
+	real_vector3d const *frame_velocity,
 	struct distributed_on_foot_bound *bound)
 {
 	struct distributed_host_speed *noted = &distributed_host_speeds[player_index];
@@ -2221,16 +2927,29 @@ static void distributed_on_foot_bound(
 	struct game_globals *globals = scenario_get_game_globals();
 	long now = game_time_get();
 	real_vector3d const *velocity = &object->object.translational_velocity;
-	real host_speed = (real)sqrt(velocity->i * velocity->i + velocity->j * velocity->j + velocity->k * velocity->k);
-	real taken_speed = (real)sqrt(noted->velocity.i * noted->velocity.i + noted->velocity.j * noted->velocity.j +
-		noted->velocity.k * noted->velocity.k);
-	real run_speed = 0.0f;
+	real_vector3d relative;
+	real_vector3d taken_relative;
+	struct vehicle_riding_state riding;
+	boolean riding_applies = biped_riding_get_state(unit_index, &riding);
+	boolean window = riding_applies && riding.ticks > 0;
+	long vehicle_index = window ? riding.object_index : NONE;
+	real host_speed;
+	real taken_speed;
+	struct game_globals_player_information *information = NULL;
+	real run_speed;
 	real jump_speed = 0.0f;
 	real crouch_rise = 0.0f;
 	real base_speed;
 	real added_rise;
 	real rise_speed;
 
+	/* (the host's transitions count even when a client's words stop) */
+	if (riding_applies)
+		distributed_riding_transition(player_index, unit_index, &riding);
+	subtract_vectors3d(velocity, frame_velocity, &relative);
+	subtract_vectors3d(&noted->velocity, &noted->frame_velocity, &taken_relative);
+	host_speed = magnitude3d(&relative);
+	taken_speed = magnitude3d(&taken_relative);
 	/* (a unit new on foot, a new life or a ride's end: all its speed its
 	ticks', from where it is) */
 	if (noted->unit_index != unit_index)
@@ -2239,14 +2958,31 @@ static void distributed_on_foot_bound(
 		noted->velocity.i = 0.0f;
 		noted->velocity.j = 0.0f;
 		noted->velocity.k = 0.0f;
+		noted->frame_velocity.i = 0.0f;
+		noted->frame_velocity.j = 0.0f;
+		noted->frame_velocity.k = 0.0f;
+		taken_relative = noted->velocity;
+		noted->window = FALSE;
+		noted->vehicle_index = NONE;
 		noted->grounded = FALSE;
 		noted->flight_speed = 0.0f;
 		noted->flight_rise = 0.0f;
 		noted->ground_height = object->object.position.z;
+		noted->ground_frame_k = frame_velocity->k;
 		noted->top_height = object->object.position.z;
 		noted->ground_time = now;
 		taken_speed = 0.0f;
 	}
+	/* (a boarding or a window's end is not a throw in either frame) */
+	if (noted->window != window || (window && noted->vehicle_index != vehicle_index))
+	{
+		noted->velocity = *velocity;
+		noted->frame_velocity = *frame_velocity;
+		taken_relative = relative;
+		taken_speed = host_speed;
+	}
+	noted->window = window;
+	noted->vehicle_index = vehicle_index;
 	/* (the most of each span) */
 	if (now < noted->time || now - noted->time >= 2 * PREDICTION_SPEED_TICKS)
 	{
@@ -2264,20 +3000,11 @@ static void distributed_on_foot_bound(
 		noted->rises[1] = noted->rises[0];
 		noted->rises[0] = 0.0f;
 	}
-	/* (as bipeds.c moves a player: forward or back and sideways at once) */
 	if (globals && globals->player_information.count > 0)
 	{
-		struct game_globals_player_information *information = TAG_BLOCK_GET_ELEMENT(&globals->player_information, 0,
+		information = TAG_BLOCK_GET_ELEMENT(&globals->player_information, 0,
 			struct game_globals_player_information);
-		real forward = MAX(information->run_forward_speed, information->run_backward_speed);
-		real sideways = information->run_sideways_speed;
-
-		run_speed = (real)sqrt(forward * forward + sideways * sideways) / TICKS_PER_SECOND;
-		if (game_players_are_double_speed() && information->double_speed_multiplier > 1.0f)
-			run_speed *= information->double_speed_multiplier;
 	}
-	if (player && player->speed_multiplier > 1.0f)
-		run_speed *= player->speed_multiplier;
 	if (biped)
 	{
 		struct biped_definition *definition = biped_definition_get(biped->definition_index);
@@ -2285,7 +3012,15 @@ static void distributed_on_foot_bound(
 		jump_speed = definition->biped.jump_velocity;
 		crouch_rise = definition->biped.collision_height_standing - definition->biped.collision_height_crouching;
 	}
-	base_speed = PREDICTED_ON_FOOT_SPEED_SCALE * (real)sqrt(run_speed * run_speed + jump_speed * jump_speed);
+	/* (the run alone is also the rise allowed up a slope) */
+	run_speed = vehicle_riding_run_jump_speed(information != NULL,
+		information ? information->run_forward_speed : 0.f, information ? information->run_backward_speed : 0.f,
+		information ? information->run_sideways_speed : 0.f, game_players_are_double_speed(),
+		information ? information->double_speed_multiplier : 1.f, player ? player->speed_multiplier : 1.f, 0.f);
+	base_speed = PREDICTED_ON_FOOT_SPEED_SCALE * vehicle_riding_run_jump_speed(information != NULL,
+		information ? information->run_forward_speed : 0.f, information ? information->run_backward_speed : 0.f,
+		information ? information->run_sideways_speed : 0.f, game_players_are_double_speed(),
+		information ? information->double_speed_multiplier : 1.f, player ? player->speed_multiplier : 1.f, jump_speed);
 	/* (so written that a tag's speed not a number is none) */
 	if (!(base_speed >= 0.0f))
 		base_speed = 0.0f;
@@ -2297,7 +3032,7 @@ static void distributed_on_foot_bound(
 	is none) */
 	if (taken_speed > base_speed)
 		host_speed -= taken_speed - base_speed;
-	added_rise = MAX(velocity->k, 0.0f) - MAX(noted->velocity.k, 0.0f);
+	added_rise = MAX(relative.k, 0.0f) - MAX(taken_relative.k, 0.0f);
 	if (noted->grounded)
 		added_rise -= jump_speed;
 	if (host_speed > noted->speeds[0])
@@ -2310,7 +3045,18 @@ static void distributed_on_foot_bound(
 	if (noted->grounded)
 	{
 		noted->ground_height = object->object.position.z;
+		/* (the falling frame can change in flight; the takeoff ground cannot) */
+		noted->ground_frame_k = frame_velocity->k;
 		noted->ground_time = now;
+		if (window && vehicle_riding_is_riding(&riding))
+		{
+			real_point3d base, place;
+			real height, width;
+
+			biped_get_physics_pill(unit_index, &base, &height, &width);
+			vehicle_riding_point_to_local(&riding.body_position, &riding.body_forward, &riding.body_up, &base, &place);
+			noted->ground_place_height = place.z;
+		}
 	}
 	if (noted->grounded || object->object.position.z > noted->top_height)
 		noted->top_height = object->object.position.z;
@@ -2328,6 +3074,9 @@ static void distributed_on_foot_bound(
 	/* (some: none is no bound, distributed_apply_state) */
 	bound->speed = MAX(bound->speed, PREDICTED_ON_FOOT_SPEED_MARGIN);
 	bound->speed = MIN(bound->speed, MAXIMUM_PREDICTED_SPEED);
+	/* (only flight uses a world bound; a deck still measures relative motion) */
+	bound->frame_speed = window && !vehicle_riding_is_riding(&riding) ? magnitude3d(&riding.velocity) : 0.f;
+	bound->speed += bound->frame_speed;
 	bound->top_height = noted->top_height;
 	/* (a jump's rise, as fast up as it or a run up a slope is: its speed
 	squared over twice gravity) */
@@ -2360,7 +3109,7 @@ static real distributed_on_foot_fall_speed(
 
 	if (drop > 0.0f && global_gravity > 0.0f)
 		speed += (real)sqrt(2.0f * global_gravity * drop);
-	return MIN(speed, MAXIMUM_PREDICTED_SPEED);
+	return MIN(speed, MAXIMUM_PREDICTED_SPEED + bound->frame_speed);
 }
 
 /* (the host) how far above where the host last had a client's player's
@@ -2403,10 +3152,10 @@ static boolean distributed_on_foot_move_valid(
 	real dy = to->y - from->y;
 	real dz = to->z - from->z;
 	real rise = dz > 0.0f ? dz : 0.0f;
-	real reach = MIN(bound->speed + PREDICTED_ON_FOOT_SPEED_MARGIN, MAXIMUM_PREDICTED_SPEED) * (real)ticks +
+	real reach = MIN(bound->speed + PREDICTED_ON_FOOT_SPEED_MARGIN, MAXIMUM_PREDICTED_SPEED + bound->frame_speed) * (real)ticks +
 		HOST_BLEND_DISTANCE;
 	real fall_reach = MIN(distributed_on_foot_fall_speed(bound, to->z) + PREDICTED_ON_FOOT_SPEED_MARGIN,
-		MAXIMUM_PREDICTED_SPEED) * (real)ticks + HOST_BLEND_DISTANCE;
+		MAXIMUM_PREDICTED_SPEED + bound->frame_speed) * (real)ticks + HOST_BLEND_DISTANCE;
 
 	/* (so written that a position not a number is not within) */
 	return dx * dx + dy * dy + rise * rise <= reach * reach && -dz <= fall_reach;
@@ -2432,6 +3181,280 @@ static boolean distributed_riding_elevator(
 		distributed_supported_elevator(unit_index) != NONE);
 }
 
+/* the vehicle a word's deck part has its rider airborne on (a jump's ticks, never
+the riding or standing ones), or NONE */
+static long distributed_air_part_vehicle(
+	struct distributed_unit_state const *state)
+{
+	return state->deck_present && state->deck.ticks > 0 && state->deck.ticks < RIDING_TICKS ?
+		state->deck.vehicle_index : NONE;
+}
+
+/* the host's transaction for a unit its copy has riding a vehicle: the word
+is checked in the body's frame and no accepted state changes until every
+check passes. A word with no deck part (or one that is not of this vehicle's
+deck) is checked and kept the same way, so a client's part coming and going
+changes nothing about the anchor it is held to */
+static boolean distributed_take_riding(
+	short player_index,
+	long unit_index,
+	struct distributed_on_foot_bound const *bound,
+	boolean deck_part)
+{
+	struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
+	struct vehicle_riding_deck const *deck = &state->deck;
+	struct object_datum *object = object_get(unit_index);
+	struct vehicle_riding_state host;
+	struct vehicle_riding_vehicle node, body, host_node;
+	struct distributed_accepted_state accepted = distributed_accepted[player_index];
+	long now = game_time_get();
+	real_point3d base, host_place, place, host_now, anchor, taken_host;
+	real_point3d target;
+	real_vector3d world_velocity;
+	real height, width;
+	real ground_place_height = distributed_host_speeds[player_index].ground_place_height;
+	boolean reset = FALSE;
+	boolean leash;
+	boolean landing;
+	boolean keep_air;
+	boolean client_node;
+	short path;
+
+	if (!biped_riding_get_state(unit_index, &host) || !biped_riding_vehicle(host.object_index, NONE, &body))
+		return FALSE;
+	biped_get_physics_pill(unit_index, &base, &height, &width);
+	/* (the unit's last tick used this snapshot, before the vehicle pass) */
+	vehicle_riding_point_to_local(&host.body_position, &host.body_forward, &host.body_up, &base, &host_place);
+	vehicle_riding_point_to_world(&body.position, &body.forward, &body.up, &host_place, &host_now);
+	/* (the word names the unit's position; the deck's names a pill base) */
+	target = state->position;
+	target.x += base.x - object->object.position.x;
+	target.y += base.y - object->object.position.y;
+	target.z += base.z - object->object.position.z;
+	/* (a deck word of this vehicle is held to the host's own deck, never to the world: the leash
+	would put the copy where the client's copy of the vehicle stood, off its support) */
+	leash = now < accepted.transition_until && !deck_part &&
+		vehicle_riding_host_leash(&target, &host_now, vehicle_riding_transition_leash());
+	landing = deck_part && !leash && accepted.taken_air_unit_index == unit_index &&
+		accepted.taken_air_vehicle == host.object_index;
+	/* (the leash puts the copy at the word with no blend as well, so the riding word it takes is part of the same landing: the
+	record waits for the deck take) */
+	keep_air = leash && accepted.taken_air_unit_index == unit_index && accepted.taken_air_vehicle != NONE &&
+		state->deck_present && state->deck.ticks == RIDING_TICKS && state->deck.vehicle_index == accepted.taken_air_vehicle;
+	path = vehicle_riding_host_path(&host, state->deck_present, deck, leash);
+	client_node = state->deck_present &&
+		vehicle_riding_deck_valid(deck, biped_riding_vehicle_node_count(deck->vehicle_index)) &&
+		biped_riding_vehicle(deck->vehicle_index, deck->node_index, &node);
+	if (!biped_riding_vehicle(host.object_index, host.node_index, &host_node))
+		return FALSE;
+	vehicle_riding_host_target(path, client_node && !leash ? &node : NULL, &host_node,
+		&host_now, deck, &target, &target);
+	/* (a word without a part, or with an airborne part of another vehicle, names no place above the host's: the client's
+	copy of the vehicle or its fall is behind the host's, so it would raise the rider off the deck. A riding part of another
+	vehicle is a rider that stepped up onto it, and is followed) */
+	if (vehicle_riding_is_riding(&host) && (!state->deck_present ||
+		(deck->vehicle_index != host.object_index && deck->ticks != RIDING_TICKS)))
+		vehicle_riding_host_unlifted(&host_node, &host_now, &target);
+	vehicle_riding_point_to_local(&body.position, &body.forward, &body.up, &target, &place);
+	if (!(distance_squared3d(&place, &host_place) <= HOST_ACCEPT_TOLERANCE * HOST_ACCEPT_TOLERANCE))
+		return FALSE;
+	if (accepted.valid && (accepted.unit_index != unit_index || accepted.vehicle_index != host.object_index))
+	{
+		accepted.valid = FALSE;
+		ground_place_height = host_place.z;
+		reset = TRUE;
+	}
+	if (accepted.valid)
+	{
+		long ticks = MIN(distributed_predictions[player_index].time - accepted.time,
+			now - accepted.host_time + PREDICTION_JITTER_TICKS);
+
+		/* (both ends carried by the same body now, never its world travel) */
+		vehicle_riding_point_to_world(&body.position, &body.forward, &body.up, &accepted.taken_host_place, &taken_host);
+		vehicle_riding_point_to_world(&body.position, &body.forward, &body.up, &accepted.place, &anchor);
+		/* (in its window the host copy goes its own way in the world, never
+		with the vehicle: a vehicle that brakes or snaps is no reason to
+		start the anchor again, or a client could climb by each reset) */
+		if (!vehicle_riding_is_riding(&host))
+		{
+			taken_host = accepted.taken_host_position;
+			host_now = object->object.position;
+		}
+		if (!distributed_on_foot_move_valid(bound, &taken_host, &host_now, now - accepted.taken_host_time))
+		{
+			accepted.valid = FALSE;
+			ground_place_height = host_place.z;
+			reset = TRUE;
+		}
+		else if (ticks <= 0 || !distributed_on_foot_move_valid(bound, &anchor, &target, ticks))
+		{
+			return FALSE;
+		}
+	}
+	/* (the part names a pill base; reconcile takes the object's position) */
+	target.x -= base.x - object->object.position.x;
+	target.y -= base.y - object->object.position.y;
+	target.z -= base.z - object->object.position.z;
+	if (leash)
+	{
+		/* (a position allowance never takes the client's velocity) */
+		world_velocity = object->object.translational_velocity;
+	}
+	else if (deck_part)
+	{
+		vehicle_riding_host_velocity(&deck->velocity, &host.velocity, bound->speed,
+			distributed_on_foot_fall_speed(bound, target.z), &world_velocity);
+	}
+	/* (in the air its ground travels at the host's kept takeoff velocity,
+	not the deck's later motion. The bound's elapsed ticks carry that ground;
+	the ceiling alone allows the client's lead and jitter in the jump) */
+	if (!((vehicle_riding_is_riding(&host) ? place.z - ground_place_height :
+		target.z - distributed_host_speeds[player_index].ground_height -
+		distributed_host_speeds[player_index].ground_frame_k * (real)MAX(bound->airborne_ticks, 0)) <=
+		distributed_on_foot_ceiling(player_index, bound)))
+	{
+		return FALSE;
+	}
+	if (deck_part || leash)
+	{
+		/* (the word's place passed every check, while the copy was put in the air by an aim at the client's world place (a world take, a leash take or an along route) off it by the two
+		vehicle copies' offset: half of that would be the state this tick sends, and a word further than the blend
+		would be put there in full anyway) */
+		if (!distributed_apply_state(unit_index, state, &target, &world_velocity, 0.0f,
+			leash || landing ? 0.f : HOST_BLEND_DISTANCE, 0.0f, 0.0f))
+			return FALSE;
+		if (leash)
+			accepted.transition_leash_time = now;
+		biped_riding_rebase(unit_index);
+	}
+	else if (!distributed_apply_state(unit_index, state, &target, NULL, 0.0f, HOST_BLEND_DISTANCE, bound->speed,
+		distributed_on_foot_fall_speed(bound, target.z)))
+	{
+		return FALSE;
+	}
+	distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
+	distributed_predictions[player_index].taken_host_time = now;
+	accepted.taken_air_unit_index = unit_index;
+	if (!keep_air)
+		accepted.taken_air_vehicle = distributed_air_part_vehicle(state);
+	if (!accepted.valid || now - accepted.host_time >= PREDICTION_ANCHOR_TICKS)
+	{
+		accepted.valid = TRUE;
+		accepted.unit_index = unit_index;
+		accepted.time = distributed_predictions[player_index].time;
+		accepted.host_time = now;
+		accepted.position = target;
+		accepted.vehicle_index = host.object_index;
+		accepted.place = place;
+	}
+	accepted.taken_host_time = now;
+	accepted.taken_host_position = object->object.position;
+	biped_get_physics_pill(unit_index, &base, &height, &width);
+	vehicle_riding_point_to_local(&body.position, &body.forward, &body.up, &base, &accepted.taken_host_place);
+	distributed_accepted[player_index] = accepted;
+	if (reset)
+	{
+		distributed_host_speeds[player_index].ground_place_height = ground_place_height;
+		distributed_host_speeds[player_index].ground_height = object->object.position.z;
+		distributed_host_speeds[player_index].top_height = object->object.position.z;
+		distributed_host_speeds[player_index].ground_time = now;
+	}
+	return TRUE;
+}
+
+/* a client can ease one disagreement, but only the host can grant another */
+static void distributed_riding_transition(
+	short player_index,
+	long unit_index,
+	struct vehicle_riding_state const *host)
+{
+	struct distributed_accepted_state *accepted = &distributed_accepted[player_index];
+	struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
+	short host_ticks = host->ticks;
+	short client_ticks = state->deck_present ? state->deck.ticks : 0;
+	long host_vehicle = host_ticks > 0 ? host->object_index : NONE;
+	long client_vehicle = client_ticks > 0 ? state->deck.vehicle_index : NONE;
+	long now = game_time_get();
+	long length = (long)distributed_machine_round_trip_ticks(distributed_player_machine(player_index)) + PREDICTION_JITTER_TICKS;
+	boolean host_changed, client_changed, acknowledged;
+
+	if (!accepted->transition_sampled || accepted->transition_unit_index != unit_index)
+	{
+		accepted->transition_sampled = TRUE;
+		accepted->transition_unit_index = unit_index;
+		accepted->transition_until = 0;
+		accepted->transition_client_spent = FALSE;
+		accepted->transition_leash_time = NONE;
+		accepted->transition_board_vehicle = NONE;
+		accepted->transition_board_until = 0;
+	}
+	else
+	{
+		/* (the air countdown is not a new takeoff each tick) */
+		host_changed = (host_ticks > 0) != (accepted->transition_host_ticks > 0) ||
+			(host_ticks == RIDING_TICKS) != (accepted->transition_host_ticks == RIDING_TICKS) ||
+			host_vehicle != accepted->transition_host_vehicle;
+		client_changed = (client_ticks > 0) != (accepted->transition_client_ticks > 0) ||
+			(client_ticks == RIDING_TICKS) != (accepted->transition_client_ticks == RIDING_TICKS) ||
+			client_vehicle != accepted->transition_client_vehicle;
+		/* (the word taken is read from the accepted state: the prediction's own stamp is cleared before each take) */
+		if (host_changed && vehicle_riding_transition_agreed(accepted->transition_host_ticks, accepted->transition_host_vehicle,
+			host_ticks, host_vehicle, client_ticks, client_vehicle, state->deck_present,
+			accepted->taken_host_time != NONE && accepted->taken_host_time >= now - length))
+		{
+			/* (both ends make this change themselves: nothing to leash, and the client's entitlement for a later one stays whole) */
+			accepted->transition_until = 0;
+			accepted->transition_client_spent = FALSE;
+			accepted->transition_board_vehicle = NONE;
+			accepted->transition_board_until = 0;
+			if (host_ticks == RIDING_TICKS && !state->deck_present)
+			{
+				/* (the client's word has not boarded yet: it will, and that is no change of its own to leash) */
+				accepted->transition_board_vehicle = host_vehicle;
+				accepted->transition_board_until = now + length;
+			}
+		}
+		else
+		{
+			/* (the host's flip right after the leash wrote the copy to the client's place is that write's doing, not a new change) */
+			if (host_changed && accepted->transition_host_ticks == RIDING_TICKS && host_ticks > 0 && host_ticks < RIDING_TICKS &&
+				host_vehicle == accepted->transition_host_vehicle && accepted->transition_leash_time != NONE &&
+				now == accepted->transition_leash_time + 1)
+			{
+				host_changed = FALSE;
+			}
+			acknowledged = !host_changed && client_changed && accepted->transition_board_vehicle != NONE &&
+				client_ticks == RIDING_TICKS && client_vehicle == accepted->transition_board_vehicle &&
+				now <= accepted->transition_board_until &&
+				host_ticks == RIDING_TICKS && host_vehicle == accepted->transition_board_vehicle;
+			if (host_changed)
+				accepted->transition_client_spent = FALSE;
+			if (acknowledged)
+			{
+				/* (the boarding the host agreed to, arriving: used up, with the entitlement as it was) */
+				accepted->transition_board_vehicle = NONE;
+			}
+			else if (!host_changed && client_changed &&
+				vehicle_riding_word_on_air_deck(host_ticks, host_vehicle, client_ticks, client_vehicle))
+			{
+				/* (the word rides the deck the copy is over: the copy's take puts it on its own deck, so nothing to leash and a leash already running is ended, with the client's entitlement for a later change as it was) */
+				accepted->transition_until = 0;
+			}
+			else if (host_changed || (client_changed && !accepted->transition_client_spent))
+			{
+				accepted->transition_until = now + length;
+				accepted->transition_board_vehicle = NONE;
+				if (!host_changed)
+					accepted->transition_client_spent = TRUE;
+			}
+		}
+	}
+	accepted->transition_host_ticks = host_ticks;
+	accepted->transition_client_ticks = client_ticks;
+	accepted->transition_host_vehicle = host_vehicle;
+	accepted->transition_client_vehicle = client_vehicle;
+}
+
 /* (the host) a client's player's prediction of its unit on foot, taken
 where it says within a tolerance (distributed_apply_predictions). Riding an
 elevator (distributed_riding_elevator), only across: a client's elevator
@@ -2452,6 +3475,53 @@ static void distributed_take_prediction(
 	long now = game_time_get();
 	real_point3d position = state->position;
 	real dx, dy, dz;
+	struct vehicle_riding_state host;
+	struct vehicle_riding_vehicle vehicle;
+	real_point3d base;
+	real height, width;
+	boolean leash;
+	boolean riding_applies;
+	real_vector3d kept_velocity = object->object.translational_velocity;
+
+	/* MCC movement effects stay host-simulated, rather than widening the
+	 * security bounds on client-supplied positions and velocities. */
+	if (mcc_script_effects_host_movement())
+		return;
+	csmemset(&host, 0, sizeof(host));
+	riding_applies = biped_riding_get_state(unit_index, &host);
+	if (riding_applies)
+		distributed_riding_transition(player_index, unit_index, &host);
+	leash = riding_applies && now < distributed_accepted[player_index].transition_until &&
+		vehicle_riding_host_leash(&position, &object->object.position, vehicle_riding_transition_leash());
+
+	/* (re-resolve after the vehicle pass: a deleted salt takes the world path.
+	A copy in the air of the vehicle its anchor is of is held to that anchor
+	too, or each switch between riding and that air would restart it) */
+	if (biped_riding_get_state(unit_index, &host) &&
+		(vehicle_riding_is_riding(&host) ||
+		(host.ticks > 0 && distributed_accepted[player_index].valid &&
+		distributed_accepted[player_index].unit_index == unit_index &&
+		distributed_accepted[player_index].vehicle_index == host.object_index)) &&
+		biped_riding_vehicle(host.object_index, NONE, &vehicle) && !distributed_riding_elevator(unit_index))
+	{
+		distributed_take_riding(player_index, unit_index, bound,
+			vehicle_riding_host_path(&host, state->deck_present, &state->deck, FALSE) == _vehicle_riding_host_deck &&
+			vehicle_riding_deck_valid(&state->deck, biped_riding_vehicle_node_count(state->deck.vehicle_index)) &&
+			biped_riding_vehicle(state->deck.vehicle_index, state->deck.node_index, &vehicle));
+		return;
+	}
+	if (distributed_accepted[player_index].valid && distributed_accepted[player_index].vehicle_index != NONE)
+		distributed_accepted[player_index].valid = FALSE;
+	if (riding_applies && !leash && state->deck_present && state->deck.ticks == RIDING_TICKS &&
+		vehicle_riding_deck_valid(&state->deck, biped_riding_vehicle_node_count(state->deck.vehicle_index)) &&
+		biped_riding_vehicle(state->deck.vehicle_index, state->deck.node_index, &vehicle))
+	{
+		biped_get_physics_pill(unit_index, &base, &height, &width);
+		vehicle_riding_host_target(_vehicle_riding_host_world, &vehicle, NULL, &base, &state->deck, &base, &position);
+		position.x -= base.x - object->object.position.x;
+		position.y -= base.y - object->object.position.y;
+		position.z -= base.z - object->object.position.z;
+	}
 
 	if (distributed_riding_elevator(unit_index))
 		position.z = object->object.position.z;
@@ -2515,8 +3585,9 @@ static void distributed_take_prediction(
 		return;
 	}
 	/* (the client told which of its ticks the host has it at) */
-	if (distributed_apply_state(unit_index, state, &position, 0.0f, HOST_BLEND_DISTANCE, bound->speed,
-		distributed_on_foot_fall_speed(bound, position.z)))
+	if (distributed_apply_state(unit_index, state, &position, leash ? &kept_velocity : NULL, 0.0f,
+		leash ? 0.f : HOST_BLEND_DISTANCE, leash ? 0.f : bound->speed,
+		leash ? 0.f : distributed_on_foot_fall_speed(bound, position.z)))
 	{
 		distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
 		distributed_predictions[player_index].taken_host_time = now;
@@ -2524,6 +3595,8 @@ static void distributed_take_prediction(
 		distributed_divergence.taken_host_time[player_index] = now;
 		distributed_divergence.taken_position[player_index] = position;
 		distributed_divergence.taken_host_position[player_index] = object->object.position;
+		if (leash)
+			distributed_accepted[player_index].transition_leash_time = now;
 		/* (a new anchor: the first, one a second on, or after a jump) */
 		if (!distributed_accepted[player_index].valid ||
 			now - distributed_accepted[player_index].host_time >= PREDICTION_ANCHOR_TICKS)
@@ -2533,9 +3606,12 @@ static void distributed_take_prediction(
 			distributed_accepted[player_index].time = distributed_predictions[player_index].time;
 			distributed_accepted[player_index].host_time = now;
 			distributed_accepted[player_index].position = position;
+			distributed_accepted[player_index].vehicle_index = NONE;
 		}
 		distributed_accepted[player_index].taken_host_time = now;
 		distributed_accepted[player_index].taken_host_position = object->object.position;
+		distributed_accepted[player_index].taken_air_unit_index = unit_index;
+		distributed_accepted[player_index].taken_air_vehicle = distributed_air_part_vehicle(state);
 	}
 }
 
@@ -2550,8 +3626,18 @@ than it climbs or jumps; its velocity is no faster. A teleporter moves the
 host's own unit too, further than it moves since the last taken: it is
 measured from where the host has it only, a new anchor (as it is after a
 new life, or a ride). */
+static boolean distributed_prediction_rides(
+	short player_index,
+	long unit_index)
+{
+	struct vehicle_riding_state host;
+
+	return (unit_index != NONE && biped_riding_get_state(unit_index, &host) && host.ticks > 0) ||
+		distributed_predictions[player_index].state.deck_present;
+}
+
 static void distributed_apply_predictions(
-	void)
+	boolean riders)
 {
 	short player_index;
 
@@ -2560,37 +3646,45 @@ static void distributed_apply_predictions(
 		struct distributed_unit_state const *state = &distributed_predictions[player_index].state;
 		struct distributed_on_foot_bound bound;
 		long unit_index;
+		struct vehicle_riding_state host;
+		real_vector3d frame_velocity = { 0.0f, 0.0f, 0.0f };
 
+		if (distributed_rider_pass[player_index] != riders)
+			continue;
+		unit_index = distributed_living_unit(distributed_player(player_index));
+		if (unit_index != NONE && object_get(unit_index)->object.parent_object_index != NONE)
+			unit_index = NONE;
 		if (!distributed_predictions[player_index].valid && !distributed_accepted[player_index].valid &&
 			distributed_host_speeds[player_index].unit_index == NONE)
 		{
 			continue;
 		}
-		unit_index = distributed_living_unit(distributed_player(player_index));
-		if (unit_index != NONE && object_get(unit_index)->object.parent_object_index != NONE)
-			unit_index = NONE;
 		if (distributed_accepted[player_index].valid && distributed_accepted[player_index].unit_index != unit_index)
 			distributed_accepted[player_index].valid = FALSE;
 		/* (how fast it may go, a tick, what the host's tick did to its own
 		copy noted before the client's word is taken; riding or dead, noted
 		afresh on foot) */
 		if (unit_index != NONE)
-			distributed_on_foot_bound(player_index, unit_index, &bound);
+		{
+			if (biped_riding_get_state(unit_index, &host) && host.ticks > 0)
+				frame_velocity = host.velocity;
+			distributed_on_foot_bound(player_index, unit_index, &frame_velocity, &bound);
+		}
 		else
 			distributed_host_speeds[player_index].unit_index = NONE;
 		if (distributed_predictions[player_index].valid)
 		{
-			distributed_predictions[player_index].valid = FALSE;
-			distributed_predictions[player_index].taken_host_time = NONE;
 			/* (of the unit it has now: not one of a life before; and not
 			from a co-op client still loading the host's BSP, whose player
 			falls there with no floor under it) */
-			if (unit_index != NONE && unit_index == state->unit_index &&
+			boolean eligible = unit_index != NONE && unit_index == state->unit_index &&
 				unit_get(unit_index)->unit.player_index != NONE &&
-				network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index))
-			{
+				network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index);
+
+			distributed_predictions[player_index].valid = FALSE;
+			distributed_predictions[player_index].taken_host_time = NONE;
+			if (eligible)
 				distributed_take_prediction(player_index, unit_index, &bound);
-			}
 		}
 		/* (what the host's next tick starts from) */
 		if (unit_index != NONE)
@@ -2598,6 +3692,7 @@ static void distributed_apply_predictions(
 			struct object_datum *object = object_get(unit_index);
 
 			distributed_host_speeds[player_index].velocity = object->object.translational_velocity;
+			distributed_host_speeds[player_index].frame_velocity = frame_velocity;
 			if (object->object.position.z > distributed_host_speeds[player_index].top_height)
 				distributed_host_speeds[player_index].top_height = object->object.position.z;
 		}
@@ -2606,6 +3701,7 @@ static void distributed_apply_predictions(
 
 /* (a client) the host's word on a player's unit */
 static void distributed_handle_unit_state(
+	long host_time,
 	struct distributed_unit_state const *state)
 {
 	struct player_datum *player = distributed_player(state->player_index);
@@ -2649,6 +3745,7 @@ static void distributed_handle_unit_state(
 	}
 	if (state->player_index < MAXIMUM_TRACKED_PLAYERS)
 		distributed_deaths[state->player_index].dead_since = NONE;
+	network_objects_expect_live_unit(state->unit_index);
 	/* spawned on the host: the host's unit is the player's here too, once
 	this machine has it (network_objects.c) */
 	if (state->unit_index == NONE || !network_objects_client_has(state->unit_index) ||
@@ -2664,10 +3761,11 @@ static void distributed_handle_unit_state(
 		network_player_attach_unit(player_index, state->unit_index);
 		/* (a unit of a life this machine missed the end of, no player's
 		now: unit_kill_no_statistics is for players' units only) */
-		if (unit_index != NONE && unit_index != state->unit_index)
+		if (unit_index != NONE && unit_index != state->unit_index && !mcc_script_effects_preserve_body())
 			unit_kill(unit_index);
 	}
 	unit_index = state->unit_index;
+	distributed_scripted_pose_apply(unit_get(unit_index), state);
 	/* the seat it rides: a client's own player's, once it has ridden
 	otherwise for longer than its prediction takes to reach the host and
 	come back (a player within the tracked ones, as players.c's datums are) */
@@ -2723,8 +3821,7 @@ static void distributed_handle_unit_state(
 			distributed_correct_own_unit(player, unit_index, state);
 		else
 		{
-			distributed_apply_state(unit_index, state, &state->position, REMOTE_CORRECTION_TOLERANCE,
-				REMOTE_BLEND_DISTANCE, 0.0f, 0.0f);
+			distributed_apply_remote_unit(unit_index, state);
 		}
 		/* moved further than a step at once (the host's teleporter sent
 		it): on the teleporter it lands on, as a teleporter leaves the
@@ -2741,6 +3838,7 @@ static void distributed_handle_unit_state(
 
 /* (a client) the host's word on every player's unit */
 static void distributed_handle_unit_states(
+	long host_time,
 	byte const *data,
 	byte const *end,
 	short count)
@@ -2755,7 +3853,7 @@ static void distributed_handle_unit_states(
 		if (!size)
 			break;
 		data += size;
-		distributed_handle_unit_state(&state);
+		distributed_handle_unit_state(host_time, &state);
 	}
 }
 
@@ -2854,6 +3952,8 @@ static void distributed_handle_inputs(
 			continue;
 		/* (the sticks and the trigger no further than a controller's) */
 		action = input->action;
+		/* Only the defined input bits are accepted; forced-off wins. */
+		action.control_flags &= 0x1FFFFUL;
 		action.throttle.i = PIN(action.throttle.i, -1.0f, 1.0f);
 		action.throttle.j = PIN(action.throttle.j, -1.0f, 1.0f);
 		action.primary_trigger = PIN(action.primary_trigger, 0.0f, 1.0f);
@@ -3732,23 +4832,126 @@ static void distributed_send_game_state(
 
 /* ---------- the game */
 
-/* a new map loading (game.c), before any of the new game's messages can
-apply: nothing sent or had yet */
-void network_distributed_new_game(
-	void)
+/* Predictions, delayed effects and send caches belong to one world, even
+when a checkpoint restores the same object handles. Connection identity,
+permissions, round trips and the host's current roster do not. */
+static void distributed_reset_checkpoint_state(boolean reset_received_times)
 {
-	short sender;
-	short type;
-	short player_index;
+	short sender, type, player_index;
 
 	distributed_last_sent_time = NONE;
 	csmemset(distributed_deaths, 0, sizeof(distributed_deaths));
 	csmemset(distributed_seat_disagreements, 0, sizeof(distributed_seat_disagreements));
 	csmemset(distributed_predictions, 0, sizeof(distributed_predictions));
 	csmemset(distributed_accepted, 0, sizeof(distributed_accepted));
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		distributed_accepted[player_index].taken_air_unit_index = NONE;
+		distributed_accepted[player_index].taken_air_vehicle = NONE;
+	}
 	csmemset(distributed_host_speeds, 0, sizeof(distributed_host_speeds));
-	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
 	csmemset(distributed_input_facings, 0, sizeof(distributed_input_facings));
+	csmemset(distributed_seen, 0, sizeof(distributed_seen));
+	csmemset(distributed_viewers, 0, sizeof(distributed_viewers));
+	csmemset(distributed_sends, 0, sizeof(distributed_sends));
+	csmemset(distributed_host_states, 0, sizeof(distributed_host_states));
+	csmemset(distributed_host_actions, 0, sizeof(distributed_host_actions));
+	csmemset(distributed_sent_statistics, 0, sizeof(distributed_sent_statistics));
+	distributed_statistics_cursor = 0;
+	distributed_statistics_due = TRUE;
+	distributed_game_state_checksum = 0;
+	distributed_game_state_time = NONE;
+	distributed_host_update_number = NONE;
+	distributed_sent_structure_bsp_index = NONE;
+	distributed_pickup_count = 0;
+	distributed_machines.valid = FALSE;
+	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+	{
+		distributed_deaths[player_index].dead_since = NONE;
+		distributed_sent_units[player_index].flags = 0;
+		distributed_sent_units[player_index].unit_index = NONE;
+		distributed_sent_units[player_index].vehicle_index = NONE;
+		distributed_sent_units[player_index].seat_index = NONE;
+		distributed_predictions[player_index].taken_host_time = NONE;
+		distributed_host_speeds[player_index].unit_index = NONE;
+		distributed_player_machines[player_index] = NONE;
+		distributed_divergence.taken_time[player_index] = NONE;
+		distributed_divergence.taken_host_time[player_index] = NONE;
+		distributed_divergence.input_time[player_index] = NONE;
+	}
+	for (sender = 0; sender < MAXIMUM_SENDERS; sender++)
+	{
+		distributed_batches[sender].size = 0;
+		if (reset_received_times)
+		{
+			distributed_sender_times[sender] = NONE;
+			for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
+				distributed_received_times[sender][type] = NONE;
+		}
+	}
+	for (sender = 0; sender < MAXIMUM_LOCAL_PLAYERS; sender++)
+	{
+		for (type = 0; type < OWN_POSITION_TICKS; type++)
+		{
+			distributed_own_positions[sender][type].time = NONE;
+			distributed_own_positions[sender][type].unit_index = NONE;
+		}
+	}
+	update_queues_distributed_reset();
+}
+
+static void distributed_advance_checkpoint(void)
+{
+	/* Unsigned rollover is defined; zero remains the unbound client state. */
+	if (++distributed_host_epoch == 0)
+		++distributed_host_epoch;
+	distributed_checkpoint_epoch = distributed_host_epoch;
+}
+
+static void distributed_restore_checkpoint(void)
+{
+	distributed_reset_checkpoint_state(TRUE);
+	network_objects_discard_client_effects();
+	network_objects_reverted();
+	network_damage_new_game();
+	network_actors_new_game();
+	network_coop_reset_recovery();
+}
+
+void network_distributed_reverted(void)
+{
+	long machines[HALO_PORT_MAXIMUM_NETWORK_MACHINES];
+	short count, index;
+
+	if (game_connection() != _game_connection_network_server || !network_coop_active())
+		return;
+	distributed_advance_checkpoint();
+	distributed_restore_checkpoint();
+	count = distributed_client_machines(machines, NUMBEROF(machines));
+	/* A snapshot may also broadcast creates/deletes. Every loaded client
+	must receive the boundary before the first snapshot is constructed. */
+	for (index = 0; index < count; index++)
+		distributed_checkpoint_to_machine(machines[index]);
+	network_objects_host_reverted();
+}
+
+/* a new map loading (game.c), before any of the new game's messages can
+apply: nothing sent or had yet */
+void network_distributed_new_game(
+	void)
+{
+	short type;
+	short player_index;
+
+	if (game_connection() == _game_connection_network_server)
+		distributed_advance_checkpoint();
+	else
+		distributed_checkpoint_epoch = 0;
+	distributed_checkpoint_synchronized = FALSE;
+
+	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
+	distributed_reset_checkpoint_state(TRUE);
+	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
 	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
 	csmemset(distributed_client_identities, 0, sizeof(distributed_client_identities));
 	distributed_identity_sent = FALSE;
@@ -3761,45 +4964,7 @@ void network_distributed_new_game(
 		for (machine_index = 0; machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine_index++)
 			distributed_client_clocks[machine_index].window_tick = NONE;
 	}
-	csmemset(distributed_seen, 0, sizeof(distributed_seen));
-	csmemset(distributed_viewers, 0, sizeof(distributed_viewers));
-	csmemset(distributed_sends, 0, sizeof(distributed_sends));
-	/* (none sent: every player's the first time) */
-	csmemset(distributed_sent_statistics, 0, sizeof(distributed_sent_statistics));
-	distributed_statistics_cursor = 0;
-	distributed_game_state_checksum = 0;
 	distributed_game_state_postgame = 0;
-	distributed_game_state_time = NONE;
-	distributed_host_update_number = NONE;
-	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-	{
-		distributed_deaths[player_index].dead_since = NONE;
-		distributed_sent_units[player_index].flags = 0;
-		distributed_sent_units[player_index].unit_index = NONE;
-		distributed_sent_units[player_index].vehicle_index = NONE;
-		distributed_sent_units[player_index].seat_index = NONE;
-	}
-	for (sender = 0; sender < MAXIMUM_SENDERS; sender++)
-	{
-		distributed_batches[sender].size = 0;
-		for (type = 0; type < NUMBER_OF_DISTRIBUTED_MESSAGES; type++)
-			distributed_received_times[sender][type] = NONE;
-		distributed_sender_times[sender] = NONE;
-	}
-	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-	{
-		distributed_predictions[player_index].taken_host_time = NONE;
-		distributed_host_speeds[player_index].unit_index = NONE;
-		distributed_player_machines[player_index] = NONE;
-	}
-	for (sender = 0; sender < MAXIMUM_LOCAL_PLAYERS; sender++)
-	{
-		for (type = 0; type < OWN_POSITION_TICKS; type++)
-		{
-			distributed_own_positions[sender][type].time = NONE;
-			distributed_own_positions[sender][type].unit_index = NONE;
-		}
-	}
 	distributed_own_round_trip = 0.0f;
 	csmemset(distributed_player_pings, 0xFF, sizeof(distributed_player_pings));
 	distributed_own_ping_valid = FALSE;
@@ -3813,26 +4978,15 @@ void network_distributed_new_game(
 		distributed_tick_sent_times[type].time = NONE;
 	csmemset(distributed_machine_players, 0xFF, sizeof(distributed_machine_players));
 	distributed_machines.in_tick = FALSE;
-	distributed_machines.valid = FALSE;
 	distributed_host_time = NONE;
 	distributed_statistics_due = FALSE;
-	distributed_pickup_count = 0;
-	/* (the tests' drift figures: none taken, no input had, of this game) */
-	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
-	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
-	{
-		distributed_divergence.taken_time[player_index] = NONE;
-		distributed_divergence.taken_host_time[player_index] = NONE;
-		distributed_divergence.input_time[player_index] = NONE;
-	}
-	/* (each player's latest input: player_queues_new.c) */
-	update_queues_distributed_reset();
 	network_objects_new_game();
 	network_damage_new_game();
 	network_actors_new_game();
 	network_coop_new_game();
 	network_aim_assist_reset();
 	network_shield_effects_reset();
+	network_riding_map_reset();
 	network_votekick_new_game();
 	network_afk_new_game();
 	network_map_vote_reset();
@@ -3868,8 +5022,18 @@ void network_distributed_tick(
 		decided first: the damage goes where the players it hurt do), and a
 		kill's statistics before the kill, so that a client announcing it
 		counts it (a double kill, a killing spree) */
-		profile_scope(distributed_tick_apply_predictions_section, distributed_apply_predictions();)
+		{
+			short player_index;
+
+			for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
+			{
+				distributed_rider_pass[player_index] = distributed_prediction_rides(player_index,
+					distributed_living_unit(distributed_player(player_index)));
+			}
+		}
+		profile_scope(distributed_tick_apply_predictions_section, distributed_apply_predictions(FALSE);)
 		profile_scope(distributed_tick_apply_vehicle_predictions_section, network_objects_apply_vehicle_predictions();)
+		profile_scope(distributed_tick_apply_predictions_section, distributed_apply_predictions(TRUE);)
 		profile_scope(distributed_tick_objects_host_tick_section, network_objects_host_tick();)
 		profile_scope(distributed_tick_plan_players_section, distributed_host_plan_players();)
 		profile_scope(distributed_tick_damage_host_tick_section, network_damage_host_tick();)
@@ -4007,6 +5171,9 @@ static boolean distributed_message_stale(
 	case _distributed_message_coop_screen_effect:
 	case _distributed_message_coop_device_states:
 	case _distributed_message_votekick_status:
+	case _distributed_message_mcc_grenades:
+	case _distributed_message_mcc_campaign:
+	case _distributed_message_mcc_object_names:
 		break;
 	default:
 		return FALSE;
@@ -4599,6 +5766,8 @@ static void distributed_note_client_clock(
 	unsigned long now = system_milliseconds();
 	unsigned long elapsed;
 
+	/* MCC clocks include only host-approved speed changes. Other maps use wall time. */
+	now = mcc_game_speed_clock(now);
 	if (machine_index < 0 || machine_index >= HALO_PORT_MAXIMUM_NETWORK_MACHINES)
 		return;
 	clock = &distributed_client_clocks[machine_index];
@@ -4708,6 +5877,81 @@ not overtaken by the newer damage sent with the ticks since
 (distributed_message_stale) */
 static boolean distributed_handling_batch;
 
+/* Only the host's ordered boundary can change worlds. A new datagram may
+overtake it, and an old reliable kill may trail newer state in its old
+world: neither is authority to adopt a different epoch. */
+static boolean distributed_message_epoch_valid(
+	long machine_index,
+	struct distributed_message_header const *header,
+	word size)
+{
+	if (header->type == _distributed_message_checkpoint)
+	{
+		if (machine_index != NONE || game_connection() != _game_connection_network_client ||
+			network_connection_last_read_was_unreliable() || distributed_handling_batch ||
+			size != sizeof(*header) || header->count != 0 || header->checkpoint_epoch == 0)
+			return FALSE;
+		if (distributed_checkpoint_epoch != 0 &&
+			(long)(header->checkpoint_epoch - distributed_checkpoint_epoch) <= 0)
+			return FALSE;
+		distributed_checkpoint_epoch = header->checkpoint_epoch;
+		distributed_checkpoint_synchronized = FALSE;
+		distributed_restore_checkpoint();
+		/* Initial ready can precede the boundary. Its identity/build may
+		have gone with epoch zero and been refused by the host. */
+		distributed_identity_sent = FALSE;
+		distributed_build_sent = FALSE;
+		return FALSE;
+	}
+	/* A late joiner does not yet know the epoch. Readiness may request the
+	current boundary/snapshot, within the existing host resend rate limit;
+	it cannot change the epoch or authorize predictions and hit reports. */
+	if (header->type == _distributed_message_client_ready)
+		return game_connection() == _game_connection_network_server &&
+			machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES &&
+			distributed_handling_stream_message && !distributed_handling_batch &&
+			size == sizeof(*header) && header->count <= 1;
+	if (distributed_checkpoint_epoch == 0 || header->checkpoint_epoch != distributed_checkpoint_epoch)
+		return FALSE;
+	if (game_connection() == _game_connection_network_client)
+	{
+		if (machine_index != NONE)
+			return FALSE;
+		if (header->type == _distributed_message_object_changes &&
+			(network_connection_last_read_was_unreliable() || distributed_handling_batch))
+			return FALSE;
+		if (header->type == _distributed_message_objects_synchronized)
+		{
+			if (network_connection_last_read_was_unreliable() || distributed_handling_batch ||
+				size != sizeof(*header) || header->count != 0)
+				return FALSE;
+			if (!distributed_checkpoint_synchronized)
+			{
+				/* The client still simulates during transfer. Retire hits,
+				projectiles and delayed effects produced by those provisional
+				replicas before gameplay resumes. Keep the ordered snapshot's
+				receive times: older same-epoch datagrams must remain stale. */
+				network_objects_discard_client_effects();
+				network_damage_new_game();
+				distributed_reset_checkpoint_state(FALSE);
+				/* These producers remember a send before the common sender
+				can suppress it during an incomplete snapshot. */
+				distributed_identity_sent = FALSE;
+				distributed_build_sent = FALSE;
+			}
+			distributed_checkpoint_synchronized = TRUE;
+		}
+		/* A current-world kill may overtake the live description in the
+		initial snapshot. Apply gameplay only after its ordered end marker;
+		otherwise that description could resurrect the newly killed copy. */
+		if (!distributed_checkpoint_synchronized)
+			return header->type == _distributed_message_object_changes ||
+				(header->type == _distributed_message_inventories &&
+					!network_connection_last_read_was_unreliable() && !distributed_handling_batch);
+	}
+	return TRUE;
+}
+
 /* a message of the distributed kind; machine_index is the sender's on the
 host, NONE on a client */
 void network_distributed_handle_message(
@@ -4726,6 +5970,11 @@ void network_distributed_handle_message(
 		network_aim_assist_handle_message(machine_index, message, size);
 		return;
 	}
+	if (network_riding_map_handles_message(message, size))
+	{
+		network_riding_map_handle_message(machine_index, message, size);
+		return;
+	}
 	if (network_shield_effects_handles_message(message, size))
 	{
 		network_shield_effects_handle_message(machine_index, message, size);
@@ -4734,6 +5983,26 @@ void network_distributed_handle_message(
 	if (network_voice_handles_message(message, size))
 	{
 		network_voice_handle_message(machine_index, message, size);
+		return;
+	}
+	if (mcc_load_network_handles_message(message, size))
+	{
+		mcc_load_network_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	/* MCC validation has its own bounded hold, independent of file sharing. */
+	if (mcc_admission_handles_message(message, size))
+	{
+		mcc_admission_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	/* (MCC package sharing's, the same way: mcc_share.c) */
+	if (mcc_share_game_handles_message(message, size))
+	{
+		mcc_share_game_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}
 	/* (map sharing's, in the lobby too, over the host's connection alone:
@@ -4756,6 +6025,9 @@ void network_distributed_handle_message(
 	if (size < sizeof(header) || !game_in_progress())
 		return;
 	csmemcpy(&header, message, sizeof(header));
+	/* MCC messages never execute in an ordinary OpenCE session, even in a batch. */
+	if (header.type >= _distributed_message_mcc_grenades && !mcc_cache_tags_loaded())
+		return;
 	/* a tick's messages in one: each as if it came alone */
 	if (header.type == _distributed_message_batch)
 	{
@@ -4794,6 +6066,15 @@ void network_distributed_handle_message(
 	case _distributed_message_unit_states: entry_size = DISTRIBUTED_UNIT_STATE_MINIMUM_SIZE; break;
 	case _distributed_message_player_statistics: entry_size = sizeof(struct distributed_player_statistics); break;
 	case _distributed_message_pings: entry_size = sizeof(struct distributed_player_ping); break;
+	case _distributed_message_mcc_grenades: entry_size = mcc_network_inventory_entry_size(); break;
+	case _distributed_message_mcc_campaign: entry_size = mcc_network_campaign_entry_size(); break;
+	case _distributed_message_mcc_game_speed:
+		/* A clock command is host-only and ordered, never accepted from datagrams. */
+		if (machine_index != NONE || network_connection_last_read_was_unreliable() ||
+			header.count != 1 || size != sizeof(header) + sizeof(real)) return;
+		entry_size = sizeof(real);
+		break;
+	case _distributed_message_mcc_object_names: entry_size = mcc_object_names_entry_size(); break;
 	case _distributed_message_actor_states: entry_size = network_actors_entry_size(); break;
 	case _distributed_message_structure_bsp: entry_size = sizeof(struct distributed_structure_bsp); break;
 	case _distributed_message_coop_presentation: entry_size = network_coop_presentation_entry_size(); break;
@@ -4816,6 +6097,7 @@ void network_distributed_handle_message(
 	case _distributed_message_player_inputs: entry_size = sizeof(struct distributed_player_input); break;
 	case _distributed_message_relayed_actions: entry_size = DISTRIBUTED_RELAYED_ACTION_MINIMUM_SIZE; break;
 	case _distributed_message_game_state:
+	case _distributed_message_checkpoint:
 	case _distributed_message_objects_synchronized:
 	case _distributed_message_notice:
 	case _distributed_message_client_ready: entry_size = 0; break;
@@ -4886,7 +6168,12 @@ void network_distributed_handle_message(
 			return;
 		break;
 	}
-	if (!distributed_message_time_bounded(machine_index, header.game_time,
+	if (!distributed_message_epoch_valid(machine_index, &header, size))
+		return;
+	/* Readiness can name an earlier world; it requests the current boundary
+	but supplies no clock or simulation evidence for that world. */
+	if (header.type != _distributed_message_client_ready &&
+		!distributed_message_time_bounded(machine_index, header.game_time,
 		machine_index == NONE ? !network_connection_last_read_was_unreliable() : distributed_handling_stream_message))
 	{
 		return;
@@ -4906,7 +6193,7 @@ void network_distributed_handle_message(
 	}
 	/* (the host: a client's clock, by its messages' ticks; and its players'
 	predictions not taken while its game runs fast) */
-	if (machine_index != NONE)
+	if (machine_index != NONE && header.type != _distributed_message_client_ready)
 	{
 		distributed_note_client_clock(machine_index, header.game_time);
 		if ((header.type == _distributed_message_player_prediction ||
@@ -4924,7 +6211,8 @@ void network_distributed_handle_message(
 			(byte const *)message + size, header.count);
 		break;
 	case _distributed_message_unit_states:
-		distributed_handle_unit_states((byte const *)entries, (byte const *)message + size, header.count);
+		distributed_handle_unit_states(header.game_time, (byte const *)entries, (byte const *)message + size,
+			header.count);
 		break;
 	case _distributed_message_actor_states:
 		network_actors_handle_states(entries, header.count);
@@ -5011,6 +6299,18 @@ void network_distributed_handle_message(
 	}
 	case _distributed_message_inventories:
 		network_objects_handle_inventories(entries, header.count);
+		break;
+	case _distributed_message_mcc_grenades:
+		mcc_network_handle_inventories(entries, header.count);
+		break;
+	case _distributed_message_mcc_campaign:
+		mcc_network_handle_campaign(entries, header.count);
+		break;
+	case _distributed_message_mcc_game_speed:
+		mcc_game_speed_receive(entries, header.count);
+		break;
+	case _distributed_message_mcc_object_names:
+		mcc_object_names_receive(entries, header.count, header.game_time);
 		break;
 	case _distributed_message_object_changes:
 		network_objects_handle_changes(entries, header.count);
@@ -5107,6 +6407,7 @@ void network_distributed_handle_message(
 		the host's objects) */
 		network_aim_assist_send_policy(machine_index);
 		network_shield_effects_send(machine_index);
+		network_riding_map_send(machine_index);
 		network_objects_client_asked(machine_index, header.count != 0);
 		/* (a machine new at its index, which may have joined the game in
 		progress: every player's statistics and the game type's state, after

@@ -1201,11 +1201,8 @@ MALFORMED_CACHES = {
                              "the model vertex and index data do not fit in the file"),
     "handle": (instance_case(3, 0x0C, "<I", 0xE1770009), "load",
                "a tag handle does not match its position in the index"),
-    "name outside": (instance_case(2, 0x10, "<I", 0x3FFFFFFF), "load",
-                     "a tag name lies outside the tag data or is not terminated"),
     "tag address outside": (instance_case(8, 0x14, "<I", BASE + 0x1000000), "load",
                             "a tag's address lies outside the tag data"),
-    "null tag address": (instance_case(8, 0x14, "<I", 0), "load", "a tag's address lies outside the tag data"),
     "external weapon": (instance_case(8, 0x18, "<I", 1), "load",
                         "a tag of a group that resource maps never hold is marked as held by one"),
     "external sound header outside": (instance_case(4, 0x14, "<I", BASE - 0x100), "load",
@@ -1264,6 +1261,25 @@ def test_malformed_caches_are_rejected_with_the_specific_reason(report_tool, tmp
         assert report["identify"] == "ok"
         assert report["load"] == message
         assert report["milestone.load"] == "no"
+
+
+# Map protection scrambles tag names and nulls tags' addresses: the reader
+# gives such a tag an empty name and skips a tag with no data, rather than
+# refusing the map (cache_file_formats.c).
+PROTECTED_CACHES = {
+    "name outside": instance_case(2, 0x10, "<I", 0x3FFFFFFF),
+    "null tag address": instance_case(8, 0x14, "<I", 0),
+}
+
+
+@pytest.mark.parametrize("case", sorted(PROTECTED_CACHES))
+def test_protected_caches_load(report_tool, tmp_path, case):
+    cache = Map()
+    path = cache.write(tmp_path)
+    PROTECTED_CACHES[case](cache, path)
+    returncode, report = report_one(report_tool, path)
+    assert returncode == 0, report
+    assert report["identify"] == "ok" and report["load"] == "ok"
 
 
 def test_a_file_length_of_zero_is_the_whole_file(report_tool, tmp_path):

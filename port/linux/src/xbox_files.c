@@ -20,6 +20,7 @@ matched case-insensitively, like the Xbox's FATX volumes.
 #include "posix.h"
 #include "port_config.h"
 #include "server_mode.h"
+#include "steam_workshop.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -225,6 +226,48 @@ static BOOL names_match(const char *a, const char *b, unsigned long length)
 	return TRUE;
 }
 
+/* mcc_maps\<Workshop item id>\... where the data root has no such package folder: the item's maps folder in the
+player's Steam library (steam_workshop.h). The rest of the path after the id in rest */
+static int translate_workshop(const char *cursor, char *resolved, unsigned long size, const char **rest)
+{
+	char id[STEAM_WORKSHOP_ID_SIZE], package[1024], data_folder[1100], local_name[256];
+	unsigned long length = 0;
+
+	while (*cursor == '\\' || *cursor == '/')
+		cursor++;
+	if (!names_match(cursor, "mcc_maps", 8) || (cursor[8] != '\\' && cursor[8] != '/'))
+		return 0;
+	cursor += 9;
+	/* MCC-owned resource discovery also serves the virtual fopen path. */
+	if (steam_workshop_resource_path(cursor, platform_data_root(), resolved, size))
+	{
+		*rest = cursor + strlen(cursor);
+		return 1;
+	}
+	while (cursor[length] >= '0' && cursor[length] <= '9' && length + 1 < sizeof(id))
+	{
+		id[length] = cursor[length];
+		length++;
+	}
+	id[length] = 0;
+	if (!length || (cursor[length] && cursor[length] != '\\' && cursor[length] != '/'))
+		return 0;
+	/* a package folder of that name in the data root wins */
+	if (posix_find_entry_case_insensitive(platform_data_root(), "mcc_maps", local_name, sizeof(local_name)))
+	{
+		snprintf(data_folder, sizeof(data_folder), "%s/%s", platform_data_root(), local_name);
+		if (posix_find_entry_case_insensitive(data_folder, id, local_name, sizeof(local_name)))
+			return 0;
+	}
+	if (!steam_workshop_package_folder(id, package, sizeof(package)) ||
+		strlen(package) >= size)
+		return 0;
+	snprintf(resolved, size, "%s", package);
+	trim_separators(resolved);
+	*rest = cursor + length;
+	return 1;
+}
+
 /* the data root's files and folders kept elsewhere when the settings say
 (paths.logs, paths.custom_maps): a read-only data root, a dedicated
 server's maps mounted so. The rest of the path after them in rest */
@@ -237,6 +280,8 @@ static int translate_elsewhere(const char *cursor, char *resolved, unsigned long
 
 	while (*cursor == '\\' || *cursor == '/')
 		cursor++;
+	if (translate_workshop(cursor, resolved, size, rest))
+		return 1;
 	for (index = 0; logs_folder[0] && index < sizeof(logs) / sizeof(logs[0]); index++)
 	{
 		if (names_match(cursor, logs[index], strlen(logs[index]) + 1))
@@ -288,6 +333,11 @@ void platform_translate_path(const char *xbox_path, char *host_path, unsigned lo
 				posix_make_directory(resolved);
 		}
 		cursor += 2;
+	}
+	else
+	{
+		/* (a path without a drive, as the package resources are named) */
+		translate_workshop(cursor, resolved, sizeof(resolved), &cursor);
 	}
 
 	while (*cursor)

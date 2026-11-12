@@ -480,6 +480,9 @@ void objects_scripting_attach(long parent_object_index, char const *parent_marke
 void object_delete_immediately(long object_index);
 void objects_garbage_collection(void);
 void objects_update(void);
+/* port: an object's update count (vehicle_riding.c) */
+void object_count_update(long object_index);
+long object_update_count(long object_index);
 void objects_memory_compact(void);
 
 

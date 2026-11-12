@@ -126,6 +126,8 @@
           "networkAliases": [],
           "env": [
             "HALO_SERVER_WEB_BIND=0.0.0.0",
+            "HALO_NET_VEHICLE_RIDING=false",
+            "HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE=false",
             "HALO_SAVE_ROOT=/workspace/saves",
             "HALO_LOG_ROOT=/workspace/logs"
           ],

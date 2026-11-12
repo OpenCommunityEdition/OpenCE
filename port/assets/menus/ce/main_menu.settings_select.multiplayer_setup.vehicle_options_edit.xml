@@ -85,6 +85,7 @@
 		<data input="mp prof vehicles update"/>
 		<on event="created" run="mp prof init vehicle options"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_vehicles_respawn" x="54" y="73"/>
+		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_vehicle_riding" x="54" y="100"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_team" x="54" y="126"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_vehicle_presets" x="54" y="152"/>
 		<child widget="main_menu/settings_select/multiplayer_setup/vehicle_options_edit/op_warthog" x="54" y="178"/>

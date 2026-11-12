@@ -125,6 +125,7 @@ symbols in this file:
 #include "cseries.h"
 #include "errors.h"
 #include "object_types.h"
+#include "mcc_objects.h" /* port: port/linux/game/mcc_objects.h */
 
 #include "cache/cache_files.h"
 #include "cutscene/cinematics.h"
@@ -262,7 +263,7 @@ struct object_type_definition unit_data_definition =
 
 struct object_type_definition biped_data_definition =
 {
-	"biped", 'bipd', 0x480, 0x228, 0x234, 0x78,
+	"biped", 'bipd', BIPED_DATUM_SIZE, 0x228, 0x234, 0x78,
 	bipeds_initialize, bipeds_dispose, bipeds_initialize_for_new_map, bipeds_dispose_from_old_map,
 	biped_adjust_placement, biped_new, biped_place, biped_delete, biped_update,
 	biped_export_function_values,
@@ -1220,6 +1221,10 @@ void object_types_place_all(
 							scenario_datums,
 							scenario_datum_index,
 							element_size);
+
+					if (object_type == _object_type_vehicle &&
+						!mcc_vehicle_placement_allowed(scenario_object))
+						continue;
 
 					/* port: a Halo Custom Edition map's vehicles are those its
 					placements' multiplayer spawn flags name for the game type, as
