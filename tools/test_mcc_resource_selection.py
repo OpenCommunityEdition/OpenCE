@@ -40,11 +40,19 @@ def resource_tool(tmp_path_factory):
         '\n'.join(function(planner, n) for n in ('base_resource_copy', 'base_resources')))
     (work / 'driver.c').write_text(code)
     (work / 'crc.c').write_text('#define Z_PREFIX\n#include "' + (ROOT / 'port/third_party/zlib/crc32.c').as_posix() + '"\n')
-    return compile_tool(work, [work / 'driver.c', game / 'mcc_package.c', GAME / 'mcc_sha256.c',
+    # Deterministic access denial on every host, including an elevated Windows run.
+    package = work / 'package.c'
+    package.write_text('#include <stdio.h>\n#include <string.h>\n#include <errno.h>\n'
+        'extern int denied;\nstatic FILE *test_open(char const *path,char const *mode) {\n'
+        'if(denied && strstr(path,"mcc_maps/p/sounds.map")) {errno=EACCES;return NULL;}\n'
+        'return fopen(path,mode); }\n#define fopen test_open\n#include "' +
+        (game / 'mcc_package.c').as_posix() + '"\n')
+    return compile_tool(work, [work / 'driver.c', package, GAME / 'mcc_sha256.c',
                               work / 'crc.c'])
 
 
-@pytest.mark.parametrize('case', ['match', 'mismatch', 'override', 'unused', 'changed', 'cache', 'stage', 'both'])
+@pytest.mark.parametrize('case', ['match', 'mismatch', 'override', 'unused', 'changed', 'cache', 'stage', 'both',
+    'owned_mismatch', 'unused_mismatch', 'all_mismatch', 'denied'])
 def test_local_resources(resource_tool, tmp_path, case):
     def resource(value, kind=2):
         names = b'sound\\test__0__0\0' if kind == 2 else b'sound\\test_0\0'
@@ -59,5 +67,12 @@ def test_local_resources(resource_tool, tmp_path, case):
     (tmp_path / 'mcc_staging/p/a.map').write_bytes(bytes(2048))
     (tmp_path / 'mcc_maps/bitmaps.map').write_bytes(resource(b'old!', 1))
     (tmp_path / 'mcc_maps/_shared/singleplayer/bitmaps.map').write_bytes(resource(b'new!', 1))
+    if case in ('owned_mismatch', 'denied'):
+        (tmp_path / 'mcc_maps/p/sounds.map').write_bytes(resource(b'new!'))
+    if case == 'owned_mismatch':
+        (tmp_path / 'mcc_maps/p/bitmaps.map').write_bytes(resource(b'new!', 1))
+    if case == 'all_mismatch':
+        (tmp_path / 'mcc_maps/_shared/singleplayer/sounds.map').write_bytes(resource(b'mid!'))
+        (tmp_path / 'mcc_maps/_shared/multiplayer/bitmaps.map').write_bytes(resource(b'end!', 1))
     result = subprocess.run([str(resource_tool), case], cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr

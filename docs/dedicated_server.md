@@ -889,6 +889,12 @@ has been played yet). `sv_reload` takes the rotation again when its text
 changed, and also when only its entries' rejections changed (a map or a
 gametype file added or taken out since).
 
+`sv_reload` also requests an MCC catalog refresh. It runs on the next pregame
+frame, or after the current game returns to the lobby; it never rescans during
+gameplay or loading. Refresh the web page after that point to see newly copied
+MCC packages. Ordinary `/api/maps` requests reuse the catalog. Xbox and Custom
+Edition map enumeration is unchanged.
+
 `server.team_start` decides how a team game starts. `one` (the default)
 starts it with the players of one team. `both` waits, saying nothing,
 for a player on each team. `skip`, when one player waits for a team game

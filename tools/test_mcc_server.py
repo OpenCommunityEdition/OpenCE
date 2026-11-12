@@ -69,6 +69,12 @@ int main(void) {
     e=parse("levels/a10/a10:coop");assert(e.map_kind==_server_map_path&&!e.rejected[0]);
     assert(mcc_server_maps_each(each,NULL)==2&&rescans==0&&listed==2);
     assert(mcc_server_maps_each(each,NULL)==2&&rescans==0&&listed==4);
+    mcc_server_request_rescan();mcc_server_request_rescan();
+    mcc_server_update(0);assert(rescans==0);
+    assert(mcc_server_maps_each(each,NULL)==2 && rescans==0);
+    mcc_server_update(1);assert(rescans==1);
+    mcc_server_update(1);assert(rescans==1);
+    mcc_server_request_rescan();mcc_server_update(1);assert(rescans==2);
     return 0;
 }
 '''.replace("SERVER_SOURCE", (ROOT / "port/linux/game/mcc_server.c").as_posix()))

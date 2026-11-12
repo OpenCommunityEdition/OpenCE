@@ -270,7 +270,9 @@ case-insensitive paths, overrides, missing types, library roots and bounds.
 malformed resources, independent bitmap/sound selection and content identity.
 
 The catalog is read the first time MCC maps are needed, and again when a joiner
-cannot find the host's map (so an item subscribed just now is found). The json
+cannot find the host's map (so an item subscribed just now is found). Dedicated
+servers also refresh after `sv_reload`, on a pregame frame; a request during a
+game waits until the lobby. Web map-list reads remain cached. The json
 files are the item makers' text: one that is too large (256 KB), too deep, not
 an object, or that names a path leaving its item, refuses that item or map and
 nothing else.

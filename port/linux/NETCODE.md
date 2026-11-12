@@ -920,6 +920,14 @@ connection and host revision. `READY` grants only the existing fifteen-second
 player-add grace; it does not prove that an untrusted client checked its files.
 Actual map loading still fingerprints content independently.
 
+Local validation enumerates distinct usable files only for resource types the
+map references. An explicit package override stays authoritative; an unreadable
+or invalid override reports its file error instead of trying base alternatives.
+Each distinct combination still requires the full gameplay SHA-256. An unchanged
+failed exact path is not hashed again after discovery rescans; changed files or
+required metadata permit a fresh check. These are local work and diagnostic
+changes, with no change to message layouts, fingerprint framing or version 44.
+
 After admission, synchronous MCC conversion has a separate bounded progress
 contract in `mcc_load_network.c` and `mcc_load_network_game.c`. Reliable message
 **106** carries the exact admitted name/origin, checksum and both digests,

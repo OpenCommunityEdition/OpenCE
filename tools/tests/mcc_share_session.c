@@ -413,6 +413,12 @@ static void entry(struct mcc_share_entry *e, int kind, char const *leaf, uint32_
     memset(e->sha256,7,32);
 }
 
+static char const *env_identity_error(void *user)
+{
+    (void)user;
+    return "Cannot read mcc_maps/_shared/multiplayer/sounds.map. Check access to this MCC resource.";
+}
+
 int main(int argc,char **argv)
 {
     unsigned i;
@@ -1429,6 +1435,13 @@ int main(int argc,char **argv)
         CHECK(staging_gone() && package_absent());
         snprintf(path,sizeof(path),"%smcc_maps/solar_flare",J);
         CHECK(!io_exists(path));
+        /* A local read failure survives stage cancellation and reaches the UI. */
+        W.join.env.identity_error=env_identity_error;W.finished=0;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        CHECK(run_until_finished(2000));
+        CHECK(!W.finished_ok && strstr(W.finished_text,"Cannot read") && strstr(W.finished_text,"sounds.map"));
+        CHECK(strstr(W.finished_text,"Nothing was installed") && staging_gone() && package_absent());
+        W.join.env.identity_error=NULL;
         /* a different fingerprint in the game record */
         W.identity_ok=1;W.finished=0;
         W.digest[5]^=1;

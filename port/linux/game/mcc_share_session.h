@@ -98,6 +98,8 @@ struct mcc_share_env {
     int (*send_request)(void *user, struct mcc_share_request const *request);
     int (*package_taken)(void *user, char const *level);         /* an installed map has this name */
     int (*identity_check)(void *user, char const *stage_dir);    /* enum mcc_share_check_result */
+    /* Optional local diagnostic retained through cancel_check until the next check. */
+    char const *(*identity_error)(void *user);
     void (*cancel_check)(void *user);                          /* release only this download's identity job */
     /* Promote the completed proof and bind the published content before DONE.
      * Failure leaves the installed package intact but refuses admission. */

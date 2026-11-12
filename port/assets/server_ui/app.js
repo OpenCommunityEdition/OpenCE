@@ -1,8 +1,24 @@
-/* Dedicated server admin page: docs/dedicated_server.md.
- * Use createElement/textContent under CSP, never HTML strings. The session
- * uses an HttpOnly cookie; changes carry X-CSRF-Token. HTTP polls back up RCON.
- * Functions outside startPage are tested in tools/server_ui_tests.
- */
+/*
+APP.JS
+
+The dedicated server's admin page (docs/dedicated_server.md: the HTTP API
+and the RCON). It is served with Content-Security-Policy default-src 'self',
+so it makes every element with createElement and sets text with textContent:
+no HTML from strings, no inline styles or handlers.
+
+- The session is the HttpOnly cookie POST /api/login sets; the page keeps
+  only its CSRF token, sent on every change (X-CSRF-Token). It ends after
+  30 minutes without an HTTP request (the WebSocket's do not count): the
+  page asks GET /api/session every 5 minutes while it is open.
+- What the server sends may be older or newer than the page: settings'
+  values typed or as text, maps with or without a title, gametypes with or
+  without their engine. The page takes either.
+- Events and the status come over the RCON's WebSocket (/ws, signed in by
+  the cookie); while it is down the page polls /api/status, /api/players,
+  /api/log and /api/events every 3 seconds.
+- Everything but startPage uses no document: Node tests it
+  (tools/server_ui_tests).
+*/
 
 'use strict';
 
@@ -239,15 +255,23 @@ function describeEvent(event, players) {
 
 // ---------- the rotation's entries: map[:gametype[+rule=value…]]
 
+function entryText(value) {
+  const text = String(value || '').trim();
+  const colon = text.indexOf(':');
+  return colon < 0 ? text : text.slice(0, colon).trim() + ':' + text.slice(colon + 1).replace(/\s+/g, '');
+}
+
 function parseEntryText(text) {
-  const match = /^([^:+\s]+)(?::([^+\s]+)((?:\+[^+\s]+)*))?$/.exec(String(text).trim());
+  const match = /^([^:]+?)(?::([^+\s]+)((?:\+[^+\s]+)*))?$/.exec(entryText(text));
   if (!match) return null;
+  const map = match[1].trim();
+  if (!map || (/[\s+]/.test(map) && !/^mcc_maps[\\/]/i.test(map))) return null;
   const rules = {};
   for (const rule of (match[3] || '').split('+').filter(Boolean)) {
     const [key, value = ''] = rule.split('=');
     rules[key] = /^-?\d+$/.test(value) ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
   }
-  return { map: match[1], gametype: match[2] || '', rules };
+  return { map, gametype: match[2] || '', rules };
 }
 
 // "score=50 time=15" or "+score=50+time=15": an entry's rules
@@ -274,7 +298,7 @@ const titleOf = (map) => String((map && (map.title || map.name)) || '');
 // entry's whole text when it has rules (sv_map takes a rotation entry,
 // map:gametype+rule=value, as its map)
 function playBody(entry) {
-  const text = String(entry.text || '').replace(/\s+/g, '');
+  const text = entryText(entry.text);
   if (entry.gametype && (text.includes('+') || Object.keys(entry.rules || {}).length)) return { map: text };
   const map = (parseEntryText(text) || entry).map;
   return entry.gametype ? { map, gametype: entry.gametype } : { map };

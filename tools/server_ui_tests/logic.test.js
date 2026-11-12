@@ -154,6 +154,28 @@ test('MCC picker entries retain their namespace when saved or played', () => {
   }
 });
 
+
+test('MCC paths keep spaces through new and saved rotation entries', () => {
+  for (const gametype of ['', 'slayer', 'coop']) {
+    for (const rules of ['', 'time=15']) {
+      if (!gametype && rules) continue;
+      const level = 'mcc_maps\\My Pack\\My Arena';
+      const entry = app.makeEntry(level, gametype, rules);
+      assert.strictEqual(app.parseEntryText(entry.text).map, level);
+      const expected = rules ? { map: entry.text } : gametype ? { map: level, gametype } : { map: level };
+      assert.deepStrictEqual(app.playBody(entry), expected);
+      assert.deepStrictEqual(app.playBody({ ...entry, map: 'My Arena' }), expected);
+      assert.deepStrictEqual(app.playBody({ ...entry, map: 'My Arena', text: '  ' + entry.text + '  ' }), expected);
+    }
+  }
+  assert.deepStrictEqual(app.parseEntryText('mcc_maps\\My Pack\\arena : slayer + time = 15'),
+    { map: 'mcc_maps\\My Pack\\arena', gametype: 'slayer', rules: { time: 15 } });
+  assert.deepStrictEqual(app.playBody(app.makeEntry('custom_maps\\arena', 'slayer', '')),
+    { map: 'custom_maps\\arena', gametype: 'slayer' });
+  assert.deepStrictEqual(app.playBody(app.makeEntry('bloodgulch', 'ctf', '')),
+    { map: 'bloodgulch', gametype: 'ctf' });
+});
+
 const SETTINGS = [
   { name: 'server.name', type: 'string', value: 'OpenCE', default: 'OpenCE Dedicated', comment: 'The name', env: 'HALO_SERVER_NAME',
     pinned: false, secret: false, choices: null, min: null, max: null },

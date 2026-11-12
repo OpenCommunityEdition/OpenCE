@@ -10,7 +10,8 @@ struct mcc_validation_check {
     FILE *stream;
     struct mcc_resource_check *check;
     void *thread, *cancel;
-    int worker_status, state, match, candidate;
+    int worker_status, state, match;
+    struct mcc_resource_candidates candidates;
     unsigned char expected[32];
     char reason[320];
 };
@@ -89,7 +90,7 @@ int mcc_validation_check_step(struct mcc_validation_check *job,
     if (!job) return -1;
     if (job->state) goto done;
     if (!job->stream) {
-        if (!job->candidate && !mcc_validation_snapshot(&job->result,&job->result.files)) goto failed;
+        if (!job->candidates.index && !mcc_validation_snapshot(&job->result,&job->result.files)) goto failed;
         /* Redirect only synchronous selection/opening. The worker receives
          * already-open private readers and never observes global routing. */
         if (job->result.directory[0]) mcc_package_stage_redirect(job->result.name,job->result.directory);
@@ -98,11 +99,11 @@ int mcc_validation_check_step(struct mcc_validation_check *job,
             if (!job->match) job->check=mcc_resources_check_begin(job->result.name,
                 &job->source,job->reason,sizeof(job->reason));
             else job->check=mcc_resources_check_begin_candidate(job->result.name,
-                &job->source,job->candidate,job->reason,sizeof(job->reason));
+                &job->source,&job->candidates,job->reason,sizeof(job->reason));
         }
         status=job->check && mcc_resources_check_paths(job->check,job->result.resources);
         if (job->result.directory[0]) mcc_package_stage_redirect(NULL,NULL);
-        if (!status) goto retry;
+        if (!status) goto failed;
         job->cancel=CreateEventA(NULL,TRUE,FALSE,NULL);
         if (job->cancel) job->thread=CreateThread(NULL,256*1024,mcc_validation_worker,job,0,NULL);
         return 0;
@@ -126,12 +127,12 @@ retry:
     /* Never turn a changed-file failure into another candidate attempt. */
     if (!mcc_validation_snapshot(&job->result,&after) || memcmp(&after,&job->result.files,sizeof(after))) goto failed;
     mcc_validation_close(job);
-    if (job->match && ++job->candidate<MCC_PACKAGE_BASE_SETS*MCC_PACKAGE_BASE_SETS) {
+    if (job->match && ++job->candidates.index<job->candidates.count[0]*job->candidates.count[1]) {
         job->reason[0]=0;
         return 0;
     }
     if (job->match) snprintf(job->reason,sizeof(job->reason),
-        "No local MCC resource combination matches the host's SHA-256. Install its matching base resources.");
+        "The local MCC map and resources do not match the host's SHA-256. Install its matching package and base resources.");
 failed:
     if (!job->reason[0]) snprintf(job->reason,sizeof(job->reason),
         "The MCC package could not be read completely. Check its map and resources.");

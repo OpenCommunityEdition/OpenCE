@@ -7,6 +7,46 @@
 #include <stdio.h>
 #include <string.h>
 
+static int mcc_server_rescan_pending;
+
+void mcc_server_request_rescan(void)
+{
+    mcc_server_rescan_pending=1;
+}
+
+void mcc_server_update(int pregame)
+{
+    if (!pregame || !mcc_server_rescan_pending) return;
+    mcc_server_rescan_pending=0;
+    mcc_maps_rescan();
+    mcc_maps_count(FALSE);
+}
+
+/* The HTTP command bridge must preserve an MCC package's internal spaces.
+ * Validate the local namespace and keep the whole entry one console word. */
+int mcc_server_play_line(char const *map,char const *gametype,char *line,int size)
+{
+    char level[64],canonical[64];
+    size_t i,length;
+    int written;
+    if (strlen(map)<9 || (map[8]!='/' && map[8]!='\\')) return 0;
+    for (i=0;i<8;i++) {
+        unsigned char c=(unsigned char)map[i];
+        if (c>='A' && c<='Z') c+='a'-'A';
+        if (c!=(unsigned char)"mcc_maps"[i]) return 0;
+    }
+    length=strcspn(map,":");
+    if (length>=sizeof(level) || size<=0) return -1;
+    memcpy(level,map,length);level[length]=0;
+    if (!mcc_package_name(level,canonical)) return -1;
+    for (i=0;map[i];i++)
+        if ((unsigned char)map[i]<32 || (unsigned char)map[i]>=127 || map[i]=='"') return -1;
+    for (i=0;gametype[i];i++)
+        if ((unsigned char)gametype[i]<=32 || (unsigned char)gametype[i]>=127 || gametype[i]=='"') return -1;
+    written=snprintf(line,(size_t)size,"sv_map \"%s\" %s",map,gametype);
+    return written>=0 && written<size ? 1 : -1;
+}
+
 void mcc_server_resolve(struct server_entry *entry)
 {
     char canonical[64],path[128];

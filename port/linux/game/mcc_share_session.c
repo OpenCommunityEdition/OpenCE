@@ -972,11 +972,14 @@ static void client_update(struct mcc_share *share)
         result=mcc_share_stage_verify(&share->stage,client_check,share);
         if (result==MCC_SHARE_STAGE_PENDING) return;
         if (result==MCC_SHARE_STAGE_REFUSED) {
+            char message[384];
+            char const *reason=share->env.identity_error ? share->env.identity_error(share->env.user) : NULL;
+            snprintf(message,sizeof(message),"%s Nothing was installed.",reason && reason[0] ? reason :
+                "The files from the host are not the host's map: their SHA-256 identity differs.");
             memset(&share->stage,0,sizeof(share->stage));
             client_terminal(share,0);
             client_idle(share);
-            share->env.finished(share->env.user,0,"The files from the host are not the host's map: their SHA-256 "
-                "identity differs. Nothing was installed.");
+            share->env.finished(share->env.user,0,message);
             return;
         }
         if (result==MCC_SHARE_STAGE_OK && share->env.prepare_install &&

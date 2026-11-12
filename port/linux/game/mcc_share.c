@@ -76,6 +76,7 @@ static char mcc_share_prompt_message[512];
 static char mcc_share_installed[64];
 static char mcc_share_text[256];
 static struct mcc_validation_check *mcc_share_check;
+static char mcc_share_check_reason[320];
 static struct mcc_validation_proof mcc_share_proof;
 static uint32_t mcc_share_validation_token;
 static unsigned long mcc_share_host_revision;
@@ -311,11 +312,12 @@ static int mcc_share_identity_check(void *user, char const *stage_dir)
     char const *leaf=strrchr(mcc_share_globals.level,'\\')+1;
     (void)user;
     if (mcc_share_check) {
-        ok=mcc_validation_check_step(mcc_share_check,&mcc_share_proof,reason,sizeof(reason));
+        ok=mcc_validation_check_step(mcc_share_check,&mcc_share_proof,mcc_share_check_reason,sizeof(mcc_share_check_reason));
         if (!ok) return MCC_SHARE_CHECK_PENDING;
         return ok==1 && !memcmp(mcc_share_proof.digest,mcc_share_digest,32) ?
             MCC_SHARE_CHECK_READY : MCC_SHARE_CHECK_FAILED;
     }
+    mcc_share_check_reason[0]=0;
     entries=malloc(MCC_SHARE_METADATA_FILES*sizeof(*entries));
     if (!entries) return 0;
     memset(entries,0,MCC_SHARE_METADATA_FILES*sizeof(*entries));
@@ -342,9 +344,16 @@ static int mcc_share_identity_check(void *user, char const *stage_dir)
     return ok;
 }
 
+static char const *mcc_share_identity_error(void *user)
+{
+    (void)user;
+    return mcc_share_check_reason;
+}
+
 static void mcc_share_cancel_check(void *user)
 {
     (void)user;
+    /* The session reads the failure reason after cancelling the stage. */
     mcc_validation_check_end(mcc_share_check);
     mcc_share_check=NULL;
     memset(&mcc_share_proof,0,sizeof(mcc_share_proof));
@@ -390,6 +399,7 @@ static void mcc_share_finished(
 	char const *message)
 {
 	(void)user;
+    mcc_share_check_reason[0]=0;
     mcc_share_release_validation();
 	if (!ok)
 	{
@@ -406,7 +416,7 @@ static void mcc_share_finished(
 /* The joiner's package matches nothing installed. Ask for an offer when downloads
  * are enabled; obtaining the manifest does not accept its files. */
 static int mcc_share_missing(char const name[128], unsigned char const digest[32],
-    unsigned char const metadata[32])
+    unsigned char const metadata[32],char const *reason)
 {
     char canonical[64];
     if (!mcc_share_ready || global_network_game_server_get() || !global_network_game_client_get() ||
@@ -426,7 +436,8 @@ static int mcc_share_missing(char const name[128], unsigned char const digest[32
         mcc_share_release_validation();
         mcc_share_prompt_download=FALSE;
         snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
-            "The host's package is missing or differs. Download Maps is OFF. Install matching content manually.");
+            "%s Download Maps is OFF. Install matching content manually.",
+            reason && reason[0] ? reason : "The host's package is missing or differs.");
         mcc_share_prompt_pending=TRUE;
         return 1;
     }
@@ -589,6 +600,7 @@ void mcc_share_game_disconnect(void)
     mcc_admission_disconnect();
     mcc_load_network_disconnect();
     mcc_share_validation_token=0;
+    mcc_share_check_reason[0]=0;
     mcc_share_close_prompt();
     if (mcc_share_ready) {
         mcc_share_client_disconnect(&mcc_share_globals);
@@ -664,6 +676,7 @@ void mcc_share_game_update(
 		env.send_request = mcc_share_send_request;
 		env.package_taken = mcc_share_package_taken;
 		env.identity_check = mcc_share_identity_check;
+        env.identity_error = mcc_share_identity_error;
         env.cancel_check = mcc_share_cancel_check;
         env.installed_ready = mcc_share_installed_ready;
         env.prepare_install = mcc_share_prepare_install;

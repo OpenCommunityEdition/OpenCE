@@ -6,6 +6,13 @@
 #include "mcc_validation.h"
 #include "mcc_resources.h"
 #include "mcc_runtime.h"
+#include "mcc_sha256.h"
+int denied;
+static int fingerprints;
+static void counted_sha256_end(struct mcc_sha256 *hash,unsigned char digest[32]) {
+    fingerprints++;mcc_sha256_end(hash,digest);
+}
+#define mcc_sha256_end counted_sha256_end
 static struct mcc_precache_snapshot stamps;
 static int unused,both,reads,stamp_reads,change_at;
 static size_t counted_read(void *p,size_t n,size_t count,FILE *f) {reads++;return fread(p,n,count,f);}
@@ -54,7 +61,8 @@ int main(int argc,char **argv) {
     unsigned char digest[32],actual[32];unsigned mask;uint32_t checksum;
     struct mcc_cache_source source;struct mcc_cache_identity identity;
     struct mcc_resource_check *check;struct mcc_validation_check *job;struct mcc_validation_proof proof;
-    struct mcc_runtime runtime;FILE *f;int status,i,before;
+    struct mcc_runtime runtime;FILE *f;int status,i,before,mismatch,owned,all;
+    struct mcc_resource_candidates candidates;
     assert(argc==2);
     if(!strcmp(argv[1],"cache")) {
         memset(paths,0,sizeof(paths));strcpy(paths[1],"mcc_maps/p/sounds.map");
@@ -77,22 +85,37 @@ int main(int argc,char **argv) {
         assert(!mcc_package_base_resource_path(2,MCC_PACKAGE_BASE_SETS,paths[0]));
         return 0;
     }
-    both=!strcmp(argv[1],"both");
-    unused=!strcmp(argv[1],"unused");
+    owned=!strcmp(argv[1],"owned_mismatch");all=!strcmp(argv[1],"all_mismatch");
+    mismatch=strstr(argv[1],"mismatch")!=NULL;
+    both=!strcmp(argv[1],"both") || owned || all;
+    unused=!strncmp(argv[1],"unused",6);
+    memset(&candidates,0,sizeof(candidates));
+    candidates.index=unused || owned || !strcmp(argv[1],"denied") ? 0 : all ? 8 : both ? 3 : 1;
     f=mcc_open_explain(name,&source,&identity,reason,sizeof(reason));assert(f);
-    check=mcc_resources_check_begin_candidate(name,&source,both ? 7 : 6,reason,sizeof(reason));assert(check);
+    check=mcc_resources_check_begin_candidate(name,&source,&candidates,reason,sizeof(reason));assert(check);
     do {status=mcc_resources_check_step(check,&checksum,digest);} while(!status);
     assert(status==1);mcc_resources_check_end(check);fclose(f);
     if(!strcmp(argv[1],"override") || unused) write_bytes("mcc_maps/p/sounds.map","invalid override");
+    denied=!strcmp(argv[1],"denied");
     /* A one-byte difference anywhere in the 32-byte SHA must reject admission. */
     for(i=0;i<(!strcmp(argv[1],"mismatch")?32:1);i++) {
-        if(!strcmp(argv[1],"mismatch"))digest[i]^=1;
+        if(mismatch)digest[i]^=1;
         job=mcc_validation_check_begin(name,!strcmp(argv[1],"stage") ? "mcc_staging/p" : NULL);assert(job);mcc_validation_check_expect(job,digest);
         if(!strcmp(argv[1],"changed"))change_at=stamp_reads+2;
-        before=0;
+        before=0;fingerprints=0;
         do {status=mcc_validation_check_step(job,&proof,reason,sizeof(reason));assert(++before<40);} while(!status);
         mcc_validation_check_end(job);
-        if(!strcmp(argv[1],"mismatch") || !strcmp(argv[1],"override") || !strcmp(argv[1],"changed")) assert(status==-1);
+        if(mismatch || denied || !strcmp(argv[1],"override") || !strcmp(argv[1],"changed")) {
+            assert(status==-1);
+            if(mismatch) {
+                assert(fingerprints==(unused || owned ? 1 : all ? 9 : 2));
+                assert(strstr(reason,"SHA-256"));
+            }
+            if(denied || !strcmp(argv[1],"override")) {
+                assert(fingerprints==0 && strstr(reason,"sounds.map") && !strstr(reason,"SHA-256"));
+                if(denied) assert(strstr(reason,"Cannot read"));
+            }
+        }
         else {
             assert(status==1 && !memcmp(proof.digest,digest,32));
             assert(unused || !strcmp(proof.resources[1],"mcc_maps/_shared/multiplayer/sounds.map"));
@@ -110,7 +133,7 @@ int main(int argc,char **argv) {
                 assert(mcc_validation_publish(name,&proof));
             }
         }
-        if(!strcmp(argv[1],"mismatch"))digest[i]^=1;
+        if(mismatch)digest[i]^=1;
     }
     return 0;
 }
