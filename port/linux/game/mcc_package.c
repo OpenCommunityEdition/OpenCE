@@ -117,3 +117,17 @@ FILE *mcc_package_resource_open(char const *name,unsigned type,char path[128])
     }
     return file;
 }
+
+int mcc_package_shared_resource(char const *path,unsigned type)
+{
+    char expected[128];
+    unsigned set;
+    if (!path || type<1 || type>2) return 0;
+    for (set=0;set<3;set++) {
+        snprintf(expected,sizeof(expected),"mcc_maps/%s%s.map",
+            set==0 ? "" : set==1 ? "_shared/singleplayer/" : "_shared/multiplayer/",
+            type==1 ? "bitmaps" : "sounds");
+        if (!strcmp(path,expected)) return 1;
+    }
+    return 0;
+}

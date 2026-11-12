@@ -67,6 +67,7 @@ unsigned long system_milliseconds(void);
 extern boolean debug_no_drawing;
 /* (menu_functions.c's) */
 extern boolean ui_widget_port_cooperative_level_choose(char const *map_name, short difficulty);
+extern boolean ui_widget_port_mcc_cooperative_level_choose(char const *map_name, short difficulty);
 extern void ui_widget_port_cooperative_settings_apply(void);
 /* (port/linux/src/updater.c's) */
 int updater_server_check(void);
@@ -584,7 +585,9 @@ static boolean server_apply_entry(
 		}
 		if (difficulty == (short)NUMBEROF(difficulties))
 			difficulty = 1;
-		if (!ui_widget_port_cooperative_level_choose(entry->level, difficulty))
+		if (!(entry->map_kind == _server_map_mcc ?
+			ui_widget_port_mcc_cooperative_level_choose(entry->level, difficulty) :
+			ui_widget_port_cooperative_level_choose(entry->level, difficulty)))
 		{
 			server_log(_server_log_warning, "lobby", "%s cannot be played as co-op", entry->level);
 			return FALSE;

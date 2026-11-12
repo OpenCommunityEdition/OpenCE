@@ -101,3 +101,19 @@ The `test_mcc_cache_format`, `test_mcc_resources`, `test_mcc_tag_validation`,
 synthetic data. Real package validation also needs rendering, scripts, gameplay,
 networking, unload/reload and campaign transitions. A successful conversion is
 not a completed playthrough.
+
+Local packages may keep their Workshop layout, with `ModInfo.json` at the
+package root and levels in `maps/`, or place levels directly in the package
+folder. The local resolver in
+[mcc_local_package.c](../../port/linux/src/mcc_local_package.c) preserves
+the same MCC virtual names for both layouts.
+
+Dedicated rotations dispatch MCC names through
+[mcc_server.c](../../port/linux/game/mcc_server.c), which validates MCC
+headers and enumerates the MCC catalog without changing Xbox or CE resolution.
+With Map Sharing enabled, [mcc_share_package.c](../../port/linux/game/mcc_share_package.c)
+offers eligible packages automatically. Base resources stay local;
+[mcc_share_session.c](../../port/linux/game/mcc_share_session.c) validates
+the receiver's copies before publication. Host downloads use separate
+folders and never replace the player's installed package. See
+[MCC installation and sharing](../mcc_maps.md) for prerequisites and limits.

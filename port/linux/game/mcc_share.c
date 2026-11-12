@@ -461,7 +461,7 @@ boolean mcc_share_game_machine_active(
     if (!mcc_share_ready || machine_index<0 || machine_index>=MCC_SHARE_HOST_MACHINES ||
         !mcc_share_admission_pending[machine_index]) return FALSE;
     game=network_game_get_game();
-    return game && global_network_game_server_get() && config_boolean("network.mcc_map_share") &&
+    return game && global_network_game_server_get() && config_boolean("network.map_share") &&
         mcc_share_host_revision==mcc_identity_host_revision() &&
         !strcmp(game->map.name,mcc_share_admission_level) &&
         (uint32_t)((uint32_t)system_milliseconds()-mcc_share_admission_at[machine_index])<15000u;
@@ -485,7 +485,7 @@ static void mcc_share_offered(void *user,uint64_t bytes,char const *credit)
         "The host's package is missing or differs. Download up to %.1f MiB from the host?\n"
         "Maps, required metadata/resources and supported previews are included.\n"
         "Your existing installation will be kept.\nMaker: %s",
-        (double)bytes/(1024.0*1024.0),credit);
+        (double)bytes/(1024.0*1024.0),credit[0] ? credit : "Not provided");
     mcc_share_prompt_pending=TRUE;
 }
 
@@ -542,12 +542,28 @@ void mcc_share_game_prompt_closed(void)
 void mcc_share_game_prompt_action(int action)
 {
     struct mcc_workshop_item item;
+#ifndef HALO_WEB
     char url[128];
+#endif
     int manual=mcc_share_manual==MCC_SHARE_MANUAL_MENU;
     int current=manual ? !global_network_game_client_get() && !global_network_game_server_get() &&
         main_menu_is_active() : mcc_share_client_current();
     int download=mcc_share_game_can_download();
     int workshop=mcc_workshop_wire_unpack(mcc_share_name,&item);
+    if (current && workshop && (action==1 || action==3)) {
+#ifdef HALO_WEB
+        /* Dedicated browser-side click; never broaden the account-link bridge. */
+        extern void web_js_post(int kind,char const *text);
+        web_js_post(6,item.id);
+#else
+        snprintf(url,sizeof(url),action==1 ? "steam://url/CommunityFilePage/%s" :
+            "https://steamcommunity.com/sharedfiles/filedetails/?id=%s",item.id);
+        platform_open_url(url);
+#endif
+        /* Keep both actions available: dispatch success cannot establish that
+         * Steam navigated, and the player may need the browser fallback. */
+        return;
+    }
     mcc_share_close_prompt();
     if (!current) {
         mcc_share_client_cancel(&mcc_share_globals);
@@ -557,10 +573,6 @@ void mcc_share_game_prompt_action(int action)
         mcc_share_prompt_download=FALSE;
         mcc_share_client_accept(&mcc_share_globals);
         return;
-    }
-    if (action==1 && workshop) {
-        snprintf(url,sizeof(url),"https://steamcommunity.com/sharedfiles/filedetails/?id=%s",item.id);
-        platform_open_url(url);
     }
     if (manual) {
         main_goto_main_menu();
@@ -611,7 +623,7 @@ static void mcc_share_host_lifecycle(void)
         mcc_share_stop_host();
         mcc_share_host_revision=revision;
     }
-    if (!server || !game || !config_boolean("network.mcc_map_share") || !mcc_level_name(game->map.name)) {
+    if (!server || !game || !config_boolean("network.map_share") || !mcc_level_name(game->map.name)) {
         mcc_share_stop_host();
         return;
     }

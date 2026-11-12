@@ -65,6 +65,31 @@ none), `open` whether it takes players now.
 The release has a `halo-server` script beside `halo`, which runs
 `halo --server` with its arguments.
 
+## MCC maps in GulchCE
+
+Use the same executable and `--server` workflow with an explicit MCC namespace:
+
+```toml
+[server]
+rotation = 'mcc_maps\2898867177\Lava_Lab:slayer, mcc_maps\a10:coop'
+rotation_fallback = false
+```
+
+Install local maps/packages under the data root's `mcc_maps`, or enable
+`game.workshop_maps` to discover this machine's installed MCC Workshop items.
+Campaign maps require `coop`; multiplayer maps require a multiplayer gametype.
+The MCC adapter checks version-13 headers without routing them through Xbox
+or CE loaders. Resource/content validation still occurs before gameplay.
+Base dependencies must be installed locally on the server and each player.
+The server still needs Xbox `maps/ui.map` for its menus.
+
+`sv_maps` includes MCC multiplayer entries with kind `mcc` and their package
+identity. Use `sv_map mcc_maps\2898867177\Lava_Lab slayer` for an immediate
+change. Rotations and voting preserve explicit MCC paths; bare map names keep
+their existing Xbox/CE lookup order. `network.map_share` automatically offers
+eligible MCC packages with custom resources, metadata and previews, excluding
+base resources. See [MCC package sharing](../port/linux/README.md#mcc-package-sharing).
+
 ## Exit codes and signals
 
 | Code | Meaning |

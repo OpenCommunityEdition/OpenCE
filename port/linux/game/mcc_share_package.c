@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 int config_boolean(char const *name);
 void platform_translate_path(char const *name, char *path, unsigned long size);
@@ -51,13 +52,54 @@ static int add_file(struct mcc_share_host_package *package, unsigned kind,
     return 1;
 }
 
+/* A copied base file is still a base dependency. Compare against the local
+ * base installations, not a package's name or its claimed Workshop origin.
+ * Missing bases are normal; unreadable candidates fail closed. */
+static int base_resource_copy(char const *resource,unsigned type)
+{
+    FILE *source,*base;
+    char path[128];
+    unsigned set;
+    long size,other;
+    unsigned char a[65536],b[65536];
+    size_t n;
+    int same;
+    source=fopen(resource,"rb");
+    if (!source) return -1;
+    if (fseek(source,0,SEEK_END) || (size=ftell(source))<0) {fclose(source);return -1;}
+    for (set=0;set<3;set++) {
+        snprintf(path,sizeof(path),"mcc_maps/%s%s.map",
+            set==0 ? "" : set==1 ? "_shared/singleplayer/" : "_shared/multiplayer/",
+            type==1 ? "bitmaps" : "sounds");
+        errno=0;
+        base=fopen(path,"rb");
+        if (!base) {
+            if (errno==ENOENT) continue;
+            fclose(source);return -1;
+        }
+        if (fseek(base,0,SEEK_END) || (other=ftell(base))<0) {fclose(base);fclose(source);return -1;}
+        same=size==other;
+        if (same) {
+            if (fseek(source,0,SEEK_SET) || fseek(base,0,SEEK_SET)) {fclose(base);fclose(source);return -1;}
+            while ((n=fread(a,1,sizeof(a),source))!=0) {
+                if (fread(b,1,n,base)!=n || memcmp(a,b,n)) {same=0;break;}
+            }
+            if (ferror(source) || ferror(base)) {fclose(base);fclose(source);return -1;}
+        }
+        fclose(base);
+        if (same) {fclose(source);return 1;}
+    }
+    fclose(source);
+    return 0;
+}
+
 void mcc_share_package_build(char const *level, struct mcc_share_host_package *package)
 {
     static char list[65537];
     static char const *credits[]={"credits.txt","readme.txt","license.txt"};
     struct mcc_share_metadata_plan *plan;
     struct mcc_workshop_item item;
-    char canonical[64],map[128],path[1024],root[1024],maps[1024],reason[128],hex[65];
+    char canonical[64],map[128],path[1024],root[1024],maps[1024],reason[128];
     char resources[2][128];
     char const *leaf;
     char *end;
@@ -80,13 +122,11 @@ void mcc_share_package_build(char const *level, struct mcc_share_host_package *p
         if (ferror(file) || length==sizeof(list)) length=0;
         fclose(file);
     }
-    package->refusal=mcc_share_admit(canonical,config_boolean("network.mcc_map_share"),
+    package->refusal=mcc_share_admit(canonical,config_boolean("network.map_share"),
         mcc_workshop_local_item(canonical,&item) ? MCC_SHARE_SIDECAR_VALID : MCC_SHARE_SIDECAR_ABSENT,
         digest,1,list,(unsigned long)length,package->credit);
     if (package->refusal!=MCC_SHARE_RESULT_OK) {
-        mcc_share_list_hex(digest,hex);
-        error(_error_silent,"mcc share: not offering %s (reason %d); list fingerprint %s with its maker in mcc_share.txt",
-            canonical,(int)package->refusal,hex);
+        error(_error_silent,"mcc share: not offering %s (reason %d)",canonical,(int)package->refusal);
         return;
     }
     package->refusal=MCC_SHARE_RESULT_UNAVAILABLE;
@@ -102,7 +142,9 @@ void mcc_share_package_build(char const *level, struct mcc_share_host_package *p
     for (i=1;i<=2;i++) {
         char const *resource=i==1 ? "bitmaps.map" : "sounds.map";
         char expected[128];
+        int base;
         if (!resources[i-1][0]) continue;
+        if (mcc_package_shared_resource(resources[i-1],i)) continue;
         /* Share the validated package selection, never unrelated siblings or
          * a stock resource selected from the MCC root/shared installation. */
         if (!mcc_package_resource_path(canonical,i,expected) || csstrcasecmp(expected,resources[i-1])) {
@@ -110,6 +152,12 @@ void mcc_share_package_build(char const *level, struct mcc_share_host_package *p
                 canonical,resources[i-1]);
             return;
         }
+        base=base_resource_copy(resources[i-1],i);
+        if (base<0) {
+            error(_error_silent,"mcc share: cannot classify resource %s against local base resources",resources[i-1]);
+            return;
+        }
+        if (base) continue;
         /* The platform resolves Workshop halo1/maps fallbacks exactly as the
          * resource reader did. The beside-level directory alone is insufficient. */
         platform_translate_path(resources[i-1],path,sizeof(path));

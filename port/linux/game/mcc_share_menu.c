@@ -68,7 +68,7 @@ void mcc_share_menu_text(wchar_t text[512])
     else {
         struct mcc_share_storage_item const *item=&items[selected];
         snprintf(message,sizeof(message),"%s\n%d of %d%s\n%s\nMaker: %s\n%.1f MiB, %u files%s%s\n%s",
-            notice,selected+1,count,truncated ? " (more packages exist)" : "",item->source,item->maker,
+            notice,selected+1,count,truncated ? " (more packages exist)" : "",item->source,item->maker[0] ? item->maker : "Not provided",
             (double)item->bytes/(1024.0*1024.0),item->files,
             item->workshop.id[0] ? "\nWorkshop: " : "",item->workshop.id,
             !mcc_share_menu_can_remove() ? "Leave the game/session before removing downloads." :

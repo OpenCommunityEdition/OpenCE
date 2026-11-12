@@ -13,4 +13,6 @@ int mcc_package_map_path(char const *name, char path[128]);
 int mcc_package_resource_path(char const *name, unsigned type, char path[128]);
 /* Package first, MCC root only on ENOENT; path records the selected/failed file. */
 FILE *mcc_package_resource_open(char const *name, unsigned type, char path[128]);
+/* Exact virtual base-resource locations; never a package-owned path. */
+int mcc_package_shared_resource(char const *path, unsigned type);
 #endif

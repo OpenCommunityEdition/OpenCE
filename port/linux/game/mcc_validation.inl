@@ -149,8 +149,9 @@ int mcc_validation_publish(char const *name,struct mcc_validation_proof const *p
         length=strlen(proof->directory);
         for (i=0;i<2;i++) {
             if (!result.resources[i][0]) continue;
-            /* Downloaded packages are complete: never promote a proof that
-             * borrowed a resource from a root/shared installation. */
+            /* Locally validated base dependencies do not move with staging.
+             * The full candidate snapshot above still checks their stamps. */
+            if (mcc_package_shared_resource(proof->resources[i],i+1)) continue;
             if (strncmp(proof->resources[i],proof->directory,length) || proof->resources[i][length]!='/') return 0;
             if (snprintf(result.resources[i],128,"%s/%s",folder,proof->resources[i]+length+1)>=128) return 0;
         }
