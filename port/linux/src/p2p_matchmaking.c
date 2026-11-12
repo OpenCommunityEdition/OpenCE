@@ -562,11 +562,68 @@ static int settle(struct mm_search *search, unsigned long now, struct mm_out *ou
 	return 0;
 }
 
+void mm_hosted(struct mm_search *search, const unsigned char *token, int players, int most_players, int under_way,
+	unsigned long now)
+{
+	if (search->state == P2P_MM_FOUND)
+	{
+		if (search->decided != P2P_MM_DECIDE_HOST)
+			return;
+		search->state = P2P_MM_HOSTING;
+		search->held_until = now + MM_HOLD;
+		search->next_hosting_record = now;
+		memcpy(search->token, token, P2P_TOKEN_SIZE);
+	}
+	else if (search->state != P2P_MM_HOSTING)
+	{
+		return;
+	}
+	else if (players != search->players || under_way != search->under_way)
+	{
+		search->next_hosting_record = now;
+	}
+	search->players = players;
+	search->most_players = most_players;
+	search->under_way = under_way;
+}
+
+static int hosting_record(struct mm_search *search, unsigned long now, struct mm_out *out)
+{
+	int held = (long)(now - search->held_until) < 0, index;
+	struct mm_record record = base_record(search, MM_KIND_HOSTING, search->hosting_playlist, search->hosting_size,
+		search->under_way ? MM_RUNNING_INTERVAL / 100 : MM_INTERVAL);
+
+	record.under_way = search->under_way;
+	record.held = held;
+	record.players = search->players;
+	record.most_players = search->most_players;
+	memcpy(record.token, search->token, P2P_TOKEN_SIZE);
+	for (index = 0; index < search->pool_count; index++)
+	{
+		struct mm_peer *member = find_peer(search, search->pool[index], search->hosting_playlist, search->hosting_size);
+
+		if (!member || (held && !mm_seal_token(search->seed, member->record.key, search->token,
+			record.sealed[record.pool_count])))
+		{
+			continue;
+		}
+		memcpy(record.pool[record.pool_count++], search->pool[index], P2P_KEY_HASH_SIZE);
+	}
+	search->next_hosting_record = now + (search->under_way ? MM_RUNNING_INTERVAL : MM_INTERVAL * 100);
+	return emit(search, &record, out);
+}
+
 int mm_step(struct mm_search *search, unsigned long now, struct mm_out *out, int out_size)
 {
 	int count = 0;
 
 	expire(search, now);
+	if (search->state == P2P_MM_HOSTING)
+	{
+		if ((long)(now - search->next_hosting_record) >= 0 && out_size > 0)
+			count = hosting_record(search, now, out);
+		return count;
+	}
 	if (search->state == P2P_MM_QUEUED)
 		count = settle(search, now, out, out_size);
 	if (search->queue_count && (long)(now - search->next_record) >= 0 && count < out_size)

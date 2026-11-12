@@ -338,13 +338,19 @@ static void game_side(int index)
 {
 	struct machine *machine = &machines[index];
 	struct p2p_mm_decision decision = machine->search.decision;
+	unsigned char token[P2P_TOKEN_SIZE];
 
+	memset(token, index + 1, sizeof(token));
 	machine->search.decision.kind = P2P_MM_DECIDE_NONE;
 	if (decision.kind == P2P_MM_DECIDE_HOST)
 	{
 		machine->hosting = 1;
 		machine->players = 1;
 		machine->most = p2p_mm_size_players(decision.size);
+	}
+	if (machine->hosting)
+	{
+		mm_hosted(&machine->search, token, machine->players, machine->most, machine->players == machine->most, now_ms);
 	}
 }
 
@@ -393,6 +399,25 @@ static void start_searching(int index, unsigned playlists, int size, int can_hos
 	machines[index].search.can_host = can_host;
 }
 
+static int find_host(void)
+{
+	int index;
+
+	for (index = 0; index < machine_count; index++)
+		if (machines[index].hosting && !machines[index].quit)
+			return index;
+	return -1;
+}
+
+static int host_count(void)
+{
+	int index, count = 0;
+
+	for (index = 0; index < machine_count; index++)
+		count += machines[index].hosting && !machines[index].quit;
+	return count;
+}
+
 static int peer_count(const struct mm_search *search)
 {
 	int index, count = 0;
@@ -400,6 +425,45 @@ static int peer_count(const struct mm_search *search)
 	for (index = 0; index < MM_MAXIMUM_UNITS; index++)
 		count += search->peers[index].used && mm_counted(&search->peers[index]);
 	return count;
+}
+
+static int host_record_open(const struct mm_search *search)
+{
+	return search->state == P2P_MM_HOSTING && search->held_until && (long)(now_ms - search->held_until) >= 0;
+}
+
+static void check_four(void)
+{
+	struct mm_out out[MM_MAXIMUM_OUT];
+	struct mm_record record;
+	struct mm_search *search;
+	int index, host, count;
+
+	case_name = "e4_four";
+	world(4);
+	for (index = 0; index < 4; index++)
+	{
+		start_searching(index, 1u << P2P_MM_SLAYER, P2P_MM_2V2, 1);
+		run(1.0);
+	}
+	while (find_host() < 0 && now_ms < 40000)
+		run(0.1);
+	host = find_host();
+	CHECK(host >= 0 && host_count() == 1, "E4: one machine hosts: %d", host_count());
+	if (host < 0)
+		return;
+	search = &machines[host].search;
+	search->next_hosting_record = now_ms;
+	count = mm_step(search, now_ms, out, MM_MAXIMUM_OUT);
+	CHECK(count == 1 && mm_record_read(out[0].bytes, out[0].size, &record) && record.kind == MM_KIND_HOSTING &&
+		record.held && record.pool_count == 3, "E4: the game is held for the other three: %d", record.pool_count);
+	run(21.0);
+	CHECK(host_record_open(search), "E4: the held game opens after 20 s");
+	mm_hosted(search, search->token, 4, 4, 1, now_ms);
+	count = mm_step(search, now_ms + 60000, out, MM_MAXIMUM_OUT);
+	CHECK(count == 1 && mm_record_read(out[0].bytes, out[0].size, &record) && record.under_way &&
+		record.interval == 250 && search->next_hosting_record == now_ms + 85000,
+		"E4: a game under way states 25 s and sends every 25 s");
 }
 
 static void check_replay(void)
@@ -428,6 +492,7 @@ int main(void)
 	check_hosting();
 	check_playlists();
 	check_topics();
+	check_four();
 	check_replay();
 	printf(failures ? "FAILED %d\n" : "PASS\n", failures);
 	return failures != 0;

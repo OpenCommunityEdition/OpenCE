@@ -424,6 +424,7 @@ enum
 	P2P_MM_LOOKING,
 	P2P_MM_QUEUED,
 	P2P_MM_FOUND,
+	P2P_MM_HOSTING,
 };
 enum
 {
