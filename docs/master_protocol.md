@@ -291,7 +291,7 @@ signature as `listing_signed` does.
 | --- | --- | --- |
 | 0 | 2 | `"HL"` |
 | 2 | 1 | Format: 1 |
-| 3 | 2 | Network version (`HALO_PORT_NETWORK_VERSION`, 43 now) |
+| 3 | 2 | Network version (`HALO_PORT_NETWORK_VERSION`, 44 now) |
 | 5 | 1 | Flags (below) |
 | 6 | 4 | Sequence: the host's count of its listings (the newest wins) |
 | 10 | 4 | The host's Unix time when it made the listing |
