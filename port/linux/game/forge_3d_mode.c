@@ -6474,7 +6474,7 @@ void forge_3d_update(float dt)
 		return;
 	}
 
-	/* Ensure Forge runtime & [C] .fxtg custom tag catalogs are initialized in BOTH Forge and Standard Gamemodes */
+	/* Ensure Forge runtime & [C] .fbrtag custom tag catalogs are initialized in BOTH Forge and Standard Gamemodes */
 	forge_runtime_init();
 	if (g_forge.active_weld_group < 1 || g_forge.active_weld_group > FORGE_MAX_WELD_GROUPS)
 		g_forge.active_weld_group = 1;

@@ -4940,8 +4940,6 @@ static void distributed_reset_checkpoint_state(boolean reset_received_times)
 		distributed_accepted[player_index].taken_air_vehicle = NONE;
 	}
 	csmemset(distributed_host_speeds, 0, sizeof(distributed_host_speeds));
-	csmemset(distributed_monitor_grace_until_tick, 0, sizeof(distributed_monitor_grace_until_tick));
-	csmemset(distributed_client_monitor_grace_until_tick, 0, sizeof(distributed_client_monitor_grace_until_tick));
 	csmemset(distributed_input_facings, 0, sizeof(distributed_input_facings));
 	csmemset(distributed_seen, 0, sizeof(distributed_seen));
 	csmemset(distributed_viewers, 0, sizeof(distributed_viewers));
@@ -5002,6 +5000,8 @@ static void distributed_advance_checkpoint(void)
 
 static void distributed_restore_checkpoint(void)
 {
+	csmemset(distributed_monitor_grace_until_tick, 0, sizeof(distributed_monitor_grace_until_tick));
+	csmemset(distributed_client_monitor_grace_until_tick, 0, sizeof(distributed_client_monitor_grace_until_tick));
 	distributed_reset_checkpoint_state(TRUE);
 	network_objects_discard_client_effects();
 	network_objects_reverted();
@@ -5042,6 +5042,8 @@ void network_distributed_new_game(
 	distributed_checkpoint_synchronized = FALSE;
 
 	csmemset(&distributed_divergence, 0, sizeof(distributed_divergence));
+	csmemset(distributed_monitor_grace_until_tick, 0, sizeof(distributed_monitor_grace_until_tick));
+	csmemset(distributed_client_monitor_grace_until_tick, 0, sizeof(distributed_client_monitor_grace_until_tick));
 	distributed_reset_checkpoint_state(TRUE);
 	csmemset(distributed_round_trips, 0, sizeof(distributed_round_trips));
 	csmemset(distributed_client_clocks, 0, sizeof(distributed_client_clocks));
@@ -6064,8 +6066,14 @@ static boolean distributed_message_epoch_valid(
 	return TRUE;
 }
 
+static void orig_network_distributed_handle_message(
+	long machine_index,
+	word const *message,
+	word size);
+
 /* a message of the distributed kind; machine_index is the sender's on the
 host, NONE on a client */
+#define network_distributed_handle_message orig_network_distributed_handle_message
 void network_distributed_handle_message(
 	long machine_index,
 	word const *message,
@@ -6122,14 +6130,6 @@ void network_distributed_handle_message(
 	if (map_share_handles_message(message, size))
 	{
 		map_share_handle_message(machine_index, message, size, machine_index != NONE ?
-			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
-		return;
-	}
-	/* (Forge's session-RAM custom tag streaming, over the reliable stream:
-	forge_network.c) */
-	if (forge_tag_stream_handles_message(message, size))
-	{
-		forge_tag_stream_handle_message(machine_index, message, size, machine_index != NONE ?
 			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
 	}
@@ -6575,6 +6575,21 @@ void network_distributed_handle_message(
 		break;
 	}
 	}
+}
+#undef network_distributed_handle_message
+
+void network_distributed_handle_message(
+	long machine_index,
+	word const *message,
+	word size)
+{
+	if (forge_tag_stream_handles_message(message, size))
+	{
+		forge_tag_stream_handle_message(machine_index, message, size, machine_index != NONE ?
+			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
+		return;
+	}
+	orig_network_distributed_handle_message(machine_index, message, size);
 }
 
 /* (the host: network_server_message_handler.c) a client machine's message

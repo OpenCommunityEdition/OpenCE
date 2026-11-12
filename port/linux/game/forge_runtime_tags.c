@@ -1499,7 +1499,7 @@ static void scan_loaded_map_into_catalog(void)
 	}
 }
 
-static void invalidate_credits_and_fxtg_caches(void);
+static void invalidate_credits_cache(void);
 static void close_runtime_xbox_donor(void);
 static void close_preview_xbox_donor(void);
 static int has_active_dynamic_tags(void);
@@ -1519,7 +1519,7 @@ void forge_runtime_reload_catalogs(void)
 		}
 	}
 
-	invalidate_credits_and_fxtg_caches();
+	invalidate_credits_cache();
 	g_forge.catalog_count = 0;
 
 	/* Built-in Spawns & Teleporters */
@@ -1536,10 +1536,9 @@ void forge_runtime_reload_catalogs(void)
 	add_catalog_entry('flag', _forge_cat_objectives, 0, "objective\\koth_hill", "[KOTH] Hill Marker");
 	add_catalog_entry('flag', _forge_cat_objectives, 0, "objective\\race_track", "[RACE] Race Marker / Checkpoint");
 
-	/* Load custom tag cache catalog first (so [C] items appear at the top of each category),
+	/* Load custom tag vault catalog first (so [C] items appear at the top of each category),
 	 * then Xbox default catalog, then any map-local tags ([MAP]) from the currently loaded map */
 	scan_faber_tag_vault_into_catalog();
-	scan_cached_tags_manifest("OpenCE Forge/cached_tags/custom_catalog.txt");
 	for (ep_i = 0; ep_i < saved_ephemeral_count; ep_i++)
 	{
 		add_catalog_entry(
@@ -2183,7 +2182,7 @@ int forge_reset_stock_tag_cache(void)
 
 int forge_clear_custom_tag_cache(void)
 {
-	/* Delete all custom cached tag bundles and custom catalog cache */
+	/* Delete all custom cached tag bundles in the Faber Tag Vault */
 	{
 		long safety = 0;
 		port_tag_profiles_scan();
@@ -2193,10 +2192,6 @@ int forge_clear_custom_tag_cache(void)
 				break;
 		}
 	}
-	forge_delete_files_matching("OpenCE Forge/cached_tags", "*.fxtg");
-	forge_delete_files_matching("OpenCE Forge/cached_tags", "c_*.*");
-	forge_delete_files_matching("OpenCE Forge/cached_tags/markers", "c_*.*");
-	remove("OpenCE Forge/cached_tags/custom_catalog.txt");
 
 	forge_runtime_reload_catalogs();
 	forge_set_status("Cleared Custom Tag Cache!");
@@ -4051,7 +4046,6 @@ static long load_native_xbox_tag_from_source(
 				return NONE;
 			}
 			tag_buf[tag_sz] = 0;
-			if (strstr(cache_map_path, "cache_fxtg_tmp.map") == NULL)
 			{
 				int replace_slot = 0;
 				unsigned long oldest_seq = (unsigned long)-1;
@@ -4682,24 +4676,10 @@ static int s_credits_entry_count = 0;
 static int s_credits_entry_cap = 0;
 static int s_credits_loaded = 0;
 
-struct forge_fxtg_cache_entry
-{
-	uint32_t group_tag;
-	uint32_t disk_bytes;
-	char tag_path[256];
-	char file_path[512];
-};
-
-static struct forge_fxtg_cache_entry *s_fxtg_entries = NULL;
-static int s_fxtg_entry_count = 0;
-static int s_fxtg_loaded = 0;
-
-static void invalidate_credits_and_fxtg_caches(void)
+static void invalidate_credits_cache(void)
 {
 	s_credits_loaded = 0;
 	s_credits_entry_count = 0;
-	s_fxtg_loaded = 0;
-	s_fxtg_entry_count = 0;
 }
 
 static void ensure_credits_loaded(void)
@@ -5476,156 +5456,46 @@ static long load_faber_vault_tag_bundle_runtime(
 	b_handle = port_tag_profiles_bundle_open(found_p, found_t, &bundle_size);
 	if (b_handle == NONE)
 		return NONE;
-	root_handle = install_faber_bundle_from_source(
-		b_handle,
-		NULL,
-		bundle_size,
-		req_group,
-		req_path,
-		out_actual_group,
-		0);
-	port_tag_profiles_bundle_close(b_handle);
-	return root_handle;
-}
-
-struct fxtg_bundle_header
-{
-	uint32_t magic;
-	uint32_t group_tag;
-	uint32_t uncompressed_size;
-	uint32_t compressed_size;
-	char tag_path[256];
-	char custom_name[64];
-	char source_map[64];
-};
-
-static long load_compressed_xbox_bundle_from_file(
-	char const *fxtg_path,
-	uint32_t req_group,
-	char const *req_path,
-	uint32_t *out_actual_group)
-{
-	FILE *fp;
-	struct fxtg_bundle_header hdr;
-	uint8_t *comp_buf;
-	uint8_t *uncomp_buf;
-	unsigned long dest_len;
-	long hdl;
-
-	fp = fopen(fxtg_path, "rb");
-	if (!fp)
-		return NONE;
-	if (fread(&hdr, 1, sizeof(hdr), fp) != sizeof(hdr) ||
-		hdr.magic != 0x31545846u /* 'FXT1' */ ||
-		hdr.group_tag != req_group ||
-		_stricmp(hdr.tag_path, req_path) != 0 ||
-		hdr.compressed_size == 0 || hdr.compressed_size > 64u * 1024u * 1024u ||
-		hdr.uncompressed_size < 2048u || hdr.uncompressed_size > 64u * 1024u * 1024u)
+	root_handle = NONE;
+	if (bundle_size >= 4u)
 	{
-		fclose(fp);
-		return NONE;
-	}
-	comp_buf = (uint8_t *)malloc(hdr.compressed_size);
-	uncomp_buf = (uint8_t *)malloc(hdr.uncompressed_size);
-	if (!comp_buf || !uncomp_buf ||
-		fread(comp_buf, 1, hdr.compressed_size, fp) != hdr.compressed_size)
-	{
-		free(comp_buf);
-		free(uncomp_buf);
-		fclose(fp);
-		return NONE;
-	}
-	fclose(fp);
-
-	dest_len = hdr.uncompressed_size;
-	if (z_uncompress(uncomp_buf, &dest_len, comp_buf, hdr.compressed_size) != Z_OK ||
-		dest_len != hdr.uncompressed_size)
-	{
-		free(comp_buf);
-		free(uncomp_buf);
-		return NONE;
-	}
-	free(comp_buf);
-
-	hdl = load_native_xbox_tag_from_source(
-		NULL,
-		uncomp_buf,
-		hdr.uncompressed_size,
-		req_group,
-		req_path,
-		out_actual_group,
-		0);
-	free(uncomp_buf);
-	return hdl;
-}
-
-static void ensure_fxtg_cache_loaded(void)
-{
-	char pat[512];
-	WIN32_FIND_DATAA fd;
-	HANDLE h;
-
-	if (s_fxtg_loaded)
-		return;
-	s_fxtg_loaded = 1;
-	s_fxtg_entry_count = 0;
-
-	snprintf(pat, sizeof(pat), "OpenCE Forge/cached_tags\\*.fxtg");
-	h = FindFirstFileA(pat, &fd);
-	if (h == INVALID_HANDLE_VALUE)
-		return;
-	do
-	{
-		if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+		uint32_t magic = 0;
+		if (port_tag_profiles_bundle_read_at(b_handle, 0, &magic, sizeof(magic)))
 		{
-			char full[512];
-			FILE *fp;
-			struct fxtg_bundle_header hdr;
-			snprintf(full, sizeof(full), "OpenCE Forge/cached_tags/%s", fd.cFileName);
-			fp = fopen(full, "rb");
-			if (fp)
+			if (magic == 0x68656164u /* 'head' Xbox/MCC v5 bundle in Faber Tag Vault */)
 			{
-				if (fread(&hdr, 1, sizeof(hdr), fp) == sizeof(hdr) &&
-					hdr.magic == 0x31545846u)
+				if (bundle_size >= 2048u && bundle_size <= 64u * 1024u * 1024u)
 				{
-					struct forge_fxtg_cache_entry *grown = (struct forge_fxtg_cache_entry *)realloc(
-						s_fxtg_entries, (size_t)(s_fxtg_entry_count + 1) * sizeof(*grown));
-					if (grown)
+					uint8_t *uncomp_buf = (uint8_t *)malloc(bundle_size);
+					if (uncomp_buf && port_tag_profiles_bundle_read_at(b_handle, 0, uncomp_buf, bundle_size))
 					{
-						s_fxtg_entries = grown;
-						s_fxtg_entries[s_fxtg_entry_count].group_tag = hdr.group_tag;
-						s_fxtg_entries[s_fxtg_entry_count].disk_bytes = (uint32_t)sizeof(hdr) + hdr.compressed_size;
-						snprintf(s_fxtg_entries[s_fxtg_entry_count].tag_path, sizeof(s_fxtg_entries[0].tag_path), "%s", hdr.tag_path);
-						snprintf(s_fxtg_entries[s_fxtg_entry_count].file_path, sizeof(s_fxtg_entries[0].file_path), "%s", full);
-						s_fxtg_entry_count++;
+						root_handle = load_native_xbox_tag_from_source(
+							NULL,
+							uncomp_buf,
+							(uint32_t)bundle_size,
+							req_group,
+							req_path,
+							out_actual_group,
+							0);
 					}
+					free(uncomp_buf);
 				}
-				fclose(fp);
+			}
+			else
+			{
+				root_handle = install_faber_bundle_from_source(
+					b_handle,
+					NULL,
+					bundle_size,
+					req_group,
+					req_path,
+					out_actual_group,
+					0);
 			}
 		}
-	} while (FindNextFileA(h, &fd));
-	CloseHandle(h);
-}
-
-static long load_compressed_xbox_bundle_runtime(
-	uint32_t req_group,
-	char const *req_path,
-	uint32_t *out_actual_group)
-{
-	int i;
-	ensure_fxtg_cache_loaded();
-	for (i = 0; i < s_fxtg_entry_count; i++)
-	{
-		if (s_fxtg_entries[i].group_tag == req_group &&
-			_stricmp(s_fxtg_entries[i].tag_path, req_path) == 0)
-		{
-			long hdl = load_compressed_xbox_bundle_from_file(
-				s_fxtg_entries[i].file_path, req_group, req_path, out_actual_group);
-			if (hdl != NONE)
-				return hdl;
-		}
 	}
-	return NONE;
+	port_tag_profiles_bundle_close(b_handle);
+	return root_handle;
 }
 
 static long register_dynamic_cached_tag(uint32_t group_tag, char const *tag_path, uint32_t *out_actual_group)
@@ -5648,13 +5518,8 @@ static long register_dynamic_cached_tag(uint32_t group_tag, char const *tag_path
 	if (s_dyn_tags.count >= FORGE_MAX_DYNAMIC_TAGS)
 		return NONE;
 
-	/* 0a. Check compressed Faber Tag Vault (.fbrtag + faber_vault.bin) in OpenCE Forge/tag_vault/ */
+	/* 1. Check compressed Faber Tag Vault (.fbrtag + faber_vault.bin) in OpenCE Forge/tag_vault/ */
 	native_idx = load_faber_vault_tag_bundle_runtime(group_tag, tag_path, out_actual_group);
-	if (native_idx != NONE)
-		return native_idx;
-
-	/* 0b. Check compressed Xbox tag bundle (.fxtg) in OpenCE Forge/custom_tags/ */
-	native_idx = load_compressed_xbox_bundle_runtime(group_tag, tag_path, out_actual_group);
 	if (native_idx != NONE)
 		return native_idx;
 
@@ -9747,74 +9612,61 @@ static void xbox_mark_schema_spans(
 	}
 }
 
-static void upsert_custom_catalog_manifest_line(
-	uint32_t grp,
-	uint8_t cat_id,
-	char const *tag_path,
-	char const *custom_name)
+struct xbox_vault_ext_patch
 {
-	FILE *in_fp;
-	char (*lines)[512];
-	int line_count = 0;
-	int updated = 0;
-	int i;
-	char grp_str[5];
-	FILE *out_fp;
+	uint32_t *offset_ptr;
+	uint32_t rel_ext_off;
+};
 
-	lines = (char (*)[512])malloc(512u * sizeof(*lines));
-	if (!lines)
-		return;
+static int xbox_vault_append_ext_region(
+	struct forge_grow_buf *ext_buf,
+	struct tag_bundle_file_region **regions,
+	long *region_count,
+	long *region_cap,
+	struct xbox_vault_ext_patch **patches,
+	long *patch_count,
+	long *patch_cap,
+	void const *bytes,
+	unsigned long size,
+	uint32_t *offset_ptr)
+{
+	unsigned long rel_off;
 
-	grp_str[0] = (char)((grp >> 24) & 0xFF);
-	grp_str[1] = (char)((grp >> 16) & 0xFF);
-	grp_str[2] = (char)((grp >> 8) & 0xFF);
-	grp_str[3] = (char)(grp & 0xFF);
-	grp_str[4] = '\0';
-
-	in_fp = fopen("OpenCE Forge/cached_tags/custom_catalog.txt", "r");
-	if (in_fp)
+	if (!ext_buf || !bytes || size == 0 || !offset_ptr)
+		return 0;
+	rel_off = ext_buf->size;
+	if (*region_count >= *region_cap)
 	{
-		char buf[512];
-		while (line_count < 510 && fgets(buf, sizeof(buf), in_fp))
-		{
-			char l_grp[16], l_path[256];
-			int l_cat = 0, l_src = 0;
-			char *nl = strchr(buf, '\r');
-			if (nl) *nl = '\0';
-			nl = strchr(buf, '\n');
-			if (nl) *nl = '\0';
-			if (sscanf(buf, "%4s|%d|%d|%255[^|\n]", l_grp, &l_cat, &l_src, l_path) == 4 &&
-				_stricmp(l_grp, grp_str) == 0 && _stricmp(l_path, tag_path) == 0)
-			{
-				snprintf(lines[line_count++], sizeof(lines[0]), "%s|%d|2|%s|%s",
-					grp_str, (int)cat_id, tag_path, custom_name);
-				updated = 1;
-			}
-			else if (buf[0])
-			{
-				snprintf(lines[line_count++], sizeof(lines[0]), "%s", buf);
-			}
-		}
-		fclose(in_fp);
+		long new_cap = *region_cap ? (*region_cap * 2) : 64;
+		struct tag_bundle_file_region *grown_r = (struct tag_bundle_file_region *)realloc(
+			*regions, (size_t)new_cap * sizeof(*grown_r));
+		if (!grown_r)
+			return 0;
+		*regions = grown_r;
+		*region_cap = new_cap;
 	}
-	if (!updated && line_count < 512)
+	if (*patch_count >= *patch_cap)
 	{
-		snprintf(lines[line_count++], sizeof(lines[0]), "%s|%d|2|%s|%s",
-			grp_str, (int)cat_id, tag_path, custom_name);
+		long new_cap = *patch_cap ? (*patch_cap * 2) : 64;
+		struct xbox_vault_ext_patch *grown_p = (struct xbox_vault_ext_patch *)realloc(
+			*patches, (size_t)new_cap * sizeof(*grown_p));
+		if (!grown_p)
+			return 0;
+		*patches = grown_p;
+		*patch_cap = new_cap;
 	}
-	CreateDirectoryA("OpenCE Forge", NULL);
-	CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
-	out_fp = fopen("OpenCE Forge/cached_tags/custom_catalog.txt", "wb");
-	if (out_fp)
-	{
-		for (i = 0; i < line_count; i++)
-			fprintf(out_fp, "%s\n", lines[i]);
-		fclose(out_fp);
-	}
-	free(lines);
+	if (!forge_grow_buf_write(ext_buf, bytes, size))
+		return 0;
+	(*regions)[*region_count].offset = rel_off;
+	(*regions)[*region_count].size = size;
+	(*region_count)++;
+	(*patches)[*patch_count].offset_ptr = offset_ptr;
+	(*patches)[*patch_count].rel_ext_off = (uint32_t)rel_off;
+	(*patch_count)++;
+	return 1;
 }
 
-static int extract_compressed_xbox_map_tag(
+static int extract_xbox_map_tag_to_vault(
 	int32_t root_abs_idx,
 	uint32_t grp,
 	char const *tag_path,
@@ -9825,17 +9677,17 @@ static int extract_compressed_xbox_map_tag(
 	uint8_t *masked_tag_buf = NULL;
 	struct forge_grow_buf ext_buf = { NULL, 0, 0 };
 	struct forge_grow_buf model_hw_buf = { NULL, 0, 0 };
-	uint32_t final_tag_sz, uncomp_size, new_tag_off;
+	struct tag_bundle_file_region *regions = NULL;
+	long region_count = 0, region_cap = 0;
+	struct xbox_vault_ext_patch *patches = NULL;
+	long patch_count = 0, patch_cap = 0;
+	static struct tag_bundle_file_region const no_region = { 0, 0 };
+	uint32_t final_tag_sz, uncomp_size, new_tag_off, tags_size;
 	uint8_t *uncomp_img = NULL;
-	unsigned long comp_bound, comp_len;
-	uint8_t *comp_img = NULL;
-	struct fxtg_bundle_header fhdr;
-	char safe_file[128];
-	char fxtg_path[512];
-	FILE *out_fp;
-	uint8_t cat_id;
+	long prof = 0, p_idx;
+	int added = 0;
 	int32_t i;
-	size_t c_idx, w_idx = 0;
+	size_t c_idx;
 
 	if (!s_map_browser.xbox_fp || !s_map_browser.xbox_tag_buf ||
 		root_abs_idx < 0 || root_abs_idx >= s_map_browser.xbox_tag_count)
@@ -10015,12 +9867,18 @@ static int extract_compressed_xbox_map_tag(
 								&conv_pix,
 								&conv_sz) && conv_pix && conv_sz > 0)
 						{
-							uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
-							if (forge_grow_buf_write(&ext_buf, conv_pix, conv_sz))
-							{
-								tmp_bmp.pixels_offset = (long)new_off;
-								memcpy(bmp_raw, &tmp_bmp, sizeof(tmp_bmp));
-							}
+							memcpy(bmp_raw, &tmp_bmp, sizeof(tmp_bmp));
+							xbox_vault_append_ext_region(
+								&ext_buf,
+								&regions,
+								&region_count,
+								&region_cap,
+								&patches,
+								&patch_count,
+								&patch_cap,
+								conv_pix,
+								conv_sz,
+								(uint32_t *)(bmp_raw + 24u));
 						}
 						free(conv_pix);
 					}
@@ -10043,9 +9901,17 @@ static int extract_compressed_xbox_map_tag(
 							fseek(s_map_browser.xbox_fp, (long)orig_off, SEEK_SET) == 0 &&
 							fread(pix_tmp, 1, read_bytes, s_map_browser.xbox_fp) == read_bytes)
 						{
-							uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
-							if (forge_grow_buf_write(&ext_buf, pix_tmp, read_bytes))
-								*(int32_t *)(bmp_raw + 24u) = (int32_t)new_off;
+							xbox_vault_append_ext_region(
+								&ext_buf,
+								&regions,
+								&region_count,
+								&region_cap,
+								&patches,
+								&patch_count,
+								&patch_cap,
+								pix_tmp,
+								read_bytes,
+								(uint32_t *)(bmp_raw + 24u));
 						}
 						free(pix_tmp);
 					}
@@ -10101,12 +9967,18 @@ static int extract_compressed_xbox_map_tag(
 										&conv_snd,
 										&conv_sz) && conv_snd && conv_sz > 0)
 								{
-									uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
-									if (forge_grow_buf_write(&ext_buf, conv_snd, conv_sz))
-									{
-										tmp_perm.samples.file_offset = (long)new_off;
-										memcpy(perm_raw, &tmp_perm, sizeof(tmp_perm));
-									}
+									memcpy(perm_raw, &tmp_perm, sizeof(tmp_perm));
+									xbox_vault_append_ext_region(
+										&ext_buf,
+										&regions,
+										&region_count,
+										&region_cap,
+										&patches,
+										&patch_count,
+										&patch_cap,
+										conv_snd,
+										conv_sz,
+										(uint32_t *)(perm_raw + 72u));
 								}
 								free(conv_snd);
 							}
@@ -10121,9 +9993,17 @@ static int extract_compressed_xbox_map_tag(
 										fseek(s_map_browser.xbox_fp, (long)s_foff, SEEK_SET) == 0 &&
 										fread(stmp, 1, (size_t)s_sz, s_map_browser.xbox_fp) == (size_t)s_sz)
 									{
-										uint32_t new_off = 2048u + (uint32_t)ext_buf.size;
-										if (forge_grow_buf_write(&ext_buf, stmp, (unsigned long)s_sz))
-											*(uint32_t *)(perm_raw + 72u) = new_off;
+										xbox_vault_append_ext_region(
+											&ext_buf,
+											&regions,
+											&region_count,
+											&region_cap,
+											&patches,
+											&patch_count,
+											&patch_cap,
+											stmp,
+											(unsigned long)s_sz,
+											(uint32_t *)(perm_raw + 72u));
 									}
 									free(stmp);
 								}
@@ -10339,11 +10219,18 @@ static int extract_compressed_xbox_map_tag(
 	}
 
 	final_tag_sz = cl.tag_sz + (uint32_t)model_hw_buf.size;
-	new_tag_off = 2048u + (uint32_t)((ext_buf.size + 31u) & ~31u);
-	uncomp_size = new_tag_off + final_tag_sz;
+	new_tag_off = 2048u;
+	tags_size = 2048u + ((final_tag_sz + 31u) & ~31u);
+	for (p_idx = 0; p_idx < patch_count; p_idx++)
+		*patches[p_idx].offset_ptr = tags_size + patches[p_idx].rel_ext_off;
+	free(patches);
+	patches = NULL;
+
+	uncomp_size = tags_size + (uint32_t)ext_buf.size;
 	uncomp_img = (uint8_t *)calloc(1, uncomp_size);
 	if (!uncomp_img)
 	{
+		free(regions);
 		free(ext_buf.bytes);
 		free(model_hw_buf.bytes);
 		free(cl.visited);
@@ -10360,11 +10247,11 @@ static int extract_compressed_xbox_map_tag(
 	*(uint32_t *)(uncomp_img + 0x10) = new_tag_off;
 	*(uint32_t *)(uncomp_img + 0x14) = final_tag_sz;
 	*(uint32_t *)(uncomp_img + 0x7FC) = 0x666F6F74u; /* 'foot' */
-	if (ext_buf.bytes && ext_buf.size > 0)
-		memcpy(uncomp_img + 2048u, ext_buf.bytes, ext_buf.size);
 	memcpy(uncomp_img + new_tag_off, masked_tag_buf, cl.tag_sz);
 	if (model_hw_buf.bytes && model_hw_buf.size > 0)
 		memcpy(uncomp_img + new_tag_off + cl.tag_sz, model_hw_buf.bytes, model_hw_buf.size);
+	if (ext_buf.bytes && ext_buf.size > 0)
+		memcpy(uncomp_img + tags_size, ext_buf.bytes, ext_buf.size);
 
 	free(ext_buf.bytes);
 	free(model_hw_buf.bytes);
@@ -10374,69 +10261,38 @@ static int extract_compressed_xbox_map_tag(
 	free(used_mask);
 	free(masked_tag_buf);
 
-	comp_bound = uncomp_size + (uncomp_size >> 10) + 256u;
-	comp_img = (uint8_t *)malloc(comp_bound);
-	if (!comp_img)
+	port_tag_profiles_scan();
+	if (port_tag_profiles_count() <= 0)
+		prof = port_tag_profiles_create("Forge Custom Tags");
+	else
+		prof = 0;
+
+	if (prof >= 0)
 	{
-		free(uncomp_img);
-		return 0;
-	}
-	comp_len = comp_bound;
-	{
-#undef compress2
-		extern int compress2(Bytef *dest, uLongf *destLen, const Bytef *source, uLong sourceLen, int level);
-		if (compress2(comp_img, &comp_len, uncomp_img, uncomp_size, 6) != Z_OK)
+		added = port_tag_profiles_tag_add(
+			prof,
+			s_map_browser.map_name[0] ? s_map_browser.map_name : "xbox_map",
+			(unsigned long)grp,
+			tag_path,
+			uncomp_img,
+			uncomp_size,
+			tags_size,
+			(struct port_tag_store_region const *)(regions ? regions : &no_region),
+			region_count);
+		if (added)
 		{
-			free(comp_img);
-			free(uncomp_img);
-			return 0;
+			long t_slot = port_tag_profiles_tag_find(prof, (unsigned long)grp, tag_path);
+			if (t_slot >= 0)
+			{
+				port_tag_profiles_tag_set_enabled(prof, t_slot, 1);
+				port_tag_profiles_tag_set_option(prof, t_slot, "name", clean_name);
+			}
 		}
 	}
+
+	free(regions);
 	free(uncomp_img);
-
-	for (c_idx = 0; tag_path[c_idx] && w_idx + 1 < sizeof(safe_file); c_idx++)
-	{
-		char ch = tag_path[c_idx];
-		if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-			(ch >= '0' && ch <= '9') || ch == '_' || ch == '-')
-			safe_file[w_idx++] = ch;
-		else
-			safe_file[w_idx++] = '_';
-	}
-	safe_file[w_idx] = '\0';
-
-	CreateDirectoryA("OpenCE Forge", NULL);
-	CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
-	snprintf(fxtg_path, sizeof(fxtg_path), "OpenCE Forge/cached_tags/%s_%08X.fxtg", safe_file, (unsigned int)grp);
-	memset(&fhdr, 0, sizeof(fhdr));
-	fhdr.magic = 0x31545846u; /* 'FXT1' */
-	fhdr.group_tag = grp;
-	fhdr.uncompressed_size = uncomp_size;
-	fhdr.compressed_size = (uint32_t)comp_len;
-	snprintf(fhdr.tag_path, sizeof(fhdr.tag_path), "%s", tag_path);
-	snprintf(fhdr.custom_name, sizeof(fhdr.custom_name), "%s", clean_name);
-	snprintf(fhdr.source_map, sizeof(fhdr.source_map), "%s", s_map_browser.map_name);
-
-	out_fp = fopen(fxtg_path, "wb");
-	if (!out_fp)
-	{
-		free(comp_img);
-		return 0;
-	}
-	fwrite(&fhdr, 1, sizeof(fhdr), out_fp);
-	fwrite(comp_img, 1, comp_len, out_fp);
-	fclose(out_fp);
-	free(comp_img);
-
-	if (grp == 'weap') cat_id = _forge_cat_weapons;
-	else if (grp == 'eqip') cat_id = _forge_cat_equipment;
-	else if (grp == 'vehi') cat_id = _forge_cat_vehicles;
-	else if (is_forge_door_tag(grp, tag_path)) cat_id = _forge_cat_barriers_devices;
-	else if (is_forge_light_beacon_emitter_tag(grp, tag_path)) cat_id = _forge_cat_lights;
-	else cat_id = _forge_cat_scenery;
-
-	upsert_custom_catalog_manifest_line(grp, cat_id, tag_path, clean_name);
-	return 1;
+	return added;
 }
 
 int forge_ui_extract_selected_map_tag(int category_tab, int list_index, char const *custom_name)
@@ -10592,7 +10448,7 @@ int forge_ui_extract_selected_map_tag(int category_tab, int list_index, char con
 	}
 	else if (s_map_browser.is_xbox_map)
 	{
-		if (!extract_compressed_xbox_map_tag(abs_idx, grp, tag_path, clean_name))
+		if (!extract_xbox_map_tag_to_vault(abs_idx, grp, tag_path, clean_name))
 			return 0;
 		forge_runtime_reload_catalogs();
 		return 1;
@@ -10998,7 +10854,7 @@ int forge_cache_active_map_tag(uint32_t group_tag, char const *tag_path)
 				}
 			}
 			if (abs_idx >= 0)
-				ok = extract_compressed_xbox_map_tag(abs_idx, group_tag, tag_path, clean_name);
+				ok = extract_xbox_map_tag_to_vault(abs_idx, group_tag, tag_path, clean_name);
 		}
 		forge_ui_close_map_tag_browser();
 		if (ok)
@@ -11044,25 +10900,6 @@ int forge_ui_installed_tag_count(int category_tab)
 	return count;
 }
 
-static int find_fxtg_file_for_tag(uint32_t grp, char const *tag_path, char *out_file, size_t out_sz, uint32_t *out_disk_bytes)
-{
-	int i;
-	ensure_fxtg_cache_loaded();
-	for (i = 0; i < s_fxtg_entry_count; i++)
-	{
-		if (s_fxtg_entries[i].group_tag == grp &&
-			_stricmp(s_fxtg_entries[i].tag_path, tag_path) == 0)
-		{
-			if (out_file && out_sz > 0)
-				snprintf(out_file, out_sz, "%s", s_fxtg_entries[i].file_path);
-			if (out_disk_bytes)
-				*out_disk_bytes = s_fxtg_entries[i].disk_bytes;
-			return 1;
-		}
-	}
-	return 0;
-}
-
 int forge_ui_installed_tag_get_info(
 	int category_tab,
 	int list_index,
@@ -11097,17 +10934,12 @@ int forge_ui_installed_tag_get_info(
 	{
 		long p_cnt = port_tag_profiles_count();
 		long p;
-		uint32_t fxtg_bytes = 0;
 
 		for (p = 0; p < p_cnt && byte_size <= 0; p++)
 		{
 			long t = port_tag_profiles_tag_find(p, (unsigned long)e->group_tag, e->tag_path);
 			if (t >= 0)
 				byte_size = (int32_t)port_tag_profiles_tag_size(p, t);
-		}
-		if (byte_size <= 0 && find_fxtg_file_for_tag(e->group_tag, e->tag_path, NULL, 0, &fxtg_bytes))
-		{
-			byte_size = (int32_t)fxtg_bytes;
 		}
 		if (byte_size <= 0 && s_preview_xbox_donor.fp && s_preview_xbox_donor.tag_buf)
 		{
@@ -11201,7 +11033,6 @@ int forge_ui_installed_tag_delete(int category_tab, int list_index)
 	int cat_idx = get_installed_catalog_index(category_tab, list_index);
 	uint32_t grp;
 	char tag_path[256];
-	char fxtg_file[512];
 	long p_cnt, p;
 
 	if (cat_idx < 0 || cat_idx >= g_forge.catalog_count)
@@ -11219,16 +11050,7 @@ int forge_ui_installed_tag_delete(int category_tab, int list_index)
 			port_tag_profiles_tag_remove(p, t);
 	}
 
-	/* 2. Remove compressed .fxtg bundle if present */
-	while (find_fxtg_file_for_tag(grp, tag_path, fxtg_file, sizeof(fxtg_file), NULL))
-	{
-		if (remove(fxtg_file) != 0)
-			break;
-		s_fxtg_loaded = 0;
-	}
-
-	/* 3. Remove from custom_catalog.txt and xbox_catalog.txt */
-	remove_manifest_entry_from_file("OpenCE Forge/cached_tags/custom_catalog.txt", grp, tag_path);
+	/* 2. Remove from xbox_catalog.txt if present */
 	remove_manifest_entry_from_file("OpenCE Forge/cached_tags/xbox_catalog.txt", grp, tag_path);
 
 	forge_runtime_reload_catalogs();
@@ -11237,7 +11059,7 @@ int forge_ui_installed_tag_delete(int category_tab, int list_index)
 
 /* ============================================================================
  * 3D SOFTWARE MESH PREVIEW BUILDER (Supports CE 'mod2', Faber '.fbrtag',
- * Stock Xbox 'mode', and Compressed Xbox '.fxtg' bundles!)
+ * and Xbox/MCC 'mode' tags!)
  * ============================================================================ */
 
 #define FORGE_PREVIEW_MAX_VERTICES   16384
@@ -12231,7 +12053,6 @@ int forge_ui_build_tag_preview_mesh(
 		int cat_idx = get_installed_catalog_index(category_tab, list_index);
 		struct forge_catalog_entry const *e;
 		long p_cnt, p;
-		char fxtg_file[512];
 
 		if (cat_idx < 0 || cat_idx >= g_forge.catalog_count)
 			return 0;
@@ -12248,36 +12069,96 @@ int forge_ui_build_tag_preview_mesh(
 				long bh = port_tag_profiles_bundle_open(p, t, &bundle_sz);
 				if (bh != NONE && bundle_sz >= TAG_BUNDLE_HEADER_BYTES)
 				{
-					byte hdr[TAG_BUNDLE_HEADER_BYTES];
-					if (port_tag_profiles_bundle_read_at(bh, 0, hdr, TAG_BUNDLE_HEADER_BYTES))
+					uint32_t magic = 0;
+					if (port_tag_profiles_bundle_read_at(bh, 0, &magic, sizeof(magic)) &&
+						magic == 0x68656164u && bundle_sz >= 2048u && bundle_sz <= 128u * 1024u * 1024u)
 					{
-						unsigned long tags_sz = tag_bundle_file_data_offset(hdr);
-						if (tags_sz >= TAG_BUNDLE_HEADER_BYTES && tags_sz <= bundle_sz)
+						uint8_t *uncomp = (uint8_t *)malloc(bundle_sz);
+						if (uncomp && port_tag_profiles_bundle_read_at(bh, 0, uncomp, bundle_sz))
 						{
-							byte *b_bytes = (byte *)malloc(tags_sz);
-							struct tag_bundle_loaded loaded;
-							if (b_bytes && port_tag_profiles_bundle_read_at(bh, 0, b_bytes, tags_sz) &&
-								tag_bundle_load_tags(b_bytes, tags_sz, bundle_sz, &loaded) == _tag_bundle_status_ok &&
-								loaded.tag_count > 0)
+							char donor_path[512];
+							FILE *dfp;
+							port_tag_profiles_bundle_close(bh);
+							platform_translate_path("z:\\cache_vault_tmp.map", donor_path, sizeof(donor_path));
+							dfp = fopen(donor_path, "wb+");
+							if (dfp)
 							{
-								struct preview_ce_source src;
-								int ok;
-								memset(&src, 0, sizeof(src));
-								src.is_bundle = 1;
-								src.bundle_loaded = &loaded;
-								src.bundle_read.handle = bh;
-								src.bundle_read.file_data_offset = loaded.file_data_offset;
-								src.bundle_read.file_data_size = loaded.file_data_size;
-								ok = build_preview_mesh_from_ce_source(
-									&src,
-									loaded.data + *(uint32_t const *)(loaded.tags + TAG_BUNDLE_TAG_ROOT_OFFSET),
-									*(uint32_t const *)(loaded.tags + TAG_BUNDLE_TAG_GROUP_OFFSET),
-									mesh);
-								free(b_bytes);
-								port_tag_profiles_bundle_close(bh);
-								return ok;
+								uint32_t tag_off = *(uint32_t const *)(uncomp + 0x10);
+								uint32_t tag_sz = *(uint32_t const *)(uncomp + 0x14);
+								fwrite(uncomp, 1, bundle_sz, dfp);
+								fflush(dfp);
+								if (tag_off >= 2048u && tag_off + tag_sz <= bundle_sz)
+								{
+									uint8_t const *tbuf = uncomp + tag_off;
+									uint32_t inst_addr = *(uint32_t const *)(tbuf + 0x00);
+									int32_t t_cnt = *(int32_t const *)(tbuf + 0x0C);
+									uint32_t t_base = inst_addr - 0x24u;
+									int32_t i, root_abs = -1;
+									for (i = 0; i < t_cnt && 0x24u + (uint32_t)t_cnt * 32u <= tag_sz; i++)
+									{
+										uint32_t io = 0x24u + (uint32_t)i * 32u;
+										uint32_t grp = *(uint32_t const *)(tbuf + io + 0x00);
+										uint32_t n_addr = *(uint32_t const *)(tbuf + io + 0x10);
+										if (grp == e->group_tag && n_addr >= t_base && (n_addr - t_base) < tag_sz)
+										{
+											if (_stricmp((char const *)(tbuf + (n_addr - t_base)), e->tag_path) == 0)
+											{
+												root_abs = i;
+												break;
+											}
+										}
+									}
+									if (root_abs >= 0)
+									{
+										int ok = build_preview_mesh_from_xbox_map_data(
+											dfp, tbuf, tag_sz, t_base, 0x24u, t_cnt, root_abs, mesh);
+										fclose(dfp);
+										remove(donor_path);
+										free(uncomp);
+										return ok;
+									}
+								}
+								fclose(dfp);
+								remove(donor_path);
 							}
-							free(b_bytes);
+							free(uncomp);
+							return 0;
+						}
+						free(uncomp);
+					}
+					else
+					{
+						byte hdr[TAG_BUNDLE_HEADER_BYTES];
+						if (port_tag_profiles_bundle_read_at(bh, 0, hdr, TAG_BUNDLE_HEADER_BYTES))
+						{
+							unsigned long tags_sz = tag_bundle_file_data_offset(hdr);
+							if (tags_sz >= TAG_BUNDLE_HEADER_BYTES && tags_sz <= bundle_sz)
+							{
+								byte *b_bytes = (byte *)malloc(tags_sz);
+								struct tag_bundle_loaded loaded;
+								if (b_bytes && port_tag_profiles_bundle_read_at(bh, 0, b_bytes, tags_sz) &&
+									tag_bundle_load_tags(b_bytes, tags_sz, bundle_sz, &loaded) == _tag_bundle_status_ok &&
+									loaded.tag_count > 0)
+								{
+									struct preview_ce_source src;
+									int ok;
+									memset(&src, 0, sizeof(src));
+									src.is_bundle = 1;
+									src.bundle_loaded = &loaded;
+									src.bundle_read.handle = bh;
+									src.bundle_read.file_data_offset = loaded.file_data_offset;
+									src.bundle_read.file_data_size = loaded.file_data_size;
+									ok = build_preview_mesh_from_ce_source(
+										&src,
+										loaded.data + *(uint32_t const *)(loaded.tags + TAG_BUNDLE_TAG_ROOT_OFFSET),
+										*(uint32_t const *)(loaded.tags + TAG_BUNDLE_TAG_GROUP_OFFSET),
+										mesh);
+									free(b_bytes);
+									port_tag_profiles_bundle_close(bh);
+									return ok;
+								}
+								free(b_bytes);
+							}
 						}
 					}
 					port_tag_profiles_bundle_close(bh);
@@ -12285,81 +12166,7 @@ int forge_ui_build_tag_preview_mesh(
 			}
 		}
 
-		/* 2. Check compressed .fxtg Xbox tag bundle */
-		if (find_fxtg_file_for_tag(e->group_tag, e->tag_path, fxtg_file, sizeof(fxtg_file), NULL))
-		{
-			FILE *fp = fopen(fxtg_file, "rb");
-			if (fp)
-			{
-				struct fxtg_bundle_header hdr;
-				if (fread(&hdr, 1, sizeof(hdr), fp) == sizeof(hdr) &&
-					hdr.magic == 0x31545846u &&
-					hdr.compressed_size > 0 && hdr.compressed_size <= 64u * 1024u * 1024u &&
-					hdr.uncompressed_size >= 2048u && hdr.uncompressed_size <= 128u * 1024u * 1024u)
-				{
-					uint8_t *comp = (uint8_t *)malloc(hdr.compressed_size);
-					uint8_t *uncomp = (uint8_t *)malloc(hdr.uncompressed_size);
-					unsigned long d_len = hdr.uncompressed_size;
-					if (comp && uncomp &&
-						fread(comp, 1, hdr.compressed_size, fp) == hdr.compressed_size &&
-						z_uncompress(uncomp, &d_len, comp, hdr.compressed_size) == Z_OK &&
-						d_len == hdr.uncompressed_size)
-					{
-						char donor_path[512];
-						FILE *dfp;
-						platform_translate_path("z:\\cache_fxtg_tmp.map", donor_path, sizeof(donor_path));
-						dfp = fopen(donor_path, "wb+");
-						if (dfp)
-						{
-							uint32_t tag_off = *(uint32_t const *)(uncomp + 0x10);
-							uint32_t tag_sz = *(uint32_t const *)(uncomp + 0x14);
-							fwrite(uncomp, 1, hdr.uncompressed_size, dfp);
-							fflush(dfp);
-							if (tag_off >= 2048u && tag_off + tag_sz <= hdr.uncompressed_size)
-							{
-								uint8_t const *tbuf = uncomp + tag_off;
-								uint32_t inst_addr = *(uint32_t const *)(tbuf + 0x00);
-								int32_t t_cnt = *(int32_t const *)(tbuf + 0x0C);
-								uint32_t t_base = inst_addr - 0x24u;
-								int32_t i, root_abs = -1;
-								for (i = 0; i < t_cnt && 0x24u + (uint32_t)t_cnt * 32u <= tag_sz; i++)
-								{
-									uint32_t io = 0x24u + (uint32_t)i * 32u;
-									uint32_t grp = *(uint32_t const *)(tbuf + io + 0x00);
-									uint32_t n_addr = *(uint32_t const *)(tbuf + io + 0x10);
-									if (grp == e->group_tag && n_addr >= t_base && (n_addr - t_base) < tag_sz)
-									{
-										if (_stricmp((char const *)(tbuf + (n_addr - t_base)), e->tag_path) == 0)
-										{
-											root_abs = i;
-											break;
-										}
-									}
-								}
-								if (root_abs >= 0)
-								{
-									int ok = build_preview_mesh_from_xbox_map_data(
-										dfp, tbuf, tag_sz, t_base, 0x24u, t_cnt, root_abs, mesh);
-									fclose(dfp);
-									remove(donor_path);
-									free(comp);
-									free(uncomp);
-									fclose(fp);
-									return ok;
-								}
-							}
-							fclose(dfp);
-							remove(donor_path);
-						}
-					}
-					free(comp);
-					free(uncomp);
-				}
-				fclose(fp);
-			}
-		}
-
-		/* 3. Stock Xbox cached tag: open donor Xbox map (cached across scroll steps) */
+		/* 2. Stock Xbox cached tag: open donor Xbox map (cached across scroll steps) */
 		if (open_preview_xbox_donor_for_tag(e->group_tag, e->tag_path))
 		{
 			int32_t i;
@@ -13022,7 +12829,7 @@ int forge_export_custom_tag_bundle(
 			port_tag_profiles_bundle_close(b_hdl);
 
 			opt_name = port_tag_profiles_tag_option(p, t, "name");
-			*out_format = 1;
+			*out_format = (*(uint32_t const *)raw == 0x68656164u) ? 2u : 1u;
 			*out_group_tag = grp;
 			snprintf(out_tag_path, path_sz, "%s", tname);
 			snprintf(out_display_name, disp_sz, "%s", (opt_name && opt_name[0]) ? opt_name : tname);
@@ -13032,65 +12839,7 @@ int forge_export_custom_tag_bundle(
 		}
 	}
 
-	/* 2. Check custom Xbox .fxtg bundles in OpenCE Forge/cached_tags/ (v5 mini-map format = 2) */
-	ensure_fxtg_cache_loaded();
-	for (i = 0; i < s_fxtg_entry_count; i++)
-	{
-		FILE *fp;
-		struct fxtg_bundle_header hdr;
-		uint8_t *comp_buf;
-		uint8_t *uncomp_buf;
-		unsigned long dest_len;
-
-		if (!forge_stream_group_is_allowed_root(s_fxtg_entries[i].group_tag))
-			continue;
-		if (forge_compute_catalog_hash(s_fxtg_entries[i].group_tag, s_fxtg_entries[i].tag_path) != hash)
-			continue;
-
-		fp = fopen(s_fxtg_entries[i].file_path, "rb");
-		if (!fp)
-			continue;
-		if (fread(&hdr, 1, sizeof(hdr), fp) != sizeof(hdr) ||
-			hdr.magic != 0x31545846u ||
-			hdr.group_tag != s_fxtg_entries[i].group_tag ||
-			hdr.compressed_size == 0 || hdr.compressed_size > 14u * 1024u * 1024u ||
-			hdr.uncompressed_size < 2048u || hdr.uncompressed_size > 14u * 1024u * 1024u)
-		{
-			fclose(fp);
-			continue;
-		}
-		comp_buf = (uint8_t *)malloc(hdr.compressed_size);
-		uncomp_buf = (uint8_t *)malloc(hdr.uncompressed_size);
-		if (!comp_buf || !uncomp_buf ||
-			fread(comp_buf, 1, hdr.compressed_size, fp) != hdr.compressed_size)
-		{
-			free(comp_buf);
-			free(uncomp_buf);
-			fclose(fp);
-			continue;
-		}
-		fclose(fp);
-
-		dest_len = hdr.uncompressed_size;
-		if (z_uncompress(uncomp_buf, &dest_len, comp_buf, hdr.compressed_size) != Z_OK ||
-			dest_len != hdr.uncompressed_size)
-		{
-			free(comp_buf);
-			free(uncomp_buf);
-			continue;
-		}
-		free(comp_buf);
-
-		*out_format = 2;
-		*out_group_tag = hdr.group_tag;
-		snprintf(out_tag_path, path_sz, "%s", hdr.tag_path);
-		snprintf(out_display_name, disp_sz, "%s", hdr.custom_name[0] ? hdr.custom_name : hdr.tag_path);
-		*out_raw_bytes = uncomp_buf;
-		*out_raw_size = hdr.uncompressed_size;
-		return 1;
-	}
-
-	/* 3. Also check session-staged ephemeral tags received in this session */
+	/* 2. Also check session-staged ephemeral tags received in this session */
 	for (i = 0; i < 32; i++)
 	{
 		struct forge_staged_ephemeral_tag const *st = &s_staged_ephemeral_tags[i];
@@ -13116,7 +12865,6 @@ int forge_export_custom_tag_bundle(
 static void forge_commit_session_ephemeral_tags_to_disk(void)
 {
 	int i, k;
-	int any_committed = 0;
 
 	for (i = 0; i < 32; i++)
 	{
@@ -13128,52 +12876,57 @@ static void forge_commit_session_ephemeral_tags_to_disk(void)
 
 		if (st->bundle_format == 2u)
 		{
-			uint8_t *comp_img = NULL;
-			uint32_t comp_len = 0;
-			if (forge_zlib_compress_buffer(st->raw_bytes, st->raw_size, &comp_img, &comp_len) &&
-				comp_img && comp_len > 0)
+			if (st->raw_size >= 2048u && *(uint32_t const *)st->raw_bytes == 0x68656164u)
 			{
-				struct fxtg_bundle_header fhdr;
-				char safe_file[128];
-				char fxtg_path[512];
-				FILE *out_fp;
-				size_t c_idx, w_idx = 0;
+				long prof = 0;
+				uint32_t tag_off = *(uint32_t const *)(st->raw_bytes + 0x10);
+				uint32_t tag_sz = *(uint32_t const *)(st->raw_bytes + 0x14);
+				unsigned long tags_size = (tag_off >= 2048u && tag_off <= st->raw_size && tag_sz <= st->raw_size - tag_off)
+					? (unsigned long)(tag_off + ((tag_sz + 31u) & ~31u))
+					: 2048ul;
+				struct tag_bundle_file_region ext_reg;
+				long reg_cnt = 0;
 
-				for (c_idx = 0; st->tag_path[c_idx] && w_idx + 1 < sizeof(safe_file); c_idx++)
+				if (tags_size > st->raw_size)
+					tags_size = st->raw_size;
+				if (st->raw_size > tags_size)
 				{
-					char ch = st->tag_path[c_idx];
-					if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') ||
-						(ch >= '0' && ch <= '9') || ch == '_' || ch == '-')
-						safe_file[w_idx++] = ch;
-					else
-						safe_file[w_idx++] = '_';
+					ext_reg.offset = 0;
+					ext_reg.size = (unsigned long)(st->raw_size - tags_size);
+					reg_cnt = 1;
 				}
-				safe_file[w_idx] = '\0';
-
-				CreateDirectoryA("OpenCE Forge", NULL);
-				CreateDirectoryA("OpenCE Forge/cached_tags", NULL);
-				snprintf(fxtg_path, sizeof(fxtg_path), "OpenCE Forge/cached_tags/%s_%08X.fxtg",
-					safe_file, (unsigned int)st->root_group);
-				memset(&fhdr, 0, sizeof(fhdr));
-				fhdr.magic = 0x31545846u; /* 'FXT1' */
-				fhdr.group_tag = st->root_group;
-				fhdr.uncompressed_size = st->raw_size;
-				fhdr.compressed_size = comp_len;
-				snprintf(fhdr.tag_path, sizeof(fhdr.tag_path), "%s", st->tag_path);
-				snprintf(fhdr.custom_name, sizeof(fhdr.custom_name), "%s", st->clean_disp);
-				snprintf(fhdr.source_map, sizeof(fhdr.source_map), "network_stream");
-
-				out_fp = fopen(fxtg_path, "wb");
-				if (out_fp)
+				else
 				{
-					fwrite(&fhdr, 1, sizeof(fhdr), out_fp);
-					fwrite(comp_img, 1, comp_len, out_fp);
-					fclose(out_fp);
-					upsert_custom_catalog_manifest_line(st->root_group, st->cat_id, st->tag_path, st->clean_disp);
-					s_fxtg_loaded = 0;
+					ext_reg.offset = 0;
+					ext_reg.size = 0;
+				}
+
+				port_tag_profiles_scan();
+				if (port_tag_profiles_count() <= 0)
+					prof = port_tag_profiles_create("Forge Custom Tags");
+				else
+					prof = 0;
+
+				if (prof >= 0 &&
+					port_tag_profiles_tag_add(
+						prof,
+						"network_stream",
+						(unsigned long)st->root_group,
+						st->tag_path,
+						st->raw_bytes,
+						st->raw_size,
+						tags_size,
+						(struct port_tag_store_region const *)&ext_reg,
+						reg_cnt))
+				{
+					long t_slot = port_tag_profiles_tag_find(prof, (unsigned long)st->root_group, st->tag_path);
+					if (t_slot >= 0)
+					{
+						port_tag_profiles_tag_set_enabled(prof, t_slot, 1);
+						port_tag_profiles_tag_set_option(prof, t_slot, "name", st->clean_disp);
+					}
 					committed_ok = 1;
 				}
-				free(comp_img);
 			}
 		}
 		else if (st->bundle_format == 1u)
@@ -13235,7 +12988,6 @@ static void forge_commit_session_ephemeral_tags_to_disk(void)
 		if (committed_ok)
 		{
 			st->committed = 1;
-			any_committed = 1;
 			for (k = 0; k < g_forge.catalog_count; k++)
 			{
 				if (g_forge.catalog[k].group_tag == st->root_group &&
@@ -13267,9 +13019,6 @@ static void forge_commit_session_ephemeral_tags_to_disk(void)
 			}
 		}
 	}
-
-	if (any_committed)
-		ensure_fxtg_cache_loaded();
 }
 
 long forge_install_ephemeral_tag_bundle(
