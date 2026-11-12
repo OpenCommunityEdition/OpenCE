@@ -1124,6 +1124,15 @@ void *_texture_cache_bitmap_get_hardware_format(
 				{
 					if (!texture->used)
 					{
+						/* port: its pixels, read for this load, as they are
+						first drawn: the armored marines' reflection mask
+						cleared under their fingertips
+						(port/linux/game/marine_fingers.c) */
+						{
+							extern void marine_fingers_bitmap_loaded(struct bitmap_data *bitmap);
+
+							marine_fingers_bitmap_loaded(bitmap);
+						}
 						texture->used = TRUE;
 					}
 					hardware_format = &texture->hardware_format;

@@ -1416,6 +1416,14 @@ long scenario_tags_load(
 
 				pal_tags_loaded(cache_file_globals.header.build);
 			}
+			/* port: the texels of the armored marines' reflection mask that
+			only their hands sample found, to be cleared as it loads
+			(port/linux/game/marine_fingers.c) */
+			{
+				extern void marine_fingers_tags_loaded(void);
+
+				marine_fingers_tags_loaded();
+			}
 			/* port: the powerups' render spheres, grown to hold their meshes
 			(port/linux/game/powerup_render_bounds.c) */
 			{
