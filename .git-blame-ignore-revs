@@ -1,0 +1,5 @@
+# Commits that git blame passes over (GitHub reads this file; locally:
+# git config blame.ignoreRevsFile .git-blame-ignore-revs)
+
+# Remove the decompilation's file headers from the game sources
+31c86da2e35b87dddee168664bca5e03638d363c
