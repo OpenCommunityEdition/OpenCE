@@ -1,7 +1,3 @@
-/*
-REAL_MATH_DECLARATIONS.H
-*/
-
 #ifndef __REAL_MATH_DECLARATIONS_H
 #define __REAL_MATH_DECLARATIONS_H
 #pragma once

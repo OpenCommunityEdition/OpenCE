@@ -1,6 +1,4 @@
 /*
-RASTERIZER_MODEL_TYPES.H
-
 Shared model geometry and draw-packet layouts.
 */
 

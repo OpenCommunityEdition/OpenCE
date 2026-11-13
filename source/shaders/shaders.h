@@ -1,9 +1,3 @@
-/*
-SHADERS.H
-
-header included in hcex build.
-*/
-
 #ifndef __SHADERS_H
 #define __SHADERS_H
 #pragma once

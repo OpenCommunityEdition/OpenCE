@@ -1,9 +1,3 @@
-/*
-ANTENNA.H
-
-header included in hcex build.
-*/
-
 #ifndef __ANTENNA_H
 #define __ANTENNA_H
 #pragma once

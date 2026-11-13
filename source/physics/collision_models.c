@@ -1,7 +1,3 @@
-/*
-COLLISION_MODELS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

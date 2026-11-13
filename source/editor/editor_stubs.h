@@ -1,7 +1,3 @@
-/*
-EDITOR_STUBS.H
-*/
-
 #ifndef __EDITOR_STUBS_H
 #define __EDITOR_STUBS_H
 #pragma once

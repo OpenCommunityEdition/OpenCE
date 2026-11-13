@@ -1,9 +1,3 @@
-/*
-STRUCTURES.H
-
-header included in hcex build.
-*/
-
 #ifndef __STRUCTURES_H
 #define __STRUCTURES_H
 #pragma once

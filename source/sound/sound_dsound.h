@@ -1,6 +1,4 @@
 /*
-SOUND_DSOUND.H
-
 file has inline function assertions.
 */
 

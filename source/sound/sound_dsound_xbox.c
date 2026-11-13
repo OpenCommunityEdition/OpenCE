@@ -1,7 +1,3 @@
-/*
-SOUND_DSOUND_XBOX.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

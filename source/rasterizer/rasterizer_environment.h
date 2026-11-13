@@ -1,6 +1,4 @@
 /*
-RASTERIZER_ENVIRONMENT.H
-
 Narrow cross-translation-unit environment interface owned by RASTERIZER.C.
 */
 

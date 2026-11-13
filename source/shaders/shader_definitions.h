@@ -1,9 +1,3 @@
-/*
-SHADER_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __SHADER_DEFINITIONS_H
 #define __SHADER_DEFINITIONS_H
 #pragma once

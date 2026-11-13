@@ -1,6 +1,4 @@
 /*
-PROJECTILES_CALLBACKS.H
-
 Projectile object-type callback declarations.
 */
 

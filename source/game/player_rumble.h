@@ -1,7 +1,3 @@
-/*
-PLAYER_RUMBLE.H
-*/
-
 #ifndef __PLAYER_RUMBLE_H
 #define __PLAYER_RUMBLE_H
 #pragma once

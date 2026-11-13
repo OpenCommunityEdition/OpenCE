@@ -1,6 +1,4 @@
 /*
-RASTERIZER_XBOX_STATE.H
-
 Narrow Xbox rasterizer state interface for translation units that do not use
 the D3D declarations in rasterizer_xbox.h.
 */

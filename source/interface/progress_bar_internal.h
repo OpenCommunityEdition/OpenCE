@@ -1,6 +1,4 @@
 /*
-PROGRESS_BAR_INTERNAL.H
-
 Xbox render-state helpers owned by PROGRESS_BAR.C.
 */
 

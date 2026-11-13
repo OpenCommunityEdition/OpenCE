@@ -1,7 +1,3 @@
-/*
-POINT_PHYSICS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

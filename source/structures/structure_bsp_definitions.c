@@ -1,7 +1,3 @@
-/*
-STRUCTURE_BSP_DEFINITIONS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

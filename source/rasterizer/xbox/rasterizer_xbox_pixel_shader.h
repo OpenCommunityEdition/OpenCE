@@ -1,6 +1,4 @@
 /*
-RASTERIZER_XBOX_PIXEL_SHADER.H
-
 Complete Xbox pixel-shader state shared by the backend and shader builders.
 */
 

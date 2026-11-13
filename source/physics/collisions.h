@@ -1,9 +1,3 @@
-/*
-COLLISIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __COLLISIONS_H
 #define __COLLISIONS_H
 #pragma once

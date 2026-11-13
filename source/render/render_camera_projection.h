@@ -1,6 +1,4 @@
 /*
-RENDER_CAMERA_PROJECTION.H
-
 Narrow projection interface kept separate from the shared camera-structure
 header so unrelated translation units retain their January declaration order.
 */

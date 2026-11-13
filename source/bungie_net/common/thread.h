@@ -1,9 +1,3 @@
-/*
-THREAD.H
-
-header included in hcex build.
-*/
-
 #ifndef __THREAD_H
 #define __THREAD_H
 #pragma once

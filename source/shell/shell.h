@@ -1,9 +1,3 @@
-/*
-SHELL.H
-
-header included in hcex build.
-*/
-
 #ifndef __SHELL_H
 #define __SHELL_H
 #pragma once

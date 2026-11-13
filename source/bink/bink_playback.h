@@ -1,9 +1,3 @@
-/*
-BINK_PLAYBACK.H
-
-header included in hcex build.
-*/
-
 #ifndef __BINK_PLAYBACK_H
 #define __BINK_PLAYBACK_H
 #pragma once

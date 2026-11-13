@@ -1,6 +1,4 @@
 /*
-BITMAPS_QUANTITIZE_INTERNAL.H
-
 Narrow cross-translation-unit data interface owned by BITMAPS_QUANTITIZE.C.
 */
 

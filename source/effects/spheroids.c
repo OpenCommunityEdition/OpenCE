@@ -1,5 +1,3 @@
 /*
 SPHEROIDS.C
-
-no symbols in this file.
 */

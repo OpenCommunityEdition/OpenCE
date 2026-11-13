@@ -1,6 +1,4 @@
 /*
-UNIT_HUD_INTERFACE_DEFINITION.H
-
 January unit-HUD tag layout, corroborated by HCEX PDB member records.
 */
 

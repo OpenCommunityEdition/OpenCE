@@ -1,9 +1,3 @@
-/*
-EQUIPMENT_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __EQUIPMENT_DEFINITIONS_H
 #define __EQUIPMENT_DEFINITIONS_H
 #pragma once

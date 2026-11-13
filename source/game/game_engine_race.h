@@ -1,7 +1,3 @@
-/*
-GAME_ENGINE_RACE.H
-*/
-
 #ifndef __GAME_ENGINE_RACE_H
 #define __GAME_ENGINE_RACE_H
 #pragma once

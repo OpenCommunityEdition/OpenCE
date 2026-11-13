@@ -1,9 +1,3 @@
-/*
-SCENERY.H
-
-header included in hcex build.
-*/
-
 #ifndef __SCENERY_H
 #define __SCENERY_H
 #pragma once

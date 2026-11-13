@@ -1,7 +1,3 @@
-/*
-DEBUG_KEYS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

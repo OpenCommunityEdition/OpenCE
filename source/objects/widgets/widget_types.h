@@ -1,6 +1,4 @@
 /*
-WIDGET_TYPES.H
-
 file has inline function assertions.
 */
 

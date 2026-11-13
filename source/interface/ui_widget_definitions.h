@@ -1,6 +1,4 @@
 /*
-UI_WIDGET_DEFINITIONS.H
-
 January-derived UI widget tag-definition prefix.
 */
 

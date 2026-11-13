@@ -1,6 +1,4 @@
 /*
-OBJECT_LIGHTS_RENDERING.H
-
 Narrow cross-translation-unit rendering interface owned by OBJECT_LIGHTS.C.
 */
 

@@ -1,7 +1,3 @@
-/*
-OBJECTS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

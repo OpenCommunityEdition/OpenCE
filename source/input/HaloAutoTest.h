@@ -1,7 +1,3 @@
-/*
-HALOAUTOTEST.H
-*/
-
 #ifndef __HALOAUTOTEST_H
 #define __HALOAUTOTEST_H
 #pragma once

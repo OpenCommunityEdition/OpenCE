@@ -1,7 +1,3 @@
-/*
-RASTERIZER_XBOX.H
-*/
-
 #ifndef __RASTERIZER_XBOX_H
 #define __RASTERIZER_XBOX_H
 #pragma once

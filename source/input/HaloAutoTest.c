@@ -1,7 +1,3 @@
-/*
-HALOAUTOTEST.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

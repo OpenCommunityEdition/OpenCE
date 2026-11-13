@@ -1,9 +1,3 @@
-/*
-FOG_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __FOG_DEFINITIONS_H
 #define __FOG_DEFINITIONS_H
 #pragma once

@@ -1,9 +1,3 @@
-/*
-SOUND_MANAGER.H
-
-header included in hcex build.
-*/
-
 #ifndef __SOUND_MANAGER_H
 #define __SOUND_MANAGER_H
 #pragma once
