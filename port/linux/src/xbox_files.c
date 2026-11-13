@@ -21,6 +21,7 @@ matched case-insensitively, like the Xbox's FATX volumes.
 #include "port_config.h"
 #include "server_mode.h"
 #include "steam_workshop.h"
+#include "mcc_local_package.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -235,6 +236,12 @@ static int translate_workshop(const char *cursor, char *resolved, unsigned long 
 
 	while (*cursor == '\\' || *cursor == '/')
 		cursor++;
+	/* MCC-owned local layout resolution is independent of Steam discovery. */
+	if (mcc_local_package_path(cursor, platform_data_root(), resolved, size))
+	{
+		*rest = cursor + strlen(cursor);
+		return 1;
+	}
 	if (!names_match(cursor, "mcc_maps", 8) || (cursor[8] != '\\' && cursor[8] != '/'))
 		return 0;
 	cursor += 9;

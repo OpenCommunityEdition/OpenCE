@@ -57,6 +57,25 @@ mcc_maps/sounds.map    Matching MCC resources, when required by the package
 mcc_maps/bitmaps.map   Matching MCC resources, when required by the package
 ```
 
+You can also copy an entire downloaded Halo 1 Workshop folder from
+`steamapps/workshop/content/976730/<item id>` into `mcc_maps/<item id>`.
+Leave its `maps`, metadata, images and `halo1/maps` resource folders intact.
+Local discovery does not require Steam or the Steam Discovery setting.
+The menu reads the package title from `ModInfo.json` and level names and PNG
+previews from the referenced metadata. Missing metadata retains the normal
+filename labels and placeholder image; a numeric package without a title
+shows "MCC package". Unsupported or damaged images also use the placeholder.
+
+Both disk layouts use `mcc_maps\<package>\<level>` internally. Local lookup
+prefers a file directly in the package, then the same file in `maps`; for
+`bitmaps.map` and `sounds.map`, it also checks the package's `halo1/maps`.
+A present invalid direct file is not replaced by a nested or Steam copy.
+Nested lookup rejects linked paths and special files. It searches only these
+fixed locations, never arbitrary subdirectories or other packages. Manual
+folders containing only level files remain valid. Copying a package does
+not supply missing shared base resources; the existing resource requirements
+and automatic sharing policy still apply.
+
 The level identity is `mcc_maps\a10`. The filename is retained even when
 the internal scenario name differs. The supplied Mercury Rising file is
 an example: its filename is `a10.map`, while its header names
@@ -251,7 +270,9 @@ case-insensitive paths, overrides, missing types, library roots and bounds.
 malformed resources, independent bitmap/sound selection and content identity.
 
 The catalog is read the first time MCC maps are needed, and again when a joiner
-cannot find the host's map (so an item subscribed just now is found). The json
+cannot find the host's map (so an item subscribed just now is found). Dedicated
+servers also refresh after `sv_reload`, on a pregame frame; a request during a
+game waits until the lobby. Web map-list reads remain cached. The json
 files are the item makers' text: one that is too large (256 KB), too deep, not
 an object, or that names a path leaving its item, refuses that item or map and
 nothing else.
@@ -323,8 +344,9 @@ The bounded reader supports 1-64 missions, rejects duplicate paths or filenames,
 and accepts the default mission kind. Hub/flashback semantics and insertion-point
 selection are not implemented; missions start normally at their beginning.
 
-For local packages, keep `ModInfo.json`, `CampaignInfo.json` and the referenced
-mission metadata beside the flattened maps, retaining the metadata subfolders.
+For local packages, keep `ModInfo.json` and `CampaignInfo.json` at the package
+root and the referenced mission metadata in its original subfolders.
+The maps may remain in the Workshop `maps` folder or sit directly in the root.
 The Android importer performs this layout conversion and preserves the Workshop
 ID in `workshop_id.txt`. Metadata never redirects loading to another package,
 Xbox or CE. A local override never borrows metadata from its Steam counterpart.
@@ -348,14 +370,16 @@ identity, including when the original tag names an Xbox campaign level.
 Continue and Load Game have MCC-specific routes with separate saved-name
 storage; they do not turn an MCC checkpoint into a stock campaign level.
 
-The catalog scans only `mcc_maps` and one package directory level, reads each candidate's 2,048-byte header,
+The catalog scans `mcc_maps`, one package directory level and each package's
+fixed `maps` subfolder. It reads each candidate's 2,048-byte header,
 and refreshes when a map menu opens. It accepts at most 1,024 entries, with
 relative level paths of at most 54 characters before `.map`, including the
-package name and separator. Deeper nesting, traversal and invalid names are
+package name and separator; the physical `maps` subfolder adds no identity
+characters. Other deeper nesting, traversal and invalid names are
 rejected. Moving an existing loose map into a package changes its saved-game
 identity; keep it at its old location to continue an existing checkpoint. A description is optional;
-the default identifies the scenario type. MCC thumbnail sidecars, Workshop
-downloads and network transfer manifests are not implemented. There is no
+the default identifies the scenario type. Previews use explicit package metadata,
+not guessed image sidecars. There is no
 dependency on the Custom Edition setting or its resource directories.
 
 The loader opens source maps read-only. A rejected map reports the failing
@@ -490,18 +514,33 @@ these generated strings is not implemented.
 ## MCC sharing eligibility
 
 The MCC-owned policy in `mcc_share_rules.c` applies to local and Workshop
-packages. Host opt-in, a known gameplay SHA-256 and a host-local list entry
-with maker credit are required. Unknown/stock content, loose maps, `_shared`,
-unsafe names and invalid origin states are refused. A Workshop ID is advisory;
-it neither grants redistribution permission nor proves which bytes are present.
-The host's `mcc_share.txt` classifies exact map/used-resource content, not a
-filename. Required JSON is separately identified and validated.
+packages. The host's `network.map_share` setting enables eligible packages
+automatically after their gameplay content has been validated. Loose maps,
+`_shared`, unsafe names and invalid origin states are refused. A Workshop ID
+is advisory; it neither grants redistribution permission nor proves which bytes
+are present. An existing `mcc_share.txt` can supply attribution, but no approval
+list is required. Required JSON is separately identified and validated.
 
 The planner uses the loader's validated resource selection. Self-contained maps
 do not transfer unrelated resources; used package dependencies follow their
 actual resolved paths, including Workshop `halo1/maps`. A used root/shared
-resource refuses the offer and is named in the host log. An invalid package
-override cannot be silently skipped in favor of another resource.
+resource is never transferred: the joiner must supply its matching local copy.
+Package copies identified as base resources are excluded too. An invalid
+package override cannot be silently skipped in favor of another resource.
+
+### Matching local shared resources
+
+When joining a host, OpenCE checks the installed base-resource candidates
+against the host's full SHA-256 content fingerprint. An older file in the
+MCC root does not hide a matching copy in either shared folder. Package-owned
+resources keep precedence; a broken package override is not silently replaced.
+The loader uses the exact resource selection that passed validation and checks
+the loaded content again before joining. Missing matches require the player to
+install the matching resources locally; the host never supplies base resources.
+
+Host sharing remembers whether a package resource duplicates a local base file.
+Repeated requests reuse that classification only while the map and every resource
+candidate retain their file stamps. A changed candidate forces a fresh comparison.
 
 ## Sharing a package with a joiner
 
@@ -511,9 +550,8 @@ The messages are request **103** and response **104**; see
 [NETCODE.md](../port/linux/NETCODE.md#mcc-package-sharing).
 Custom Edition sharing and its messages remain independent.
 
-Enable host `network.mcc_map_share` (default off), list
-`<gameplay SHA-256> <maker>` in `mcc_share.txt`, and have the joiner enable
-`network.map_download` (existing default on). A missing/differing package
+Enable host `network.map_share` and joiner `network.map_download` (both default
+on). The same host setting covers CE maps and MCC packages. A missing/differing package
 prompts before any chunk download or stage creation. When either permission
 is off, only manual installation or a valid Workshop page is offered as a
 content-acquisition action, plus cancellation. Matching installed content
