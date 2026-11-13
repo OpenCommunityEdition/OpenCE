@@ -90,6 +90,12 @@ static void frame(short ticks)
 	glow_update(&glow, 0);
 }
 
+/* the same frame drawn again, in another view (split screen, a mirror) */
+static void view_again(void)
+{
+	glow_update(&glow, 0);
+}
+
 static short alive(void)
 {
 	return (short)glow_globals.glow_particle_data->count;
@@ -145,6 +151,28 @@ int main(int argc, char **argv)
 		CHECK(alive() == 1, "a particle with 30 ticks to live is gone after %d", 30);
 		frame(1);
 		CHECK(alive() == 0, "a particle with 30 ticks to live is there after 31");
+		return 0;
+	}
+
+	/* a frame drawn in two views makes and ages its particles once */
+	CASE("views")
+	{
+		for (i = 0; i < 3; i++)
+		{
+			frame(1);
+			view_again();
+		}
+		CHECK(alive() == 1, "three ticks in two views made %d particles, not one", alive());
+		glow_tag.trailing_particle_generation_frequency = 0.f; /* (no more) */
+		for (i = 0; i < 30; i++)
+		{
+			frame(1);
+			view_again();
+		}
+		CHECK(alive() == 1, "a particle with 30 ticks to live is gone after %d in two views", 30);
+		frame(1);
+		view_again();
+		CHECK(alive() == 0, "a particle with 30 ticks to live is there after 31 in two views");
 		return 0;
 	}
 

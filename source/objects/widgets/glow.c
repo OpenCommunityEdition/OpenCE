@@ -193,7 +193,9 @@ struct glow_datum
 	real total_time;
 	real marker_time_index[MAXIMUM_GLOW_MARKERS];
 	short number_of_particles;
-	short pad24E;
+	/* port: the game time (its low 16 bits) its trailing particles were last
+	made and aged at (glow_update_trailing_ticks; was pad24E) */
+	short trailing_particles_time;
 	struct glow_particle *head_particle;
 	struct glow_particle *tail_particle;
 	short accumulated_trailing_particle_generation_ticks;
@@ -1272,6 +1274,22 @@ static struct glow_particle *glow_trailing_particle_new(
 	return particle;
 }
 
+/* port: the ticks to make and age a glow's trailing particles by: those since
+the last frame (game_time_get_elapsed), once a frame. glow_update runs each
+time the glow is drawn, in each view (split screen's windows, a mirror's),
+and each added the frame's ticks, which aged the particles and made them as
+many times as fast as there were views; a later view of the same frame adds
+none. One not drawn for a while waits, as before, rather than catching up */
+static short glow_update_trailing_ticks(
+	struct glow_datum *glow)
+{
+	short now = (short)game_time_get();
+	short since = (short)(now - glow->trailing_particles_time);
+
+	glow->trailing_particles_time = now;
+	return (short)PIN(since, 0, game_time_get_elapsed());
+}
+
 static void glow_update(
 	struct glow_datum *glow,
 	long object_index)
@@ -1281,6 +1299,7 @@ static void glow_update(
 	real rotation_per_unit_t;
 	real effect_rotational_velocity;
 	real effect_translational_velocity;
+	short trailing_ticks; /* port: (glow_update_trailing_ticks) */
 
 	if (!definition)
 		return;
@@ -1422,8 +1441,9 @@ static void glow_update(
 	game's whole time (game_time_get), which made a glow with trailing
 	particles (no stock map's glow has them; a Custom Edition map's can)
 	make them up to the limit of glow particles and age each past its
-	lifetime by the next frame */
-	glow->accumulated_trailing_particle_generation_ticks += game_time_get_elapsed();
+	lifetime by the next frame; once a frame (glow_update_trailing_ticks) */
+	trailing_ticks = glow_update_trailing_ticks(glow);
+	glow->accumulated_trailing_particle_generation_ticks += trailing_ticks;
 
 	if (glow->number_of_markers > 1)
 	{
@@ -1447,7 +1467,7 @@ static void glow_update(
 	{
 		if (TEST_FLAG(particle->flags, _glow_particle_trailing_bit))
 		{
-			particle->ticks_in_existence += game_time_get_elapsed(); /* port: as above */
+			particle->ticks_in_existence += trailing_ticks; /* port: as above */
 			glow_trailing_particle_update_color(glow, particle);
 			glow_trailing_particle_update_size(glow, particle);
 			glow_trailing_particle_update_velocity(glow, particle);
