@@ -4,6 +4,7 @@
 #include "mcc_script_parameters.h"
 #include "mcc_scripts.h"
 #include "mcc_campaign.h"
+#include "mcc_script_library.h"
 #include "mcc_game_speed.h"
 
 /* Once an if has selected a branch, its frame only forwards that branch's
@@ -61,6 +62,23 @@ void mcc_script_finished_evaluate(short function, long thread_index, boolean ini
     /* Dormant and sleep_forever threads use -2. Only -1 means that the
      * native script thread has terminated; sleeping is not completion. */
     hs_return(thread_index,target!=NONE && hs_thread_get(target)->sleep_until==NONE);
+}
+
+/* A dormant script has started once woken: its thread no longer waits at
+ * the start with nothing evaluated. Startup and continuous scripts start
+ * with the map. A disabled script (hs_scenario_functions_check) never does. */
+void mcc_script_started_evaluate(short function, long thread_index, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread_index,initialize);
+    long target=NONE;
+    short script;
+    struct hs_thread_datum *thread;
+    if (!args) return;
+    script=args[0] ? hs_find_script_by_name((char const *)args[0]) : NONE;
+    if (script!=NONE && !hs_scenario_script_disabled(script)) target=hs_find_thread_by_script(script);
+    thread=target!=NONE ? hs_thread_get(target) : NULL;
+    hs_return(thread_index,thread && !(thread->sleep_until==NONE-1 &&
+        thread->stack==(struct hs_stack_frame *)thread->stack_data));
 }
 
 void mcc_sleep_forever_evaluate(short function, long thread_index, boolean initialize)

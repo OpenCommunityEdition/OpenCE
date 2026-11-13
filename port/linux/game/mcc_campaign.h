@@ -19,6 +19,8 @@ void mcc_campaign_snapshot(void *out);
 real mcc_campaign_effects_gain(void);
 boolean mcc_campaign_unlimited_ammo(void);
 real mcc_campaign_mix_gain(boolean music);
+real mcc_campaign_gravity_scale(void);
+real mcc_campaign_music_gain(void);
 int mcc_campaign_validate(void const *in, unsigned long bytes);
 int mcc_campaign_restore(void const *in, unsigned long bytes);
 /* Implemented beside the native interpreter's private stack declarations. */
