@@ -854,6 +854,13 @@ header is 12 bytes, including its checkpoint epoch.
   survive that deliberate disconnect; it holds no host slot or transfer alive.
   Dismissal, another session or leaving the menu clears it. Live download
   consent still requires the current host's exact content identity.
+- **The game's start.** A machine fetching the package from the host (its
+  download prompt, then the transfer) does not hold the game's start, as a
+  Custom Edition map's downloader does not: the host leaves it and its players
+  out of the start (`network_game_server_hold_map_fetcher_players`) and it
+  joins the game in progress once it has the package. A machine still checking
+  its own copy does hold the start, until its admission ends: told to load
+  before then, it could not.
 - **Messages and bounds.** `MANIFEST` responses carry up to 16 file entries per
   page. The full offer has at most 168 entries, each with kind, a 128-byte path
   buffer, size and SHA-256. Exactly one map is required. `CHUNK` requests up to
