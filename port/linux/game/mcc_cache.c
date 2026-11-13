@@ -324,7 +324,7 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
     unsigned char *raw = NULL;
     enum mcc_cache_status status;
     uint32_t package_checksum;
-    char memory_problem[192];
+    char memory_problem[192],resource_paths[2][128];
     char const *problem = "the map could not be opened";
     mcc_cache_tags_unload();
     mcc_stream = mcc_open_explain(mcc_identity_local_name(name), &runtime->source, &identity,
@@ -344,7 +344,8 @@ struct cache_file_tag_header *mcc_cache_tags_load(char const *name, void *header
         (unsigned long)runtime->report.problem_location);
     if (status != MCC_CACHE_OK) goto failed;
     problem = "Its MCC resources could not be selected. See debug.txt for the failing check.";
-    if (!mcc_resources_select(runtime,raw)) goto failed;
+    if (!mcc_resources_select_paths(runtime,raw,
+        mcc_validation_resources(runtime->level_name,resource_paths) ? resource_paths : NULL)) goto failed;
     mcc_loading_update(MCC_LOADING_RESOURCES, 1, 3);
     problem = "Its map resources could not be read completely. Check that the files are accessible.";
     if (!mcc_resources_checksum(runtime,

@@ -98,6 +98,7 @@ jobs:
           python -m pytest -q tools/test_dedicated_server.py
           python tools/test_light_storage.py
           python -m pytest -q \
+            tools/test_mcc_local_package.py tools/test_mcc_server.py tools/test_mcc_share_menu.py tools/test_mcc_resource_selection.py tools/test_mcc_identity_candidates.py \
             tools/test_mcc_cache_format.py tools/test_mcc_projectiles.py tools/test_mcc_tag_validation.py \
             tools/test_mcc_share.py tools/test_mcc_share_rules.py tools/test_mcc_share_stage.py \
             tools/test_mcc_share_storage.py tools/test_mcc_share_metadata.py tools/test_mcc_load_network.py \

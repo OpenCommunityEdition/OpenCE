@@ -30,6 +30,7 @@ rate limited, and its password guesses locked out.
 #include "server_master.h"
 #include "server_netlist.h"
 #include "server_rotation.h"
+#include "../game/mcc_server.h"
 #include "server_toml.h"
 
 #include <SDL3/SDL.h>
@@ -1913,12 +1914,19 @@ else why it cannot be played */
 static const char *rotation_play_line(const char *body, int length, char *line, int size)
 {
 	char map[SERVER_ENTRY_TEXT_SIZE], gametype[64] = "";
+	int mcc;
 
-	if (!body_string(body, length, "map", map, sizeof(map)) || !map[0] || strchr(map, ' ') || strchr(map, '"'))
+	if (!body_string(body, length, "map", map, sizeof(map)) || !map[0] || strchr(map, '"'))
 		return "map is needed: a map or a rotation entry, 255 characters at most, with no spaces";
 	body_string(body, length, "gametype", gametype, sizeof(gametype));
 	if (strchr(gametype, ' ') || strchr(gametype, '"'))
 		return "a gametype holds no space";
+	/* MCC owns its path validation and quoting; legacy request rules stay intact. */
+	mcc = mcc_server_play_line(map, gametype, line, size);
+	if (mcc)
+		return mcc > 0 ? NULL : "invalid MCC map or rotation entry";
+	if (strchr(map, ' '))
+		return "map is needed: a map or a rotation entry, 255 characters at most, with no spaces";
 	snprintf(line, (size_t)size, "sv_map %s %s", map, gametype);
 	return NULL;
 }

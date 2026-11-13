@@ -163,10 +163,11 @@ int mcc_manifest_package_root(const char *level, char path[1024])
 	n = (size_t)(separator - level - 9);
 	if (!n || n >= sizeof(package) || strlen(level) > 63 || !relative_path(level)) return 0;
 	memcpy(package, level + 9, n); package[n] = 0;
-	snprintf(request, sizeof(request), "d:\\%s.map", level);
+	/* Resolve the package itself: local Workshop maps may be one directory
+	 * below their metadata, while flattened manual maps remain beside it. */
+	snprintf(request, sizeof(request), "d:\\mcc_maps\\%s", package);
 	platform_translate_path(request, path, 1024);
 	for (last = path; *last; last++) if (*last == '\\') *last = '/';
-	last = strrchr(path, '/'); if (!last) return 0; *last = 0;
 #ifdef HALO_WEB
     if (!web_mcc_directory_visible(path)) { path[0]=0; return 0; }
 #endif

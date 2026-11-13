@@ -714,7 +714,9 @@ static const struct config_setting config_settings[] =
 		"Hosting: the minutes a player kicked by a vote cannot join again (1 to\n"
 		"1440)." },
 	{ "network.map_share", _config_boolean, "true", "HALO_NET_MAP_SHARE", _environment_value, _platform_all,
-		"Hosting: send a player who joins without the game's Custom Edition map\n"
+		"Hosting: share CE maps and MCC packages automatically. MCC base\n"
+		"resources are never sent; joiners need matching local copies.\n"
+		"For a player without the game's Custom Edition map, send\n"
 		"the map (from custom_maps), and the resource maps it needs that the\n"
 		"player lacks (bitmaps.map, sounds.map, loc.map). The game's other\n"
 		"players help (network.map_seed)." },
@@ -738,12 +740,6 @@ static const struct config_setting config_settings[] =
 		"download it (and the resource maps it needs) from the game's players\n"
 		"into custom_maps, if its host shares it (network.map_share); false\n"
 		"leaves the game, saying which map is missing." },
-	{ "network.mcc_map_share", _config_boolean, "false", "HALO_NET_MCC_MAP_SHARE", _environment_value, _platform_all,
-        "Hosting: offer eligible local or Workshop MCC packages to joiners.\n"
-        "Off by default. List each map/resource fingerprint with its maker in\n"
-        "mcc_share.txt. Includes required package metadata and supported previews;\n"
-        "never shares stock/global resources. Joiners need network.map_download\n"
-        "and must accept the download prompt before files are transferred." },
 	{ "network.coop_public", _config_boolean, "false", "HALO_NET_COOP_PUBLIC", _environment_value, _platform_all,
 		"Whether an online co-op game (Create Game > Internet, a SINGLEPLAYER\n"
 		"map) starts as PUBLIC or, false, PRIVATE: Server Setup's LISTING in\n"
@@ -930,6 +926,14 @@ static const struct config_setting config_settings[] =
 		"A team game: \"one\" starts with one team's players (the next joiners\n"
 		"balance), \"both\" waits for a player on each team, \"skip\" skips team\n"
 		"games while one player waits." },
+	{ "server.team_switch", _config_boolean, "true", "HALO_SERVER_TEAM_SWITCH", _environment_value,
+		_platform_server,
+		"A player in a team game may say \"!switch\" (or \"!team\") in the chat to\n"
+		"change teams: not in Infection, and with the gametype's auto team\n"
+		"balance only to the smaller team." },
+	{ "server.team_switch_cooldown_seconds", _config_integer, "30", "HALO_SERVER_TEAM_SWITCH_COOLDOWN_SECONDS",
+		_environment_value, _platform_server,
+		"Seconds a player waits after a !switch before another (0 to 3600)." },
 	{ "server.motd", _config_string, "\"\"", "HALO_SERVER_MOTD", _environment_value, _platform_server,
 		"A notice each machine is shown as it joins (127 characters); empty for\n"
 		"none." },

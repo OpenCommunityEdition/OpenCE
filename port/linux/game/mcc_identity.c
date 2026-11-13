@@ -40,6 +40,10 @@ static struct {
     int active,scanned,finishing;
     struct mcc_validation_check *check;
     struct mcc_validation_proof selected_proof;
+    struct mcc_precache_snapshot attempted_files;
+    unsigned char attempted_metadata[32];
+    int attempted;
+    char reason[320];
 } mcc_identity_job;
 
 static void mcc_identity_job_clear(void)
@@ -52,9 +56,9 @@ static void mcc_identity_job_clear(void)
 /* MCC package sharing (mcc_share.c) may offer to fetch a package that matches nothing
  * here, instead of the join being refused. It registers itself; the identity
  * rules below stay the only judge of what is installed and matches. */
-static int (*mcc_identity_missing)(char const name[128],unsigned char const digest[32],unsigned char const metadata[32]);
+static int (*mcc_identity_missing)(char const name[128],unsigned char const digest[32],unsigned char const metadata[32],char const *reason);
 
-void mcc_identity_set_missing(int (*handler)(char const name[128],unsigned char const digest[32],unsigned char const metadata[32]))
+void mcc_identity_set_missing(int (*handler)(char const name[128],unsigned char const digest[32],unsigned char const metadata[32],char const *reason))
 {
     mcc_identity_missing=handler;
 }
@@ -325,12 +329,14 @@ static void mcc_identity_failed(char const *message)
 }
 
 /* Refresh discovery once, then count all same-leaf candidates before opening
- * any fallback. A preferred exact path is retried after the rescan. */
+ * any fallback. Retry the preferred path only if its files or metadata changed. */
 static int mcc_identity_candidates(void)
 {
     char const *leaf=strrchr(mcc_identity_job.session,'\\')+1,*candidate;
     short i,count;
     unsigned matches=0;
+    struct mcc_precache_snapshot files;
+    unsigned char metadata[32];
     mcc_maps_rescan();count=mcc_maps_count(FALSE);
     for (i=0;i<count;i++) {
         candidate=mcc_maps_level_name(i);
@@ -338,6 +344,10 @@ static int mcc_identity_candidates(void)
     }
     mcc_identity_job.count=1;mcc_identity_job.index=0;mcc_identity_job.scanned=1;
     strcpy(mcc_identity_job.candidates[0],mcc_identity_job.session);
+    if (mcc_identity_job.attempted && mcc_precache_snapshot(mcc_identity_job.session,&files) &&
+        !memcmp(&files,&mcc_identity_job.attempted_files,sizeof(files)) &&
+        mcc_identity_metadata(mcc_identity_job.session,metadata) &&
+        !memcmp(metadata,mcc_identity_job.attempted_metadata,32)) mcc_identity_job.count=0;
     for (i=0;i<count;i++) {
         candidate=mcc_maps_level_name(i);
         if (csstrcasecmp(leaf,strrchr(candidate,'\\')+1) || !csstrcasecmp(candidate,mcc_identity_job.session)) continue;
@@ -370,11 +380,18 @@ void mcc_identity_update(void)
             if (!mcc_identity_metadata(candidate,metadata) || memcmp(metadata,mcc_identity_job.metadata,32)) {
                 mcc_identity_job.index++;return;
             }
+            if (!mcc_identity_job.scanned && !strcmp(candidate,mcc_identity_job.session)) {
+                mcc_identity_job.attempted=mcc_precache_snapshot(candidate,&mcc_identity_job.attempted_files);
+                memcpy(mcc_identity_job.attempted_metadata,metadata,32);
+            }
             mcc_identity_job.check=mcc_validation_check_begin(candidate,NULL);
+            mcc_validation_check_expect(mcc_identity_job.check,mcc_identity_job.digest);
             if (!mcc_identity_job.check) {mcc_identity_failed("There is not enough memory to check the MCC package.");return;}
         }
         status=mcc_validation_check_step(mcc_identity_job.check,&proof,reason,sizeof(reason));
         if (!status) return;
+        if (status<0 && !mcc_identity_job.reason[0])
+            snprintf(mcc_identity_job.reason,sizeof(mcc_identity_job.reason),"%s",reason);
         mcc_validation_check_end(mcc_identity_job.check);mcc_identity_job.check=NULL;
         if (status>0 && !memcmp(proof.digest,mcc_identity_job.digest,32) &&
             (!mcc_identity_job.checksum || proof.checksum==mcc_identity_job.checksum) &&
@@ -393,8 +410,9 @@ void mcc_identity_update(void)
     if (!mcc_identity_job.matches) {
         /* The sharing adapter retains this lease until the host confirms its
          * transfer hold. Queued intent alone is not proof a request was sent. */
-        if (!mcc_identity_missing || !mcc_identity_missing(mcc_identity_job.wire,mcc_identity_job.digest,mcc_identity_job.metadata)) {
-            mcc_identity_refusal(mcc_identity_job.wire,mcc_identity_job.session);
+        if (!mcc_identity_missing || !mcc_identity_missing(mcc_identity_job.wire,mcc_identity_job.digest,mcc_identity_job.metadata,mcc_identity_job.reason)) {
+            if (mcc_identity_job.reason[0]) mcc_identity_error(mcc_identity_job.reason);
+            else mcc_identity_refusal(mcc_identity_job.wire,mcc_identity_job.session);
             mcc_identity_job_clear();mcc_admission_client_finish(0);network_game_abort();return;
         }
         mcc_identity_job.active=0;return;

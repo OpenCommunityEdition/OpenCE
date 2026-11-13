@@ -91,6 +91,7 @@ enum
 	_server_map_name,
 	_server_map_custom,
 	_server_map_path,
+	_server_map_mcc,
 };
 
 struct server_entry

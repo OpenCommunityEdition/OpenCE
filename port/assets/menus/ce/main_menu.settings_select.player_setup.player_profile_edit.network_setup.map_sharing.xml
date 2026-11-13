@@ -13,12 +13,11 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/help">
 		<data input="port settings help"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_mcc_map_share" x="54" y="73"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_map_download" x="54" y="103"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_map_seed" x="54" y="133"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_map_seed_upload" x="54" y="163"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_mcc_packages" x="54" y="193"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_mcc_downloads" x="54" y="223"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_map_download" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_map_seed" x="54" y="103"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_map_seed_upload" x="54" y="133"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_mcc_packages" x="54" y="163"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_mcc_downloads" x="54" y="193"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -26,20 +25,11 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/button_ok" x="380" y="1"/>
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_mcc_map_share" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_map_share_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_map_share_spinner" x="320" y="1"/>
-	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_map_share_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
-	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_map_share_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.mcc_map_share" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
-	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_map_download" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_download_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_download_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_download_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_download_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_download_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.map_download" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -48,7 +38,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="network.map_seed" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -57,7 +47,7 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_upload_label"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_upload_spinner" x="320" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_upload_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_upload_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/map_seed_upload_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="64 KB/S|128 KB/S|256 KB/S|512 KB/S|1 MB/S|2 MB/S|4 MB/S|8 MB/S|10 MB/S" setting="network.map_seed_upload" values="64|128|256|512|1024|2048|4096|8192|10240" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
@@ -68,7 +58,7 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_packages_label"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_packages_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_packages_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/op_mcc_downloads" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
 		<on event="a" open="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/screen"/>
@@ -76,7 +66,7 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_downloads_label"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_downloads_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/mcc_downloads_label" type="text" controller="1" width="512" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port settings defaults"/>
@@ -89,7 +79,6 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/labels">
-		<string text="SHARE MCC PACKAGES:"/>
 		<string text="DOWNLOAD MAPS:"/>
 		<string text="HELP SEND MAPS:"/>
 		<string text="UPLOAD LIMIT:"/>
@@ -98,7 +87,6 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/map_sharing/help_strings">
 		<string text=""/>
-		<string text="Host only: offer explicitly approved MCC packages.\nOff by default; configure mcc_share.txt first."/>
 		<string text="Allow shared map downloads. CE uses players; MCC\nuses the host and asks before downloading."/>
 		<string text="In another's game, send its map to players who\njoin without it, as a torrent's peers do."/>
 		<string text="The most you send of maps to other players, so\nthat the game keeps the rest of your upload."/>
