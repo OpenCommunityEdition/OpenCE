@@ -158,7 +158,7 @@ int main(int argc,char **argv){
   printf("%d %d\n",mcc_share_stage_companion(&stage,"../outside","x",1),
    mcc_share_stage_companion(&stage,"readme.txt","x",1));mcc_share_stage_cancel(&stage);return 0;
  }
- result=mcc_share_storage_record(&stage,"mcc_maps\\host\\m0","Map maker",!strcmp(mode,"local")?NULL:&workshop);
+ result=mcc_share_storage_record(&stage,"mcc_maps\\host\\m0",!strcmp(mode,"no_credit")?"":"Map maker",!strcmp(mode,"local")?NULL:&workshop);
  if(!result){mcc_share_stage_cancel(&stage);printf("record 0\n");return 0;}
  if(!strcmp(mode,"cancel")){mcc_share_stage_cancel(&stage);printf("cancelled\n");return 0;}
  if(!strcmp(mode,"tamper_companion")){
@@ -227,6 +227,15 @@ def test_native_reads_use_callback_in_every_storage_route(storage_tool, tmp_path
     package = install(storage_tool, tmp_path)
     assert run(storage_tool, "native_route", tmp_path) == "0 0 0 0 4"
     assert (package / "m0.map").read_bytes() == b"x"
+
+
+def test_automatic_offer_needs_no_manual_credit(storage_tool, tmp_path):
+    package = install(storage_tool, tmp_path, "no_credit")
+    row = run(storage_tool, "list", tmp_path).splitlines()[1].split("\t")
+    assert row[4] == ""
+    assert row[5:] == ["12345", "Advertised title"]
+    assert run(storage_tool, "remove", tmp_path) == "1"
+    assert not package.exists()
 
 
 def test_native_open_uses_actual_file_and_refuses_nonregular_paths(storage_tool, tmp_path):

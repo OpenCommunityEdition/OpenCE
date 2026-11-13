@@ -615,8 +615,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.fire_origins` | `true` | `HALO_NET_FIRE_ORIGINS` | Host: whether a client's reported hit that the shooter's camera had no line of sight to may still count from where the client says its player's shots leave, when that is not the camera (distributed message 93: a VR build's weapon hand, which may be past a corner the camera is behind). The hand must be within 0.4 world units of the camera, no more than 0.05 behind the eye along the line to the target, 0.2 to its side and 0.1 above it, with the line from the eye to it clear; the host logs how many hits counted only that way. `false`: from the camera and vehicles' guns only (`network_damage.c`). |
 | `network.vehicle_riding` | `false` | `HALO_NET_VEHICLE_RIDING` | Host: with `true`, a player standing on a moving vehicle is carried by it, turns with it, lands back on it after a jump and keeps its motion when stepping or jumping off; the vehicle it stands on does not hurt it. The base setting (co-op's options in Server Setup write it). In multiplayer (online, system link, split screen) the gametype's VEHICLE RIDING rule under Vehicle Options, saved with the gametype, overrides it; a gametype without the rule is off, whatever this setting says (stock gametypes and older saved ones have none). A co-op rotation entry's `riding` rule overrides it for that entry. Changes count from the next map; clients use the host's decision, including when joining mid-map, and its `debug.riding_` values. Film playback and the editor never ride. Saved games of builds before this setting are not offered or loaded. No row in the Settings menu. A map can choose for itself, winning over the base setting, the gametype and the dedicated override until the next map: with `(global boolean vehicle_riding true)` (or `false`; its value at the map's start counts, a later `set` does not), or with `(vehicle_riding true)` or `(vehicle_riding false)` in a startup script, which counts only on the map's first tick and wins over the global. The old `game.vehicle_riding` name is not read. |
 | `network.block_mouse_aim_assist` | `false` | `HALO_NET_BLOCK_MOUSE_AIM_ASSIST` | Host: Player Options > Aim Assist, Allowed or Block M+KB. Block overrides optional mouse magnetism while mouse/keyboard aims, including on the host, without changing the saved preference. Controllers and touch retain their existing behavior; bullet autoaim is unchanged. |
-| `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: send a player who joins without the game's Custom Edition map the map, and the resource maps that it needs and that the player does not have. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
-| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | SHARE MCC PACKAGES in Settings > Network Setup > Map Sharing. Host-only, explicit-list sharing of eligible local or Workshop packages; requires a gameplay fingerprint and maker in `mcc_share.txt`. Includes used package resources and recognized metadata/previews. The joiner needs Download Maps enabled and must accept the offer. See "MCC package sharing" for implementation status and limits. |
+| `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: automatically offer CE maps and MCC packages. MCC base resources stay local to each machine; players consent before an MCC download. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
 | `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
@@ -738,7 +737,8 @@ See [MCC maps](../../docs/mcc_maps.md) for supported formats, resources and limi
 [MCC previews](../../docs/reading/mcc_level_previews.md) for menu discovery, and
 [browser imports](../../docs/reading/browser_imports.md) for browser storage.
 
-All map families use OpenCE network version 43. MCC content identity, sharing
+All map families use network version 44 (camera mode 32745); older peers
+cannot join, including OpenCE protocol 43 peers. MCC content identity, sharing
 consent and load-progress checks remain separate from the existing Xbox/CE paths;
 see [the network agreement](NETCODE.md#opence-network-agreement).
 
@@ -1297,13 +1297,14 @@ only invites, not listings.
 
 ### MCC package sharing
 
-MCC delivery is host-only and separate from Custom Edition sharing. The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
-Sharing (`network.mcc_map_share`, off by default; also
-`HALO_NET_MCC_MAP_SHARE`). It must list the exact map/used-resource SHA-256 and
-maker in the data root's `mcc_share.txt`, one line per approved identity:
-`<64 hexadecimal digits> <maker>`. The host log reports an unlisted fingerprint.
-This explicit approval does not come from a package name or a Workshop ID.
-Stock, unclassified, loose and shared-root packages are not offered.
+MCC delivery is host-only and separate from Custom Edition's transfer path.
+The existing **SHARE MAPS** setting in Server Setup > Map Sharing
+(`network.map_share`, on by default) automatically offers validated local and
+Workshop packages. No second toggle or manual approval file is required.
+The obsolete `network.mcc_map_share` setting and its environment variable no
+longer control sharing. An existing `mcc_share.txt` is read only for optional
+maker attribution; missing attribution is shown as "Not provided".
+Loose maps and the `_shared` base-resource folders are not shared packages.
 
 The joiner uses **DOWNLOAD MAPS** (`network.map_download`, on by default).
 Missing or differing content opens an offer showing size and maker; accepting
@@ -1313,12 +1314,22 @@ Workshop page when available, or install matching content manually, or cancel.
 The latest Workshop package may still differ from the host's copy; installation
 must be checked again. The prompt does not infer which version is newer.
 
+On desktop the prompt offers **OPEN IN STEAM** and **OPEN IN BROWSER**.
+The Steam action opens a fixed `CommunityFilePage` URI built from the validated
+numeric item ID. The prompt stays available so the browser action remains a
+fallback if Steam is absent or fails to navigate. Android uses the browser;
+the web build presents a browser-side click dialog. No URL opens merely
+because a host advertises an item, and the ID is not proof of provenance.
+
 The offer includes the current map and its actually used package resources,
 required recognized JSON, eligible referenced PNG previews and attribution
 files. Campaign metadata is obtained upfront; mission binaries/resources are
 obtained as needed. Unrelated resource files are omitted. A package depending
-on root/shared stock resources is refused with a host diagnostic, rather than
-silently redistributing those resources. A local dedicated-server folder needs
+on root/shared base resources can be shared: those files are omitted, and
+joiners use their own matching MCC installation or `mcc_maps/_shared` copies.
+Package resource copies matching locally installed base files are also omitted.
+The complete fingerprint still includes required base contents; missing or
+mismatched local resources prevent joining. A local dedicated-server folder needs
 no invented Workshop metadata or artwork to qualify.
 
 Each accepted download is checked in an exclusively owned staging directory,
@@ -1334,7 +1345,7 @@ The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
 not seed MCC downloads. Android requires no Steam for these files, but device
 runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
 transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
-for bounds, lifecycle and OpenCE network version **43**.
+for bounds, lifecycle and network version **44**.
 
 ### Map sharing
 

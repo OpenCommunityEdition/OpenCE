@@ -65,6 +65,37 @@ none), `open` whether it takes players now.
 The release has a `halo-server` script beside `halo`, which runs
 `halo --server` with its arguments.
 
+## MCC maps
+
+Use the same executable and `--server` workflow with an explicit MCC namespace:
+
+```toml
+[server]
+rotation = 'mcc_maps\2898867177\Lava_Lab:slayer, mcc_maps\a10:coop'
+rotation_fallback = false
+```
+
+Install local maps/packages under the data root's `mcc_maps`, or enable
+`game.workshop_maps` to discover this machine's installed MCC Workshop items.
+An intact copied Workshop folder (`mcc_maps/<id>/maps/<level>.map`) and a
+manual package (`mcc_maps/<package>/<level>.map`) both use the rotation name
+`mcc_maps\<package>\<level>`: do not add the physical `maps` subfolder.
+Local packages work with Steam discovery disabled. Keep their metadata and
+authored resources together; the server resolves the same layout as clients.
+Campaign maps require `coop`; multiplayer maps require a multiplayer gametype.
+The MCC adapter checks version-13 headers without routing them through Xbox
+or CE loaders. Resource/content validation still occurs before gameplay.
+Base dependencies must be installed locally on the server and each player.
+The server still needs Xbox `maps/ui.map` for its menus.
+
+`sv_maps` and the web map picker include MCC multiplayer and campaign entries
+with kind `mcc` and their package identity. The MCC catalog is cached during
+server operation; restart after adding or removing local packages. Use `sv_map mcc_maps\2898867177\Lava_Lab slayer` for an immediate
+change. Rotations and voting preserve explicit MCC paths; bare map names keep
+their existing Xbox/CE lookup order. `network.map_share` automatically offers
+eligible MCC packages with custom resources, metadata and previews, excluding
+base resources. See [MCC package sharing](../port/linux/README.md#mcc-package-sharing).
+
 ## Exit codes and signals
 
 | Code | Meaning |
@@ -631,7 +662,7 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | `GET /api/gametypes/{name}` | viewer | `{"ok":true,"name":…,"text":"<the TOML>"}` |
 | `PUT /api/gametypes/{name}` | admin | `{"text":"<TOML>"}` → `{"ok":true}`, or `400 invalid` with `line` and `message` (a name is `a`–`z`, `0`–`9`, `_` and `-`, 32 at most) |
 | `DELETE /api/gametypes/{name}` | admin | `{"ok":true}` |
-| `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox` or `custom`; `title` is the map's display name, else its `name`) |
+| `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox`, `custom` or `mcc`; `title` is the map's display name, else its `name`) |
 | `GET /api/bans` | admin | `{"ok":true,"bans":[{"n":0,"when":"2026-10-19 18:00:00","ip":"…","hwid":"…","discord_id":"…","discord_verified":true,"players":"…","reason":"…","until":<unix>\|null}…]}` |
 | `GET /api/vpn` | viewer | `{"ok":true,"policy":"link","fail":"open","lists":[{"master":"<url>","key_id":"…","serial":12,"generated":<unix>,"fetched":<unix>\|null,"ranges":30582,"error":""}…],"file":"<server.vpn_list>","allow_ranges":0,"block_ranges":0,"held":true,"refused":{"vpn_link_required":0,"vpn_blocked":0,"vpn_link_invalid":0,"vpn_link_too_new":0,"vpn_link_in_use":0}}` (`held`: a list is held, from a master or the file) |
 | `POST /api/vpn/check` | moderator | `{"ip":"203.0.113.5"}` → `{"ok":true,"listed":true,"by":"netlist"}` (`by`: `netlist`, `vpn_block.txt`, `vpn_allow.txt`, or `""`) |
@@ -897,6 +928,12 @@ played last, found again in the new list (the first entry only when none
 has been played yet). `sv_reload` takes the rotation again when its text
 changed, and also when only its entries' rejections changed (a map or a
 gametype file added or taken out since).
+
+`sv_reload` also requests an MCC catalog refresh. It runs on the next pregame
+frame, or after the current game returns to the lobby; it never rescans during
+gameplay or loading. Refresh the web page after that point to see newly copied
+MCC packages. Ordinary `/api/maps` requests reuse the catalog. Xbox and Custom
+Edition map enumeration is unchanged.
 
 `server.team_start` decides how a team game starts. `one` (the default)
 starts it with the players of one team. `both` waits, saying nothing,

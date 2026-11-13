@@ -183,7 +183,7 @@ lockstep netcode was removed, set to play it): it tells the player why.
 ## OpenCE network agreement
 
 OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
-version 43 (below, "Versions") replaces it.
+version 44 (below, "Versions") replaces it.
 Advertisements and ordinary join requests carry this one version; mismatched
 versions are rejected before admission. There is no separate MCC capability
 envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
@@ -454,6 +454,10 @@ ones, so a config change on the host waits for the next map; a co-op host's
 revert or saved-game load reads the config again, and the new values are
 sent again then. It ships with
 the rest of version 43, which stays 43.
+
+Version 44 unifies MCC offers under Map Sharing and lets a receiver satisfy
+omitted base resources with its own validated local files. Message layouts
+are unchanged; the changed sharing agreement requires matching peers.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -830,16 +834,16 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. Every map family uses OpenCE version **43**.
+separate from CE sharing 83-86. Every map family uses network version **44** for automatic sharing and local base dependencies.
 The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
 the gameplay/resource identity and the required-JSON identity. The distributed
 header is 12 bytes, including its checkpoint epoch.
 
-- **Permission and admission.** `network.mcc_map_share` defaults off. The host
-  offers only its current map package, classified by its locally maintained
-  `mcc_share.txt`: `<gameplay SHA-256> <maker>`. Unknown content, missing credit,
-  known stock, loose maps and `_shared` are refused. Eligible Workshop and local
-  packages use the same policy. The client requires `network.map_download`
+- **Permission and admission.** The existing `network.map_share` setting
+  enables both CE and MCC sharing. MCC offers only the current validated
+  package automatically; no manual approval list is required. Loose maps and
+  `_shared` are not packages to offer. An existing `mcc_share.txt` may supply
+  optional maker attribution but cannot enable or block sharing. The client requires `network.map_download`
   (existing default on) and explicit acceptance of the size/maker prompt.
   Before acceptance it receives only an offer; it creates no stage and requests
   no file chunks. If either setting is off, the download action is absent.
@@ -862,8 +866,10 @@ header is 12 bytes, including its checkpoint epoch.
 - **Selected files.** `mcc_share_package_build` uses the validated resource
   selection cached by `mcc_validation_resources`; it does not scan arbitrary
   siblings. Only used package `bitmaps.map`/`sounds.map` are eligible, including
-  their resolved Workshop fallback paths. A required root/shared resource
-  refuses the offer with a host diagnostic naming the dependency. Recognized
+  their resolved Workshop fallback paths. Root/shared base resources and
+  package copies matching an installed base are omitted. Joiners must provide
+  matching local dependencies; the complete gameplay fingerprint still covers
+  their contents, and missing or mismatched resources prevent admission. Recognized
   package/campaign/mission JSON and referenced supported PNG previews travel
   with the map; `credits.txt`, `readme.txt`, `license.txt` and a valid bounded
   Workshop sidecar preserve attribution. `ModInfo.json` is parsed metadata,
@@ -913,6 +919,14 @@ or completed holds cannot be restarted by replaying `BEGIN` on the same
 connection and host revision. `READY` grants only the existing fifteen-second
 player-add grace; it does not prove that an untrusted client checked its files.
 Actual map loading still fingerprints content independently.
+
+Local validation enumerates distinct usable files only for resource types the
+map references. An explicit package override stays authoritative; an unreadable
+or invalid override reports its file error instead of trying base alternatives.
+Each distinct combination still requires the full gameplay SHA-256. An unchanged
+failed exact path is not hashed again after discovery rescans; changed files or
+required metadata permit a fresh check. These are local work and diagnostic
+changes, with no change to message layouts, fingerprint framing or version 44.
 
 After admission, synchronous MCC conversion has a separate bounded progress
 contract in `mcc_load_network.c` and `mcc_load_network_game.c`. Reliable message

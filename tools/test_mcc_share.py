@@ -59,7 +59,7 @@ def test_share(share_tool, tmp_path, case):
     ("if (file.size>MCC_SHARE_MAXIMUM_CREDIT_BYTES || !mcc_share_credit_allowed(name,(unsigned)strlen(name))) return 0;", "", "manifest"),
     # the host's opt-in and the rules decide before anything is offered
     ("if (!opt_in) return MCC_SHARE_RESULT_OFF;", "if (0 && !opt_in) return MCC_SHARE_RESULT_OFF;", "admit"),
-    ("package.content=listed ? MCC_SHARE_CONTENT_CUSTOM : MCC_SHARE_CONTENT_UNKNOWN;", "package.content=MCC_SHARE_CONTENT_CUSTOM;", "admit"),
+    ("package.content_known=digest_known;", "package.content_known=1;", "admit"),
     # the joiner takes only what it asked for
     ("head->offset!=share->stage.written ||", "", "hostile_chunk"),
     ("head->session!=share->session ||", "", "hostile_chunk"),

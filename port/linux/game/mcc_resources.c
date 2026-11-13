@@ -170,7 +170,7 @@ static int mcc_resource_equal(FILE *a,FILE *b)
     return !ferror(a) && !ferror(b);
 }
 
-int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
+int mcc_resources_select_paths(struct mcc_runtime *runtime,void *raw,char const paths[2][128])
 {
     struct mcc_resources *resources;
     unsigned type;
@@ -189,8 +189,9 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
         if (!(type==1 ? runtime->report.external_bitmap_count : runtime->report.external_sound_count)) continue;
         probe.type=type;probe.file=selected;
         /* Explicit package and legacy root files are authoritative. */
-        status=mcc_resource_open(selected,type,runtime->level_name,NULL,runtime->failure,sizeof(runtime->failure));
-        if (!status) return 0;
+        status=mcc_resource_open(selected,type,runtime->level_name,paths ? paths[type-1] : NULL,
+            runtime->failure,sizeof(runtime->failure));
+        if (!status || (paths && status<0)) return 0;
         if (status==1) {
             if (!mcc_cache_visit_resources(raw,&runtime->report,mcc_resource_check,&probe)) {
                 error(_error_silent,"mcc resources: %s does not satisfy every external reference in %s",selected->path,runtime->level_name);
@@ -198,11 +199,11 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
                     "%s does not match. Install the matching MCC package resource.",type==1 ? "bitmaps.map" : "sounds.map");
                 return 0;
             }
-        } else for (set=0;set<2;set++) {
+        } else for (set=1;set<MCC_PACKAGE_BASE_SETS;set++) {
             struct mcc_resource_file candidate;
             char path[128];
             memset(&candidate,0,sizeof(candidate));
-            snprintf(path,sizeof(path),"mcc_maps/_shared/%s/%s.map",set ? "multiplayer" : "singleplayer",type==1 ? "bitmaps" : "sounds");
+            if (!mcc_package_base_resource_path(type,(unsigned)set,path)) return 0;
             status=mcc_resource_open(&candidate,type,runtime->level_name,path,runtime->failure,sizeof(runtime->failure));
             if (!status) return 0;
             if (status<0) continue;
@@ -233,6 +234,10 @@ int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
     return 1;
 }
 
+int mcc_resources_select(struct mcc_runtime *runtime,void *raw)
+{
+    return mcc_resources_select_paths(runtime,raw,NULL);
+}
 
 void mcc_resources_dispose(struct mcc_runtime *runtime)
 {
