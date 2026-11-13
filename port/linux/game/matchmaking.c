@@ -74,12 +74,13 @@ static struct
 	short playlist, size;
 	char map[64];
 	boolean map_set, player_added;
+	boolean public_game;
 	byte host[6];
 } matchmaking;
 
 boolean matchmaking_game_locked(void)
 {
-	return matchmaking.role != _matchmaking_idle;
+	return matchmaking.role != _matchmaking_idle && !matchmaking.public_game;
 }
 
 static void matchmaking_start_countdown(struct network_game_server *server, short players, short most_players)
@@ -145,6 +146,7 @@ static void matchmaking_begin_host(struct p2p_mm_decision const *decision)
 	p2p_set_hosting_public(FALSE);
 	matchmaking_open_lobby();
 	matchmaking.role = _matchmaking_hosting;
+	matchmaking.public_game = FALSE;
 	matchmaking.seconds = 0.0f;
 	matchmaking.map_set = matchmaking.player_added = FALSE;
 }
@@ -221,6 +223,7 @@ static void matchmaking_begin_join(struct p2p_mm_decision const *decision)
 		return;
 	}
 	matchmaking.role = _matchmaking_joining;
+	matchmaking.public_game = decision->public_game != 0;
 	matchmaking.seconds = 0.0f;
 }
 
