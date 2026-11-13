@@ -1,5 +1,3 @@
 /*
 DIALOGS.C
-
-no symbols in this file.
 */

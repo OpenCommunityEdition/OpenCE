@@ -1,7 +1,3 @@
-/*
-GAME_ENGINE_KING.H
-*/
-
 #ifndef __GAME_ENGINE_KING_H
 #define __GAME_ENGINE_KING_H
 #pragma once

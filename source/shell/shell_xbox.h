@@ -1,7 +1,3 @@
-/*
-SHELL_XBOX.H
-*/
-
 #ifndef __SHELL_XBOX_H
 #define __SHELL_XBOX_H
 #pragma once

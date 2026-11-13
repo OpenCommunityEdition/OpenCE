@@ -1,7 +1,3 @@
-/*
-LOCAL_PLAYERS.H
-*/
-
 #ifndef __LOCAL_PLAYERS_H
 #define __LOCAL_PLAYERS_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-RASTERIZER_MEMORY_POOL.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

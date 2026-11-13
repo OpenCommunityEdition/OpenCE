@@ -1,9 +1,3 @@
-/*
-OBSERVER.H
-
-header included in hcex build.
-*/
-
 #ifndef __OBSERVER_H
 #define __OBSERVER_H
 #pragma once

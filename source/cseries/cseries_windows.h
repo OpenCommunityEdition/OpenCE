@@ -1,7 +1,3 @@
-/*
-CSERIES_WINDOWS.H
-*/
-
 #ifndef __CSERIES_WINDOWS_H
 #define __CSERIES_WINDOWS_H
 #pragma once

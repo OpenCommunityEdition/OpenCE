@@ -1,9 +1,3 @@
-/*
-GAME_SOUND.H
-
-header included in hcex build.
-*/
-
 #ifndef __GAME_SOUND_H
 #define __GAME_SOUND_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-ATTRACT_MODE.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

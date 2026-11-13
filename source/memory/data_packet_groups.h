@@ -1,7 +1,3 @@
-/*
-DATA_PACKET_GROUPS.H
-*/
-
 #ifndef __DATA_PACKET_GROUPS_H
 #define __DATA_PACKET_GROUPS_H
 #pragma once

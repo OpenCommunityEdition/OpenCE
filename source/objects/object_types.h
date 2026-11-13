@@ -1,7 +1,3 @@
-/*
-OBJECT_TYPES.H
-*/
-
 #ifndef __OBJECT_TYPES_H
 #define __OBJECT_TYPES_H
 #pragma once

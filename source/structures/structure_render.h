@@ -1,7 +1,3 @@
-/*
-STRUCTURE_RENDER.H
-*/
-
 #ifndef __STRUCTURE_RENDER_H
 #define __STRUCTURE_RENDER_H
 #pragma once

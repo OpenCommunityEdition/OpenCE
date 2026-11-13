@@ -1,6 +1,4 @@
 /*
-STRUCTURE_VECTOR_TESTS.H
-
 Narrow cross-translation-unit vector-test interface owned by STRUCTURES.C.
 */
 

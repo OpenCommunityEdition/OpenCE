@@ -1,9 +1,3 @@
-/*
-NETWORK_GAME_MANAGER.H
-
-header included in hcex build.
-*/
-
 #ifndef __NETWORK_GAME_MANAGER_H
 #define __NETWORK_GAME_MANAGER_H
 #pragma once

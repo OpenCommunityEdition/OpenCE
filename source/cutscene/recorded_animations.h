@@ -1,9 +1,3 @@
-/*
-RECORDED_ANIMATIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __RECORDED_ANIMATIONS_H
 #define __RECORDED_ANIMATIONS_H
 #pragma once

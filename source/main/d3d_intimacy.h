@@ -1,7 +1,3 @@
-/*
-D3D_INTIMACY.H
-*/
-
 #ifndef __D3D_INTIMACY_H
 #define __D3D_INTIMACY_H
 #pragma once

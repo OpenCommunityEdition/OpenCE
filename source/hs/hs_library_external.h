@@ -1,9 +1,3 @@
-/*
-HS_LIBRARY_EXTERNAL.H
-
-header included in hcex build.
-*/
-
 #ifndef __HS_LIBRARY_EXTERNAL_H
 #define __HS_LIBRARY_EXTERNAL_H
 #pragma once

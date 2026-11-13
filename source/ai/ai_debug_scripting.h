@@ -1,6 +1,4 @@
 /*
-AI_DEBUG_SCRIPTING.H
-
 Scripting callbacks implemented by ai_debug.c.
 */
 

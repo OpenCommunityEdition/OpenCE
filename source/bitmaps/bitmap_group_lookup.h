@@ -1,6 +1,4 @@
 /*
-BITMAP_GROUP_LOOKUP.H
-
 Narrow cross-translation-unit lookup interface owned by BITMAP_GROUP.C.
 */
 

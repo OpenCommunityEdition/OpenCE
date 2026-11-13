@@ -1,9 +1,3 @@
-/*
-MODELS.H
-
-header included in hcex build.
-*/
-
 #ifndef __MODELS_H
 #define __MODELS_H
 #pragma once

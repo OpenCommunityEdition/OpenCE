@@ -1,7 +1,3 @@
-/*
-MASS_POINT_DATUM.H
-*/
-
 #ifndef __MASS_POINT_DATUM_H
 #define __MASS_POINT_DATUM_H
 #pragma once

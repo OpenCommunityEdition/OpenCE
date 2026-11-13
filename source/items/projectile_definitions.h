@@ -1,9 +1,3 @@
-/*
-PROJECTILE_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __PROJECTILE_DEFINITIONS_H
 #define __PROJECTILE_DEFINITIONS_H
 #pragma once

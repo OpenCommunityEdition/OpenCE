@@ -1,6 +1,4 @@
 /*
-RASTERIZER_XBOX_HARDWARE_BITMAPS.H
-
 Bitmap lifecycle interface owned by RASTERIZER_XBOX_HARDWARE_BITMAPS.C.
 */
 

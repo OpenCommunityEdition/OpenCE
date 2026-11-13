@@ -1,6 +1,4 @@
 /*
-RASTERIZER_TRANSPARENT_GEOMETRY.H
-
 Narrow cross-translation-unit interface owned by RASTERIZER_TRANSPARENT_GEOMETRY.C.
 */
 

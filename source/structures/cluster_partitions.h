@@ -1,9 +1,3 @@
-/*
-CLUSTER_PARTITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __CLUSTER_PARTITIONS_H
 #define __CLUSTER_PARTITIONS_H
 #pragma once

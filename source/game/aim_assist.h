@@ -1,9 +1,3 @@
-/*
-AIM_ASSIST.H
-
-header included in hcex build.
-*/
-
 #ifndef __AIM_ASSIST_H
 #define __AIM_ASSIST_H
 #pragma once

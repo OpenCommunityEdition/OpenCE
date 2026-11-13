@@ -1,9 +1,3 @@
-/*
-CINEMATICS.H
-
-header included in hcex build.
-*/
-
 #ifndef __CINEMATICS_H
 #define __CINEMATICS_H
 #pragma once

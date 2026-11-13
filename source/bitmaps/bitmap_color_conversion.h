@@ -1,7 +1,3 @@
-/*
-BITMAP_COLOR_CONVERSION.H
-*/
-
 #ifndef __BITMAP_COLOR_CONVERSION_H
 #define __BITMAP_COLOR_CONVERSION_H
 #pragma once

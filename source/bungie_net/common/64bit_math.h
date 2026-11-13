@@ -1,9 +1,3 @@
-/*
-64BIT_MATH.H
-
-header included in hcex build.
-*/
-
 #ifndef __64BIT_MATH_H
 #define __64BIT_MATH_H
 #pragma once
