@@ -641,12 +641,12 @@ def riding_function(text, name):
 
 
 def riding_version_check(text):
-    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 44\b", text["limits"])
+    assert re.search(r"#define HALO_PORT_NETWORK_VERSION 45\b", text["limits"])
 
 
 RIDING_CHECKS["version"] = riding_version_check
-RIDING_CONTROLS["version-lowered"] = ("limits", None, "#define HALO_PORT_NETWORK_VERSION 44",
-                                      "#define HALO_PORT_NETWORK_VERSION 43", "version")
+RIDING_CONTROLS["version-lowered"] = ("limits", None, "#define HALO_PORT_NETWORK_VERSION 45",
+                                      "#define HALO_PORT_NETWORK_VERSION 44", "version")
 
 RIDING_MCC_GUARD = "\tif (mcc_script_effects_host_movement())\n\t\treturn;\n"
 

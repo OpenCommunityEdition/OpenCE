@@ -441,7 +441,7 @@ their existing map-selection code immediately.
 All hashing, package selection and binding lifetime policy lives in MCC modules;
 Xbox/CE settings use a zero digest trailer and keep their original map checks. The
 protocol recorder includes the full MCC settings record and its size/offset
-bounds; all three map families use the shared OpenCE version 43 contract.
+bounds; all three map families use the shared OpenCE version 45 contract.
 
 MCC's `halo1/maps/bitmaps.map` stores individual texture entries. Its
 `halo1/maps/custom_edition` resources store grouped `__pixels` and

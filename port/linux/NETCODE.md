@@ -183,7 +183,7 @@ lockstep netcode was removed, set to play it): it tells the player why.
 ## OpenCE network agreement
 
 OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
-version 44 (below, "Versions") replaces it.
+versions 44 and 45 (below, "Versions") replace it in turn.
 Advertisements and ordinary join requests carry this one version; mismatched
 versions are rejected before admission. There is no separate MCC capability
 envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
@@ -458,6 +458,15 @@ the rest of version 43, which stays 43.
 Version 44 unifies MCC offers under Map Sharing and lets a receiver satisfy
 omitted base resources with its own validated local files. Message layouts
 are unchanged; the changed sharing agreement requires matching peers.
+
+Then version 45 numbers a race track's flags as `race_flags_make_unique`
+(`game/game_engine_race.c`) was meant to: a flag whose number another has
+is given a free number, now marked used, so that no later flag shares it
+(the next flag of a track numbered on, a third of one number). A map with
+two flags of one number can have its flags numbered otherwise than by a
+build before it, and the race's state, which names the flags by their
+numbers (the flags of each player's lap, the first flag, the rally flag),
+would show them on other flags.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -834,7 +843,7 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. Every map family uses network version **44** for automatic sharing and local base dependencies.
+separate from CE sharing 83-86. Every map family uses network version **45** (automatic sharing and local base dependencies arrived in 44).
 The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
 the gameplay/resource identity and the required-JSON identity. The distributed
 header is 12 bytes, including its checkpoint epoch.
