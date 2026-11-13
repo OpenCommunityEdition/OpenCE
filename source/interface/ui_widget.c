@@ -6347,6 +6347,25 @@ static void ui_mouse_note_target(
 	target->button_index = button_index;
 	target->split_x = (bounds.x0 + bounds.x1) / 2;
 	target->split_y = (bounds.y0 + bounds.y1) / 2;
+	/* port: a spinner's arrows are drawn outside its value's box
+	(ui_widget_render's list header and footer), so a mouse click reaches
+	them here; ui_mouse_widen_values covers them for a finger */
+	if (kind == _ui_mouse_target_value && !ui_mouse_pointer_is_touch)
+	{
+		rectangle2d header = definition->list_header_bounds;
+		short shift = spinner_string_list_extra_count(definition->text_label_string_list.index) ? SPINNER_EXTRA_WIDTH : 0;
+
+		if (definition->list_header_bitmap.index != NONE)
+		{
+			target->bounds.x0 = MIN(target->bounds.x0, (short)(header.x0 - shift + offset.x));
+			target->bounds.x1 = MAX(target->bounds.x1, (short)(header.x1 - shift + offset.x));
+		}
+		if (definition->list_footer_bitmap.index != NONE)
+		{
+			target->bounds.x0 = MIN(target->bounds.x0, (short)(definition->list_footer_bounds.x0 + offset.x));
+			target->bounds.x1 = MAX(target->bounds.x1, (short)(definition->list_footer_bounds.x1 + offset.x));
+		}
+	}
 	target->icon_bounds = icon_bounds;
 	target->label = target_label;
 	target->label_bounds = target_label_bounds;
