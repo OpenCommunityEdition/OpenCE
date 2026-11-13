@@ -76,6 +76,7 @@ static char mcc_share_prompt_message[512];
 static char mcc_share_installed[64];
 static char mcc_share_text[256];
 static struct mcc_validation_check *mcc_share_check;
+static char mcc_share_check_reason[320];
 static struct mcc_validation_proof mcc_share_proof;
 static uint32_t mcc_share_validation_token;
 static unsigned long mcc_share_host_revision;
@@ -311,11 +312,12 @@ static int mcc_share_identity_check(void *user, char const *stage_dir)
     char const *leaf=strrchr(mcc_share_globals.level,'\\')+1;
     (void)user;
     if (mcc_share_check) {
-        ok=mcc_validation_check_step(mcc_share_check,&mcc_share_proof,reason,sizeof(reason));
+        ok=mcc_validation_check_step(mcc_share_check,&mcc_share_proof,mcc_share_check_reason,sizeof(mcc_share_check_reason));
         if (!ok) return MCC_SHARE_CHECK_PENDING;
         return ok==1 && !memcmp(mcc_share_proof.digest,mcc_share_digest,32) ?
             MCC_SHARE_CHECK_READY : MCC_SHARE_CHECK_FAILED;
     }
+    mcc_share_check_reason[0]=0;
     entries=malloc(MCC_SHARE_METADATA_FILES*sizeof(*entries));
     if (!entries) return 0;
     memset(entries,0,MCC_SHARE_METADATA_FILES*sizeof(*entries));
@@ -335,15 +337,23 @@ static int mcc_share_identity_check(void *user, char const *stage_dir)
     for (i=0;i<count;i++) if (!keep[i] &&
         !mcc_share_stage_discard_preview(&mcc_share_globals.stage,indices[i])) goto done;
     mcc_share_check=mcc_validation_check_begin(mcc_share_globals.level,stage_dir);
+    mcc_validation_check_expect(mcc_share_check,mcc_share_digest);
     if (mcc_share_check) ok=MCC_SHARE_CHECK_PENDING;
  done:
     free(entries);
     return ok;
 }
 
+static char const *mcc_share_identity_error(void *user)
+{
+    (void)user;
+    return mcc_share_check_reason;
+}
+
 static void mcc_share_cancel_check(void *user)
 {
     (void)user;
+    /* The session reads the failure reason after cancelling the stage. */
     mcc_validation_check_end(mcc_share_check);
     mcc_share_check=NULL;
     memset(&mcc_share_proof,0,sizeof(mcc_share_proof));
@@ -389,6 +399,7 @@ static void mcc_share_finished(
 	char const *message)
 {
 	(void)user;
+    mcc_share_check_reason[0]=0;
     mcc_share_release_validation();
 	if (!ok)
 	{
@@ -405,7 +416,7 @@ static void mcc_share_finished(
 /* The joiner's package matches nothing installed. Ask for an offer when downloads
  * are enabled; obtaining the manifest does not accept its files. */
 static int mcc_share_missing(char const name[128], unsigned char const digest[32],
-    unsigned char const metadata[32])
+    unsigned char const metadata[32],char const *reason)
 {
     char canonical[64];
     if (!mcc_share_ready || global_network_game_server_get() || !global_network_game_client_get() ||
@@ -425,7 +436,8 @@ static int mcc_share_missing(char const name[128], unsigned char const digest[32
         mcc_share_release_validation();
         mcc_share_prompt_download=FALSE;
         snprintf(mcc_share_prompt_message,sizeof(mcc_share_prompt_message),
-            "The host's package is missing or differs. Download Maps is OFF. Install matching content manually.");
+            "%s Download Maps is OFF. Install matching content manually.",
+            reason && reason[0] ? reason : "The host's package is missing or differs.");
         mcc_share_prompt_pending=TRUE;
         return 1;
     }
@@ -461,7 +473,7 @@ boolean mcc_share_game_machine_active(
     if (!mcc_share_ready || machine_index<0 || machine_index>=MCC_SHARE_HOST_MACHINES ||
         !mcc_share_admission_pending[machine_index]) return FALSE;
     game=network_game_get_game();
-    return game && global_network_game_server_get() && config_boolean("network.mcc_map_share") &&
+    return game && global_network_game_server_get() && config_boolean("network.map_share") &&
         mcc_share_host_revision==mcc_identity_host_revision() &&
         !strcmp(game->map.name,mcc_share_admission_level) &&
         (uint32_t)((uint32_t)system_milliseconds()-mcc_share_admission_at[machine_index])<15000u;
@@ -485,7 +497,7 @@ static void mcc_share_offered(void *user,uint64_t bytes,char const *credit)
         "The host's package is missing or differs. Download up to %.1f MiB from the host?\n"
         "Maps, required metadata/resources and supported previews are included.\n"
         "Your existing installation will be kept.\nMaker: %s",
-        (double)bytes/(1024.0*1024.0),credit);
+        (double)bytes/(1024.0*1024.0),credit[0] ? credit : "Not provided");
     mcc_share_prompt_pending=TRUE;
 }
 
@@ -542,12 +554,28 @@ void mcc_share_game_prompt_closed(void)
 void mcc_share_game_prompt_action(int action)
 {
     struct mcc_workshop_item item;
+#ifndef HALO_WEB
     char url[128];
+#endif
     int manual=mcc_share_manual==MCC_SHARE_MANUAL_MENU;
     int current=manual ? !global_network_game_client_get() && !global_network_game_server_get() &&
         main_menu_is_active() : mcc_share_client_current();
     int download=mcc_share_game_can_download();
     int workshop=mcc_workshop_wire_unpack(mcc_share_name,&item);
+    if (current && workshop && (action==1 || action==3)) {
+#ifdef HALO_WEB
+        /* Dedicated browser-side click; never broaden the account-link bridge. */
+        extern void web_js_post(int kind,char const *text);
+        web_js_post(6,item.id);
+#else
+        snprintf(url,sizeof(url),action==1 ? "steam://url/CommunityFilePage/%s" :
+            "https://steamcommunity.com/sharedfiles/filedetails/?id=%s",item.id);
+        platform_open_url(url);
+#endif
+        /* Keep both actions available: dispatch success cannot establish that
+         * Steam navigated, and the player may need the browser fallback. */
+        return;
+    }
     mcc_share_close_prompt();
     if (!current) {
         mcc_share_client_cancel(&mcc_share_globals);
@@ -557,10 +585,6 @@ void mcc_share_game_prompt_action(int action)
         mcc_share_prompt_download=FALSE;
         mcc_share_client_accept(&mcc_share_globals);
         return;
-    }
-    if (action==1 && workshop) {
-        snprintf(url,sizeof(url),"https://steamcommunity.com/sharedfiles/filedetails/?id=%s",item.id);
-        platform_open_url(url);
     }
     if (manual) {
         main_goto_main_menu();
@@ -576,6 +600,7 @@ void mcc_share_game_disconnect(void)
     mcc_admission_disconnect();
     mcc_load_network_disconnect();
     mcc_share_validation_token=0;
+    mcc_share_check_reason[0]=0;
     mcc_share_close_prompt();
     if (mcc_share_ready) {
         mcc_share_client_disconnect(&mcc_share_globals);
@@ -611,7 +636,7 @@ static void mcc_share_host_lifecycle(void)
         mcc_share_stop_host();
         mcc_share_host_revision=revision;
     }
-    if (!server || !game || !config_boolean("network.mcc_map_share") || !mcc_level_name(game->map.name)) {
+    if (!server || !game || !config_boolean("network.map_share") || !mcc_level_name(game->map.name)) {
         mcc_share_stop_host();
         return;
     }
@@ -651,6 +676,7 @@ void mcc_share_game_update(
 		env.send_request = mcc_share_send_request;
 		env.package_taken = mcc_share_package_taken;
 		env.identity_check = mcc_share_identity_check;
+        env.identity_error = mcc_share_identity_error;
         env.cancel_check = mcc_share_cancel_check;
         env.installed_ready = mcc_share_installed_ready;
         env.prepare_install = mcc_share_prepare_install;

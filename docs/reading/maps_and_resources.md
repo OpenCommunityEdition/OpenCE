@@ -101,3 +101,34 @@ The `test_mcc_cache_format`, `test_mcc_resources`, `test_mcc_tag_validation`,
 synthetic data. Real package validation also needs rendering, scripts, gameplay,
 networking, unload/reload and campaign transitions. A successful conversion is
 not a completed playthrough.
+
+Local packages may keep their Workshop layout, with `ModInfo.json` at the
+package root and levels in `maps/`, or place levels directly in the package
+folder. The local resolver in
+[mcc_local_package.c](../../port/linux/src/mcc_local_package.c) preserves
+the same MCC virtual names for both layouts.
+
+Dedicated rotations dispatch MCC names through
+[mcc_server.c](../../port/linux/game/mcc_server.c), which validates MCC
+headers and enumerates the MCC catalog without changing Xbox or CE resolution.
+`mcc_server_request_rescan` queues `sv_reload` discovery until `mcc_server_update`
+runs in pregame, keeping HTTP reads and active gameplay free of rescans.
+For example, copy `mcc_maps/My Pack/arena.map`, run `sv_reload`, and refresh the
+web page in the lobby. Saving or playing that entry retains the spaces in its
+full MCC path. The HTTP command bridge calls `mcc_server_play_line` to validate
+the MCC namespace and quote that entry as one console argument. Legacy requests
+keep their established validation and command construction.
+With Map Sharing enabled, [mcc_share_package.c](../../port/linux/game/mcc_share_package.c)
+offers eligible packages automatically. Base resources stay local;
+[mcc_share_session.c](../../port/linux/game/mcc_share_session.c) validates
+the receiver's copies before publication. In
+[mcc_resource_check.inl](../../port/linux/game/mcc_resource_check.inl),
+`mcc_resources_candidates` fixes package overrides and enumerates only usable
+base files for referenced resource types. A resource-free map or a package with
+both overrides has one combination. `mcc_validation_check_step` hashes each
+distinct combination against the host's full digest and retains file-change
+checks; unreadable overrides produce a local diagnostic. The resource-selection,
+identity-candidate, sharing and server tests exercise these cases with synthetic
+files; they do not measure slow-device join times. Host downloads use separate
+folders and never replace the player's installed package. See
+[MCC installation and sharing](../mcc_maps.md) for prerequisites and limits.

@@ -615,8 +615,7 @@ the setting for one start of the game. It has priority over the file.
 | `network.fire_origins` | `true` | `HALO_NET_FIRE_ORIGINS` | Host: whether a client's reported hit that the shooter's camera had no line of sight to may still count from where the client says its player's shots leave, when that is not the camera (distributed message 93: a VR build's weapon hand, which may be past a corner the camera is behind). The hand must be within 0.4 world units of the camera, no more than 0.05 behind the eye along the line to the target, 0.2 to its side and 0.1 above it, with the line from the eye to it clear; the host logs how many hits counted only that way. `false`: from the camera and vehicles' guns only (`network_damage.c`). |
 | `network.vehicle_riding` | `false` | `HALO_NET_VEHICLE_RIDING` | Host: with `true`, a player standing on a moving vehicle is carried by it, turns with it, lands back on it after a jump and keeps its motion when stepping or jumping off; the vehicle it stands on does not hurt it. The base setting (co-op's options in Server Setup write it). In multiplayer (online, system link, split screen) the gametype's VEHICLE RIDING rule under Vehicle Options, saved with the gametype, overrides it; a gametype without the rule is off, whatever this setting says (stock gametypes and older saved ones have none). A co-op rotation entry's `riding` rule overrides it for that entry. Changes count from the next map; clients use the host's decision, including when joining mid-map, and its `debug.riding_` values. Film playback and the editor never ride. Saved games of builds before this setting are not offered or loaded. No row in the Settings menu. A map can choose for itself, winning over the base setting, the gametype and the dedicated override until the next map: with `(global boolean vehicle_riding true)` (or `false`; its value at the map's start counts, a later `set` does not), or with `(vehicle_riding true)` or `(vehicle_riding false)` in a startup script, which counts only on the map's first tick and wins over the global. The old `game.vehicle_riding` name is not read. |
 | `network.block_mouse_aim_assist` | `false` | `HALO_NET_BLOCK_MOUSE_AIM_ASSIST` | Host: Player Options > Aim Assist, Allowed or Block M+KB. Block overrides optional mouse magnetism while mouse/keyboard aims, including on the host, without changing the saved preference. Controllers and touch retain their existing behavior; bullet autoaim is unchanged. |
-| `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: send a player who joins without the game's Custom Edition map the map, and the resource maps that it needs and that the player does not have. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
-| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | SHARE MCC PACKAGES in Settings > Network Setup > Map Sharing. Host-only, explicit-list sharing of eligible local or Workshop packages; requires a gameplay fingerprint and maker in `mcc_share.txt`. Includes used package resources and recognized metadata/previews. The joiner needs Download Maps enabled and must accept the offer. See "MCC package sharing" for implementation status and limits. |
+| `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: automatically offer CE maps and MCC packages. MCC base resources stay local to each machine; players consent before an MCC download. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
 | `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
@@ -648,6 +647,8 @@ the setting for one start of the game. It has priority over the file.
 | `server.empty_seconds` | `30` | `HALO_SERVER_EMPTY_SECONDS` | The seconds a game with nobody in it goes on before it ends. `0`: it does not end. A game whose last player leaves ends at once, as the game ends it. |
 | `server.idle_minutes` | `0` | `HALO_SERVER_IDLE_MINUTES` | The minutes a game goes on with no score before it ends. `0`: it does not end. |
 | `server.team_start` | `"one"` | `HALO_SERVER_TEAM_START` | A team game. `"one"`: it starts with the players of one team (the next players to join balance the teams). `"both"`: it waits, saying nothing, for a player on each team. `"skip"`: while one player waits, a team game (not one `sv_map` asked for) gives way to the rotation's next entry without teams, if it has one; checked when the lobby opens and again when its countdown would begin. |
+| `server.team_switch` | `true` | `HALO_SERVER_TEAM_SWITCH` | `true`: a player in a team game changes teams by saying `!switch` (or `!team`) in the chat; the line goes to no one, and everyone is told of the switch. Not in the postgame, co-op or Infection, and with the gametype's auto team balance only to a team with fewer players than theirs (one player bigger than the old at most after). A living player dies as they switch, no one's kill and no suicide scored. Refer to `docs/dedicated_server.md`, "Changing teams". |
+| `server.team_switch_cooldown_seconds` | `30` | `HALO_SERVER_TEAM_SWITCH_COOLDOWN_SECONDS` | The seconds a player waits after a `!switch` before another (`0` to `3600`; `0`: no wait). |
 | `server.motd` | `""` | `HALO_SERVER_MOTD` | A notice each machine sees when it joins (127 characters). Empty: none. |
 | `server.frame_rate` | `60` | `HALO_SERVER_FRAME_RATE` | The frames a second (30 to 120); the game's ticks stay at 30 a second. A server with no other machine runs 10 frames a second. |
 | `server.console`, `server.console_exit_on_eof` | `true`, `false` | `HALO_SERVER_CONSOLE`, `HALO_SERVER_CONSOLE_EXIT_ON_EOF` | `true`: the server takes commands from the standard input; it stops when the standard input ends if `server.console_exit_on_eof` is `true` (a panel can close it), after running the last line, whether or not a line's end ended it. |
@@ -736,7 +737,8 @@ See [MCC maps](../../docs/mcc_maps.md) for supported formats, resources and limi
 [MCC previews](../../docs/reading/mcc_level_previews.md) for menu discovery, and
 [browser imports](../../docs/reading/browser_imports.md) for browser storage.
 
-All map families use OpenCE network version 44. MCC content identity, sharing
+All map families use network version 45; older peers
+cannot join, including OpenCE protocol 44 peers. MCC content identity, sharing
 consent and load-progress checks remain separate from the existing Xbox/CE paths;
 see [the network agreement](NETCODE.md#opence-network-agreement).
 
@@ -1295,13 +1297,14 @@ only invites, not listings.
 
 ### MCC package sharing
 
-MCC delivery is host-only and separate from Custom Edition sharing. The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
-Sharing (`network.mcc_map_share`, off by default; also
-`HALO_NET_MCC_MAP_SHARE`). It must list the exact map/used-resource SHA-256 and
-maker in the data root's `mcc_share.txt`, one line per approved identity:
-`<64 hexadecimal digits> <maker>`. The host log reports an unlisted fingerprint.
-This explicit approval does not come from a package name or a Workshop ID.
-Stock, unclassified, loose and shared-root packages are not offered.
+MCC delivery is host-only and separate from Custom Edition's transfer path.
+The existing **SHARE MAPS** setting in Server Setup > Map Sharing
+(`network.map_share`, on by default) automatically offers validated local and
+Workshop packages. No second toggle or manual approval file is required.
+The obsolete `network.mcc_map_share` setting and its environment variable no
+longer control sharing. An existing `mcc_share.txt` is read only for optional
+maker attribution; missing attribution is shown as "Not provided".
+Loose maps and the `_shared` base-resource folders are not shared packages.
 
 The joiner uses **DOWNLOAD MAPS** (`network.map_download`, on by default).
 Missing or differing content opens an offer showing size and maker; accepting
@@ -1311,12 +1314,22 @@ Workshop page when available, or install matching content manually, or cancel.
 The latest Workshop package may still differ from the host's copy; installation
 must be checked again. The prompt does not infer which version is newer.
 
+On desktop the prompt offers **OPEN IN STEAM** and **OPEN IN BROWSER**.
+The Steam action opens a fixed `CommunityFilePage` URI built from the validated
+numeric item ID. The prompt stays available so the browser action remains a
+fallback if Steam is absent or fails to navigate. Android uses the browser;
+the web build presents a browser-side click dialog. No URL opens merely
+because a host advertises an item, and the ID is not proof of provenance.
+
 The offer includes the current map and its actually used package resources,
 required recognized JSON, eligible referenced PNG previews and attribution
 files. Campaign metadata is obtained upfront; mission binaries/resources are
 obtained as needed. Unrelated resource files are omitted. A package depending
-on root/shared stock resources is refused with a host diagnostic, rather than
-silently redistributing those resources. A local dedicated-server folder needs
+on root/shared base resources can be shared: those files are omitted, and
+joiners use their own matching MCC installation or `mcc_maps/_shared` copies.
+Package resource copies matching locally installed base files are also omitted.
+The complete fingerprint still includes required base contents; missing or
+mismatched local resources prevent joining. A local dedicated-server folder needs
 no invented Workshop metadata or artwork to qualify.
 
 Each accepted download is checked in an exclusively owned staging directory,
@@ -1332,7 +1345,7 @@ The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
 not seed MCC downloads. Android requires no Steam for these files, but device
 runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
 transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
-for bounds, lifecycle and OpenCE network version **44**.
+for bounds, lifecycle and network version **45**.
 
 ### Map sharing
 
@@ -1948,7 +1961,7 @@ Other changes:
 | `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB; the main menu and Multiplayer clear co-op's controllers, so that a gamepad going back to controller 1 is not a controller unplugged; the lobby's split screen players leave alone, and one who quits in game is not joined to the next game (`interface/player_ui.c`). |
 | `interface/player_ui.c` | Fast setup opens the pregame screen through the port's menus (the lobby), as `interface/ui_widget.c` does. |
 | `game/game_engine.c`, `game/game_engine.h`, `game/game_engine_slayer.c`, `game/game.c`, `game/aim_assist.c`, `game/players.c`, `objects/damage.c`, `objects/objects.c`, `units/units.c`, `items/weapons.c`, `saved games/playlist_profile.c`, `saved games/saved_game_files.c` | OpenCE's gametypes (`game/game_modes.c`, "OpenCE gametypes"): the gametype's PC options carry a mode and Hardcore with their options; the built-in ones are written after the Xbox's default gametypes; Infection's and Gun Game's game engines are Slayer's with their rules; SWAT's headshots, Hardcore's motion sensor, aim assist and restore of the killer; Infection's zombies' skulls, grenades, powerups, seats and melee. |
-| `game/game_engine_race.c` | A race track's flag whose number another flag has keeps the free number it is given to itself, as `race_flags_make_unique` meant: the number was not marked used, and a later flag of it (the next of a track numbered on, a third of one number) shared it, so a lap had fewer flags than the map and flag rally could never choose some of them (network version 44). |
+| `game/game_engine_race.c` | A race track's flag whose number another flag has keeps the free number it is given to itself, as `race_flags_make_unique` meant: the number was not marked used, and a later flag of it (the next of a track numbered on, a third of one number) shared it, so a lap had fewer flags than the map and flag rally could never choose some of them (network version 45). |
 | `game/game_time.c`, `main/main.c` | With `debug.fixed_step`, a game of one machine runs a tick a frame, each frame taking a tick's time, so that it plays the same every time (`tools/stagekit`). |
 | `input/input_abstraction.c`, `game/player_control.c`, `game/players.c`, `game/player_queues_new.c`, `units/units.h` | The keyboard and mouse's actions (`src/xinput_sdl.c`, `include/halo_keyboard.h`) join controller 1's game controls; their reload key reloads on its own, and their action key only acts (a control flag of the port's, sent with the player's action, stops the reload the controller's X falls back to). |
 | `saved games/player_profile.h`, `interface/player_ui.c` | A sixth button layout, the Master Chief Collection's Bumper Jumper (`profile.button_preset` 5), and a seventh, Fishsticks (6: zoom on the left trigger, melee on the right stick's button, grenade throw on the right bumper, crouch on B, grenade switch on the pad's left, which then does not move you), and an eighth, Recon (7: the standard buttons with action and reload on the right bumper, grenade switch on the left bumper, flashlight on X). A layout the build does not know (a later build's) gets the standard buttons, not none, which moved start and back and stopped the game. |

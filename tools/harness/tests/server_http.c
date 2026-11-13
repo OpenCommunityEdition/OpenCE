@@ -18,6 +18,9 @@ lockouts), on stand-ins for the HMAC, the random bytes and the settings.
 */
 
 #include "harness.h"
+#ifdef _WIN32
+#define strncasecmp _strnicmp /* The origin-prefix negative control uses the POSIX name. */
+#endif
 
 #include <ctype.h>
 #include <stdint.h>
@@ -1907,6 +1910,17 @@ int main(int argc, char **argv)
 		snprintf(body, sizeof(body), "{\"map\":\"bloodgulch\",\"gametype\":\"ctf\"}");
 		refused = rotation_play_line(body, (int)strlen(body), line, sizeof(line));
 		CHECK(!refused && !strcmp(line, "sv_map bloodgulch ctf"), "a map and gametype: %s", refused ? refused : line);
+		snprintf(body, sizeof(body), "{\"map\":\"mcc_maps/My Pack/arena\",\"gametype\":\"slayer\"}");
+		refused = rotation_play_line(body, (int)strlen(body), line, sizeof(line));
+		CHECK(!refused && !strcmp(line, "sv_map \"mcc_maps/My Pack/arena\" slayer"), "MCC path lost spaces");
+		snprintf(body, sizeof(body), "{\"map\":\"mcc_maps/My Pack/mission:coop+difficulty=heroic\"}");
+		refused = rotation_play_line(body, (int)strlen(body), line, sizeof(line));
+		CHECK(!refused && !strcmp(line, "sv_map \"mcc_maps/My Pack/mission:coop+difficulty=heroic\" "), "MCC entry lost its rules");
+		CHECK(rotation_play_line(body, (int)strlen(body), line, 12), "truncated MCC command accepted");
+		snprintf(body, sizeof(body), "{\"map\":\"mcc_maps/../arena\"}");
+		CHECK(rotation_play_line(body, (int)strlen(body), line, sizeof(line)), "MCC traversal accepted");
+		snprintf(body, sizeof(body), "{\"map\":\"mcc_maps/My Pack/arena:slayer\\nquit\"}");
+		CHECK(rotation_play_line(body, (int)strlen(body), line, sizeof(line)), "MCC command newline accepted");
 		CHECK(sizeof(entry_text) - 1 > 127, "the entry is %d characters", (int)sizeof(entry_text) - 1);
 		snprintf(body, sizeof(body), "{\"map\":\"%s\"}", entry_text);
 		snprintf(expected, sizeof(expected), "sv_map %s ", entry_text);

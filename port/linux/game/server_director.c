@@ -39,6 +39,8 @@ Called from the main loop every frame (main.c).
 #include "network_coop.h"
 #include "network_map_vote.h"
 #include "server_director.h"
+#include "mcc_server.h"
+#include "mcc_ui_network.h"
 #include "server_gametypes.h"
 
 #include "../src/p2p.h" /* port: port/linux/src/p2p.c, p2p_lobby.c */
@@ -67,6 +69,7 @@ unsigned long system_milliseconds(void);
 extern boolean debug_no_drawing;
 /* (menu_functions.c's) */
 extern boolean ui_widget_port_cooperative_level_choose(char const *map_name, short difficulty);
+extern boolean ui_widget_port_mcc_cooperative_level_choose(char const *map_name, short difficulty);
 extern void ui_widget_port_cooperative_settings_apply(void);
 /* (port/linux/src/updater.c's) */
 int updater_server_check(void);
@@ -584,7 +587,9 @@ static boolean server_apply_entry(
 		}
 		if (difficulty == (short)NUMBEROF(difficulties))
 			difficulty = 1;
-		if (!ui_widget_port_cooperative_level_choose(entry->level, difficulty))
+		if (!(entry->map_kind == _server_map_mcc ?
+			ui_widget_port_mcc_cooperative_level_choose(entry->level, difficulty) :
+			ui_widget_port_cooperative_level_choose(entry->level, difficulty)))
 		{
 			server_log(_server_log_warning, "lobby", "%s cannot be played as co-op", entry->level);
 			return FALSE;
@@ -940,6 +945,8 @@ void server_director_reload(
 		server_log(_server_log_warning, "server", "config.toml cannot be read again: nothing changed");
 		return;
 	}
+	/* MCC discovery waits for pregame; legacy rotation resolution is unchanged. */
+	mcc_server_request_rescan();
 	/* (server.vpn_list's file, vpn_allow.txt and vpn_block.txt too) */
 	server_netlist_reload();
 	server_read_rotation(&rotation, config_string("server.rotation"));
@@ -1780,6 +1787,19 @@ static boolean server_map_vote(
 	return FALSE;
 }
 
+/* whether the lobby's map is to be set again, its widgets having put
+another back: not once the game is starting, nor while an MCC map waits for
+its package check (mcc_ui_network.c: the lobby shows its stand-in map
+meanwhile, and setting the MCC map again would start the check over, so
+that a check longer than the second between looks never ends) */
+static boolean server_lobby_map_lost(
+	struct network_game_server *network_server,
+	struct network_game const *game)
+{
+	return game && csstrcasecmp(game->map.name, server.current.level) &&
+		!network_game_server_port_start_sent(network_server) && !mcc_ui_network_map_pending(network_server);
+}
+
 static void server_lobby(
 	real seconds)
 {
@@ -1846,7 +1866,7 @@ static void server_lobby(
 		struct network_game *game = server_game();
 
 		server.map_checked_seconds = server.lobby_seconds;
-		if (game && csstrcasecmp(game->map.name, server.current.level) && !network_game_server_port_start_sent(network_server))
+		if (server_lobby_map_lost(network_server, game))
 		{
 			server_log(_server_log_warning, "lobby", "the lobby's map became %s: %s set again", game->map.name,
 				server.current.level);
@@ -2246,6 +2266,8 @@ void server_update(
 
 	network_server = global_network_game_server_get();
 	network_state = server_network_state();
+	mcc_server_update((network_state == SERVER_PREGAME && server.state != _server_state_loading &&
+        server.state != _server_state_playing) || (!network_server && main_menu_loaded));
 	server.state_seconds += seconds;
 	server_mode_set_idle(!network_server ||
 		(network_state == SERVER_PREGAME && !network_game_server_port_remote_machine_count(network_server, FALSE)));

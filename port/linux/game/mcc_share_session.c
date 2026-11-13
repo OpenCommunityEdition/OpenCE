@@ -96,25 +96,20 @@ enum mcc_share_result mcc_share_admit(char const *level, int opt_in, enum mcc_sh
     char credit[MCC_SHARE_CREDIT_SIZE])
 {
     struct mcc_share_package package;
-    int listed;
     credit[0]=0;
     if (!opt_in) return MCC_SHARE_RESULT_OFF;
-    listed=digest_known ? mcc_share_list_find(list,list_length,digest,credit) : 0;
+    /* Older optional lists supply attribution only. A validated package no
+     * longer needs manual fingerprint approval to be offered. */
+    if (digest_known) mcc_share_list_find(list,list_length,digest,credit);
     memset(&package,0,sizeof(package));
     package.name=level;
     package.name_length=level ? strlen(level) : 0;
     package.sidecar=sidecar;
-    package.content=listed ? MCC_SHARE_CONTENT_CUSTOM : MCC_SHARE_CONTENT_UNKNOWN;
+    package.content=MCC_SHARE_CONTENT_CUSTOM;
     package.content_known=digest_known;
     package.host_opt_in=1;
     switch (mcc_share_decide(&package)) {
     case MCC_SHARE_ELIGIBLE:
-        /* Listed without a maker: permission and credit are unclear, so the joiner is
-         * pointed to the maker instead. */
-        if (listed<0) {
-            credit[0]=0;
-            return MCC_SHARE_RESULT_NO_CREDIT;
-        }
         return MCC_SHARE_RESULT_OK;
     case MCC_SHARE_NOT_OPTED_IN: return MCC_SHARE_RESULT_OFF;
     default: break;
@@ -977,11 +972,14 @@ static void client_update(struct mcc_share *share)
         result=mcc_share_stage_verify(&share->stage,client_check,share);
         if (result==MCC_SHARE_STAGE_PENDING) return;
         if (result==MCC_SHARE_STAGE_REFUSED) {
+            char message[384];
+            char const *reason=share->env.identity_error ? share->env.identity_error(share->env.user) : NULL;
+            snprintf(message,sizeof(message),"%s Nothing was installed.",reason && reason[0] ? reason :
+                "The files from the host are not the host's map: their SHA-256 identity differs.");
             memset(&share->stage,0,sizeof(share->stage));
             client_terminal(share,0);
             client_idle(share);
-            share->env.finished(share->env.user,0,"The files from the host are not the host's map: their SHA-256 "
-                "identity differs. Nothing was installed.");
+            share->env.finished(share->env.user,0,message);
             return;
         }
         if (result==MCC_SHARE_STAGE_OK && share->env.prepare_install &&

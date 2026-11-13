@@ -413,6 +413,12 @@ static void entry(struct mcc_share_entry *e, int kind, char const *leaf, uint32_
     memset(e->sha256,7,32);
 }
 
+static char const *env_identity_error(void *user)
+{
+    (void)user;
+    return "Cannot read mcc_maps/_shared/multiplayer/sounds.map. Check access to this MCC resource.";
+}
+
 int main(int argc,char **argv)
 {
     unsigned i;
@@ -460,25 +466,25 @@ int main(int argc,char **argv)
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         CHECK(!strcmp(credit,"Example Maker"));
         CHECK(mcc_share_admit("mcc_maps/solar_flare/m0",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
-        /* off by default: the opt-in decides first and nothing is read from the list */
+        /* disabled sharing decides first and nothing is read from the optional list */
         CHECK(mcc_share_admit(LEVEL,0,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OFF && !credit[0]);
         /* unlisted, unknown fingerprint, other fingerprint */
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,"",0,credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,"",0,credit)==MCC_SHARE_RESULT_OK);
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,0,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
         d[0]^=1;
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         d[0]^=1;
-        /* listed without a maker: the joiner is pointed to the maker */
+        /* a missing maker is optional attribution, not an admission requirement */
         snprintf(list,sizeof(list),"%s\n",hex);
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NO_CREDIT && !credit[0]);
-        CHECK(mcc_share_admit("mcc_maps/2915693904/a10",1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NO_CREDIT && !credit[0]);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK && !credit[0]);
+        CHECK(mcc_share_admit("mcc_maps/2915693904/a10",1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK && !credit[0]);
         snprintf(list,sizeof(list),"%s Example Maker\n",hex);
-        /* Workshop origin permits an offer only with the same permission and credit. */
+        /* Workshop and local packages use the same automatic policy. */
         CHECK(mcc_share_admit("mcc_maps\\2915693904\\a10",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         CHECK(!strcmp(credit,"Example Maker"));
         CHECK(mcc_share_admit(LEVEL,0,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OFF && !credit[0]);
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,"",0,credit)==MCC_SHARE_RESULT_NOT_SHAREABLE && !credit[0]);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,"",0,credit)==MCC_SHARE_RESULT_OK && !credit[0]);
         /* The remaining rules still refuse invalid origins/names and shared resources. */
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_UNREADABLE,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
         CHECK(mcc_share_admit("mcc_maps\\loose",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
@@ -1429,6 +1435,13 @@ int main(int argc,char **argv)
         CHECK(staging_gone() && package_absent());
         snprintf(path,sizeof(path),"%smcc_maps/solar_flare",J);
         CHECK(!io_exists(path));
+        /* A local read failure survives stage cancellation and reaches the UI. */
+        W.join.env.identity_error=env_identity_error;W.finished=0;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        CHECK(run_until_finished(2000));
+        CHECK(!W.finished_ok && strstr(W.finished_text,"Cannot read") && strstr(W.finished_text,"sounds.map"));
+        CHECK(strstr(W.finished_text,"Nothing was installed") && staging_gone() && package_absent());
+        W.join.env.identity_error=NULL;
         /* a different fingerprint in the game record */
         W.identity_ok=1;W.finished=0;
         W.digest[5]^=1;

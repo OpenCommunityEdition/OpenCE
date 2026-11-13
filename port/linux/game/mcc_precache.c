@@ -49,15 +49,12 @@ static boolean mcc_precache_files(char const *name, struct mcc_precache_stamp *f
     if (!mcc_package_map_path(name, path) || !mcc_precache_file(path, files)) return FALSE;
     for (type = 1; type <= 2; type++) {
         if (!mcc_package_resource_path(name, type, path) ||
-            !mcc_precache_file(path, &files[index++]) ||
-            !mcc_package_resource_path("mcc_maps/root", type, path) ||
             !mcc_precache_file(path, &files[index++])) return FALSE;
         /* Include absent candidates: adding an override or a second matching
          * shared set must invalidate the result as well as editing a file. */
-        for (set = 0; set < 2; set++) {
-            snprintf(path, sizeof(path), "mcc_maps/_shared/%s/%s.map",
-                set ? "multiplayer" : "singleplayer", type == 1 ? "bitmaps" : "sounds");
-            if (!mcc_precache_file(path, &files[index++])) return FALSE;
+        for (set = 0; set < MCC_PACKAGE_BASE_SETS; set++) {
+            if (!mcc_package_base_resource_path(type,set,path) ||
+                !mcc_precache_file(path, &files[index++])) return FALSE;
         }
     }
     return TRUE;

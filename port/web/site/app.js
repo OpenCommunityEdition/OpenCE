@@ -775,6 +775,30 @@ function showLinkPage(url) {
   $('ask').hidden = false;
 }
 
+// Workshop metadata is untrusted. Construct only this page from a bounded ID;
+// the browser-side click also supplies the user activation for opening a tab.
+function showMccWorkshop(id) {
+  if (typeof id !== 'string' || !id.length || id.length > 20 || /[^0-9]/.test(id)) return;
+  $('ask-title').textContent = 'Steam Workshop';
+  $('ask-text').textContent = `Open Workshop item ${id}. Check the item before subscribing.`;
+  const buttons = [];
+  for (const [label, url] of [
+    ['Open in Steam', `steam://url/CommunityFilePage/${id}`],
+    ['Open in browser', `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`],
+  ]) {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
+    buttons.push(button);
+  }
+  const close = document.createElement('button');
+  close.textContent = 'Close';
+  close.addEventListener('click', () => { $('ask').hidden = true; });
+  $('ask-buttons').replaceChildren(...buttons, close);
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  $('ask').hidden = false;
+}
+
 $('invite-copy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText($('invite-link').value);
@@ -855,6 +879,7 @@ async function play() {
         // (the game quits, as the player asked: the page starts again)
         if (kind === 4) location.reload();
         if (kind === 5) showLinkPage(text);
+        if (kind === 6) showMccWorkshop(text);
       },
       // a question the game waits on (sdl_platform.c's platform_ask: the
       // mods that cannot be played together), answered with a button's index

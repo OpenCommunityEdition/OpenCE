@@ -98,6 +98,8 @@ struct mcc_share_env {
     int (*send_request)(void *user, struct mcc_share_request const *request);
     int (*package_taken)(void *user, char const *level);         /* an installed map has this name */
     int (*identity_check)(void *user, char const *stage_dir);    /* enum mcc_share_check_result */
+    /* Optional local diagnostic retained through cancel_check until the next check. */
+    char const *(*identity_error)(void *user);
     void (*cancel_check)(void *user);                          /* release only this download's identity job */
     /* Promote the completed proof and bind the published content before DONE.
      * Failure leaves the installed package intact but refuses admission. */
@@ -206,11 +208,9 @@ struct mcc_share {
     struct mcc_share_stage stage;
 };
 
-/* The host's admission for a level: the maintained rules (mcc_share_decide, unchanged)
- * decide eligibility from the facts the game established locally; the host's list
- * (mcc_share_list.h) is the classification: the content is custom only when its exact
- * fingerprint is listed, and it is offered only with a maker to credit. Anything
- * unknown is refused. credit is the maker when the result is OK. */
+/* Host admission requires sharing enabled and a validated package identity.
+ * The optional legacy list supplies attribution, never permission or identity.
+ * credit may be empty. The package planner separately excludes base resources. */
 enum mcc_share_result mcc_share_admit(char const *level, int opt_in, enum mcc_share_sidecar sidecar,
     unsigned char const digest[32], int digest_known, char const *list, unsigned long list_length,
     char credit[MCC_SHARE_CREDIT_SIZE]);

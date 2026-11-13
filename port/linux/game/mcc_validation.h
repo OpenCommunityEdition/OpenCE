@@ -19,6 +19,9 @@ struct mcc_validation_proof {
  * complete); end joins the worker and closes every reader before cleanup.
  * A non-NULL directory redirects only this check's opening and snapshots. */
 struct mcc_validation_check *mcc_validation_check_begin(char const *name, char const *directory);
+/* Before the first step, enable bounded local base selection. Success still
+ * requires the complete expected SHA-256; explicit package overrides stay fixed. */
+void mcc_validation_check_expect(struct mcc_validation_check *check,unsigned char const digest[32]);
 int mcc_validation_check_step(struct mcc_validation_check *check,
     struct mcc_validation_proof *proof, char *reason, size_t reason_size);
 void mcc_validation_check_end(struct mcc_validation_check *check);
