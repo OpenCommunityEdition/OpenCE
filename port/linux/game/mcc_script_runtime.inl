@@ -5,6 +5,9 @@
 #include "mcc_scripts.h"
 #include "mcc_campaign.h"
 #include "mcc_game_speed.h"
+/* (mcc_cache_tags_loaded's declaration: without it the call took its
+boolean, a byte, as an int, whose other bytes nothing sets) */
+#include "mcc_cache.h"
 
 /* Once an if has selected a branch, its frame only forwards that branch's
  * result. MCC's deeply nested equipment selectors need not retain all those

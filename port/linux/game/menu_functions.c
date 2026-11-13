@@ -81,6 +81,9 @@ their handlers open opens.
 #include "bitmaps/bitmap_group.h"
 #include "bitmaps/bitmaps.h"
 #include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
+/* (game_state_test_persistent_storage's declaration: without it the call
+took its boolean, a byte, as an int, whose other bytes nothing sets) */
+#include "saved games/game_state.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
