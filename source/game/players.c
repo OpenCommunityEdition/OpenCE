@@ -3830,9 +3830,8 @@ boolean unit_should_autopick_weapon(
 	if ((unit_approve_weapon_pickup(unit_index, weapon_index) &&
 		TEST_FLAG(weapon_definition->weapon.flags, _weapon_doesnt_count_toward_maximum_bit)) ||
 		weapon_count == 0 ||
-		/* port: and in multiplayer (campaign's only), a second weapon into
-		the empty slot, readied (unit_add_weapon_to_inventory) */
-		(unit_approve_weapon_pickup(unit_index, weapon_index) &&
+		(!game_engine_running() &&
+			unit_approve_weapon_pickup(unit_index, weapon_index) &&
 			weapon_count < 2) ||
 		game_engine_force_autopickup(unit_index, weapon_index))
 	{
