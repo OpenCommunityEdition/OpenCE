@@ -4,6 +4,8 @@
 #include "mcc_script_threads.h"
 #include "mcc_checkpoint.h"
 #include "mcc_campaign.h"
+/* (mcc_cache_tags_loaded's declaration, as in mcc_script_runtime.inl) */
+#include "mcc_cache.h"
 #include "saved games/game_state.h"
 #include "../../third_party/zlib/zlib_prefixed.h"
 #include <stdint.h>

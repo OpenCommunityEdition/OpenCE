@@ -78,6 +78,9 @@ their handlers open opens.
 #include "main/main.h"
 #include "networking/network_game_manager.h"
 #include "saved games/player_profile.h"
+/* (game_state_test_persistent_storage's declaration: without it the call
+took its boolean, a byte, as an int, whose other bytes nothing sets) */
+#include "saved games/game_state.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
