@@ -1,3 +1,0 @@
-/*
-ANTENNA_DEFINITIONS.C
-*/

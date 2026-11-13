@@ -1,3 +1,0 @@
-/*
-LIST_CONTROL.C
-*/

@@ -1,3 +1,0 @@
-/*
-GLASS_DEFINITIONS.C
-*/

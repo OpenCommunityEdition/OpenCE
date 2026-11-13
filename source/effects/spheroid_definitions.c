@@ -1,3 +1,0 @@
-/*
-SPHEROID_DEFINITIONS.C
-*/

@@ -1,3 +1,0 @@
-/*
-ACTOR_DEFINITIONS.C
-*/

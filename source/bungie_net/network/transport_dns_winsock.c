@@ -1,3 +1,0 @@
-/*
-TRANSPORT_DNS_WINSOCK.C
-*/

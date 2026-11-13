@@ -1,3 +1,0 @@
-/*
-VEHICLE_DEFINITIONS.C
-*/

@@ -1,3 +1,0 @@
-/*
-COLOR_TABLE_GROUP.C
-*/

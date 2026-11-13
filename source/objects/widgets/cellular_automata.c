@@ -1,3 +1,0 @@
-/*
-CELLULAR_AUTOMATA.C
-*/

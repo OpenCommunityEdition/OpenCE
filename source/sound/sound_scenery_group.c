@@ -1,3 +1,0 @@
-/*
-SOUND_SCENERY_GROUP.C
-*/

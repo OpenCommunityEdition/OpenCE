@@ -1,3 +1,0 @@
-/*
-RESTRICTED_BETA.C
-*/

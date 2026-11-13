@@ -1,3 +1,0 @@
-/*
-METER_DEFINITIONS.C
-*/

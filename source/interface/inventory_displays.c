@@ -1,3 +1,0 @@
-/*
-INVENTORY_DISPLAYS.C
-*/

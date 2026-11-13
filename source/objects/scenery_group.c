@@ -1,3 +1,0 @@
-/*
-SCENERY_GROUP.C
-*/

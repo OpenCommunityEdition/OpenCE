@@ -1,3 +1,0 @@
-/*
-PHYSICS_DEFINITIONS.C
-*/

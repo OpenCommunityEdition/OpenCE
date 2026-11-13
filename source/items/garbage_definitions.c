@@ -1,3 +1,0 @@
-/*
-GARBAGE_DEFINITIONS.C
-*/

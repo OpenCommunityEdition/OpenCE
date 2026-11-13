@@ -1,3 +1,0 @@
-/*
-PICTURE_CONTROL.C
-*/

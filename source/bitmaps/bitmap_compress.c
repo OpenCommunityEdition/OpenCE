@@ -1,3 +1,0 @@
-/*
-BITMAP_COMPRESS.C
-*/

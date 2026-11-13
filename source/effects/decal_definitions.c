@@ -1,3 +1,0 @@
-/*
-DECAL_DEFINITIONS.C
-*/

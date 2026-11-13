@@ -1,3 +1,0 @@
-/*
-FOG_DEFINITIONS.C
-*/

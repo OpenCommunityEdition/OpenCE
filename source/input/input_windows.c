@@ -1,3 +1,0 @@
-/*
-INPUT_WINDOWS.C
-*/

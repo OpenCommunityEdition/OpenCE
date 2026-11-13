@@ -1,3 +1,0 @@
-/*
-TAG_FILES_XBOX.C
-*/

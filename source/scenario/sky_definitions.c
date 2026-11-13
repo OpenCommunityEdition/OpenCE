@@ -1,3 +1,0 @@
-/*
-SKY_DEFINITIONS.C
-*/

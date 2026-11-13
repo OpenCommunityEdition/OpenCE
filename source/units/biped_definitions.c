@@ -1,3 +1,0 @@
-/*
-BIPED_DEFINITIONS.C
-*/

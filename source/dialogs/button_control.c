@@ -1,3 +1,0 @@
-/*
-BUTTON_CONTROL.C
-*/

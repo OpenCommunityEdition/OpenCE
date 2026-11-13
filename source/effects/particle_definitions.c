@@ -1,3 +1,0 @@
-/*
-PARTICLE_DEFINITIONS.C
-*/

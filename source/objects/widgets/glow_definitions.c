@@ -1,3 +1,0 @@
-/*
-GLOW_DEFINITIONS.C
-*/

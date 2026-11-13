@@ -1,3 +1,0 @@
-/*
-FLAG_DEFINITIONS.C
-*/

@@ -1,3 +1,0 @@
-/*
-INTERFACE_PANELS.C
-*/

@@ -1,3 +1,0 @@
-/*
-DIALOG_CONTROLS.C
-*/

@@ -1,3 +1,0 @@
-/*
-TERRAIN_DEFINITIONS.C
-*/

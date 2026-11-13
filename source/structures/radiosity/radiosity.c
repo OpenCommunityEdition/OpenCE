@@ -1,3 +1,0 @@
-/*
-RADIOSITY.C
-*/

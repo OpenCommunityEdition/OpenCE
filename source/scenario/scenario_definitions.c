@@ -1,3 +1,0 @@
-/*
-SCENARIO_DEFINITIONS.C
-*/

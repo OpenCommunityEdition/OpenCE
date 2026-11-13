@@ -1,3 +1,0 @@
-/*
-GAME_ENGINE_TERMINATOR.C
-*/

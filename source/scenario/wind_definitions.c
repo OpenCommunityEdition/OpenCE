@@ -1,3 +1,0 @@
-/*
-WIND_DEFINITIONS.C
-*/

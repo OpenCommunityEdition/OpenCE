@@ -1,3 +1,0 @@
-/*
-WEAPON_INTERFACES.C
-*/

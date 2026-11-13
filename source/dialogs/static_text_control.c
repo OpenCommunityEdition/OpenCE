@@ -1,3 +1,0 @@
-/*
-STATIC_TEXT_CONTROL.C
-*/

@@ -1,3 +1,0 @@
-/*
-SPHEROIDS.C
-*/

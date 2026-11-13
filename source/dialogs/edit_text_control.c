@@ -1,3 +1,0 @@
-/*
-EDIT_TEXT_CONTROL.C
-*/

@@ -1,3 +1,0 @@
-/*
-DEVICE_DEFINITIONS.C
-*/

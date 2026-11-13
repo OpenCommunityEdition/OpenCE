@@ -1,3 +1,0 @@
-/*
-SHELL_WINDOWS.C
-*/

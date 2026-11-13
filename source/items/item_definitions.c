@@ -1,3 +1,0 @@
-/*
-ITEM_DEFINITIONS.C
-*/
