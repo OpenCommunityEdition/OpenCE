@@ -600,6 +600,9 @@ static void solo_level_select_list_update_displayed_items(
 	struct widget_instance *widget);
 static void difficulty_select_menu_update_extended_description(
 	struct widget_instance *widget);
+/* port: port/linux/src/port_config.c */
+int config_boolean(const char *name);
+
 static void set_textbox_to_build_number(
 	struct widget_instance *widget);
 static void server_list_menu_update(
@@ -2048,9 +2051,12 @@ static void set_textbox_to_build_number(
 
 	if (widget->parameters.text_box.text)
 	{
+		/* port: none unless display.build_number, as the Xbox's menus showed
+		none (Halo Custom Edition's main menu, which the port's follows, has
+		its own) */
 		ustrncpy(
 			widget->parameters.text_box.text,
-			build_number_string,
+			config_boolean("display.build_number") ? build_number_string : L"",
 			NUMBEROF(build_number_string) - 1);
 		widget->parameters.text_box.text[NUMBEROF(build_number_string) - 1] = 0;
 	}

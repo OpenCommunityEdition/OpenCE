@@ -142,6 +142,14 @@ static const struct config_setting config_settings[] =
 	{ "display.show_fps", _config_boolean, "false", "HALO_SHOW_FPS", _environment_set_is_true, _platform_all,
 		"Draw the frame rate at the bottom right of a game, counted over half a\n"
 		"second: green from 30 frames a second, red below." },
+	/* port: the build number the menus' text box shows
+	(ui_widget_game_data_input_functions.c, set_textbox_to_build_number),
+	which Halo Custom Edition's main menu has at its bottom right and the
+	Xbox's menus did not */
+	{ "display.build_number", _config_boolean, "false", "HALO_BUILD_NUMBER", _environment_value, _platform_all,
+		"Show the game's build number (01.01.14.2342) at the main menu's bottom\n"
+		"right, as Halo Custom Edition shows its own; false shows none, as the\n"
+		"Xbox's menus did." },
 	{ "display.anti_aliasing", _config_string, "\"off\"", "HALO_ANTI_ALIASING", _environment_value, _platform_all,
 		"Smoothing of jagged edges, which the Xbox did not have: \"off\"; \"fxaa\"\n"
 		"or \"smaa\" smooth the 3D view once it is drawn (the HUD and menus stay\n"
