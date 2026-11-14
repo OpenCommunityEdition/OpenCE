@@ -344,6 +344,9 @@ static void first_person_weapon_predict(
 static void first_person_weapon_start_interpolation(
 	short local_player_index,
 	short frame_count);
+static short needler_reload_rounds_loaded(
+	struct weapon_magazine const *magazine,
+	struct weapon_magazine_definition const *magazine_definition);
 static void first_person_weapon_set_state(
 	short local_player_index,
 	short new_state,
@@ -878,6 +881,23 @@ void first_person_weapons_update(
 
 /* ---------- private code */
 
+/* port: the needles a needler's reload ends with, as
+weapon_magazine_finish_reload loads them (weapons.c): those loaded (none,
+for a magazine that wastes them) and as many of the rest as a reload loads,
+up to a full magazine. The reload drew the needles growing toward the rest
+alone, as many as a magazine holds: right only with 20 or more left. With
+fewer, the needles sank toward what was left (from 15 loaded with 3 left,
+to 3) and popped up to 18 as the reload ended. */
+static short needler_reload_rounds_loaded(
+	struct weapon_magazine const *magazine,
+	struct weapon_magazine_definition const *magazine_definition)
+{
+	long rounds_loaded = TEST_FLAG(magazine_definition->flags, 0) ? 0 : magazine->rounds_loaded;
+
+	rounds_loaded += MIN(magazine->rounds_total, magazine_definition->rounds_reloaded);
+	return (short)MIN(rounds_loaded, magazine_definition->rounds_loaded_maximum);
+}
+
 static void first_person_weapon_set_visibility(
 	short local_player_index,
 	boolean visible)
@@ -1311,9 +1331,11 @@ static void first_person_weapon_build_node_matrices(
 							{
 								settle_fraction= 1.0f;
 							}
-							predicted_frame_index= (short)MIN(
-								weapon->weapon.magazines[0].rounds_total,
-								magazine_definition->rounds_loaded_maximum);
+							/* port: as many as the reload loads, not the rest
+							alone (needler_reload_rounds_loaded) */
+							predicted_frame_index= needler_reload_rounds_loaded(
+								&weapon->weapon.magazines[0],
+								magazine_definition);
 							frame_index= (short)((predicted_frame_index-frame_index)*settle_fraction)+
 								frame_index;
 						}
