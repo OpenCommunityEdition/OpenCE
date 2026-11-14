@@ -1021,15 +1021,11 @@ void hud_render_timer(
 		}
 	}
 
-	if (time_code_time != NONE)
-	{
-		long stop_time = time_code_stop_time;
-
-		if (stop_time == NONE)
-			stop_time = game_time_get();
-		sprintf(temporary, "%d", stop_time - time_code_time);
-		render_debug_string(TRUE, temporary);
-	}
+	/* port: the time code (time_code_show), a count of ticks for timing a
+	cinematic, is not drawn (render_debug_string, as the console's debug
+	displays are): c20's and d40's endings (cutscene_extraction, launch_1)
+	turn it on and leave it on, and it counted at the top left of the screen
+	through them. The scripts keep it as before. */
 
 	return;
 }
