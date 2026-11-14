@@ -88,6 +88,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 /* ---------- constants */
 
@@ -933,10 +934,13 @@ void hud_render_unit_interface(
 						NONE);
 				}
 
+				/* port: nor with an MCC map's Malfunction skull on it
+				(port/linux/game/mcc_skulls.c) */
 				if (game_engine_has_shield(player_index) &&
 					!TEST_FLAG(
 						unit_hud_globals->script_flags,
-						_hud_panel_shield_dont_show_bit))
+						_hud_panel_shield_dont_show_bit) &&
+					!mcc_skulls_malfunction(0))
 				{
 					short draw_flags =
 						hud_unit->object.shield_vitality < 0.25f ||
@@ -1053,9 +1057,11 @@ void hud_render_unit_interface(
 					}
 				}
 
+				/* port: nor with an MCC map's Malfunction skull on it */
 				if (!TEST_FLAG(
 					unit_hud_globals->script_flags,
-					_hud_panel_health_dont_show_bit))
+					_hud_panel_health_dont_show_bit) &&
+					!mcc_skulls_malfunction(1))
 				{
 					short draw_flags =
 						TEST_FLAG(
@@ -1148,7 +1154,9 @@ void hud_render_unit_interface(
 					!TEST_FLAG(
 						unit_hud_globals->script_flags,
 						_hud_panel_motion_sensor_dont_show_bit) &&
-					game_engine_hud_draw_motion_sensor(player_index))
+					game_engine_hud_draw_motion_sensor(player_index) &&
+					/* port: nor with an MCC map's Malfunction skull on it */
+					!mcc_skulls_malfunction(5))
 				{
 					struct hud_absolute_placement_definition absolute_placement;
 					short draw_flags = 0;

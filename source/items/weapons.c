@@ -235,6 +235,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/units.h"
 #include "mcc_projectiles.h" /* port: port/linux/game/mcc_projectiles.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 #ifdef HALO_PORT_MAXIMUM_NETWORK_PLAYERS
 #include "bitmaps/bitmap_group.h"
@@ -2701,12 +2702,19 @@ static void weapon_trigger_fire(
 		if (magazine &&
 			(!loads_alternate_ammunition || weapon->weapon.alternate_shots_loaded<weapon_definition->weapon.maximum_alternate_shots_loaded))
 		{
-			if ((magazine->rounds_loaded>=trigger_definition->rounds_per_shot || TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit)) &&
+			/* port: an MCC map's Recession skull needs twice the rounds of a
+			player's weapon (mcc_skulls.c) */
+			if ((magazine->rounds_loaded>=trigger_definition->rounds_per_shot*
+					mcc_skulls_ammunition_scale(TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit)) ||
+				TEST_FLAG(trigger_definition->flags, _weapon_trigger_can_fire_with_partial_ammunition_bit)) &&
 				!(TEST_FLAG(weapon_definition->weapon.flags, _weapon_cannot_fire_at_maximum_age_bit) && weapon->weapon.age>=1.0f) &&
 				(magazine->rounds_loaded>=trigger_definition->minimum_rounds_loaded_per_shot || !TEST_FLAG(trigger->flags, _weapon_trigger_released_since_last_shot_bit)))
 			{
-				/* port: keep MCC predicted ammunition consistent with the host. */
-				if (!(cheat.bottomless_clip || mcc_script_effect_enabled(MCC_EFFECT_BOTTOMLESS_CLIP)) && (magazine->rounds_loaded-= trigger_definition->rounds_per_shot)<=0)
+				/* port: keep MCC predicted ammunition consistent with the host;
+				an MCC map's Recession skull doubles a player's (mcc_skulls.c) */
+				if (!(cheat.bottomless_clip || mcc_script_effect_enabled(MCC_EFFECT_BOTTOMLESS_CLIP)) &&
+					(magazine->rounds_loaded-= trigger_definition->rounds_per_shot*
+						mcc_skulls_ammunition_scale(TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit)))<=0)
 				{
 					magazine->rounds_loaded= 0;
 				}
@@ -2868,7 +2876,8 @@ static void weapon_trigger_fire(
 		/* port: MCC clients mirror the host's battery consumption rule. */
 		if (TEST_FLAG(weapon->item.flags, _item_belongs_to_player_bit) && !(cheat.infinite_ammo || mcc_campaign_unlimited_ammo()))
 		{
-			weapon->weapon.age+= trigger_definition->age_generated_per_round;
+			/* port: twice as fast with an MCC map's Recession skull (mcc_skulls.c) */
+			weapon->weapon.age+= trigger_definition->age_generated_per_round*mcc_skulls_ammunition_scale(TRUE);
 			if (weapon->weapon.age>1.0f)
 			{
 				weapon->weapon.age= 1.0f;

@@ -21,6 +21,9 @@ short mcc_script_find(char const *name);
 boolean mcc_script_call_valid(struct hs_syntax_node const *call, struct data_array *syntax);
 boolean mcc_script_call_arguments_valid(struct hs_syntax_node const *call, struct data_array *syntax);
 int mcc_scripts_prepare(struct mcc_runtime *runtime);
+/* The console: MCC's names for its map-local globals, and completions. */
+short mcc_script_find_global(char const *name);
+void mcc_script_enumerate(boolean functions, void (*add)(char const *name));
 /* MCC permits an AI reference in an object/unit or object-list expression. */
 int mcc_script_parse_ai(struct hs_syntax_node *node, char const *text);
 boolean mcc_script_ai_cast(short actual_type, short desired_type);

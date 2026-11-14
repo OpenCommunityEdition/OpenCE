@@ -4,6 +4,7 @@
 #include "mcc_game_speed.h"
 #include "cseries_windows.h"
 #include "mcc_cache.h"
+#include "mcc_skulls.h"
 #include "game/game.h"
 #include "hs/hs.h"
 #include "hs/hs_scenario_definitions.h"
@@ -19,6 +20,8 @@ static boolean mcc_clock_started,mcc_speed_sent;
 static unsigned long mcc_clock_wall,mcc_clock_time,mcc_speed_last_sent;
 static double mcc_clock_fraction;
 static real mcc_clock_speed=1.0f,mcc_sent_speed;
+static short mcc_paused_global=NONE;
+static boolean mcc_paused_seen;
 
 void mcc_game_speed_reset(void)
 {
@@ -78,6 +81,26 @@ real mcc_game_speed_client(real original)
         mcc_remote_speed : original;
 }
 
+void mcc_game_paused_bind(short scenario_global)
+{
+    mcc_paused_global=scenario_global;
+    mcc_paused_seen=FALSE;
+}
+
+/* As MCC's game time update: a change of game_paused pauses or resumes the
+ * clock, as the pause menu does, which may change it again. A local game's
+ * only: a network host's clock is its clients' too. */
+static void mcc_game_paused_frame(void)
+{
+    boolean paused;
+    if (!mcc_cache_tags_loaded() || mcc_paused_global==NONE || game_connection()!=_game_connection_local) return;
+    /* (a boolean global's value is its low byte; set writes no more) */
+    paused=(mcc_script_scenario_global_value(mcc_paused_global)&0xFF)!=0;
+    if (paused==mcc_paused_seen) return;
+    mcc_paused_seen=paused;
+    game_time_set_paused(paused);
+}
+
 void mcc_game_speed_frame(void)
 {
     struct {
@@ -85,6 +108,7 @@ void mcc_game_speed_frame(void)
         real speed;
     } message;
     unsigned long now;
+    mcc_game_paused_frame();
     if (!mcc_cache_tags_loaded() || game_connection()!=_game_connection_network_server ||
         !game_in_progress()) return;
     now=system_milliseconds();

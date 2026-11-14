@@ -166,6 +166,7 @@ symbols in this file:
 #undef normalize3d
 
 #include "math/real_math_declarations.h"
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 /* ---------- constants */
 
@@ -1017,7 +1018,8 @@ boolean actor_combat_plan_grenade_trajectory(
 	if (actor_combat_build_grenade_trajectory(
 			variant_definition->grenade_combat.grenade_type,
 			&origin,
-			variant_definition->grenade_combat.grenade_maximum_velocity,
+			/* port: twice as fast with an MCC map's Catch skull (mcc_skulls.c) */
+			variant_definition->grenade_combat.grenade_maximum_velocity*(mcc_skulls_catch() ? 2.0f : 1.0f),
 			grenade_target,
 			NULL,
 			FALSE,
@@ -2370,6 +2372,9 @@ void actor_combat_update(
 			{
 				real rate_of_fire = firing_variant_definition->ranged_combat.rate_of_fire;
 
+				/* port: an MCC map's Anger skull doubles an enemy's
+				(port/linux/game/mcc_skulls.c) */
+				rate_of_fire *= mcc_skulls_rate_of_fire_scale(actor->meta.team_index);
 				if (actor->control.overcharging_weapon)
 				{
 					actor->control.overcharging_weapon = FALSE;

@@ -824,6 +824,8 @@ void unit_render_debug(
 	long object_index);
 boolean unit_clip_to_aiming_bounds(long unit_index, real_vector3d *vector, boolean use_aiming_screen);
 long unit_inventory_get_weapon(long unit_index, short index);
+/* port: one grenade out of the unit (port/linux/game/mcc_skulls.c) */
+void unit_port_drop_one_grenade(long unit_index, short grenade_type);
 short unit_inventory_next_weapon(
 	long unit_index,
 	short current_index,

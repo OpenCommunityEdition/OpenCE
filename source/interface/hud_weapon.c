@@ -81,6 +81,7 @@ symbols in this file:
 #include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "custom_edition_hud.h" /* port: CE warning placement and reticle classification */
 #include "hud_hires_crosshairs.h" /* port: port/linux/game/hud_hires_tags.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 #include <math.h>
 #include <string.h>
@@ -2125,21 +2126,29 @@ void hud_render_weapon_interface(
 		hud_index = definition->weapon.interface_definition.hud_interface.index;
 		if (hud_index != NONE)
 		{
-			crosshairs_draw(
-				player,
-				weapon_index,
-				hud_index,
-				&weapon_state);
+			/* port: an MCC map's Malfunction skull may take the crosshairs
+			or the weapon's HUD away (port/linux/game/mcc_skulls.c) */
+			if (!mcc_skulls_malfunction(4))
+			{
+				crosshairs_draw(
+					player,
+					weapon_index,
+					hud_index,
+					&weapon_state);
+			}
 			/* port: keep MCC child and inherited HUD components in one safe frame. */
 			mcc_hud_weapon_frame_begin(hud_index);
-			render_weapon_hud(
-				hud_index,
-				player->local_player_index,
-				definition,
-				&weapon_state,
-				NULL,
-				NULL,
-				NULL);
+			if (!mcc_skulls_malfunction(2))
+			{
+				render_weapon_hud(
+					hud_index,
+					player->local_player_index,
+					definition,
+					&weapon_state,
+					NULL,
+					NULL,
+					NULL);
+			}
 			mcc_hud_weapon_frame_end(); /* port: do not affect later HUD draws. */
 			play_weapon_hud_sounds(
 				player->local_player_index,
@@ -2151,16 +2160,24 @@ void hud_render_weapon_interface(
 	{
 		struct weapon_interface_state weapon_state = { 0 };
 
-		crosshairs_draw(
-			player,
-			NONE,
-			hud_globals->defaults.default_weapon_hud.index,
-			&weapon_state);
+		/* port: (Malfunction, above) */
+		if (!mcc_skulls_malfunction(4))
+		{
+			crosshairs_draw(
+				player,
+				NONE,
+				hud_globals->defaults.default_weapon_hud.index,
+				&weapon_state);
+		}
 	}
 
-	render_grenade_hud(
-		player->local_player_index,
-		player->unit_index);
+	/* port: (Malfunction, above) */
+	if (!mcc_skulls_malfunction(3))
+	{
+		render_grenade_hud(
+			player->local_player_index,
+			player->unit_index);
+	}
 	if (player->local_player_index != NONE)
 	{
 		get_hud_state(player->local_player_index)->last_weapon_index = weapon_index;

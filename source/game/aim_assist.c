@@ -45,6 +45,7 @@ symbols in this file:
 #include "cseries.h"
 #include "game/aim_assist.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 #include "camera/director.h"
 #include "camera/observer.h"
@@ -528,8 +529,9 @@ boolean aim_assist(
 	short ignore_team_index,
 	struct aim_assist_target *target)
 {
-	/* port: Hardcore has no aim assist: no autoaim, no magnetism */
-	if (game_modes_aim_assist_off())
+	/* port: Hardcore has no aim assist: no autoaim, no magnetism; nor
+	has an MCC map's Eye Patch skull (port/linux/game/mcc_skulls.c) */
+	if (game_modes_aim_assist_off() || mcc_skull_active(_mcc_skull_eye_patch))
 		return FALSE;
 	if (scenario_leaf_index_from_point(position)!=NONE)
 	{

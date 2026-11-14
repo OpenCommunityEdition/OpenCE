@@ -82,6 +82,9 @@ void projectiles_delete_all(
 	void);
 void projectile_delete(
 	long projectile_index);
+/* port: port/linux/game/mcc_skulls.c */
+void projectile_port_detonate(
+	long projectile_index);
 boolean dangerous_projectiles_near_player(
 	void);
 real projectile_estimate_time_to_target(

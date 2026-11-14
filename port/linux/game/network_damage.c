@@ -68,6 +68,7 @@ being hit looks and feels like on the clients).
 #include "units/units.h"
 #include "network_distributed.h"
 #include "mcc_grenades.h"
+#include "mcc_skulls.h"
 
 #include <math.h>
 
@@ -2296,7 +2297,7 @@ static boolean distributed_report_valid(
 	definition = damage_effect_definition_get(report->damage.definition_index);
 	reach = target->object.bounding_sphere_radius + REPORT_IMPACT_TOLERANCE;
 	if (area)
-		reach += definition->cutoff_radius;
+		reach += definition->cutoff_radius*mcc_skulls_explosion_radius_scale();
 	if (!(distributed_distance_squared(&report->damage.origin, &report->target_position) <= reach * reach))
 		return FALSE;
 	/* what only a grenade of theirs deals, from one the host saw them throw
@@ -2413,9 +2414,12 @@ static boolean distributed_report_valid(
 		distance = normalize3d(&damage->direction);
 		if (!TEST_FLAG(definition->flags, _damage_effect_dont_scale_damage_by_distance_bit))
 		{
-			real radius_delta = definition->cutoff_radius - definition->falloff_radius;
+			/* (an MCC map's Boom skull doubles the radii: mcc_skulls.c) */
+			real radius_delta = (definition->cutoff_radius - definition->falloff_radius)*
+				mcc_skulls_explosion_radius_scale();
 			real scale = radius_delta > 0.0f ?
-				PIN(1.0f - (distance - definition->falloff_radius) / radius_delta, 0.0f, 1.0f) : 1.0f;
+				PIN(1.0f - (distance - definition->falloff_radius*mcc_skulls_explosion_radius_scale()) /
+					radius_delta, 0.0f, 1.0f) : 1.0f;
 
 			damage->scale = MIN(damage->scale, scale);
 		}
@@ -2777,7 +2781,8 @@ void network_damage_handle_events(
 				if (TEST_FLAG(damage.flags, _damage_area_of_effect_bit) &&
 					tag_index_is_group(damage.definition_index, DAMAGE_EFFECT_DEFINITION_TAG))
 				{
-					reach += damage_effect_definition_get(damage.definition_index)->cutoff_radius;
+					reach += damage_effect_definition_get(damage.definition_index)->cutoff_radius*
+						mcc_skulls_explosion_radius_scale();
 				}
 				object_index = static_target_near(&damage.origin, reach);
 			}

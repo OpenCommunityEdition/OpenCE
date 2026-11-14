@@ -70,6 +70,7 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 #include "halo_keyboard.h" /* port */
+#include "mcc_script_library.h" /* port: port/linux/game/mcc_script_library.c */
 
 /* ---------- constants */
 
@@ -537,6 +538,8 @@ void input_abstraction_update(
 
 			player_look_yaw_rate[controller_index] = input_abstraction_globals.player_control_preferences[controller_index].yaw_rate;
 			player_look_pitch_rate[controller_index] = input_abstraction_globals.player_control_preferences[controller_index].pitch_rate;
+			/* port: or the rates an MCC map's scripts set */
+			mcc_script_look_rates((short)controller_index);
 			{
 				real scale;
 

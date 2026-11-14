@@ -284,6 +284,7 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 #include "mcc_seats.h" /* port: port/linux/game/mcc_seats.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -512,6 +513,9 @@ struct data_array *team_data;
 struct data_array *player_data;
 static long machine_to_player_table[MAXIMUM_NETWORK_MACHINE_COUNT][MAXIMUM_LOCAL_PLAYERS] = { 0 };
 static boolean players_lost_map_started = FALSE;
+/* port: player_pseudo_kill is under way: its player_died is no loss for an
+MCC map's Iron skull (port/linux/game/mcc_skulls.c) */
+static boolean players_pseudo_killing = FALSE;
 static short over_shield_screen_flash_fade_function = 0;
 static real over_shield_screen_flash_alpha = 0.f;
 static real over_shield_screen_flash_green = 0.f;
@@ -843,6 +847,15 @@ void player_died(
 		if (other_player->unit_index != NONE)
 			players_globals->all_dead = FALSE;
 	}
+	/* port: a local player's death chooses another HUD element for an MCC
+	map's Malfunction skull (port/linux/game/mcc_skulls.c) */
+	if (player->local_player_index != NONE && !players_pseudo_killing)
+		mcc_skulls_malfunction_died();
+	/* port: with an MCC map's Iron skull any player's death loses the map:
+	a solo game restarts, a co-op game rewinds (main_lost_map_private). Not
+	a pseudo kill's, as MCC (port/linux/game/mcc_skulls.c) */
+	if (mcc_skulls_iron() && !players_pseudo_killing)
+		main_lost_map();
 
 	return;
 }
@@ -1776,7 +1789,9 @@ static void player_pseudo_kill(
 
 		players_globals->dead_units[player->local_player_index] =
 			player->unit_index;
+		players_pseudo_killing = TRUE;
 		player_died(player_index);
+		players_pseudo_killing = FALSE;
 
 		dead_unit_index =
 			players_globals->dead_units[player->local_player_index];

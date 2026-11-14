@@ -35,6 +35,7 @@ symbols in this file:
 #include "errors.h"
 #include "sound_classes.h"
 #include "sound_definitions.h"
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 /* ---------- constants */
 
@@ -337,7 +338,9 @@ short sound_definition_next_permutation(
 				&range->permutations,
 				selected_permutation_index,
 				struct sound_permutation);
-				if (random >= permutation->skip_fraction)
+				/* port: an MCC map's I Would Have Been Your Daddy skull
+				makes rare permutations common (port/linux/game/mcc_skulls.c) */
+				if (random >= mcc_skulls_skip_fraction(permutation->skip_fraction))
 					break;
 			}
 		}

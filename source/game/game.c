@@ -185,6 +185,7 @@ struct game_options;
 #include "units/bipeds.h" /* port: bipeds_riding_latch */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "mcc_loading.h" /* port: port/linux/game/mcc_loading.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -362,7 +363,12 @@ void game_tick(
 	distributed netcode has from the host: its own would fight the host's
 	positions, and could place objects of their own) */
 	if (!network_game_distributed_client())
+	{
 		profile_scope(game_tick_ai_section, ai_update();)
+		/* port: an MCC map's Assassins skull cloaks the host's enemy actors
+		(port/linux/game/mcc_skulls.c) */
+		mcc_skulls_update();
+	}
 	else
 		profile_scope(game_tick_actors_drive_section, network_actors_drive();)
 	profile_scope(game_tick_players_before_section, players_update_before_game();)

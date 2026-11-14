@@ -87,6 +87,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/hud.h"
 #include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 #include "interface/hud_definitions.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
@@ -1481,8 +1482,10 @@ void hud_draw_screen(
 		/* port: related MCC HUD elements share this player's unit safe frame. */
 		mcc_hud_view_begin(player->unit_index);
 
+		/* port: nor with an MCC map's Blind skull on, as MCC's Halo 1
+		(port/linux/game/mcc_skulls.c) */
 		if ((!game_engine_running() || game_engine_display_team_indicators()) &&
-			!cinematic_in_progress())
+			!cinematic_in_progress() && !mcc_skull_active(_mcc_skull_blind))
 		{
 			hud_draw_players();
 		}
@@ -1504,15 +1507,23 @@ void hud_draw_screen(
 			hud_draw_match_timer();
 		}
 
+		/* port: Blind (above) stops the motion sensor too */
 		if (!game_time_get_paused() &&
-			render.local_player_index == local_player_get_next(NONE))
+			render.local_player_index == local_player_get_next(NONE) &&
+			!mcc_skull_active(_mcc_skull_blind))
 		{
 			motion_sensor_tick();
 		}
 
 		if (hud_scripted_globals->show_hud)
 		{
-			if (perspective != _director_perspective_neutral &&
+			/* port: an MCC map's Blind skull draws none of it; its sounds
+			still play (port/linux/game/mcc_skulls.c) */
+			if (mcc_skull_active(_mcc_skull_blind))
+			{
+				hud_play_unit_sounds(player, hud_scripted_globals->show_hud);
+			}
+			else if (perspective != _director_perspective_neutral &&
 				perspective != _director_perspective_scripted &&
 				player->unit_index != NONE)
 			{

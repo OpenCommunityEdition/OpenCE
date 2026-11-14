@@ -282,6 +282,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 #include "actors.h"
 #include "actor_definitions.h"
 #include "actor_placement.h"
@@ -3364,8 +3365,11 @@ void actor_died(
 			actor->meta.unit_index,
 			unit_get(actor->meta.unit_index)->unit.current_weapon_index);
 
-		if (!ai_globals->grenades_enabled ||
-			grenade_roll < actor_variant_definition->items.dont_drop_grenades_chance)
+		/* port: an MCC map's Catch skull drops them all
+		(port/linux/game/mcc_skulls.c) */
+		if (!mcc_skulls_catch() &&
+			(!ai_globals->grenades_enabled ||
+			grenade_roll < actor_variant_definition->items.dont_drop_grenades_chance))
 		{
 			csmemset(unit->unit.grenade_counts, 0, sizeof(unit->unit.grenade_counts));
 			/* port: and MCC's expanded grenade inventory */

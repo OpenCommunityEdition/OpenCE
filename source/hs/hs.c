@@ -13906,6 +13906,14 @@ short hs_find_global_by_name(
 {
 	short global_index;
 
+	/* port: MCC's names for an MCC map's own globals (mcc_scripts.c) */
+	{
+		short mcc_index = mcc_script_find_global(name);
+
+		if (mcc_index != NONE)
+			return mcc_index;
+	}
+
 	for (global_index = 0; global_index<hs_external_global_count; global_index++)
 	{
 		if (_stricmp(name, hs_global_external_get(global_index)->name) == 0)
@@ -14254,6 +14262,8 @@ static void hs_enumerate_function_names(
 
 	for (function_index = 0; function_index<hs_function_table_count; function_index++)
 		hs_tokens_enumerate_add_string(hs_function_get(function_index)->name);
+	/* port: and an MCC map's (mcc_scripts.c) */
+	mcc_script_enumerate(TRUE, hs_tokens_enumerate_add_string);
 	return;
 }
 
@@ -14287,6 +14297,8 @@ static void hs_enumerate_variable_names(
 			hs_tokens_enumerate_add_string(global->name);
 		}
 	}
+	/* port: and MCC's names for an MCC map's own (mcc_scripts.c) */
+	mcc_script_enumerate(FALSE, hs_tokens_enumerate_add_string);
 	return;
 }
 

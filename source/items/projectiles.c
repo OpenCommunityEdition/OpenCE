@@ -317,6 +317,14 @@ static void projectile_detonate(
 	long projectile_index,
 	boolean first_collision,
 	real time_left);
+
+/* port: a projectile detonated where it is, at once (an MCC map's Grunt
+Funeral skull, port/linux/game/mcc_skulls.c) */
+void projectile_port_detonate(
+	long projectile_index)
+{
+	projectile_detonate(projectile_index, TRUE, 1.0f);
+}
 static void projectile_collision(
 	long projectile_index,
 	struct collision_result *collision,

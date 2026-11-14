@@ -408,6 +408,7 @@ symbols in this file:
 #include "custom_edition_cache.h" /* port: custom_edition_level_name */
 #include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
 #include "mcc_main.h" /* port: port/linux/game/mcc_main.h */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 #include "view_fov.h" /* port: display.fov, before the projection and culling */
 
 #if defined(HALO_WINDOWS) || defined(HALO_ANDROID) || defined(__linux__)
@@ -2234,9 +2235,18 @@ static void main_lost_map_private(
 		/* port: the co-op host chooses whether a team wipe rewinds or only
 		respawns. Scripted failures still revert, or their cutscene would
 		never end. A missing save falls back to checkpoint positions. */
+		/* port: with an MCC map's Iron skull, a loss with one player in the
+		game restarts the level, and a co-op team's always rewinds
+		(port/linux/game/mcc_skulls.c) */
 		if (game_connection() != _game_connection_network_server)
-			game_state_revert();
-		else if ((players_are_all_dead() && !network_coop_wipe_reverts()) || !main_coop_host_revert())
+		{
+			if (mcc_skulls_iron_restarts())
+				main_reset_map();
+			else
+				game_state_revert();
+		}
+		else if ((players_are_all_dead() && !network_coop_wipe_reverts() && !mcc_skulls_iron()) ||
+			!main_coop_host_revert())
 			players_respawn_at_checkpoint();
 	}
 	return;

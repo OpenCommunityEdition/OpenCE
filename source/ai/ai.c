@@ -237,6 +237,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "tag_files/tag_files.h"
 #include "tag_files/tag_groups.h"
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 #include <stddef.h>
 
@@ -617,6 +618,14 @@ void ai_get_major_upgrade_chance(
 		*is_random = TRUE;
 		*random_chance = game_difficulty_get_value(_game_difficulty_value_major_upgrade);
 		break;
+	}
+	/* port: an MCC map's Thunderstorm skull upgrades every actor whose
+	variant has a major upgrade, whatever its squad says, as MCC's Halo 1
+	(port/linux/game/mcc_skulls.c) */
+	if (mcc_skull_active(_mcc_skull_thunderstorm))
+	{
+		*is_random = FALSE;
+		*force_major = TRUE;
 	}
 
 	return;

@@ -17,6 +17,9 @@
 #include "mcc_syntax.h"
 #include "mcc_campaign.h"
 #include "mcc_player.h"
+#include "mcc_script_library.h"
+#include "mcc_skulls.h"
+#include "mcc_game_speed.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -203,6 +206,7 @@ struct hs_function_definition *mcc_script_function(short index)
     if (index == MCC_HS_EXECUTING_THREAD) return &mcc_executing_thread_definition;
     if (index == MCC_HS_KILL_THREAD) return &mcc_kill_thread_definition;
     if (index == MCC_HS_AI_DESELECT) return &mcc_ai_deselect_definition;
+    if (index >= MCC_HS_LIBRARY_FIRST) return mcc_script_library_function(index);
     return mcc_campaign_function(index);
 }
 
@@ -222,6 +226,7 @@ static short mcc_script_resolve(char const *name, boolean native_fallback)
     if (!csstrcasecmp(name, "kill_thread")) return MCC_HS_KILL_THREAD;
     if (!csstrcasecmp(name, "ai_deselect")) return MCC_HS_AI_DESELECT;
     index = mcc_campaign_find(name);
+    if (index == NONE) index = mcc_script_library_find(name);
     return index == NONE && native_fallback ? hs_find_function_by_name(name) : index;
 }
 
@@ -305,30 +310,116 @@ static short mcc_local_global(struct mcc_runtime *runtime, struct scenario *scen
     return (short)count;
 }
 
-static boolean mcc_disabled_skull(char const *name)
+/* MCC external globals the Xbox engine lacks, and the f0-f5 debug floats
+ * whose native renderer controls a map must not reach. Each is given the
+ * scenario storage above, starting at zero (game_speed_value at one): script
+ * reads, writes and checkpoints work. The engine reads the skulls'
+ * (mcc_skulls.c) and game_paused (mcc_game_speed.c); nothing reads the
+ * others. The list is MCC's editing kit's (hs_doc.txt). A scenario global's
+ * name has at most 31 characters, so longer names, and f0-f5 (which the
+ * native table also has), use an internal name appended to the script
+ * strings: the native recompiler resolves the token by name again. Bandanna
+ * is the existing infinite ammunition and grenades control (an external
+ * global). */
+#define MCC_LOCAL_NAME_BYTES 32
+static struct {
+    char const *name, *internal;
+    short type;
+    boolean external;
+} const mcc_local_globals[] = {
+    {"f0","__mcc_scratch_f0",_hs_type_real,FALSE},
+    {"f1","__mcc_scratch_f1",_hs_type_real,FALSE},
+    {"f2","__mcc_scratch_f2",_hs_type_real,FALSE},
+    {"f3","__mcc_scratch_f3",_hs_type_real,FALSE},
+    {"f4","__mcc_scratch_f4",_hs_type_real,FALSE},
+    {"f5","__mcc_scratch_f5",_hs_type_real,FALSE},
+    {"game_speed_value",NULL,_hs_type_real,FALSE},
+    /* Debug score is a map-local long, not a multiplayer score or authority control. */
+    {"debug_score",NULL,_hs_type_long_integer,FALSE},
+    /* Not the engine's developer privileges. */
+    {"developer_mode",NULL,_hs_type_short_integer,FALSE},
+    {"debug_ice_cream_flavor_status_bandanna","cheat_infinite_ammo",_hs_type_boolean,TRUE},
+    {"debug_ice_cream_flavor_status_grunt_birthday_party","__mcc_skull_birthday_party",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_assassins","__mcc_skull_assassins",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_famine","__mcc_skull_famine",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_i_would_have_been_your_daddy","__mcc_skull_iwhbyd",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_blind","__mcc_skull_blind",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_ghost","__mcc_skull_ghost",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_black_eye","__mcc_skull_black_eye",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_catch","__mcc_skull_catch",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_sputnik","__mcc_skull_sputnik",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_mythic","__mcc_skull_mythic",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_anger","__mcc_skull_anger",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_thunderstorm","__mcc_skull_thunderstorm",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_iron","__mcc_skull_iron",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_thats_just_wrong","__mcc_skull_thats_just_wrong",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_boom","__mcc_skull_boom",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_eye_patch","__mcc_skull_eye_patch",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_fog","__mcc_skull_fog",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_foreign","__mcc_skull_foreign",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_grunt_funeral","__mcc_skull_grunt_funeral",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_pinata","__mcc_skull_pinata",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_recession","__mcc_skull_recession",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_malfunction","__mcc_skull_malfunction",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_streaking","__mcc_skull_streaking",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_styx","__mcc_skull_styx",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_feather","__mcc_skull_feather",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_bonded_pair","__mcc_skull_bonded_pair",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_status_masterblaster","__mcc_skull_masterblaster",_hs_type_boolean,FALSE},
+    {"debug_ice_cream_flavor_force_coop","__mcc_skull_force_coop",_hs_type_boolean,FALSE},
+    /* Debug and settings switches with no effect here. */
+    {"rasterizer_debug_shader_transparent_generic","__mcc_debug_transparent_generic",_hs_type_boolean,FALSE},
+    {"rasterizer_effects_level",NULL,_hs_type_short_integer,FALSE},
+    {"rasterizer_fps",NULL,_hs_type_boolean,FALSE},
+    {"debug_sound_cache_graph",NULL,_hs_type_boolean,FALSE},
+    {"sound_obstruction_ratio",NULL,_hs_type_real,FALSE},
+    {"debug_sound_channels_detail",NULL,_hs_type_boolean,FALSE},
+    {"debug_sound_hardware",NULL,_hs_type_boolean,FALSE},
+    {"hs_verbose",NULL,_hs_type_boolean,FALSE},
+    {"breakpoints_enabled",NULL,_hs_type_boolean,FALSE},
+    {"debug_structure_automatic",NULL,_hs_type_boolean,FALSE},
+    {"director_camera_switching",NULL,_hs_type_boolean,FALSE},
+    {"slow_server_startup_safety_zone_in_seconds","__mcc_slow_server_startup",_hs_type_long_integer,FALSE},
+    {"error_suppress_all",NULL,_hs_type_boolean,FALSE},
+    {"mouse_acceleration",NULL,_hs_type_real,FALSE},
+    /* MCC's client prediction and its breadcrumbs override; both start
+     * false in MCC. The port's netcode predicts for itself, and its
+     * breadcrumbs are always available (breadcrumbs_nav_points_active). */
+    {"object_prediction",NULL,_hs_type_boolean,FALSE},
+    {"breadcrumbs_navpoints_enabled_override","__mcc_breadcrumbs_override",_hs_type_boolean,FALSE},
+    {"game_paused",NULL,_hs_type_boolean,FALSE}
+};
+
+static short mcc_local_global_find(char const *name)
 {
-    return name && (!csstrcasecmp(name,"debug_ice_cream_flavor_status_i_would_have_been_your_daddy") ||
-        !csstrcasecmp(name,"debug_ice_cream_flavor_status_grunt_birthday_party") ||
-        !csstrcasecmp(name,"debug_ice_cream_flavor_status_bandanna") ||
-        !csstrcasecmp(name,"debug_ice_cream_flavor_status_sputnik") ||
-        !csstrcasecmp(name,"debug_ice_cream_flavor_status_catch") ||
-        !csstrcasecmp(name,"debug_ice_cream_flavor_status_boom"));
+    short i;
+    for (i=0;i<(short)NUMBEROF(mcc_local_globals);i++)
+        if (!csstrcasecmp(name,mcc_local_globals[i].name)) return i;
+    return NONE;
 }
 
-static boolean mcc_boolean_result(struct hs_syntax_node *node,boolean value)
+/* Append every internal name once, in fixed slots. The final 1 KiB of the
+ * string data belongs to console source, not map strings, and stays last. */
+static long mcc_local_global_strings(struct mcc_runtime *runtime, struct scenario *scenario,
+    char const **strings)
 {
-    union { real number;long bits; } result;
-    switch (node->type) {
-    case _hs_type_void: result.bits=0;break;
-    case _hs_type_boolean: case _hs_type_short_integer: case _hs_type_long_integer:
-        result.bits=value!=FALSE;break;
-    case _hs_type_real: result.number=value ? 1.0f : 0.0f;break;
-    default: return FALSE;
-    }
-    /* The native cache recompiler requires primitive constants to have
-     * matching stored/desired types, including discarded (void) results. */
-    node->flags=9;node->constant_type=node->type;node->data=result.bits;node->source_offset=NONE;
-    return TRUE;
+    long base;
+    short i;
+    char *expanded;
+    unsigned long bytes=NUMBEROF(mcc_local_globals)*MCC_LOCAL_NAME_BYTES;
+    if (scenario->hs_string_constants.size<1024) return NONE;
+    expanded=mcc_runtime_allocate(runtime,(uint32_t)(scenario->hs_string_constants.size+bytes));
+    if (!expanded) return NONE;
+    base=scenario->hs_string_constants.size-1024;
+    memcpy(expanded,*strings,(unsigned long)base);
+    memset(expanded+base,0,bytes+1024);
+    for (i=0;i<(short)NUMBEROF(mcc_local_globals);i++)
+        if (mcc_local_globals[i].internal)
+            strcpy(expanded+base+i*MCC_LOCAL_NAME_BYTES,mcc_local_globals[i].internal);
+    *strings=expanded;
+    scenario->hs_string_constants.address=expanded;
+    scenario->hs_string_constants.size+=bytes;
+    return base;
 }
 
 int mcc_scripts_prepare(struct mcc_runtime *runtime)
@@ -339,10 +430,12 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
     struct hs_syntax_node *nodes;
     char const *strings;
     long i, missing = 0;
-    short developer=NONE, score=NONE, speed=NONE, scratch[6]={NONE,NONE,NONE,NONE,NONE,NONE};
-    long scratch_strings=NONE;
-    static char const scratch_names[6][17]={"__mcc_scratch_f0","__mcc_scratch_f1",
-        "__mcc_scratch_f2","__mcc_scratch_f3","__mcc_scratch_f4","__mcc_scratch_f5"};
+    short locals[NUMBEROF(mcc_local_globals)];
+    long local_strings=NONE;
+    for (i=0;i<(long)NUMBEROF(locals);i++) locals[i]=NONE;
+    mcc_skulls_reset();
+    mcc_game_paused_bind(NONE);
+    mcc_script_library_reset();
     memcpy(&address, runtime->tag_index + (runtime->report.scenario_handle & 0xFFFFu) * 32 + 20, 4);
     scenario = mcc_runtime_pointer(runtime, address, sizeof(*scenario));
     if (!scenario) return FALSE;
@@ -370,108 +463,37 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
                 return FALSE;
             name = mcc_script_string(strings, scenario->hs_string_constants.size, nodes[child].string_offset);
             if (!name) return FALSE;
-            /* These status queries describe disabled, unimplemented skulls.
-             * They are read-only constants, not writable legacy globals. */
-            if (!csstrcasecmp(name,"set")) {
-                struct hs_syntax_node *target = datum_try_and_get(syntax,nodes[child].next_node_index);
-                char const *target_name=target ? mcc_script_string(strings,scenario->hs_string_constants.size,target->string_offset) : NULL;
-                if (target && (target->flags&5)==5 && target_name && (!csstrcasecmp(target_name,"object_prediction") ||
-                    !csstrcasecmp(target_name,"breadcrumbs_navpoints_enabled_override"))) {
-                    struct hs_syntax_node *value=datum_try_and_get(syntax,target->next_node_index);
-                    /* Prediction and MCC breadcrumb availability are always
-                     * enabled. A literal enable agrees with those policies;
-                     * never discard a disable request or computed value. */
-                    if (value && (value->flags&7)==1 && value->type==_hs_type_boolean &&
-                        value->constant_type==_hs_type_boolean && value->boolean_value && value->next_node_index==NONE) {
-                        if (!mcc_boolean_result(node,TRUE)) return FALSE;
-                        continue;
-                    }
-                    error(_error_silent,"mcc: %s supports only a literal enable (syntax node %ld)",target_name,i);
-                    return FALSE;
-                }
-                if (target && (target->flags & 1) && mcc_disabled_skull(
-                    mcc_script_string(strings,scenario->hs_string_constants.size,target->string_offset))) {
-                    struct hs_syntax_node *value=datum_try_and_get(syntax,target->next_node_index);
-                    /* A literal disable is already satisfied. Retain the
-                     * expression's requested result type and sibling link;
-                     * never discard computed values or an enable request. */
-                    if (value && (value->flags&7)==1 && value->type==_hs_type_boolean &&
-                        value->constant_type==_hs_type_boolean && !value->boolean_value &&
-                        value->next_node_index==NONE) {
-                        if (!mcc_boolean_result(node,FALSE)) return FALSE;
-                        continue;
-                    }
-                    error(_error_silent,"mcc: unsupported skull assignment to %s (syntax node %ld); only a literal disable is supported",target_name,i);
-                    return FALSE;
-                }
-            }
             index = mcc_script_resolve(name, TRUE);
             if (index != NONE) node->function_index = nodes[child].function_index = index;
         } else if ((node->flags & 5) == 5 && ((uint16_t)node->data & 0x8000)) {
             name = mcc_script_string(strings, scenario->hs_string_constants.size, node->string_offset);
             if (!name) return FALSE;
-            if (!csstrcasecmp(name,"object_prediction") || !csstrcasecmp(name,"breadcrumbs_navpoints_enabled_override")) {
-                if (node->type!=_hs_type_boolean) return FALSE;
-                node->flags&=~4;node->constant_type=_hs_type_boolean;node->data=TRUE;continue;
-            }
-            if (mcc_disabled_skull(name)) {
-                if (node->type != _hs_type_boolean) return FALSE;
-                node->flags &= ~4;
-                node->constant_type = _hs_type_boolean;
-                node->data = FALSE;
-                continue;
-            }
-            if (!csstrcasecmp(name,"game_speed_value")) {
-                if (speed==NONE) speed=mcc_local_global(runtime,scenario,syntax,name,_hs_type_real);
-                if (speed==NONE) {
-                    error(_error_silent,"mcc: no scenario storage for game_speed_value");
+            index = mcc_local_global_find(name);
+            if (index != NONE) {
+                short local = index;
+                char const *global_name = mcc_local_globals[local].internal ?
+                    mcc_local_globals[local].internal : mcc_local_globals[local].name;
+                if (mcc_local_globals[local].internal && local_strings == NONE &&
+                    (local_strings = mcc_local_global_strings(runtime, scenario, &strings)) == NONE) return FALSE;
+                if (locals[local] == NONE) locals[local] = mcc_local_globals[local].external ?
+                    hs_find_global_by_name(global_name) :
+                    mcc_local_global(runtime, scenario, syntax, global_name, mcc_local_globals[local].type);
+                /* The recompiler checks each use's cast from the stored type;
+                 * an aliased engine global must have MCC's type. */
+                if (locals[local] == NONE ||
+                    (mcc_local_globals[local].external && (!((uint16_t)locals[local] & 0x8000) ||
+                        hs_global_external_get((short)(locals[local] & 0x7fff))->type !=
+                            mcc_local_globals[local].type))) {
+                    error(_error_silent, "mcc: no scenario storage for %s", name);
                     return FALSE;
                 }
-                node->data=speed;
-                continue;
-            }
-            /* Debug score is a map-local long, not a multiplayer score or
-             * authority control. Preserve its script reads and writes. */
-            if (!csstrcasecmp(name,"debug_score")) {
-                if (score==NONE) score=mcc_local_global(runtime,scenario,syntax,name,_hs_type_long_integer);
-                if (score==NONE) {
-                    error(_error_silent,"mcc: no scenario storage for debug_score");
-                    return FALSE;
+                if (mcc_local_globals[local].external) node->short_value = locals[local];
+                else {
+                    node->data = locals[local];
+                    mcc_skulls_bind(mcc_skull_find(name), locals[local]);
                 }
-                node->data=score;
-                continue;
-            }
-            if (!csstrcasecmp(name,"developer_mode")) {
-                if (developer==NONE) developer=mcc_local_global(runtime,scenario,syntax,"developer_mode",_hs_type_short_integer);
-                if (developer==NONE) {
-                    error(_error_silent,"mcc: no scenario storage for developer_mode");
-                    return FALSE;
-                }
-                node->data=developer;
-                continue;
-            }
-            /* Maps use these debug floats as script counters. Give them
-             * ordinary scenario storage, not the native renderer's controls.
-             * Rename tokens too: the native recompiler resolves them again. */
-            if ((name[0]=='f' || name[0]=='F') && name[1]>='0' && name[1]<='5' && !name[2]) {
-                unsigned slot=(unsigned)(name[1]-'0');
-                if (scratch_strings==NONE) {
-                    char *expanded;
-                    if (scenario->hs_string_constants.size<1024) return FALSE;
-                    expanded=mcc_runtime_allocate(runtime,
-                        (uint32_t)scenario->hs_string_constants.size+sizeof(scratch_names));
-                    if (!expanded) return FALSE;
-                    /* The final 1 KiB belongs to console source, not map strings. */
-                    scratch_strings=scenario->hs_string_constants.size-1024;
-                    memcpy(expanded,strings,(unsigned long)scratch_strings);
-                    memcpy(expanded+scratch_strings,scratch_names,sizeof(scratch_names));
-                    memset(expanded+scratch_strings+sizeof(scratch_names),0,1024);
-                    strings=expanded;scenario->hs_string_constants.address=expanded;
-                    scenario->hs_string_constants.size+=sizeof(scratch_names);
-                }
-                if (scratch[slot]==NONE) scratch[slot]=mcc_local_global(runtime,scenario,syntax,scratch_names[slot],_hs_type_real);
-                if (scratch[slot]==NONE) return FALSE;
-                node->data=scratch[slot];node->string_offset=scratch_strings+slot*sizeof(scratch_names[0]);
+                if (mcc_local_globals[local].internal)
+                    node->string_offset = local_strings + local * MCC_LOCAL_NAME_BYTES;
                 continue;
             }
             index = hs_find_global_by_name(name);
@@ -485,8 +507,55 @@ int mcc_scripts_prepare(struct mcc_runtime *runtime)
             ++missing;
         }
     }
+    /* Every skull, and game_paused, has storage, whether or not the map's
+     * scripts name it, so the console can set any of them
+     * (mcc_script_find_global). */
+    for (i = 0; i < (long)NUMBEROF(mcc_local_globals); i++) {
+        short skull = mcc_skull_find(mcc_local_globals[i].name);
+        boolean paused = !csstrcasecmp(mcc_local_globals[i].name, "game_paused");
+        if ((skull == NONE && !paused) || mcc_local_globals[i].external) continue;
+        if (locals[i] == NONE) locals[i] = mcc_local_global(runtime, scenario, syntax,
+            mcc_local_globals[i].internal ? mcc_local_globals[i].internal : mcc_local_globals[i].name,
+            mcc_local_globals[i].type);
+        if (locals[i] == NONE) error(_error_silent, "mcc: no scenario storage for %s", mcc_local_globals[i].name);
+        else if (paused) mcc_game_paused_bind(locals[i]);
+        else mcc_skulls_bind(skull, locals[i]);
+    }
     /* Retain the MCC arena, including free slots for console expressions.
      * Its separate validator owns the larger traversal workspace. */
     syntax->data = nodes;
     return missing == 0 && mcc_parameters_prepare(runtime, scenario, syntax);
+}
+
+/* The console's names for MCC's map-local globals: MCC's own, for those
+ * kept under an internal name (an external one's, for Bandanna). NONE when
+ * the map has no storage for it, as for f0-f5 when its scripts do not use
+ * them (the console then reaches the native ones). */
+short mcc_script_find_global(char const *name)
+{
+    short local;
+    if (!mcc_cache_tags_loaded() || !name || (local = mcc_local_global_find(name)) == NONE ||
+        !mcc_local_globals[local].internal) return NONE;
+    return hs_find_global_by_name(mcc_local_globals[local].internal);
+}
+
+/* The console's completions: MCC's functions, or its names for the globals
+ * this map has (the scenario's own names are listed already). */
+void mcc_script_enumerate(boolean functions, void (*add)(char const *name))
+{
+    short index;
+    struct hs_function_definition *function;
+    if (!mcc_cache_tags_loaded()) return;
+    if (functions) {
+        for (index = MCC_HS_DISTANCE_TO_OBJECT; index <= MCC_HS_AI_DESELECT; index++)
+            if ((function = mcc_script_function(index)) != NULL) add(function->name);
+        for (index = MCC_HS_CAMPAIGN_FIRST; (function = mcc_script_function(index)) != NULL; index++)
+            add(function->name);
+        for (index = MCC_HS_LIBRARY_FIRST; (function = mcc_script_function(index)) != NULL; index++)
+            add(function->name);
+        return;
+    }
+    for (index = 0; index < (short)NUMBEROF(mcc_local_globals); index++)
+        if (mcc_local_globals[index].internal && mcc_script_find_global(mcc_local_globals[index].name) != NONE)
+            add(mcc_local_globals[index].name);
 }

@@ -67,6 +67,9 @@ symbols in this file:
 #include "scenario/scenario.h"
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
+#include "tag_files/tag_files.h" /* port: tag_get_name, for MCC's cheats (below) */
+#include "units/unit_definitions.h" /* port: (MCC's cheat_all_chars) */
+#include <string.h> /* port: strstr */
 
 /* ---------- constants */
 
@@ -477,6 +480,95 @@ void cheat_all_vehicles(
 		cheat_objects_from_block(
 			&TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
 				struct game_globals_multiplayer_information)->vehicles);
+	}
+
+	return;
+}
+
+/* port: MCC's Halo 1 cheats for an MCC map's scripts and console
+(port/linux/game/mcc_script_library.c), as MCC's halo1.dll has them. Each
+looks for a tag whose path has a word (strstr: case matters), and drops
+what it finds as the cheats above do. */
+
+/* port: the first reference of a block of references (the map's count and
+address) whose tag's path has the text, or NULL */
+static struct tag_reference *cheat_reference_named(
+	struct tag_block const *block,
+	char const *text)
+{
+	long reference_index;
+
+	for (reference_index = 0;
+		block->address && reference_index<block->count;
+		reference_index++)
+	{
+		struct tag_reference *reference =
+			(struct tag_reference *)block->address + reference_index;
+		char const *name = reference->index!=NONE ? tag_get_name(reference->index) : NULL;
+
+		if (name && strstr(name, text))
+			return reference;
+	}
+
+	return NULL;
+}
+
+/* port: the first shotgun of the globals' weapons */
+void cheat_give_some_gun(
+	void)
+{
+	struct tag_reference *reference =
+		cheat_reference_named(&scenario_get_game_globals()->weapon_list, "shotgun");
+
+	if (reference)
+		cheat_objects(reference, 1);
+
+	return;
+}
+
+/* port: up to 64 units whose path has "character": the map's bipeds, though
+MCC's help text says vehicles */
+void cheat_all_chars(
+	void)
+{
+	struct tag_reference references[64];
+	struct tag_iterator iterator;
+	long tag_index;
+	short reference_count = 0;
+
+	tag_iterator_new(&iterator, UNIT_DEFINITION_TAG);
+	for (tag_index = tag_iterator_next(&iterator);
+		tag_index!=NONE && reference_count<NUMBEROF(references);
+		tag_index = tag_iterator_next(&iterator))
+	{
+		char const *name = tag_get_name(tag_index);
+
+		if (name && strstr(name, "character"))
+		{
+			references[reference_count].index = tag_index;
+			reference_count++;
+		}
+	}
+	cheat_objects(references, reference_count);
+
+	return;
+}
+
+/* port: the first warthog of the globals' multiplayer vehicles */
+void cheat_spawn_warthog(
+	void)
+{
+	struct game_globals *globals = scenario_get_game_globals();
+
+	if (globals->multiplayer_information.count > 0 && globals->multiplayer_information.address)
+	{
+		struct tag_reference *reference = cheat_reference_named(
+			&TAG_BLOCK_GET_ELEMENT(&globals->multiplayer_information, 0,
+				struct game_globals_multiplayer_information)->vehicles,
+			"warthog");
+
+		if (reference)
+			cheat_objects(reference, 1);
 	}
 
 	return;

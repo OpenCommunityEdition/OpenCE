@@ -44,6 +44,13 @@ void cheat_all_powerups(
 	void);
 void cheat_all_vehicles(
 	void);
+/* port: MCC's Halo 1 cheats (cheats.c) */
+void cheat_give_some_gun(
+	void);
+void cheat_all_chars(
+	void);
+void cheat_spawn_warthog(
+	void);
 void cheats_dispose(
 	void);
 void cheats_dispose_from_old_map(

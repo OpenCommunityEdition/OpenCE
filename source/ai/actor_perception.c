@@ -274,6 +274,7 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 #include "units/biped_definitions.h"
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 /* ---------- constants */
 
@@ -4261,7 +4262,9 @@ void prop_status_refresh(
 							position,
 							&prop->body_position,
 							&prop->body_location,
-							sound_unit_definition->unit.constant_sound,
+							/* port: loud with an MCC map's That's Just Wrong
+							skull (port/linux/game/mcc_skulls.c) */
+							mcc_skulls_unit_sound_volume(sound_unit_definition->unit.constant_sound),
 							1.0f,
 							prop->line_of_sight);
 				}

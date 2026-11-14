@@ -250,6 +250,7 @@ symbols in this file:
 #include "units/unit_definitions.h"
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 /* ---------- constants */
 
@@ -2092,6 +2093,10 @@ boolean actor_action_test_grenade(
 			encounter->team_index) * grenade_timeout;
 		long throw_delay_ticks;
 
+		/* port: an MCC map's Catch skull has no encounter timeout
+		(port/linux/game/mcc_skulls.c) */
+		if (mcc_skulls_catch())
+			throw_delay = 0.0f;
 		if (actor->external_orders.playfighting)
 			throw_delay *= 2.0f;
 
@@ -3368,7 +3373,10 @@ boolean actor_action_consider_grenade(
 		real chance;
 		long current_time = game_time_get();
 		{
-			if (actor->control.grenade_last_check_time == NONE ||
+			/* port: an MCC map's Catch skull considers a grenade every
+			time, at an even chance (port/linux/game/mcc_skulls.c) */
+			if (mcc_skulls_catch() ||
+				actor->control.grenade_last_check_time == NONE ||
 				(real)current_time >=
 					(real)actor->control.grenade_last_check_time +
 					variant_definition->grenade_combat.throw_grenade_delay *
@@ -3379,6 +3387,8 @@ boolean actor_action_consider_grenade(
 				chance *= game_difficulty_get_team_value(
 					_game_difficulty_value_grenade_chance_scale,
 					(word)actor->meta.team_index);
+				if (mcc_skulls_catch())
+					chance = 0.5f;
 
 				actor->control.grenade_last_check_time = current_time;
 

@@ -472,6 +472,7 @@ static void render_state_text(
 boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	rectangle2d *cursor, pixel32 color);
 #include "keyboard_glyphs.h" /* port: optional semantic keyboard prompts; custom icons stay native */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
 
 static void render_state_bitmap(
@@ -978,6 +979,10 @@ void hud_render_timer(
 			if (reference_time == NONE)
 				timer->reference_time = game_time_get();
 		}
+		/* port: the timer keeps time but is not drawn with an MCC map's
+		Blind skull on, as MCC's Halo 1 (port/linux/game/mcc_skulls.c) */
+		if (mcc_skull_active(_mcc_skull_blind))
+			return;
 
 		{
 			short clamped_ticks = MAX(timer_ticks, 0);

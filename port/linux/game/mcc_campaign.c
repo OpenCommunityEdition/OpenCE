@@ -4,6 +4,7 @@
 #include "mcc_cache.h"
 #include "mcc_script_effects.h"
 #include "mcc_game_speed.h"
+#include "mcc_skulls.h"
 #include "ai/actor_definitions.h"
 #include "mcc_ui_network.h"
 #include "main/main.h"
@@ -66,6 +67,15 @@ static boolean mcc_campaign_owned;
 static boolean *mcc_screen_flashes;
 static boolean mcc_original_screen_flashes;
 enum { MCC_CAMPAIGN_FLASHES_DISABLED = 1u << 11 };
+/* The skulls clients draw or predict (mcc_skulls.h), from bit 12. */
+#define MCC_CAMPAIGN_SKULL_SHIFT 12
+/* sound_set_master_gain's multiplier, from bit 22: whether the host sent
+ * it, then its value in 128ths, to 511/128 (a state without it has 1). */
+#define MCC_CAMPAIGN_MASTER_GAIN_SENT (1u<<22)
+#define MCC_CAMPAIGN_MASTER_GAIN_SHIFT 23
+#define MCC_CAMPAIGN_MASTER_GAIN_LIMIT 511u
+#define MCC_CAMPAIGN_MASTER_GAIN_BITS (MCC_CAMPAIGN_MASTER_GAIN_SENT|(MCC_CAMPAIGN_MASTER_GAIN_LIMIT<<MCC_CAMPAIGN_MASTER_GAIN_SHIFT))
+static real mcc_master_gain=1.0f;
 extern real sound_gain_under_dialog;
 extern real object_light_ambient_base,object_light_ambient_scale;
 extern boolean loud_dialog_hack;
@@ -117,6 +127,7 @@ void mcc_campaign_begin(void)
         mcc_original_ignore_player=mcc_ignore_player ? *mcc_ignore_player : FALSE;
     }
     memset(&mcc_campaign,0,sizeof(mcc_campaign));
+    mcc_master_gain=1.0f;
     mcc_campaign.version=6; mcc_campaign.gravity=1.0f;
     mcc_campaign.effects_gain=1.0f;
     mcc_campaign.music_gain=1.0f;
@@ -157,7 +168,15 @@ void mcc_campaign_dispose(void)
     mcc_ignore_player=NULL;
     mcc_screen_flashes=NULL;
     mcc_model_ambient=NULL;
+    mcc_master_gain=1.0f;
     memset(&mcc_campaign,0,sizeof(mcc_campaign));
+}
+
+/* The master gain as it is mixed and sent: none below silence, and no more
+ * than the flags carry. */
+static real mcc_campaign_master_mix(void)
+{
+    return PIN(mcc_master_gain,0.0f,(real)MCC_CAMPAIGN_MASTER_GAIN_LIMIT/128.0f);
 }
 
 void mcc_campaign_snapshot(void *out)
@@ -168,7 +187,10 @@ void mcc_campaign_snapshot(void *out)
         mcc_campaign.flags=(mcc_campaign.flags&8u) | (cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
             (mcc_ignore_player && *mcc_ignore_player ? 4u : 0u) |
             (mcc_script_effects_snapshot()<<4) |
-            (mcc_screen_flashes && !*mcc_screen_flashes ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u);
+            (mcc_screen_flashes && !*mcc_screen_flashes ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u) |
+            (mcc_skulls_replicated()<<MCC_CAMPAIGN_SKULL_SHIFT) |
+            MCC_CAMPAIGN_MASTER_GAIN_SENT |
+            ((uint32_t)(mcc_campaign_master_mix()*128.0f+0.5f)<<MCC_CAMPAIGN_MASTER_GAIN_SHIFT);
     mcc_campaign.ambient_base=object_light_ambient_base;mcc_campaign.ambient_scale=object_light_ambient_scale;
     memcpy(out,&mcc_campaign,sizeof(mcc_campaign));
 }
@@ -189,7 +211,9 @@ int mcc_campaign_validate(void const *in, unsigned long bytes)
     if (!(state.effects_gain>=0.0f && state.effects_gain<=4.0f) ||
         !(state.music_gain>=0.0f && state.music_gain<=1.0f) ||
         (state.flags & ~(state.version==1u ? 1u : state.version==2u ? 15u :
-            15u|(MCC_EFFECT_MASK<<4)|(state.version>=4u ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u))) ||
+            15u|(MCC_EFFECT_MASK<<4)|(state.version>=4u ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u)|
+            (state.version>=6u ? (MCC_SKULLS_REPLICATED_MASK<<MCC_CAMPAIGN_SKULL_SHIFT)|MCC_CAMPAIGN_MASTER_GAIN_BITS : 0u))) ||
+        ((state.flags & MCC_CAMPAIGN_MASTER_GAIN_BITS) && !(state.flags & MCC_CAMPAIGN_MASTER_GAIN_SENT)) ||
         !mcc_campaign_real(state.ambient_base) || !mcc_campaign_real(state.ambient_scale) ||
         !mcc_campaign_real(state.model_ambient) ||
         !mcc_campaign_real(state.dialog_gain) ||
@@ -228,6 +252,8 @@ int mcc_campaign_restore(void const *in, unsigned long bytes)
     if (mcc_campaign.version<4u && !mcc_original_screen_flashes)
         mcc_campaign.flags|=MCC_CAMPAIGN_FLASHES_DISABLED;
     mcc_campaign.version=6;
+    mcc_master_gain=(mcc_campaign.flags&MCC_CAMPAIGN_MASTER_GAIN_SENT) ?
+        (real)((mcc_campaign.flags>>MCC_CAMPAIGN_MASTER_GAIN_SHIFT)&MCC_CAMPAIGN_MASTER_GAIN_LIMIT)/128.0f : 1.0f;
     mcc_script_effects_restore((mcc_campaign.flags>>4)&MCC_EFFECT_MASK);
     global_gravity=mcc_original_gravity*mcc_campaign.gravity;
     sound_gain_under_dialog=mcc_campaign.dialog_gain;
@@ -239,6 +265,9 @@ int mcc_campaign_restore(void const *in, unsigned long bytes)
      * runs campaign scripts and decides ammunition consumption. */
     if (game_connection()!=_game_connection_network_client) cheat.infinite_ammo=(mcc_campaign.flags&1u)!=0;
     if (mcc_ignore_player && game_connection()!=_game_connection_network_client) *mcc_ignore_player=(mcc_campaign.flags&4u)!=0;
+    /* The host's skulls are its script globals, which its checkpoints restore. */
+    if (game_connection()==_game_connection_network_client)
+        mcc_skulls_receive((mcc_campaign.flags>>MCC_CAMPAIGN_SKULL_SHIFT)&MCC_SKULLS_REPLICATED_MASK);
     return 1;
 }
 
@@ -283,12 +312,39 @@ boolean mcc_campaign_unlimited_ammo(void)
         (game_connection()==_game_connection_network_client ? (mcc_campaign.flags&1u)!=0 : cheat.infinite_ammo);
 }
 
+/* The values physics_set_gravity and sound_set_music_gain set. */
+real mcc_campaign_gravity_scale(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_campaign.gravity : 1.0f;
+}
+
+real mcc_campaign_music_gain(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_campaign.music_gain : 1.0f;
+}
+
+real mcc_campaign_master_gain(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_master_gain : 1.0f;
+}
+
+/* MCC's sound_set_master_gain, on the host: a gain at or below zero from
+ * above it is kept as given, and one above zero from zero is at least 1. */
+void mcc_campaign_set_master_gain(real gain)
+{
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned || game_connection()==_game_connection_network_client ||
+        !mcc_campaign_real(gain) || gain==mcc_master_gain) return;
+    if (mcc_master_gain==0.0f && gain>0.0f && gain<1.0f) gain=1.0f;
+    mcc_master_gain=gain;
+}
+
 /* Script muting is additional to the player's audio settings, and belongs
  * to this map's checkpoint/network state. Music is muted too. */
 real mcc_campaign_mix_gain(boolean music)
 {
     if (!mcc_cache_tags_loaded() || !mcc_campaign_owned) return 1.0f;
-    return (mcc_campaign.flags&8u) ? 0.0f : music ? mcc_campaign.music_gain : mcc_campaign.effects_gain;
+    return (mcc_campaign.flags&8u) ? 0.0f :
+        (music ? mcc_campaign.music_gain : mcc_campaign.effects_gain)*mcc_campaign_master_mix();
 }
 
 static void mcc_sound_enable_evaluate(short function, long thread, boolean initialize)

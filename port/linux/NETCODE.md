@@ -183,7 +183,7 @@ lockstep netcode was removed, set to play it): it tells the player why.
 ## OpenCE network agreement
 
 OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
-version 44 (below, "Versions") replaces it.
+version 45 (below, "Versions") replaces it.
 Advertisements and ordinary join requests carry this one version; mismatched
 versions are rejected before admission. There is no separate MCC capability
 envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
@@ -458,6 +458,16 @@ the rest of version 43, which stays 43.
 Version 44 unifies MCC offers under Map Sharing and lets a receiver satisfy
 omitted base resources with its own validated local files. Message layouts
 are unchanged; the changed sharing agreement requires matching peers.
+
+In version 45, the MCC skulls that every machine draws or predicts
+(`port/linux/game/mcc_skulls.h`: Fog, Blind, Eye Patch, Recession, Boom,
+I Would Have Been Your Daddy, Sputnik, Feather, Foreign and Malfunction) are
+bits 12-21 of an MCC map's campaign state flags, which the host sends every
+third tick. A version-44 client would refuse a state with those bits. Only
+the host runs a map's scripts, so it alone applies the other skulls. Bits
+22-31 carry the map's master gain (`sound_set_master_gain`): bit 22 says it
+is there, then its value in 128ths, to 511/128; a state without it has one.
+The message layouts are unchanged.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -834,7 +844,7 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. Every map family uses network version **44** for automatic sharing and local base dependencies.
+separate from CE sharing 83-86. Every map family uses network version **45**; version 44 brought automatic sharing and local base dependencies.
 The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
 the gameplay/resource identity and the required-JSON identity. The distributed
 header is 12 bytes, including its checkpoint epoch.

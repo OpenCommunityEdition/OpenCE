@@ -624,7 +624,9 @@ are not an MCC implementation dependency. The independent components are:
 | `port/linux/game/mcc_hud.c` | MCC bitmap/placement scaling, including nested weapon and grenade HUD items. |
 | `port/linux/game/mcc_hud_draw.c` | MCC canvas, glyph geometry and text advances; neutral dispatch for Xbox/CE. |
 | `port/linux/game/mcc_terminal.c` | MCC terminal-only font scaling; preserves the map's HUD fonts and all legacy rendering. |
-| `port/linux/game/mcc_scripts.c` | Name-based MCC function/global linking and supported MCC native functions. |
+| `port/linux/game/mcc_scripts.c` | Name-based MCC function/global linking, map-local MCC globals and supported MCC native functions. |
+| `port/linux/game/mcc_skulls.c` | Skull status from an MCC map's scripts, the skulls clients receive, and the skulls' effects at their engine hooks. |
+| `port/linux/game/mcc_script_library.c` | The editing kit's other MCC-only functions, MCC's `map_name` and `cheat_active_camouflage`, and inert debug commands. |
 | `port/linux/game/mcc_campaign.c` | Local-player/authority queries, gravity, campaign markers and scoped global permissions. |
 | `port/linux/game/mcc_syntax.c` | MCC's 32,767-slot syntax validation and traversal workspace. |
 | `port/linux/game/mcc_script_parameters.c`, `mcc_script_runtime.inl`, `mcc_script_threads.inl` | MCC parameter metadata/scopes and bounded, checkpointed interpreter stacks. |
@@ -970,11 +972,11 @@ Navigation has eight independently owned team markers and uses the native
 HUD drawing services; the host replicates the complete marker state and
 gravity periodically, including after changes and late joins.
 
-The recognized `debug_ice_cream_flavor_status_*` globals for IWHBYD,
-Grunt Birthday Party and Bandanna report false. This does not implement
-skull gameplay. A literal assignment of false is accepted because the
-skull is already disabled; attempts to enable one or assign a computed
-value are refused. MCC maps may
+The `debug_ice_cream_flavor_status_*` skull globals are map-local
+booleans that scripts may read and set (see
+[MCC editing kit script names](#mcc-editing-kit-script-names)); most of
+them change play (see [MCC skulls](#mcc-skulls)).
+MCC maps may
 set `sound_gain_under_dialog` and `cheat_infinite_ammo`; the adapter captures
 their previous values and restores them on unload. The native global table
 and Xbox/CE write permissions remain unchanged.
@@ -1461,12 +1463,12 @@ are migrated with defaults for the added state. Network compatibility advances
 from 27 to 28: **all peers must use matching versions**, including when playing
 Xbox or Custom Edition maps. There is no separate MCC transport or matchmaking.
 
-Boom, Sputnik, and Catch skull globals report disabled. Literal assignments
-that keep them disabled are accepted; enabling them or computing an assignment
-is refused rather than pretending their gameplay effects exist. Similarly,
-`object_prediction` reports enabled and accepts a literal enable only, matching
-the existing engine prediction policy. Converted constant expressions preserve
-their expected result types, including a void result for a `set` statement.
+Boom, Sputnik, and Catch skull globals reported disabled, and enabling one
+was refused. They are now map-local state; see
+[MCC editing kit script names](#mcc-editing-kit-script-names).
+`object_prediction` reported enabled and accepted a literal enable only. It
+is now map-local state too; see
+[MCC editing kit script names](#mcc-editing-kit-script-names).
 
 Several data corrections are confined to MCC conversion:
 
@@ -2017,7 +2019,9 @@ map directory, native function table, network packet or checkpoint layout change
 - **Bot Bootcamp A10:** its syntax node 8865 assigns literal true to
   `breadcrumbs_navpoints_enabled_override`. MCC already exposes breadcrumb
   availability as true. This assignment and boolean reads now agree with that
-  policy; computed assignments and disables remain explicit errors.
+  policy; computed assignments and disables remain explicit errors. (The
+  global is now map-local state, which any value may set; see
+  [MCC editing kit script names](#mcc-editing-kit-script-names).)
 - **Bot Bootcamp D40:** `characters\ai_bbcmp\aicyborg` omits the neck-to-head
   child edge. Its associated cyborg model supplies that edge with matching
   ordered names and parents.
@@ -2068,9 +2072,9 @@ were not modified.
 Remaining limitations established during this investigation:
 
 - **CE Third Person Armory** enables I Would Have Been Your Daddy and Grunt
-  Birthday Party. These skull effects are not implemented. The refusal now names
-  the offending global and syntax node; accepting an enable as a no-op would
-  change authored gameplay and is intentionally not done.
+  Birthday Party. These skull effects are not implemented. The map was refused
+  at the time; it is now accepted with the skulls recorded but without effect
+  (see [MCC editing kit script names](#mcc-editing-kit-script-names)).
 - **PFD** loads and advances simulation during a three-minute idle run, without
   reproducing the reported post-transition crash. Its assault rifle and M4A1
   reference the model shader `deathstar\project_subterfuge\shader model\tag_334`
@@ -2227,3 +2231,244 @@ The final Windows binary also completed a single-process sequence from Ruby
 C20 to Xbox `a10`, to Custom Edition `deathisland`, then back to Ruby C20,
 with console responses after each load and a normal timed exit. This checks
 bounded loading and activation transitions, not full legacy visual parity.
+
+## MCC editing kit script names
+
+MCC's editing kit writes the script functions and external globals its Sapien
+knows to `hs_doc.txt` (the Steam Halo CE editing kit's copy was compared;
+[c20 hosts a copy](https://github.com/Sigmmma/c20/blob/master/src/data/hs_docs/h1/hs_doc_sapien.txt)).
+It lists 78 functions and 38 globals that neither the Xbox table nor the
+sections above provided, and six skull globals that were accepted only when a
+script kept them off. A map naming any of the others was refused at
+"converting scripts". All are now accepted, with the kit's return and
+parameter types.
+The other functions the kit lists have the Xbox table's signatures.
+
+The globals are map-local. Each one a map names is given scenario storage, as
+`developer_mode` was. It starts at zero or false and lasts as checkpoints do.
+Scripts may read and set it. The engine reads the skulls and `game_paused`;
+nothing reads the others.
+
+- **Skulls.** The 29 `debug_ice_cream_flavor_*` globals record which skulls a
+  script turned on. Bandanna reads and sets the existing `cheat_infinite_ammo`.
+  That control gives infinite reserve ammunition and grenades, and still
+  requires reloading. Most others change play ([MCC skulls](#mcc-skulls)).
+  The earlier rule, which accepted only a literal `false` and refused maps
+  that enabled a skull, is withdrawn.
+- **`game_paused`** pauses the game when it turns true and resumes it when
+  it turns false, as MCC's game time update does: the clock stops as the
+  pause menu stops it. Closing the pause menu resumes the game, whatever the
+  global holds; MCC does the same. In a local game only: a network host's
+  clock is its clients' too, so there the global is only stored.
+- **`object_prediction` and `breadcrumbs_navpoints_enabled_override`** start
+  false, as in MCC, and take any value. They were accepted only when a script
+  set them to a literal true, which refused maps that turned them off. This
+  port's netcode predicts for itself, and its breadcrumbs are always
+  available (`breadcrumbs_nav_points_active`), so nothing reads them.
+- **Debug and settings switches** (`rasterizer_fps`, `hs_verbose`,
+  `breakpoints_enabled`, `director_camera_switching`, `mouse_acceleration`
+  and nine more) have no effect.
+- The f0–f5 counters, `game_speed_value`, `debug_score` and
+  `developer_mode` keep their earlier behaviour. They share one table in
+  `mcc_scripts.c`.
+
+A scenario global's name has at most 31 characters. Longer MCC names use an
+internal name appended to the script strings, which the native recompiler
+resolves (`__mcc_skull_catch`, for example).
+
+Every skull, and `game_paused`, has storage on an MCC map whose scenario has
+scripts, whether or not they name it. The other globals have storage only on
+a map that names them. The console knows the globals by MCC's names too
+(`hs_find_global_by_name`), and completes them and MCC's functions. So
+`debug_ice_cream_flavor_status_iron 1` (or `set ... true`) turns a skull on to
+test it, and the bare name prints whether it is on. Bandanna's name reaches
+`cheat_infinite_ammo`. On the network, only the host's console changes them.
+
+[`mcc_script_library.c`](../port/linux/game/mcc_script_library.c) holds the
+functions:
+
+- **Implemented:** `pin`, `bitwise_xor`, `bitwise_flags_toggle` (unsigned
+  32-bit, like the other bitwise functions), `script_started`,
+  `physics_get_gravity`, `sound_get_music_gain`, `log_print`,
+  `TestPrintBool` and `TestPrintReal`. `script_started` is true once a dormant
+  script has been woken, and always true for startup and continuous scripts.
+  It is never true for a disabled script. The two getters return the values
+  `physics_set_gravity` and `sound_set_music_gain` set. The print functions
+  write `hs:` lines to `debug.txt`.
+- **Implemented since:**
+  - `kill_active_scripts` ends every script thread that is running or
+    asleep, and any other console command, as `kill_thread` ends one. As
+    in MCC (`halo1.dll`), it leaves the caller, dormant scripts (a `wake`
+    still starts them) and finished ones.
+  - `sound_set_master_gain` and `sound_get_master_gain`: the map's
+    multiplier over every sound, after the player's own volume, which it
+    does not change. It starts at one on each map and lasts as checkpoints
+    do. The setter keeps MCC's rules: from zero, a gain above zero is at
+    least one. Clients have it from the host (NETCODE.md, version 45), to
+    1/128 and at most 511/128.
+  - `get_yaw_rate`, `get_pitch_rate`, `set_yaw_rate` and `set_pitch_rate`:
+    a local player's look rates, in degrees a second (the native
+    `player0_look_yaw_rate` and its kind). The engine takes the rates from
+    the player's settings each update, so a rate a script sets stands in
+    for them until the next map. An index that is not a local player's
+    gets zero. On a network game only the host runs the scripts, so only
+    its own players' rates change.
+  - `cheat_give_some_gun`, `cheat_all_chars` and `cheat_spawn_warthog`, as
+    MCC's: the first of the globals' weapons whose tag path has `shotgun`;
+    up to 64 units whose path has `character` (bipeds, though MCC's help
+    says vehicles); the first of the multiplayer vehicles whose path has
+    `warthog`. Each is dropped as the native cheats drop theirs, on the
+    host (`cheats.c`).
+- **MCC's versions of two native functions.** A map's scripts may not call
+  either Xbox version.
+  - `cheat_active_camouflage` camouflages every player's unit on the host.
+    The Xbox version camouflages only the first player's. Each unit's
+    camouflage reaches the other machines with its state. The Halo 1
+    Firefight package calls it from its round setup, when the camouflage
+    option is on.
+  - `map_name` names another map of the same package by its file name.
+    The change happens where a won mission's does: after the scripts'
+    update, and in a network game the host moves every machine. A map that
+    is not installed shows an error and returns to the menu, or a network
+    game to its lobby. Nothing else is loaded in its place. The request
+    belongs to the map that made it. It does not record campaign progress.
+- **Inert (59):** the script debugger, the debug camera's files, `quit`,
+  screenshots, reloads, dumps, the player's sound settings (EAX, hardware
+  buffers, rolloff), key bindings, `sv_map`, profiles, checkpoint files,
+  network events, saved films, determinism debugging, the debug menu and
+  `net_never_timeout`. Their arguments are still evaluated, so sleeps and
+  side effects inside them happen. They return zero or false. The first call
+  of each in a run is noted in `debug.txt`.
+
+The Steam Workshop items examined used only a few of these names. All nine
+maps of the Halo 1 Firefight package (Workshop 2898809930) read and set
+skulls, Bandanna among them. That package also calls
+`cheat_active_camouflage`. Its maps were refused, and now load. Of the skulls
+their scripts turn on, all have their effects ([MCC skulls](#mcc-skulls)). Lumoria (Workshop
+3323672581) calls `map_name episode_2a` on Impossible. The native version of
+that function disabled the script that calls it; the script now runs, and the
+missing map returns to the menu.
+
+Checked on Windows with the headless runner (`init.txt`'s `map_name`, a hidden
+window, `debug.network_test` set to `log`, and console cues):
+
+- `ff_snowfield_night`, the other eight Firefight maps and Lumoria load with
+  no script refused or disabled.
+- Console calls of `pin`, `bitwise_xor`, `bitwise_flags_toggle`, the gravity
+  and gain getters, an inert command and `script_started` return the values
+  above. A skull global reads false, then true after it is set.
+- `map_name geomar_final` changed Lumoria to that map. `map_name episode_2a`
+  logged the missing map and returned to the menu.
+- Maps that use the refactored globals load with the values above:
+  `game_speed_value` (3512468479 `c10`), `developer_mode` (`crashsite`) and
+  `object_prediction` (`mercury2`).
+
+Skull effects, the network-game path of `map_name` and camouflage seen from
+a client were not exercised.
+
+The functions and globals implemented since were checked the same way, on
+Ruby's Rebalanced Halo `a10` (2915693904), `mercury2` and `ff_snowfield_night`:
+
+- `sound_get_master_gain` read 1, then 0 after setting 0, then 1 after
+  setting 0.25 (from zero), then 0.25 after setting 0.25 again.
+- `player0_look_yaw_rate` set to 12 read 120 again a second later (the
+  player's setting); `set_yaw_rate 0 45` and `set_pitch_rate 0 30` still read
+  45 and 30 a second and a half later. `get_yaw_rate 7` read zero.
+- `script_finished "mission_a10"` read false, then true after
+  `kill_active_scripts`; the console went on running commands.
+- `set game_paused true` stopped game time: a cue two game seconds later
+  never ran in the twenty seconds the game had left. With
+  `set game_paused false` instead, it ran.
+- `mercury2`'s scripts turn `object_prediction` on; the console then set it
+  false and true again.
+- With a temporary trace, since removed, the cheats dropped a shotgun and a
+  warthog on Mercury Rising's `mp_plains`, and the characters of `a10` and
+  `ff_snowfield_night`.
+- `ff_snowfield_night` still loads, and its skulls, `game_paused` and the
+  master gain answer from the console.
+
+Not exercised: a map that calls these functions itself, the master gain
+heard on a client, and `breadcrumbs_navpoints_enabled_override` on a map that
+names it (Bot Bootcamp, which is not installed here).
+
+## MCC skulls
+
+Twenty-three skulls change play when an MCC map's scripts turn them on, as
+they do in MCC's Halo 1, besides Bandanna. `mcc_skulls.c` records which
+scenario global holds each skull while the scripts are prepared, and the host
+reads the globals. Every machine draws or predicts ten of them, so the host
+sends them in bits 12-21 of the campaign state's flags
+([NETCODE.md](../port/linux/NETCODE.md)): Fog, Blind, Eye Patch, Recession,
+Boom, I Would Have Been Your Daddy, Sputnik, Feather, Foreign and Malfunction.
+The host alone applies the rest. A skull is off outside MCC maps, so the Xbox
+and Custom Edition paths are unchanged.
+
+Each rule was read from MCC's own `halo1.dll`. MCC reads every skull through
+one function of the skull's index, so each of its checks could be found and
+matched to the engine function here that does the same work. Halopedia's
+descriptions ([Anniversary](https://www.halopedia.org/Halo:_Combat_Evolved_Anniversary_skulls),
+[MCC](https://www.halopedia.org/Halo:_The_Master_Chief_Collection_skulls))
+agree with the rules but give few of their values.
+
+| Skull | Effect, as MCC's Halo 1 | Where |
+| --- | --- | --- |
+| Iron | Any player's death loses the map: with one player in the game the level restarts, otherwise every player rewinds to the last checkpoint. A pseudo kill is not a death here. A network co-op loss always rewinds, whatever the host's wipe choice. | `player_died` (`players.c`), `main_lost_map_private` (`main.c`) |
+| Fog | No motion tracker. | `game_engine_hud_draw_motion_sensor` (`game_engine.c`) |
+| Mythic | As a biped is created: a Covenant or Flood biped's body vitality doubles, and a Sentinel's shields rise to its body vitality. | `object_initialize_vitality` (`damage.c`) |
+| Famine | The weapons a unit no player controlled drops when it dies keep half their rounds, by integer division; a battery weapon's use moves halfway to empty. | `unit_died` (`units.c`) |
+| Grunt Funeral | A Grunt (`characters\grunt\grunt` or `grunt specops`) is destroyed when it dies, in the explosion of the globals' plasma grenade projectile, and drops nothing. | `object_destroy` (`damage.c`), `units.c` |
+| Foreign | A player's unit cannot pick up, swap to or cycle to a needler, plasma pistol or plasma rifle (weapon types 2-4), nor pick up plasma grenades. | `unit_can_use_weapon`, `unit_add_grenade_to_inventory` (`units.c`) |
+| Eye Patch | No aim assist: no autoaim and no magnetism, as Hardcore. | `aim_assist` (`aim_assist.c`) |
+| Recession | A player's weapon spends twice its rounds per shot, needs twice its rounds to fire, and drains its battery twice as fast. | `weapon_trigger_fire` (`weapons.c`) |
+| Malfunction | One HUD element is off: the shield meter, health meter, weapon HUD, grenades, crosshairs or motion sensor (not the sensor with Fog). This machine's own random numbers choose it when the skull turns on and when a local player dies. | `hud_unit.c`, `hud_weapon.c` |
+| Black Eye | A player's shields do not recharge on their own. A player's melee that damages an enemy unit fills them, and leaves an overshield as it is. | Shield recharge and `object_cause_damage` (`damage.c`) |
+| Piñata | A player's melee knocks one plasma grenade out of a living enemy biped, even one that carries none, before the blow lands. | `object_cause_damage` (`damage.c`), `unit_port_drop_one_grenade` (`units.c`) |
+| Boom | An explosion's cutoff and falloff radii double. | Area damage (`damage.c`), the host's checks of clients' hit reports (`network_damage.c`) |
+| I Would Have Been Your Daddy | A sound permutation skipped half the time or more is skipped one minus as often: rare lines become common. | `sound_definition_next_permutation` (`sound_definitions.c`) |
+| Blind | Not as the later games: no HUD, team indicators or scripted timer, the motion sensor stops, and the first-person weapon is neither updated nor drawn. The HUD's sounds still play, and help, objective and pickup messages still show. | `hud_draw_screen` (`hud.c`), `hud_render_timer` (`hud_messaging.c`), `first_person_weapons.c` |
+| Ghost | No unit flinches from a hit that does not kill it: a soft ping instead of a hard one. Players and allies too. | `unit_ping_animation` (`units.c`) |
+| Assassins | Every enemy unit an actor controls is camouflaged, each tick. | `game_tick` (`game.c`) |
+| Catch | Every actor: a dying one drops all its grenades; it throws them twice as fast; there is no encounter grenade timeout; it considers a grenade every time, at an even chance. | `actor_died` (`actors.c`), `actor_combat.c`, `actions.c` |
+| Sputnik | Every damage impulse is three times as strong. | `object_damage_aftermath` (`damage.c`) |
+| Anger | An enemy actor's primary rate of fire doubles. | `actor_combat_update` (`actor_combat.c`) |
+| Thunderstorm | Every actor whose variant has a major upgrade is placed as that upgrade, whatever its squad says. Allies too. | `ai_get_major_upgrade_chance` (`ai.c`) |
+| That's Just Wrong | Outside cinematics, actors hear every unit as loud, so silent units are heard at the full hearing distance. | `prop_status_refresh` (`actor_perception.c`) |
+| Styx | A Hunter (`characters\hunter\hunter`) has three times its body vitality. | `object_initialize_vitality` (`damage.c`) |
+| Feather | The impulse of damage whose owner holds a weapon is three times as strong (nine with Sputnik). | `object_damage_aftermath` (`damage.c`) |
+| Bandanna | Infinite reserve ammunition and grenades, still reloading, and no battery drain: the existing `cheat_infinite_ammo`. Every player's unit also keeps at least one grenade of each type (no plasma grenade with Foreign). | `mcc_scripts.c`, `mcc_skulls_update` |
+
+Values the code leaves open:
+
+- Catch's encounter timeout is a value in MCC that nothing writes, so it is
+  zero. Reading it in a running MCC game would confirm that.
+- Grunt Birthday Party is not in MCC's Halo 1 engine. Its confetti is an
+  Anniversary-graphics effect, which this port does not have, so it stays
+  recorded only.
+- Streaking, Bonded Pair, Masterblaster and the co-op flag stay recorded
+  only. They are co-op and scoring rules that were not decoded.
+
+Checked on Windows with FIREFIGHT CE's `ff_snowfield_night`, run headless
+with console cues. Temporary trace logs were used, and have been removed.
+
+- Black Eye: a player's shields set to zero stayed at zero for eight
+  seconds. Without it, they refilled.
+- Iron: a marker was set and a checkpoint saved, then the player died.
+  Without Iron the game reverted to the checkpoint, with the marker set.
+  With Iron the level restarted, with the marker clear.
+- Mythic: a Grunt set to 10 points of body vitality read 0.333 without it and
+  0.167 with it. Its maximum went from 30 to 60.
+- Famine: a killed Grunt's plasma weapon went from 0.29 to 0.645 of its
+  battery used.
+- Assassins: four placed Grunts were camouflaged.
+- Nine skulls on at once, with Grunts, Jackals and Marines placed, fighting
+  and dying, ran without fault: Anger, Assassins, Black Eye, Catch, Fog,
+  Famine, Mythic, Thunderstorm and That's Just Wrong.
+- A stock Xbox level still loads.
+
+Not observed, because the runs had no display and the map names only some
+skulls:
+
+- The HUD and sound skulls.
+- Foreign, Piñata, Grunt Funeral, Sputnik and Feather.
+- The Black Eye refill.
+- Co-op Iron, and the replicated skulls on a client.

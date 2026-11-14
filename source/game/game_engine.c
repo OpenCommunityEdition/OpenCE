@@ -601,6 +601,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "mcc_objects.h" /* port: port/linux/game/mcc_objects.h */
 #include "mcc_player.h" /* port: port/linux/game/mcc_player.h */
 #include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 #include "server_team_switch.h" /* port: port/linux/game/server_team_switch.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
 #include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
@@ -5486,6 +5487,9 @@ boolean game_engine_hud_draw_motion_sensor(
 		if (game_modes_motion_sensor_hidden())
 			draw_motion_sensor = FALSE;
 	}
+	/* port: an MCC map's Fog skull has none (port/linux/game/mcc_skulls.c) */
+	if (mcc_skull_active(_mcc_skull_fog))
+		draw_motion_sensor = FALSE;
 
 	return draw_motion_sensor;
 }

@@ -699,6 +699,7 @@ symbols in this file:
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 #include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -2183,6 +2184,9 @@ boolean unit_add_grenade_to_inventory(
 	boolean result = FALSE;
 	static boolean grenade_type_reported = FALSE;
 
+	/* port: an MCC map's Foreign skull (port/linux/game/mcc_skulls.c) */
+	if (mcc_skulls_foreign_refuses_grenade(unit_index, equipment_index))
+		return FALSE;
 	/* port: expanded MCC types must bypass the legacy grenade table, and
 	an Infection zombie takes none of them either. */
 	if (mcc_grenades_active())
@@ -2458,6 +2462,9 @@ boolean unit_can_use_weapon(
 	{
 		can_use_weapon = game_engine_allow_pick_up(unit_index, weapon_index);
 	}
+	/* port: an MCC map's Foreign skull (port/linux/game/mcc_skulls.c) */
+	if (can_use_weapon && mcc_skulls_foreign_refuses_weapon(unit_index, weapon_index))
+		can_use_weapon = FALSE;
 
 	return can_use_weapon;
 }
@@ -2824,6 +2831,10 @@ void unit_died(
 
 	if (!feigned)
 	{
+		/* port: the weapons of a unit no player controls, for an MCC map's
+		Famine skull (below) */
+		boolean mcc_famine = unit->unit.player_index == NONE;
+
 		object_set_garbage(unit_index, TRUE);
 		if (unit->unit.player_index != NONE)
 		{
@@ -2848,6 +2859,10 @@ void unit_died(
 			actor_swarm_unit_died(unit->unit.swarm_actor_index, unit_index);
 			unit->unit.swarm_actor_index = NONE;
 		}
+		/* port: an MCC map's Famine skull halves the ammunition the unit drops,
+		after its actor chose it (port/linux/game/mcc_skulls.c) */
+		if (mcc_famine)
+			mcc_skulls_famine(unit_index);
 
 		unit->unit.time_of_death = game_time_get();
 	}
@@ -2941,6 +2956,46 @@ static void unit_drop_grenades(
 
 		grenade_count++;
 	} while (--grenade_type_count);
+
+	return;
+}
+
+/* port: one grenade of the type out of the unit, whether or not it carries
+one, as unit_drop_grenades drops them (an MCC map's Pinata skull,
+port/linux/game/mcc_skulls.c) */
+void unit_port_drop_one_grenade(
+	long unit_index,
+	short grenade_type)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	struct game_globals *game_globals = scenario_get_game_globals();
+	struct object_placement_data placement_data;
+	struct game_globals_grenade *grenade;
+	long grenade_object_index;
+
+	if (grenade_type < 0 || grenade_type >= NUMBER_OF_UNIT_GRENADE_TYPES ||
+		grenade_type >= game_globals->grenades.count)
+	{
+		return;
+	}
+	grenade = TAG_BLOCK_GET_ELEMENT(
+		&game_globals->grenades,
+		grenade_type,
+		struct game_globals_grenade);
+	if (grenade->item.index == NONE)
+		return;
+	object_placement_data_new(
+		&placement_data,
+		grenade->item.index,
+		unit_index);
+	grenade_object_index = object_new(&placement_data);
+	if (grenade_object_index != NONE)
+	{
+		object_disconnect_from_map(grenade_object_index);
+		unit_drop_item(unit_index, grenade_object_index);
+	}
+	if (unit->unit.grenade_counts[grenade_type] > 0)
+		unit->unit.grenade_counts[grenade_type]--;
 
 	return;
 }
@@ -6673,6 +6728,13 @@ static void unit_ping_animation(
 		hard_ping = TRUE;
 		ping = TRUE;
 	}
+	/* port: with an MCC map's Ghost skull no unit flinches from a hit that
+	does not kill it: a soft ping instead, as MCC's Halo 1
+	(port/linux/game/mcc_skulls.c) */
+	if (!killed && hard_ping && mcc_skull_active(_mcc_skull_ghost))
+	{
+		hard_ping = FALSE;
+	}
 
 	if (damage_part==NONE)
 	{
@@ -6978,9 +7040,12 @@ static void unit_ping_animation(
 					FLAG(_unit_animation_ignore_translation_bit);
 				unit->unit.animation.flags = animation_flags;
 
+				/* port: and a Grunt, with an MCC map's Grunt Funeral skull
+				(port/linux/game/mcc_skulls.c) */
 				if (TEST_FLAG(
 					unit_definition->unit.flags,
-					_unit_is_destroyed_after_dying_bit))
+					_unit_is_destroyed_after_dying_bit) ||
+					mcc_skulls_funeral_grunt(unit_index))
 				{
 					unit_destroy(unit_index);
 				}
@@ -10459,9 +10524,11 @@ short unit_update_animation(
 				break;
 
 			case _unit_state_dying:
+				/* port: and a Grunt, with an MCC map's Grunt Funeral skull */
 				if (TEST_FLAG(
 						unit_definition->unit.flags,
-						_unit_is_destroyed_after_dying_bit))
+						_unit_is_destroyed_after_dying_bit) ||
+					mcc_skulls_funeral_grunt(unit_index))
 				{
 					if (TEST_FLAG(unit->object.flags, _object_at_rest_bit))
 					{
@@ -12222,6 +12289,10 @@ static void unit_drop_item(
 		}
 	}
 
+	/* port: a Grunt drops nothing, and never will, with an MCC map's Grunt
+	Funeral skull (port/linux/game/mcc_skulls.c) */
+	if (mcc_skulls_funeral_grunt(unit_index))
+		SET_FLAG(unit->unit.flags, _unit_doesnt_drop_items_bit, TRUE);
 	if (TEST_FLAG(unit->unit.flags, _unit_doesnt_drop_items_bit))
 	{
 		object_delete(item_index);

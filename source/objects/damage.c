@@ -141,6 +141,7 @@ symbols in this file:
 #include "units/vehicles.h"
 #include "mcc_damage.h" /* port: port/linux/game/mcc_damage.c */
 #include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
+#include "mcc_skulls.h" /* port: port/linux/game/mcc_skulls.c */
 #include "server_team_switch.h" /* port: port/linux/game/server_team_switch.c */
 
 /* network_game_globals.c's */
@@ -448,6 +449,8 @@ void object_initialize_vitality(
 	if (custom_shield_vitality)
 		maximum_shield_vitality = *custom_shield_vitality;
 
+	/* port: an MCC map's Mythic and Styx skulls (port/linux/game/mcc_skulls.c) */
+	mcc_skulls_vitality(object_index, &maximum_body_vitality, &maximum_shield_vitality);
 	object->object.maximum_body_vitality = maximum_body_vitality;
 	object->object.maximum_shield_vitality = maximum_shield_vitality;
 	object->object.body_vitality = maximum_body_vitality > 0.f ? 1.f : 0.f;
@@ -639,6 +642,9 @@ void object_destroy(
 	object = object_get(object_index);
 	definition = object_definition_get(object->definition_index);
 
+	/* port: a Grunt's plasma, with an MCC map's Grunt Funeral skull
+	(port/linux/game/mcc_skulls.c) */
+	mcc_skulls_funeral_explosion(object_index);
 	object_deplete_body(object_index);
 
 	collision_model_index = definition->object.collision_model.index;
@@ -1067,6 +1073,8 @@ static void object_damage_aftermath(
 		/* port: MCC extension data cannot be represented by a scalar impulse. */
 		mcc_accelerate_unit = mcc_damage_acceleration(&damage_effect->damage,
 			object_definition->object.acceleration_scale, &direction, &acceleration);
+		/* port: an MCC map's Sputnik and Feather skulls (port/linux/game/mcc_skulls.c) */
+		scale_vector3d(&acceleration, mcc_skulls_impulse_scale(damage->owner_object_index), &acceleration);
 
 		switch (object->object.type)
 		{
@@ -1489,6 +1497,13 @@ void object_cause_damage(
 	damage_definition = &damage_effect->damage;
 	damage_was_modified = FALSE;
 	parent_takes_body_damage = TRUE;
+	/* port: an MCC map's Pinata skull, before the blow lands
+	(port/linux/game/mcc_skulls.c) */
+	mcc_skulls_pinata(
+		damage->owner_player_index,
+		damage->owner_team_index,
+		object_index,
+		damage_definition->category == _damage_category_melee);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\objects\\damage.c",
@@ -1932,6 +1947,13 @@ void object_cause_damage(
 				body_damage,
 				body_damage_multiplier,
 				body_part);
+			/* port: an MCC map's Black Eye skull fills the shields of a
+			player whose melee struck an enemy (port/linux/game/mcc_skulls.c) */
+			mcc_skulls_melee_struck(
+				damage->owner_player_index,
+				current_object_index,
+				damage_definition->category == _damage_category_melee,
+				shield_damage > 0.f || body_damage > 0.f);
 			/* (the host's, for its clients) */
 			network_damage_aftermath(
 				current_object_index,
@@ -1974,7 +1996,8 @@ void area_of_effect_cause_damage(
 		0,
 		&damage->location,
 		&damage->origin,
-		definition->cutoff_radius,
+		/* port: an MCC map's Boom skull (port/linux/game/mcc_skulls.c) */
+		definition->cutoff_radius*mcc_skulls_explosion_radius_scale(),
 		object_indices,
 		NUMBEROF(object_indices));
 	if (object_count > 0)
@@ -2109,7 +2132,10 @@ void object_damage_update(
 				hud_tick_shield(player_index, 0.00074074074f);
 			}
 		}
-		else if (object->object.shield_vitality < 1.f)
+		/* port: not a player's with an MCC map's Black Eye skull
+		(port/linux/game/mcc_skulls.c) */
+		else if (object->object.shield_vitality < 1.f &&
+			!mcc_skulls_shield_recharge_blocked(object_index))
 		{
 			if (object->object.shield_stun_ticks == 0)
 			{
@@ -2594,12 +2620,14 @@ static void area_of_effect_cause_damage_to_object(
 			&object->object.bounding_sphere_center,
 			&damage->direction);
 		distance = normalize3d(&damage->direction);
-		radius_delta = damage_effect->cutoff_radius - damage_effect->falloff_radius;
+		/* port: an MCC map's Boom skull (port/linux/game/mcc_skulls.c) */
+		radius_delta = (damage_effect->cutoff_radius - damage_effect->falloff_radius)*
+			mcc_skulls_explosion_radius_scale();
 		if (radius_delta > 0.f)
 		{
 			scale = PIN(
 				1.f -
-					(distance - damage_effect->falloff_radius) /
+					(distance - damage_effect->falloff_radius*mcc_skulls_explosion_radius_scale()) /
 					radius_delta,
 				0.f,
 				1.f);
