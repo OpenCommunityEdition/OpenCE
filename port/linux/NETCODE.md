@@ -47,6 +47,13 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
+  The camera sent is the host's first local player's. A dedicated server
+  has no local player, so while the scripts have the camera
+  (`camera_control`) its first observer films their camera as a player's
+  would (`director_unattended_scripted_camera`, director.c); before, it
+  never ran, and every client watched a cutscene from the world's origin.
+  Only the camera's values changed: no network version.
+
   The scripts' looping sounds (music, ambience, a cutscene's music and
   dialogue) are resent every two seconds, so a machine that joins hears
   them. The resends of one that plays once (a fake impulse looping sound)
