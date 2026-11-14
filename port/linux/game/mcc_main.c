@@ -16,7 +16,7 @@
 #include "networking/network_game_manager.h"
 #include "../src/port_config.h"
 
-boolean mcc_main_campaign_won(void)
+boolean mcc_main_campaign_won(char const *requested)
 {
     struct network_game *game;
     char const *current;
@@ -24,15 +24,21 @@ boolean mcc_main_campaign_won(void)
     wchar_t text[512];
     int state;
     boolean server;
+    /* A mission the scripts named is the package's own: no manifest needed. */
     if (!mcc_cache_tags_loaded() || mcc_cache_scenario_type() != 0 ||
-        !config_boolean("game.mcc_campaigns")) return FALSE;
+        (!requested && !config_boolean("game.mcc_campaigns"))) return FALSE;
     /* Clients follow the host's existing round/settings messages. */
     if (game_connection() == _game_connection_network_client) return TRUE;
     server = game_connection() == _game_connection_network_server;
     game = server ? network_game_get_game() : NULL;
     current = game ? game->map.name : main_get_map_name();
     mcc_progress_complete(current, game_difficulty_level_get());
-    state = mcc_maps_next_mission(current, next);
+    if (requested && strlen(requested) < sizeof(next)) {
+        strcpy(next, requested);
+        state = 1;
+    } else {
+        state = mcc_maps_next_mission(current, next);
+    }
     if (state < 0) {
         error(_error_silent, "mcc campaign: next mission for %s is unavailable: %s", current, next);
         mcc_error_text(current, "The next campaign mission is missing or invalid. Install the complete package; no mission was skipped.", text, 512);

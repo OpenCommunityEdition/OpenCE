@@ -1492,12 +1492,20 @@ static long camera_object_get(
 static void host_presentation(
 	struct distributed_coop_presentation *presentation)
 {
-	struct observer_result const *camera = observer_get_camera(0);
+	/* the first local player's camera (director.c's), or, on a host with no
+	player of its own (a dedicated server), the first observer's while it
+	films the scripts' camera (director_unattended_scripted_camera): else
+	none */
+	short observer_index = local_player_get_next(NONE);
+	struct observer_result const *camera;
 	struct hud_timer_state timer;
 	real_rgb_color fade_color;
 	boolean fading_out;
 	long elapsed;
 
+	if (observer_index == NONE && director_unattended_scripted_camera(0))
+		observer_index = 0;
+	camera = observer_get_camera(observer_index);
 	csmemset(presentation, 0, sizeof(*presentation));
 	SET_FLAG(presentation->flags, _presentation_cinematic_bit, cinematic_in_progress());
 	SET_FLAG(presentation->flags, _presentation_letterbox_bit, cinematic_globals->show_letterbox);
