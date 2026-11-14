@@ -787,8 +787,12 @@ its name alone beside it, has its name given back as the map lists find it.
   others on port 5153 (of two downloading, the one of the lower machine
   connects). Each end says which files it has, whole or by piece, and tells
   the other of each piece it gets; the client asks for the rarest pieces
-  first (from a random place, so that clients ask for different pieces), two
-  at a time from each connection, sixteen in all, and the last few again of
+  first (from a random place, so that clients ask for different pieces),
+  eight at a time from each connection (as many as every version sends at
+  once: it refuses more, so this needs no network version; two at a time
+  held a download from one machine to about 15 MB/s, a piece coming a round
+  trip, about two frames, after it is asked for), thirty-two in all, and
+  the last few again of
   whoever is quicker. The pieces' hashes come from the host (from the
   others it named after ten seconds without them, and from the connections
   other machines made after thirty), all of them within a minute, checked
