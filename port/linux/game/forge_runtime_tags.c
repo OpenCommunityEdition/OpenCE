@@ -11854,9 +11854,11 @@ static int preview_decode_bitmap_texture(
 		free(pixels);
 		return 0;
 	}
-	if (bpp > 0 && TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit))
+	if (bpp > 0 && TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit) &&
+		mip_w > 0 && mip_h > 0 &&
+		(mip_w & (mip_w - 1)) == 0 && (mip_h & (mip_h - 1)) == 0)
 	{
-		unsigned char *unswizzled = (unsigned char *)malloc(size);
+		unsigned char *unswizzled = (unsigned char *)calloc(1, size);
 		if (!unswizzled)
 		{
 			free(pixels);
@@ -11868,8 +11870,10 @@ static int preview_decode_bitmap_texture(
 			{
 				for (sx = 0; sx < mip_w; sx++)
 				{
-					long swz = 0;
-					bitmap_swizzle_vector2d(mip_w, mip_h, sx, sy, &swz);
+					long swz_vec[2] = { 0, 0 };
+					long swz;
+					bitmap_swizzle_vector2d(mip_w, mip_h, sx, sy, swz_vec);
+					swz = swz_vec[0] | swz_vec[1];
 					if (swz >= 0 && (unsigned long)(swz + 1) * (unsigned long)bpp <= size)
 						memcpy(unswizzled + ((long)sy * mip_w + sx) * bpp, pixels + swz * bpp, (size_t)bpp);
 				}

@@ -318,6 +318,19 @@ static void sample_texture(
 	int x, y;
 	unsigned int p;
 
+	if (!t || !t->pixels || t->width <= 0 || t->height <= 0)
+	{
+		rgba[0] = 150u;
+		rgba[1] = 195u;
+		rgba[2] = 235u;
+		rgba[3] = 255u;
+		return;
+	}
+	if (!(u == u && u > -1e6f && u < 1e6f))
+		u = 0.0f;
+	if (!(v == v && v > -1e6f && v < 1e6f))
+		v = 0.0f;
+
 	u -= (float)floor(u);
 	v -= (float)floor(v);
 	x = (int)(u * (float)t->width);
@@ -695,7 +708,10 @@ static void render_frame(void)
 				float us = mesh.materials[m].u_scale;
 				float vs = mesh.materials[m].v_scale;
 
-				if (ti >= 0 && ti < mesh.texture_count && mesh.textures[ti].pixels)
+				if (ti >= 0 && ti < mesh.texture_count &&
+					mesh.textures[ti].pixels &&
+					mesh.textures[ti].width > 0 &&
+					mesh.textures[ti].height > 0)
 				{
 					tex = &mesh.textures[ti];
 					ua[0] = mesh.texcoords[i0][0] * us;
