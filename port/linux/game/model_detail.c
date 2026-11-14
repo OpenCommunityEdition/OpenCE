@@ -12,17 +12,20 @@ Two kinds of a map's levels are not made for those sizes:
   "highest" would leave the part out at every distance, so it draws its
   most detailed level below that has some;
 - a level whose cutoff is over 1000 pixels is the model's inside, made for
-  a camera within it (a10's cryotube's top level, at 3000, is the inside of
-  the tube without its outside), so it is drawn only while the camera is
-  inside the model's bounding sphere, and the level below otherwise.
+  a camera within it (a10's cryotube's top level, at 3000, is the tube with
+  the Master Chief's armor in it, seen from his own eyes in first person), so
+  it is drawn only when the Xbox drew it: when the model's size in the lines
+  of the 480-line screen reaches its cutoff, the camera inside it; the level
+  below otherwise. Inside the model's bounding sphere was too far out: the
+  cryotube's reaches past the tube, and a player who climbed out, or stood by
+  one of the cryo bay's empty tubes (the same model), saw the armor standing
+  in it.
 */
 
 #include "cseries.h"
 #include "model_detail.h"
 #include "models/model_definitions.h"
 #include "rasterizer/rasterizer_console_vars.h"
-#include "render/render.h"
-#include "render/render_cameras.h"
 
 /* ---------- constants */
 
@@ -34,37 +37,28 @@ enum
 
 /* ---------- public code */
 
-short model_detail_rules(struct model const *model, real_point3d const *centroid, real radius)
+short model_detail_rules(struct model const *model, real stock_pixels)
 {
 	if (halo_model_detail_stock() || rasterizer_debug_options.debug_model_lod!=NONE)
 	{
 		return _model_detail_rules_stock;
 	}
-	return model_detail_camera_inside(model, &render.camera.position, centroid, radius) ?
+	return model_detail_inside_reached(model, stock_pixels) ?
 		_model_detail_rules_inside :
 		_model_detail_rules_outside;
 }
 
-boolean model_detail_camera_inside(struct model const *model, real_point3d const *camera,
-	real_point3d const *centroid, real radius)
+boolean model_detail_inside_reached(struct model const *model, real stock_pixels)
 {
 	short level;
 
+	/* (the least detailed of its inside's levels: the Xbox draws one of them
+	from that size up; not a number reaches none) */
 	for (level = 0; level<(short)NUMBEROF(model->detail_cutoff_pixels); level++)
 	{
 		if (model->detail_cutoff_pixels[level]>MODEL_DETAIL_INTERIOR_CUTOFF_PIXELS)
 		{
-			real x, y, z;
-
-			/* (a sphere of no size, infinite or not a number holds nothing) */
-			if (!(radius>0.f && radius<=REAL_MAX))
-			{
-				return FALSE;
-			}
-			x = camera->x-centroid->x;
-			y = camera->y-centroid->y;
-			z = camera->z-centroid->z;
-			return x*x+y*y+z*z<radius*radius;
+			return stock_pixels>=model->detail_cutoff_pixels[level];
 		}
 	}
 	return FALSE;
