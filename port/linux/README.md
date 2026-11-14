@@ -856,8 +856,11 @@ see, posed as they see it: the upper body is folded away, and the body is
 set back behind the eye as far as keeps the open waist below the view
 (the way Halo 2 keeps its first-person body's open top out of sight), more
 the further down you look. It is drawn with the world's camera, so it keeps
-its place and size at any field of view. Hit boxes, markers and everything
-the game does with the body are unchanged.
+its place and size at any field of view. A mirror (the dynamic mirrors of
+some levels' floors and walls) shows your whole body and what you carry, as
+the game always has, set back as far as the legs, so that your legs meet
+their reflection. Hit boxes, markers and everything the game does with the
+body are unchanged.
 
 Only this machine's view changes. Nothing the machines send each other
 changes, so players with different settings play together.
@@ -1978,7 +1981,7 @@ Other changes:
 | `objects/widgets/flags.c` | A flag's cloth steps a tick at a time, as on the Xbox, not every frame (eight steps a tick at 240 frames a second held it eight times as stiff), and is drawn as far from where the frame that stepped it hung it as its first attachment marker has moved since, so that it stays on a running carrier's pole. |
 | `rasterizer/rasterizer_text.c`, `text/draw_string.c` | Text is drawn from an atlas of the fonts' glyphs, rasterized at the resolution the game draws at (`src/text_hires.c`), when the font has every character of the string. Text can be drawn scaled about a point (`rasterizer_text_set_scale`), as the players' names are. Each glyph's advance is centred on the font tag character's, so the layout is the same, and a glyph is cut at a text box only where the font tag's character visibly was. |
 | `interface/first_person_weapons.c` | The first-person hands are drawn with the unit's shield modifier shader, as its body is (`display.viewmodel_shield`). |
-| `render/render_objects.c`, `objects/objects.c` | In first person, your own body is drawn from the waist down with the pose `first_person_legs.c` makes (`display.first_person_legs`); the waist it found and the mesh `object_mesh.c` read are forgotten on a new map. |
+| `render/render_objects.c`, `render/render.c`, `objects/objects.c` | In first person, your own body is drawn from the waist down with the pose `first_person_legs.c` makes (`display.first_person_legs`), and in a mirror whole, with what it carries, set back as far as the legs as the window's own view sets them back (`render.c` gives the mirror that view); the waist it found and the mesh `object_mesh.c` read are forgotten on a new map. |
 | `render/render_objects.c` | An object's shadow map is centered where the frame draws the object between the ticks (`display.interpolation`, `render_interpolation_object_point`), as its model is drawn into the map, not where the tick left it: a fast vehicle (a Ghost) stood up to a tick's travel off its map's center, and the map's edge and corner fade cut its shadow's trailing side, flickering. |
 | `objects/object_lights.c` | Glows the port lights itself (`shield_glow.c`): dynamic lights attached to an object's node, colored and sized each frame by their maker, drawn with a light definition the map has. |
 | `render/render_objects.c`, `interface/first_person_weapons.c`, `rasterizer/xbox/rasterizer_xbox_plasma_energy.c`, `items/projectiles.c` | An overshield as `overshield_effect.c` draws it (`display.overshield_effect`): in its own color, its intensity full, its energy slower, faded above the height it has risen to; a hit on it plays the projectile's effect for an Elite's energy shield in place of its own (only the effect: the projectile's response is its own). |
