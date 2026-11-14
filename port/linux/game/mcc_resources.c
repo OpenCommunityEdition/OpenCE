@@ -141,7 +141,25 @@ int mcc_resources_read(struct mcc_runtime *runtime,unsigned type,char const *nam
     uint32_t offset,uint32_t bytes,void *out,char const *group_name)
 {
     struct mcc_resource_file *file=mcc_resource_get(runtime,type);
-    return file && out && mcc_resource_read(file,name,offset,bytes,out,group_name);
+    if (file && out && mcc_resource_read(file,name,offset,bytes,out,group_name))
+        return 1;
+    if (!file && runtime && runtime->resources && out && type>=1 && type<=2) {
+        unsigned set;
+        for (set=1;set<MCC_PACKAGE_BASE_SETS;set++) {
+            struct mcc_resource_file candidate;
+            char path[128];
+            memset(&candidate,0,sizeof(candidate));
+            if (!mcc_package_base_resource_path(type,set,path)) continue;
+            if (mcc_resource_open(&candidate,type,runtime->level_name,path,NULL,0)==1) {
+                if (mcc_resource_read(&candidate,name,offset,bytes,out,group_name)) {
+                    ((struct mcc_resources *)runtime->resources)->files[type-1]=candidate;
+                    return 1;
+                }
+                mcc_resource_close(&candidate);
+            }
+        }
+    }
+    return 0;
 }
 
 struct mcc_resource_probe {struct mcc_resource_file *file;unsigned type;};

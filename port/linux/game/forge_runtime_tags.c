@@ -11529,9 +11529,9 @@ int forge_ui_installed_tag_delete(int category_tab, int list_index)
  * and Xbox/MCC 'mode' tags!)
  * ============================================================================ */
 
-#define FORGE_PREVIEW_MAX_VERTICES   16384
-#define FORGE_PREVIEW_MAX_TRIANGLES  24576
-#define FORGE_PREVIEW_MAX_SHADERS    64
+#define FORGE_PREVIEW_MAX_VERTICES   131072
+#define FORGE_PREVIEW_MAX_TRIANGLES  196608
+#define FORGE_PREVIEW_MAX_SHADERS    128
 #define FORGE_PREVIEW_TEXTURE_SIZE   128
 
 struct forge_preview_node_xform
@@ -11626,7 +11626,7 @@ static void preview_append_part_vertices_and_strip(
 
 	if (vtx_count <= 0 || strip_tri_count <= 0 ||
 		base_vtx + vtx_count > FORGE_PREVIEW_MAX_VERTICES ||
-		mesh->triangle_count + strip_tri_count > FORGE_PREVIEW_MAX_TRIANGLES)
+		mesh->triangle_count >= FORGE_PREVIEW_MAX_TRIANGLES)
 		return;
 
 	for (v = 0; v < vtx_count; v++)
@@ -11706,7 +11706,7 @@ static void preview_append_part_vertices_and_strip(
 	}
 	mesh->vertex_count += vtx_count;
 
-	for (t = 0; t < strip_tri_count; t++)
+	for (t = 0; t < strip_tri_count && mesh->triangle_count < FORGE_PREVIEW_MAX_TRIANGLES; t++)
 	{
 		uint16_t a = strip_indices[t];
 		uint16_t b = strip_indices[t + 1];
@@ -11823,6 +11823,32 @@ static int preview_decode_bitmap_texture(
 	pixels = (unsigned char *)malloc(size);
 	if (!pixels)
 		return 0;
+	if (bpp > 0 && (bitmap->flags & 16) && level == 0)
+	{
+		unsigned long row_bytes = (unsigned long)mip_w * (unsigned long)bpp;
+		unsigned long pitch = (row_bytes + 63ul) & ~63ul;
+		unsigned long pitched_size = pitch * (unsigned long)mip_h;
+		if (pitch > row_bytes &&
+			offset - (unsigned long)bitmap->pixels_offset <= (unsigned long)bitmap->pixels_size &&
+			pitched_size <= (unsigned long)bitmap->pixels_size - (offset - (unsigned long)bitmap->pixels_offset))
+		{
+			unsigned char *pitched = (unsigned char *)malloc(pitched_size);
+			if (pitched && read_fn(read_ctx, offset, pitched_size, pitched))
+			{
+				short ry;
+				for (ry = 0; ry < mip_h; ry++)
+					memcpy(pixels + (unsigned long)ry * row_bytes, pitched + (unsigned long)ry * pitch, row_bytes);
+				free(pitched);
+				out_tex->width = mip_w;
+				out_tex->height = mip_h;
+				out_tex->format = bitmap->format;
+				out_tex->size = size;
+				out_tex->pixels = pixels;
+				return 1;
+			}
+			free(pitched);
+		}
+	}
 	if (!read_fn(read_ctx, offset, size, pixels))
 	{
 		free(pixels);
@@ -11979,7 +12005,7 @@ static int build_preview_mesh_from_xbox_map_data(
 	if (!preview_mesh_alloc_buffers(mesh, shader_to_mat))
 		return 0;
 
-	if (node_cnt > 0 && node_cnt <= 64 && node_addr >= tag_base &&
+	if (node_cnt > 0 && node_cnt <= 256 && node_addr >= tag_base &&
 		(node_addr - tag_base) + (uint32_t)node_cnt * 156u <= tag_sz)
 	{
 		world_nodes = (struct forge_preview_node_xform *)malloc((size_t)node_cnt * sizeof(*world_nodes));
@@ -12002,6 +12028,7 @@ static int build_preview_mesh_from_xbox_map_data(
 			int32_t perm_cnt = *(int32_t const *)(tag_buf + ro + 64u);
 			uint32_t perm_addr = *(uint32_t const *)(tag_buf + ro + 68u);
 			int pm_i;
+			int16_t fallback_g = -1;
 			geom_idx = -1;
 			if (perm_cnt > 0 && perm_addr >= tag_base && (perm_addr - tag_base) + (uint32_t)perm_cnt * 88u <= tag_sz)
 			{
@@ -12014,11 +12041,19 @@ static int build_preview_mesh_from_xbox_map_data(
 						int16_t g = *(int16_t const *)(tag_buf + pmo + 64u + (uint32_t)lod * 2u);
 						if (g >= 0 && g < geom_cnt)
 						{
-							geom_idx = g;
-							break;
+							uint32_t g_check = (geom_addr - tag_base) + (uint32_t)g * 48u;
+							if (fallback_g < 0)
+								fallback_g = g;
+							if (*(int32_t const *)(tag_buf + g_check + 36u) > 0)
+							{
+								geom_idx = g;
+								break;
+							}
 						}
 					}
 				}
+				if (geom_idx < 0)
+					geom_idx = fallback_g;
 			}
 		}
 		if (geom_idx < 0 || geom_idx >= geom_cnt)
@@ -12052,15 +12087,72 @@ static int build_preview_mesh_from_xbox_map_data(
 						uint32_t sdata = *(uint32_t const *)(tag_buf + sio + 0x14);
 						int32_t bitm_ref = -1;
 						float su = 1.0f, sv = 1.0f;
+						short col_src = 0;
 						if (sgrp == 'soso' && sdata >= tag_base && (sdata - tag_base) + 0xB4u <= tag_sz)
 						{
-							su = *(float const *)(tag_buf + (sdata - tag_base) + 0x9Cu);
-							sv = *(float const *)(tag_buf + (sdata - tag_base) + 0xA0u);
-							bitm_ref = *(int32_t const *)(tag_buf + (sdata - tag_base) + 0xB0u);
+							uint32_t s_off = sdata - tag_base;
+							uint16_t s_flags = *(uint16_t const *)(tag_buf + s_off + 0x28u);
+							int16_t cc_src = *(int16_t const *)(tag_buf + s_off + 0x4Cu);
+							int16_t det_mask = (s_off + 0xD8u <= tag_sz) ? *(int16_t const *)(tag_buf + s_off + 0xD6u) : 0;
+							su = *(float const *)(tag_buf + s_off + 0x9Cu);
+							sv = *(float const *)(tag_buf + s_off + 0xA0u);
+							bitm_ref = *(int32_t const *)(tag_buf + s_off + 0xB0u);
+							if ((s_flags & 4u) != 0 || cc_src > 0 || det_mask == 3 || det_mask == 4)
+								col_src = 1;
 						}
 						else if (sgrp == 'senv' && sdata >= tag_base && (sdata - tag_base) + 0x98u <= tag_sz)
 						{
-							bitm_ref = *(int32_t const *)(tag_buf + (sdata - tag_base) + 0x94u);
+							uint32_t s_off = sdata - tag_base;
+							uint16_t s_flags = *(uint16_t const *)(tag_buf + s_off + 0x28u);
+							bitm_ref = *(int32_t const *)(tag_buf + s_off + 0x94u);
+							if ((s_flags & 1u) == 0)
+								col_src = 1;
+						}
+						else if ((sgrp == 'schi' || sgrp == 'scex') && sdata >= tag_base && (sdata - tag_base) + 0x6Cu <= tag_sz)
+						{
+							uint32_t s_off = sdata - tag_base;
+							int32_t m_cnt = *(int32_t const *)(tag_buf + s_off + 0x54u);
+							uint32_t m_addr = *(uint32_t const *)(tag_buf + s_off + 0x58u);
+							if (sgrp == 'scex' && m_cnt <= 0 && s_off + 0x6Cu <= tag_sz)
+							{
+								m_cnt = *(int32_t const *)(tag_buf + s_off + 0x60u);
+								m_addr = *(uint32_t const *)(tag_buf + s_off + 0x64u);
+							}
+							if (m_cnt > 0 && m_addr >= tag_base && (m_addr - tag_base) + 0xDCu <= tag_sz)
+							{
+								uint32_t mo = m_addr - tag_base;
+								su = *(float const *)(tag_buf + mo + 0x54u);
+								sv = *(float const *)(tag_buf + mo + 0x58u);
+								bitm_ref = *(int32_t const *)(tag_buf + mo + 0x78u);
+							}
+						}
+						else if (sgrp == 'sotr' && sdata >= tag_base && (sdata - tag_base) + 0x6Cu <= tag_sz)
+						{
+							uint32_t s_off = sdata - tag_base;
+							int32_t m_cnt = *(int32_t const *)(tag_buf + s_off + 0x54u);
+							uint32_t m_addr = *(uint32_t const *)(tag_buf + s_off + 0x58u);
+							if (m_cnt > 0 && m_addr >= tag_base && (m_addr - tag_base) + 0x64u <= tag_sz)
+							{
+								uint32_t mo = m_addr - tag_base;
+								su = *(float const *)(tag_buf + mo + 0x04u);
+								sv = *(float const *)(tag_buf + mo + 0x08u);
+								bitm_ref = *(int32_t const *)(tag_buf + mo + 0x28u);
+							}
+						}
+						else if (sgrp == 'sgla' && sdata >= tag_base && (sdata - tag_base) + 0x168u <= tag_sz)
+						{
+							uint32_t s_off = sdata - tag_base;
+							bitm_ref = *(int32_t const *)(tag_buf + s_off + 0x164u);
+							if (bitm_ref == -1)
+								bitm_ref = *(int32_t const *)(tag_buf + s_off + 0x68u);
+						}
+						else if ((sgrp == 'smet' || sgrp == 'swat') && sdata >= tag_base && (sdata - tag_base) + 0x5Cu <= tag_sz)
+						{
+							bitm_ref = *(int32_t const *)(tag_buf + (sdata - tag_base) + 0x58u);
+						}
+						else if (sgrp == 'spla' && sdata >= tag_base && (sdata - tag_base) + 0xE4u <= tag_sz)
+						{
+							bitm_ref = *(int32_t const *)(tag_buf + (sdata - tag_base) + 0xE0u);
 						}
 						if (bitm_ref != -1 && (bitm_ref & 0xFFFF) < tag_count)
 						{
@@ -12085,7 +12177,6 @@ static int build_preview_mesh_from_xbox_map_data(
 									{
 										unsigned char *conv_pix = NULL;
 										uint32_t conv_sz = 0;
-										b_elem.flags |= 16u;
 										if (mcc_forge_convert_single_bitmap(
 												s_map_browser.mcc_rt,
 												b_tname,
@@ -12121,7 +12212,7 @@ static int build_preview_mesh_from_xbox_map_data(
 										short m_slot = (short)mesh->material_count++;
 										short t_slot = (short)mesh->texture_count++;
 										mesh->materials[m_slot].texture_index = t_slot;
-										mesh->materials[m_slot].color_source = 0;
+										mesh->materials[m_slot].color_source = col_src;
 										mesh->materials[m_slot].u_scale = (su > 0.0001f && su < 1000.0f) ? su : 1.0f;
 										mesh->materials[m_slot].v_scale = (sv > 0.0001f && sv < 1000.0f) ? sv : 1.0f;
 										mesh->materials[m_slot].base_map_alpha_Replicates = 0;
@@ -12146,7 +12237,7 @@ static int build_preview_mesh_from_xbox_map_data(
 				int16_t loc_node_cnt = (int16_t)tag_buf[po + 0x6Bu];
 				uint8_t const *loc_nodes = tag_buf + po + 0x6Cu;
 
-				if (fp && tri_cnt > 0 && tri_cnt <= 65536 && vtx_cnt > 0 && vtx_cnt <= 16384 &&
+				if (fp && tri_cnt > 0 && tri_cnt <= 131072 && vtx_cnt > 0 && vtx_cnt <= 65535 &&
 					model_file_off >= 2048u)
 				{
 					uint32_t vtx_bytes = (uint32_t)vtx_cnt * 68u;
@@ -12187,7 +12278,7 @@ static int build_preview_mesh_from_xbox_map_data(
 				uint32_t vb_hw = *(uint32_t const *)(tag_buf + po + 100u);
 
 				if (tri_type == _triangle_buffer_type_precompiled_strip &&
-					tri_cnt > 0 && tri_cnt <= 65536 && vtx_cnt > 0 && vtx_cnt <= 16384 &&
+					tri_cnt > 0 && tri_cnt <= 131072 && vtx_cnt > 0 && vtx_cnt <= 65535 &&
 					tb_hw >= tag_base && (tb_hw - tag_base) + 12u <= tag_sz &&
 					vb_hw >= tag_base && (vb_hw - tag_base) + 12u <= tag_sz)
 				{
@@ -12337,6 +12428,7 @@ static int build_preview_mesh_from_ce_source(
 		{
 			struct model_region const *reg = (struct model_region const *)model->regions.address + r_i;
 			long pm_i;
+			short fallback_g = NONE;
 			geom_idx = NONE;
 			for (pm_i = 0; reg->permutations.address && pm_i < reg->permutations.count && geom_idx == NONE; pm_i++)
 			{
@@ -12348,11 +12440,20 @@ static int build_preview_mesh_from_ce_source(
 					short g = perm->geometry_indices[lod];
 					if (g >= 0 && g < model->geometries.count)
 					{
-						geom_idx = g;
-						break;
+						uint8_t const *g_chk = (uint8_t const *)model->geometries.address + (size_t)g * 48u;
+						struct tag_block const *p_chk = (struct tag_block const *)(g_chk + 36u);
+						if (fallback_g == NONE)
+							fallback_g = g;
+						if (p_chk->count > 0 && p_chk->address)
+						{
+							geom_idx = g;
+							break;
+						}
 					}
 				}
 			}
+			if (geom_idx == NONE)
+				geom_idx = fallback_g;
 		}
 		if (geom_idx < 0 || geom_idx >= model->geometries.count)
 			continue;
@@ -12388,15 +12489,62 @@ static int build_preview_mesh_from_ce_source(
 					{
 						long bitm_idx = NONE;
 						float su = 1.0f, sv = 1.0f;
+						short col_src = 0;
 						if (s_grp == 'soso')
 						{
+							uint16_t s_flags = *(uint16_t const *)(s_def + 0x28u);
+							int16_t cc_src = *(int16_t const *)(s_def + 0x4Cu);
+							int16_t det_mask = *(int16_t const *)(s_def + 0xD6u);
 							su = *(float const *)(s_def + 0x9Cu);
 							sv = *(float const *)(s_def + 0xA0u);
 							bitm_idx = *(long const *)(s_def + 0xB0u);
+							if ((s_flags & 4u) != 0 || cc_src > 0 || det_mask == 3 || det_mask == 4)
+								col_src = 1;
 						}
 						else if (s_grp == 'senv')
 						{
+							uint16_t s_flags = *(uint16_t const *)(s_def + 0x28u);
 							bitm_idx = *(long const *)(s_def + 0x94u);
+							if ((s_flags & 1u) == 0)
+								col_src = 1;
+						}
+						else if (s_grp == 'schi' || s_grp == 'scex')
+						{
+							struct tag_block const *m_blk = (struct tag_block const *)(s_def + 0x54u);
+							if (s_grp == 'scex' && (m_blk->count <= 0 || !m_blk->address))
+								m_blk = (struct tag_block const *)(s_def + 0x60u);
+							if (m_blk->count > 0 && m_blk->address)
+							{
+								uint8_t const *m_el = (uint8_t const *)m_blk->address;
+								su = *(float const *)(m_el + 0x54u);
+								sv = *(float const *)(m_el + 0x58u);
+								bitm_idx = *(long const *)(m_el + 0x78u);
+							}
+						}
+						else if (s_grp == 'sotr')
+						{
+							struct tag_block const *m_blk = (struct tag_block const *)(s_def + 0x54u);
+							if (m_blk->count > 0 && m_blk->address)
+							{
+								uint8_t const *m_el = (uint8_t const *)m_blk->address;
+								su = *(float const *)(m_el + 0x04u);
+								sv = *(float const *)(m_el + 0x08u);
+								bitm_idx = *(long const *)(m_el + 0x28u);
+							}
+						}
+						else if (s_grp == 'sgla')
+						{
+							bitm_idx = *(long const *)(s_def + 0x164u);
+							if (bitm_idx == NONE)
+								bitm_idx = *(long const *)(s_def + 0x68u);
+						}
+						else if (s_grp == 'smet' || s_grp == 'swat')
+						{
+							bitm_idx = *(long const *)(s_def + 0x58u);
+						}
+						else if (s_grp == 'spla')
+						{
+							bitm_idx = *(long const *)(s_def + 0xE0u);
 						}
 						if (bitm_idx != NONE)
 						{
@@ -12415,7 +12563,7 @@ static int build_preview_mesh_from_ce_source(
 									short m_slot = (short)mesh->material_count++;
 									short t_slot = (short)mesh->texture_count++;
 									mesh->materials[m_slot].texture_index = t_slot;
-									mesh->materials[m_slot].color_source = 0;
+									mesh->materials[m_slot].color_source = col_src;
 									mesh->materials[m_slot].u_scale = (su > 0.0001f && su < 1000.0f) ? su : 1.0f;
 									mesh->materials[m_slot].v_scale = (sv > 0.0001f && sv < 1000.0f) ? sv : 1.0f;
 									mesh->materials[m_slot].base_map_alpha_Replicates = 0;
@@ -12428,7 +12576,7 @@ static int build_preview_mesh_from_ce_source(
 				mat_idx = shader_to_mat[shdr_idx];
 			}
 
-			if (vtx_cnt > 0 && vtx_cnt <= 16384 && tri_cnt > 0 && tri_cnt <= 65536)
+			if (vtx_cnt > 0 && vtx_cnt <= 65535 && tri_cnt > 0 && tri_cnt <= 131072)
 			{
 				unsigned long vtx_bytes = (unsigned long)vtx_cnt * 68u;
 				unsigned long strip_bytes = ((unsigned long)tri_cnt + 2u) * 2u;

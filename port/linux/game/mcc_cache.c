@@ -543,6 +543,26 @@ struct mcc_runtime *mcc_forge_browser_open(FILE *fp, char const *map_path, void 
                 ws_id[k] = '\0';
             }
         }
+        if (!ws_id[0])
+        {
+            char const *mc = strstr(map_path, "mcc_maps/");
+            if (!mc)
+                mc = strstr(map_path, "mcc_maps\\");
+            if (mc)
+            {
+                mc += 9;
+                if (mc < leaf)
+                {
+                    size_t k = 0;
+                    while (mc[k] && mc[k] != '/' && mc[k] != '\\' && k + 1 < sizeof(ws_id))
+                    {
+                        ws_id[k] = mc[k];
+                        k++;
+                    }
+                    ws_id[k] = '\0';
+                }
+            }
+        }
         if (ws_id[0] != '\0')
             snprintf(rt->level_name, sizeof(rt->level_name), "mcc_maps\\%s\\%s", ws_id, stem);
         else

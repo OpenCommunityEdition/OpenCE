@@ -173,6 +173,47 @@ static void measure_mesh(void)
 	mesh_radius = (float)sqrt(r2);
 }
 
+static void sample_texture(
+	const struct tag_injector_texture *t,
+	float u,
+	float v,
+	unsigned int rgba[4]);
+
+static void normalize_preview_materials(void)
+{
+	long m;
+
+	if (!mesh.materials || !mesh.textures)
+		return;
+	for (m = 0; m < mesh.material_count; m++)
+	{
+		short ti = mesh.materials[m].texture_index;
+		const struct tag_injector_texture *t;
+		int gx, gy, has_visible_alpha = 0;
+
+		if (mesh.materials[m].color_source != 0 || ti < 0 || ti >= mesh.texture_count)
+			continue;
+		t = &mesh.textures[ti];
+		if (!t->pixels || t->width <= 0 || t->height <= 0)
+			continue;
+		for (gy = 0; gy < 16 && !has_visible_alpha; gy++)
+		{
+			for (gx = 0; gx < 16; gx++)
+			{
+				unsigned int rgba[4];
+				sample_texture(t, ((float)gx + 0.5f) * (1.0f / 16.0f), ((float)gy + 0.5f) * (1.0f / 16.0f), rgba);
+				if (rgba[3] >= 32u)
+				{
+					has_visible_alpha = 1;
+					break;
+				}
+			}
+		}
+		if (!has_visible_alpha)
+			mesh.materials[m].color_source = 1;
+	}
+}
+
 static void load_selected(void)
 {
 	if (loaded_mode == selected_mode &&
@@ -189,7 +230,10 @@ static void load_selected(void)
 	if (selected_mode < 0 || selected_cat < 0 || selected_index < 0)
 		return;
 	if (forge_ui_build_tag_preview_mesh(selected_mode, selected_cat, selected_index, &mesh))
+	{
+		normalize_preview_materials();
 		measure_mesh();
+	}
 }
 
 static void project_vertex(
