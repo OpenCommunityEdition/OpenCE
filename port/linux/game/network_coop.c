@@ -3671,10 +3671,25 @@ void network_coop_handle_presentation(
 	coop_presentation.heard_any = TRUE;
 }
 
+/* client: whether the host's camera is inside the level, where a view of
+it shows something. A camera outside every cluster draws only the clear
+colour, purple. */
+static boolean client_host_camera_in_level(
+	struct distributed_coop_presentation const *presentation)
+{
+	struct location location;
+
+	if (!distributed_point_valid(&presentation->camera_position, CAMERA_WORLD_BOUND))
+		return FALSE;
+	scenario_location_from_point(&location, &presentation->camera_position);
+	return location.cluster_index != NONE;
+}
+
 static void client_presentation_apply(
 	struct distributed_coop_presentation const *presentation)
 {
 	boolean cinematic = TEST_FLAG(presentation->flags, _presentation_cinematic_bit);
+	boolean host_shot;
 
 	player_input_enable(!presentation->input_disabled);
 	if (presentation->players_vitality_set && distributed_real_valid(presentation->players_maximum_body_vitality) &&
@@ -3703,11 +3718,14 @@ static void client_presentation_apply(
 	/* Use the host's camera while its scripts control it, a dead player's
 	too: the cutscene's camera wins over spectating (shots filmed by a moving
 	Pelican follow this machine's copy of it: camera_object_offset). Spectate
-	instead only when the cutscene leaves the camera with the player. A
+	instead only when the cutscene leaves the camera with the player, or
+	the host's camera is outside the level (a dedicated server built before
+	director_port_viewless_scripted_camera sends one at the world origin). A
 	player with no unit and nobody to watch also gets the host's view,
 	rather than a dead camera at the world origin. */
-	client_host_camera_set((coop_presentation.cinematic_started && presentation->camera_scripted) ||
-		coop_spectate_nothing_to_watch(0));
+	host_shot = coop_presentation.cinematic_started && presentation->camera_scripted &&
+		client_host_camera_in_level(presentation);
+	client_host_camera_set(host_shot || coop_spectate_nothing_to_watch(0));
 	/* (also outside a cinematic: a cutscene that leaves the players their
 	controls shows the bars too) */
 	cinematic_show_letterbox(TEST_FLAG(presentation->flags, _presentation_letterbox_bit));
@@ -3738,7 +3756,7 @@ static void client_presentation_apply(
 		{
 			boolean camera_ready = TRUE;
 
-			if (!(coop_presentation.cinematic_started && presentation->camera_scripted))
+			if (!host_shot)
 				camera_ready = client_watch_host_from_behind(&position, &forward, &up);
 			if (camera_ready && valid_real_vector3d_axes2(&forward, &up))
 				scripted_camera_set_camera_point_relative(&position, &forward, &up,

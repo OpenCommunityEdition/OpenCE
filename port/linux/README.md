@@ -1942,6 +1942,7 @@ Other changes:
 | File | Change |
 | --- | --- |
 | `scenario/scenario.c` | The BSP connection tables have names, not MSVC offsets. |
+| `camera/director.c`, `camera/observer.c` | A network host with no local player (a dedicated server) runs local player 0's director and observer while the scripts hold the camera, for the scripted camera alone (`director_port_viewless_scripted_camera`), so co-op sends its clients the cutscene's camera rather than one at the world origin. |
 | `rasterizer/xbox/rasterizer_xbox_environment_fog.c` | A local pointer gets its value from the file-scope array with the same name. |
 | `game/player_control.c` | The mouse aims the player on controller 1 directly. |
 | `sound/game_sound.c` | The game calculates the obstruction of each sound one time for each tick, not for each frame. |

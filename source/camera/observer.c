@@ -102,6 +102,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "observer.h"
+#include "director.h" /* port: director_port_viewless_scripted_camera */
 
 #include "game/players.h"
 #include "networking/network_connection.h"
@@ -1321,7 +1322,10 @@ void observer_update(
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
 	{
-		if (local_player_get_player_index(local_player_index) != NONE)
+		/* port: and a dedicated server's cutscene camera, as local player 0's
+		(director_port_viewless_scripted_camera) */
+		if (local_player_get_player_index(local_player_index) != NONE ||
+			(local_player_index == 0 && director_port_viewless_scripted_camera()))
 		{
 			struct observer *observer = observer_get(local_player_index);
 

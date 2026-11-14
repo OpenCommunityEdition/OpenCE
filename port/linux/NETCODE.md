@@ -36,7 +36,10 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   - every tick: the cinematic, camera, screen fade, the HUD settings the
     scripts control (what is shown, the mission timer), the skip vote, and
     which teams are allies and friends (the scripts' allegiances, so the
-    marines are the players' allies on every machine);
+    marines are the players' allies on every machine). A dedicated server,
+    which has no player of its own, still runs the scripted camera, so its
+    clients see the cutscene's shots. A client keeps its own view when the
+    host's camera is outside the level, as an older dedicated server's is;
   - once each, numbered so nothing is applied twice: script sounds,
     chapter titles, help and objective text, "Checkpoint" messages, screen
     shake, nav points, custom animations on units and scenery, and units

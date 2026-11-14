@@ -159,6 +159,13 @@ void director_initialize_for_saved_game(
 	void);
 void director_update(
 	real time_delta_sec);
+/* port: a network host with no local player of its own (a dedicated
+server) while the scripts hold the camera: local player 0's director and
+observer run anyway, for the scripted camera alone, so that observer has
+the cutscene's camera a co-op host sends its clients
+(port/linux/game/network_coop.c) */
+boolean director_port_viewless_scripted_camera(
+	void);
 
 /* ---------- globals */
 

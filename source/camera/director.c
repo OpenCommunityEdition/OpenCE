@@ -133,6 +133,7 @@ symbols in this file:
 #include "orbiting_camera.h"
 
 #include "editor/editor_stubs.h"
+#include "game/game.h"
 #include "game/players.h"
 #include "input/input.h"
 #include "main/console.h"
@@ -1178,7 +1179,36 @@ void director_update(
 		}
 	}
 
+	/* port: a dedicated server's cutscene camera (director_port_viewless_scripted_camera):
+	no player, so no controls and no choice of camera, only the scripted one */
+	if (director_port_viewless_scripted_camera())
+	{
+		struct director *director = director_get(0);
+		struct camera_control controls;
+		struct observer_command command;
+
+		csmemset(&controls, 0, sizeof(controls));
+		controls.local_player_index = 0;
+		controls.seconds_elapsed = director_globals.dtime;
+		csmemset(&command, 0, sizeof(command));
+		if (director->camera_proc != (director_camera_update_proc)scripted_camera_update)
+			director_set_camera(0, (director_camera_update_proc)scripted_camera_update, FALSE);
+		director->camera_proc(director->camera_data, &controls, &command);
+		if (TEST_FLAG(command.flags, _observer_command_valid_bit))
+			director->command = command;
+		else
+			SET_FLAG(director->command.flags, _observer_command_valid_bit, FALSE);
+		observer_set_camera(0, &director->command);
+	}
+
 	return;
+}
+
+boolean director_port_viewless_scripted_camera(
+	void)
+{
+	return director_camera_scripted && *director_camera_scripted &&
+		game_connection() == _game_connection_network_server && local_player_get_next(NONE) == NONE;
 }
 
 void director_initialize_for_saved_game(
