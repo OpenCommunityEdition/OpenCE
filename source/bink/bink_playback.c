@@ -1017,6 +1017,19 @@ static boolean bink_query_analog_controller_buttons(
 {
 	boolean button_pressed= FALSE;
 	short gamepad_index;
+	struct key_stroke key;
+
+	/* tap on touchscreen or mouse click skips */
+	if (input_mouse_button_is_down(0) || input_mouse_button_is_down(1))
+		return TRUE;
+	/* any key press skips */
+	if (input_get_key(&key))
+		return TRUE;
+	if (input_key_is_down(_key_space) || input_key_is_down(_key_return) ||
+		input_key_is_down(_keypad_enter) || input_key_is_down(_key_escape))
+	{
+		return TRUE;
+	}
 
 	for (gamepad_index= 0; gamepad_index<MAXIMUM_GAMEPADS && !button_pressed; gamepad_index++)
 	{

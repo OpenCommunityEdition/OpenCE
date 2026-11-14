@@ -133,6 +133,9 @@ MUSL_FILES = [
     "misc/syscall.c", "network/htonl.c", "network/htons.c", "network/ntohl.c",
     "network/ntohs.c", "network/inet_addr.c", "network/inet_aton.c",
     "network/inet_ntoa.c", "network/inet_pton.c", "network/inet_ntop.c",
+    # (tempnam, which the movies' FFmpeg pulls in through libavutil's temporary
+    # files, is built from this one with __randname)
+    "temp/__randname.c",
 ]
 MUSL_THREAD_PREFIXES = (
     "pthread_attr_", "pthread_cond", "pthread_mutex", "pthread_rwlock",
@@ -382,6 +385,31 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     generated_headers = [*xdk_headers(), alltypes, syscall_h, version_h, gl_stamp,
                          semantics_header, platform_semantics_header]
 
+    # the disc's movies (configure.py --with-ffmpeg): FFmpeg built for the
+    # guest's ABI (tools/android_ffmpeg.py), or bink_null.c's stubs
+    ffmpeg_guest = BUILD / "ffmpeg-guest"
+    ffmpeg_archives: List[Path] = []
+    ffmpeg_cflags: List[str] = []
+    ffmpeg_link = ""
+    if getattr(sln, "with_ffmpeg", False):
+        libraries = ["libavformat", "libavcodec", "libswscale", "libswresample", "libavutil"]
+        ffmpeg_archives = [ffmpeg_guest / "build" / library / f"{library}.a" for library in libraries]
+        n.rule(
+            name="android_ffmpeg",
+            command=f"{python} tools/android_ffmpeg.py {ffmpeg_guest} --ndk {ndk}",
+            description="ANDROID FFMPEG (the movies' decoder)",
+            restat=True,
+            pool="console",
+        )
+        n.build(outputs=[*ffmpeg_archives, ffmpeg_guest / "ffmpeg.stamp"], rule="android_ffmpeg",
+                implicit=[Path("tools/android_ffmpeg.py"), *generated_headers])
+        ffmpeg_cflags = ["-DHALO_BINK_FFMPEG", f"-I{ffmpeg_guest}/src", f"-I{ffmpeg_guest}/build"]
+        # (FFmpeg's libraries call each other's symbols: the group is what a
+        # static link needs to resolve them in one pass; ld.lld takes it
+        # without the -Wl, a compiler's driver would need)
+        ffmpeg_link = " ".join(["--start-group", *[str(archive) for archive in ffmpeg_archives],
+                                "--end-group"])
+
     # ---------- guest compilation: C -> Darwin assembly -> ELF assembly -> object
 
     n.rule(
@@ -479,6 +507,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         f"-I{PORT_DIR}/include", f"-I{TOML_DIR}", f"-I{EXPAT_DIR}", f"-I{KCP_DIR}", f"-I{MONOCYPHER_DIR}",
         f"-I{ZLIB_DIR}", "-Isource -Isource/cseries",
         f"-I{SDL_DIR}/include", f"-I{gl_include}", *libc_includes, f"-idirafter {XDK_INCLUDE}",
+        *ffmpeg_cflags,
     ])
     guest_host_only = {"memory_watch.c"}  # replaced by guest_memory_watch.c
     for source in sorted((LINUX_DIR / "src").glob("*.c")):
@@ -549,13 +578,14 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     n.rule(
         name="android_guest_link",
         command=(f"$android_ndk_bin/ld.lld -m aarch64linux -static -nostdlib -T {linker_script} "
-                 f"-Map $out.map -o $out @$out.rsp {libguestc} "
+                 f"-Map $out.map -o $out @$out.rsp {libguestc} {ffmpeg_link} "
                  "$$($android_host_cc -print-libgcc-file-name)"),
         description="ANDROID LINK $out",
         rspfile="$out.rsp",
         rspfile_content="$in_newline",
     )
-    n.build(outputs=image, rule="android_guest_link", inputs=objects, implicit=[libguestc, linker_script])
+    n.build(outputs=image, rule="android_guest_link", inputs=objects,
+            implicit=[libguestc, linker_script, *ffmpeg_archives])
 
     # ---------- SDL3
 

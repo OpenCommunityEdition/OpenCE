@@ -79,6 +79,8 @@ final class XisoExtractor {
     private static final int MAXIMUM_ENTRIES = 256;
     private static final int COPY_CHUNK = 1024 * 1024;
     private static final String PARTIAL_DIRECTORY = "maps.partial";
+    private static final String MOVIES_DIRECTORY = "bink";
+    private static final String MOVIES_PARTIAL_DIRECTORY = "bink.partial";
     /** the loading screen's picture (source/interface/progress_bar.c), out of default.xbe; the executable is a few MB */
     private static final int LOADING_WIDTH = 320;
     private static final int LOADING_HEIGHT = 240;
@@ -177,6 +179,20 @@ final class XisoExtractor {
         if (maps == null)
             throw new ExtractException("The disc image has no maps folder: it is not a Halo disc.");
 
+        // the root's bink folder (the movies: bink_playback.c plays them);
+        // a disc may carry none
+        Entry moviesFolder = null;
+        for (Entry entry : directories) {
+            if (entry.name.equalsIgnoreCase(MOVIES_DIRECTORY))
+                moviesFolder = entry;
+        }
+        List<Entry> movies = new ArrayList<>();
+        if (moviesFolder != null) {
+            byte[] movieTable = readTable(image, partition, moviesFolder.sector, moviesFolder.size,
+                    "The disc image's bink folder is damaged.");
+            movies = walkTable(movieTable, false);
+        }
+
         // its files
         byte[] table = readTable(image, partition, maps.sector, maps.size, "The disc image's maps folder is damaged.");
         List<Entry> files = walkTable(table, false);
@@ -193,6 +209,11 @@ final class XisoExtractor {
         // is written; an empty file's sector need not be anywhere)
         long total = 0;
         for (Entry file : files) {
+            if (file.size > 0 && partition + file.sector * SECTOR_SIZE + file.size > imageSize)
+                throw new ExtractException(readFailure(file));
+            total += file.size;
+        }
+        for (Entry file : movies) {
             if (file.size > 0 && partition + file.sector * SECTOR_SIZE + file.size > imageSize)
                 throw new ExtractException(readFailure(file));
             total += file.size;
@@ -233,6 +254,52 @@ final class XisoExtractor {
                 throw new ExtractException("Could not move " + file.name + " into " + mapsFolder.getPath() + ".");
         }
         partial.delete();
+
+        // the movies, beside the maps (the intro, the menu's attract loop and
+        // the credits), through bink.partial and never over a file already
+        // there; the maps are the game, so a movie that cannot be copied does
+        // not fail them
+        copyMovies(image, partition, destination, movies, buffer, done, total, progress);
+    }
+
+    /** Copies the disc's movies to destination/bink, the ones it lacks, through bink.partial. */
+    private static boolean copyMovies(FileChannel image, long partition, File destination, List<Entry> movies,
+            ByteBuffer buffer, long done, long total, Progress progress) {
+        File finished = new File(destination, MOVIES_DIRECTORY);
+        File partial = new File(destination, MOVIES_PARTIAL_DIRECTORY);
+        List<Entry> missing = new ArrayList<>();
+
+        for (Entry file : movies) {
+            if (isPlainName(file.name) && !new File(finished, file.name).isFile())
+                missing.add(file);
+        }
+        if (missing.isEmpty())
+            return true;
+        try {
+            if (partial.isDirectory()) {
+                File[] leftovers = partial.listFiles();
+                if (leftovers != null) {
+                    for (File leftover : leftovers)
+                        leftover.delete();
+                }
+            } else {
+                partial.delete();
+                if (!partial.mkdirs() && !partial.isDirectory())
+                    return false;
+            }
+            for (Entry file : missing)
+                done = copyFile(image, partition, file, new File(partial, file.name), buffer, done, total, progress);
+            if (!finished.isDirectory() && !finished.mkdirs() && !finished.isDirectory())
+                return false;
+            for (Entry file : missing) {
+                if (!new File(partial, file.name).renameTo(new File(finished, file.name)))
+                    return false;
+            }
+            partial.delete();
+            return true;
+        } catch (IOException exception) {
+            return false;
+        }
     }
 
     /** No path, no . or .., and only printable ASCII that every file system takes as a plain name. */
