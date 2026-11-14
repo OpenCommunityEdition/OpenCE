@@ -28,6 +28,7 @@ Conventions carried over from the Xbox:
 #include "port_config.h"
 #include "loading_widescreen.h"
 #include "posix.h"
+#include "gpu_profile.h"
 #include "main/console.h"
 #ifdef HALO_ANDROID
 #include "../../android/include/android_render_policy.h"
@@ -2459,6 +2460,8 @@ static void gl_initialize(void)
 		android_render_chip, android_geometry_fixes ? "on" : "off", android_texture_fixes ? "on" : "off");
 #endif
 	glGetIntegerv(GL_MINOR_VERSION, &minor);
+	gpu_profile_initialize((const char *)glGetString(GL_VENDOR),
+		(const char *)glGetString(GL_RENDERER), (const char *)glGetString(GL_VERSION));
 #ifdef HALO_GLES
 	{
 		BOOL es32 = major > 3 || (major == 3 && minor >= 2);
@@ -2575,10 +2578,9 @@ static void gl_initialize(void)
 	}
 	{
 		long every = config_integer("debug.gpu_flush_draws");
-		const char *renderer = (const char *)glGetString(GL_RENDERER);
 
 		if (every < 0)
-			every = renderer && strstr(renderer, "Mesa Intel") ? 3 : 0;
+			every = gpu_profile_flush_draws();
 		if (every > 0)
 		{
 			device.flush_every = (unsigned long)every;
@@ -3190,7 +3192,6 @@ static BOOL visibility_queries_initialize(void)
 
 static void visibility_results_initialize(void)
 {
-	const char *vendor = (const char *)glGetString(GL_VENDOR);
 	GLsizeiptr size = VISIBILITY_BATCH_COUNT * VISIBILITY_TEST_SLOTS * sizeof(GLuint);
 	GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
 	BOOL success;
@@ -3202,7 +3203,7 @@ static void visibility_results_initialize(void)
 	into the buffer (Mesa's GL thread waits for everything before a
 	glGetQueryObjectuiv, even one into a bound buffer), each batch into its
 	own part, with a fence after the copies. */
-	if (!vendor || strcmp(vendor, "ATI Technologies Inc."))
+	if (!gpu_profile_cpu_visibility())
 	{
 		visibility_readback_gl_ok("before buffer creation");
 		glGenBuffers(1, &device.visibility_buffer);
@@ -3220,7 +3221,7 @@ static void visibility_results_initialize(void)
 		}
 	}
 	else
-		platform_log("GPU: AMD's driver; visibility test queries are read on the CPU");
+		platform_log("GPU: %s; visibility test queries are read on the CPU", gpu_profile_name());
 }
 
 static BOOL visibility_readback_gl_ok(const char *phase)
@@ -5564,6 +5565,33 @@ static BOOL mirror_refresh(unsigned long first, unsigned long last)
 that holds it, the range's offset in that buffer and the newest upload
 generation of its pages (which changes whenever its contents do); FALSE if
 the range is outside the window, spans two segments or is volatile */
+/* display.geometry_cache: whether vertices and indices are kept in the
+mirror's persistent GL buffers, by address, or uploaded as they are drawn.
+Some Android drivers hand back stale or corrupted data from those buffers
+(stretched models, missing surfaces: OpenCE's PR #419), so "auto" bypasses the
+cache there and keeps it on the desktop builds, which have not shown it. The
+streaming path is correct but uploads more. */
+static BOOL geometry_cache_enabled(void)
+{
+	static int enabled = -1;
+	if (enabled < 0)
+	{
+		char const *setting = config_string("display.geometry_cache");
+
+		if (setting && !strcmp(setting, "on"))
+			enabled = 1;
+		else if (setting && !strcmp(setting, "off"))
+			enabled = 0;
+		else
+#ifdef HALO_ANDROID
+			enabled = 0;
+#else
+			enabled = 1;
+#endif
+	}
+	return enabled;
+}
+
 static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buffer, unsigned long *offset,
 	unsigned long *generation)
 {
@@ -5576,6 +5604,8 @@ static BOOL mirror_range(unsigned long address, unsigned long size, GLuint *buff
 	if (android_geometry_fixes)
 		return FALSE;
 #endif
+	if (!geometry_cache_enabled())
+		return FALSE;
 	if (!size || address < PLATFORM_CONTIGUOUS_BASE || start + size > PLATFORM_CONTIGUOUS_SIZE)
 		return FALSE;
 	segment = start / MIRROR_SEGMENT_SIZE;
