@@ -74,6 +74,12 @@ static void voice_audio_mix(float *output, unsigned long frames)
 	(void)frames;
 }
 
+static void talking_timer_audio_mix(float *output, unsigned long frames)
+{
+	(void)output;
+	(void)frames;
+}
+
 #ifdef UNDER_TEST_I3DL2_SOURCE
 typedef struct { LONG lHFLevel; float flLFRatio; } DSI3DL2OBSTRUCTION, DSI3DL2OCCLUSION;
 typedef struct

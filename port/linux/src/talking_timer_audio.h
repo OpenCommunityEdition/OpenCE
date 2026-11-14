@@ -1,0 +1,20 @@
+/*
+TALKING_TIMER_AUDIO.H
+*/
+
+#ifndef TALKING_TIMER_AUDIO_H
+#define TALKING_TIMER_AUDIO_H
+
+enum talking_timer_line
+{
+	TALKING_TIMER_30_SECONDS,
+	TALKING_TIMER_20_SECONDS,
+	TALKING_TIMER_COUNTDOWN_10,
+	TALKING_TIMER_MINUTE_1 = TALKING_TIMER_COUNTDOWN_10 + 10,
+	NUMBER_OF_TALKING_TIMER_LINES = TALKING_TIMER_MINUTE_1 + 30
+};
+
+void talking_timer_audio_play(int line, float volume);
+void talking_timer_audio_mix(float *output, unsigned long frames);
+
+#endif

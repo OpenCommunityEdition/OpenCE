@@ -2,7 +2,8 @@
 
 [Opus](https://opus-codec.org) 1.5.2 (`opus-1.5.2.tar.gz`, SHA-256
 `65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1`), for
-voice chat (`port/linux/game/network_voice.c`). BSD licence: `COPYING`.
+voice chat (`port/linux/game/network_voice.c`) and the talking timer
+(`port/linux/src/talking_timer_audio.c`). BSD licence: `COPYING`.
 
 Only the library is kept: `include/`, `src/`, `celt/` and `silk/` with
 `silk/float/` (the floating-point build), without the multistream and
