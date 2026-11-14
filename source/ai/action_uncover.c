@@ -1,18 +1,3 @@
-/*
-ACTION_UNCOVER.C
-
-symbols in this file:
-00008690 0080: _action_uncover_setup_target
-00008710 0100: _action_uncover_setup_pursuit
-00008810 0220: _action_uncover_perform
-00008A30 0170: _action_uncover_control
-00008BA0 0040: _action_uncover_flush_position_indices
-00008BE0 0030: _action_uncover_flush_structure_indices
-00008C10 0070: _action_uncover_modify_color
-00008C80 0170: _action_uncover_begin
-00008DF0 0300: _action_uncover_update
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

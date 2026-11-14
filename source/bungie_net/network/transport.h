@@ -1,9 +1,3 @@
-/*
-TRANSPORT.H
-
-header included in hcex build.
-*/
-
 #ifndef __TRANSPORT_H
 #define __TRANSPORT_H
 #pragma once

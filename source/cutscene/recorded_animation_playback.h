@@ -1,9 +1,3 @@
-/*
-RECORDED_ANIMATION_PLAYBACK.H
-
-header included in hcex build.
-*/
-
 #ifndef __RECORDED_ANIMATION_PLAYBACK_H
 #define __RECORDED_ANIMATION_PLAYBACK_H
 #pragma once

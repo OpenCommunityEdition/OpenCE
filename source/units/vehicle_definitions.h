@@ -1,9 +1,3 @@
-/*
-VEHICLE_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __VEHICLE_DEFINITIONS_H
 #define __VEHICLE_DEFINITIONS_H
 #pragma once

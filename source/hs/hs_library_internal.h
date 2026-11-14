@@ -1,9 +1,3 @@
-/*
-HS_LIBRARY_INTERNAL.H
-
-header included in hcex build.
-*/
-
 #ifndef __HS_LIBRARY_INTERNAL_H
 #define __HS_LIBRARY_INTERNAL_H
 #pragma once

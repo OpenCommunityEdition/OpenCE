@@ -1,9 +1,3 @@
-/*
-INPUT_ABSTRACTION.H
-
-header included in hcex build.
-*/
-
 #ifndef __INPUT_ABSTRACTION_H
 #define __INPUT_ABSTRACTION_H
 #pragma once

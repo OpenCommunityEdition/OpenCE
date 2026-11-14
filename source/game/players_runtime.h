@@ -1,7 +1,3 @@
-/*
-PLAYERS_RUNTIME.H
-*/
-
 #ifndef __PLAYERS_RUNTIME_H
 #define __PLAYERS_RUNTIME_H
 #pragma once

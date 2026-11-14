@@ -1,7 +1,3 @@
-/*
-PLAYER_QUEUES_NEW.H
-*/
-
 #ifndef __PLAYER_QUEUES_NEW_H
 #define __PLAYER_QUEUES_NEW_H
 #pragma once

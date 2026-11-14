@@ -1,9 +1,3 @@
-/*
-DECALS.H
-
-header included in hcex build.
-*/
-
 #ifndef __DECALS_H
 #define __DECALS_H
 #pragma once

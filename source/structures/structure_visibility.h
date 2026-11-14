@@ -1,7 +1,3 @@
-/*
-STRUCTURE_VISIBILITY.H
-*/
-
 #ifndef __STRUCTURE_VISIBILITY_H
 #define __STRUCTURE_VISIBILITY_H
 #pragma once

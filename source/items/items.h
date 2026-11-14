@@ -1,9 +1,3 @@
-/*
-ITEMS.H
-
-header included in hcex build.
-*/
-
 #ifndef __ITEMS_H
 #define __ITEMS_H
 #pragma once

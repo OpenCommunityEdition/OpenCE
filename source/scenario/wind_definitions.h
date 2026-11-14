@@ -1,9 +1,3 @@
-/*
-WIND_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __WIND_DEFINITIONS_H
 #define __WIND_DEFINITIONS_H
 #pragma once

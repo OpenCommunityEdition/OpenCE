@@ -1,9 +1,3 @@
-/*
-DATA_PACKETS.H
-
-header included in hcex build.
-*/
-
 #ifndef __DATA_PACKETS_H
 #define __DATA_PACKETS_H
 #pragma once

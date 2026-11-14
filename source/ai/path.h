@@ -1,6 +1,4 @@
 /*
-PATH.H
-
 file has inline function assertions.
 */
 

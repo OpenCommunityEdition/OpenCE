@@ -1,7 +1,3 @@
-/*
-EDITOR_STUBS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

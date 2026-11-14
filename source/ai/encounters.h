@@ -1,6 +1,4 @@
 /*
-ENCOUNTERS.H
-
 file has inline function assertions.
 */
 

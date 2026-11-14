@@ -1,6 +1,4 @@
 /*
-TRANSPORT_ADDRESS_CONSTANTS.H
-
 Named address values shared by actual endpoint address consumers.
 */
 

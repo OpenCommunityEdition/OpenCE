@@ -1,7 +1,3 @@
-/*
-OBJECT_LISTS.H
-*/
-
 #ifndef __OBJECT_LISTS_H
 #define __OBJECT_LISTS_H
 #pragma once

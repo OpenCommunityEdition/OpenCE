@@ -1,7 +1,3 @@
-/*
-UNIT_DEFINITIONS.H
-*/
-
 #ifndef __UNIT_DEFINITIONS_H
 #define __UNIT_DEFINITIONS_H
 #pragma once

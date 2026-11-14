@@ -1,7 +1,3 @@
-/*
-RASTERIZER_XBOX_WATER.H
-*/
-
 #ifndef __RASTERIZER_XBOX_WATER_H
 #define __RASTERIZER_XBOX_WATER_H
 #pragma once

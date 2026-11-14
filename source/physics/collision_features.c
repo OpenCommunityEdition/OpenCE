@@ -1,7 +1,3 @@
-/*
-COLLISION_FEATURES.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

@@ -1,7 +1,3 @@
-/*
-TAG_GROUPS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

@@ -1,6 +1,4 @@
 /*
-RASTERIZER_XBOX_INTERNAL.H
-
 Narrow backend interface owned by RASTERIZER_XBOX.C and the Xbox rasterizer
 family.  Keeping these declarations out of the broad public header preserves
 January's compiler-sensitive declaration context for unrelated consumers.

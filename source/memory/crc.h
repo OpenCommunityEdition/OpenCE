@@ -1,9 +1,3 @@
-/*
-CRC.H
-
-header included in hcex build.
-*/
-
 #ifndef __CRC_H
 #define __CRC_H
 #pragma once

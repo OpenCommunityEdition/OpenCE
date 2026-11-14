@@ -1,9 +1,3 @@
-/*
-NETWORK_CONNECTION.H
-
-header included in hcex build.
-*/
-
 #ifndef __NETWORK_CONNECTION_H
 #define __NETWORK_CONNECTION_H
 #pragma once

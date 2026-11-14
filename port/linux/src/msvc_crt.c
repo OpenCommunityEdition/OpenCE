@@ -705,8 +705,8 @@ int _fileno(FILE *stream)
 	return fileno(stream);
 }
 
-/* the MSVC underscore names of the POSIX file calls (the game's libtiff
-used them; the builds leave it out: port.json) */
+/* the MSVC underscore names of the POSIX file calls (written for the game's
+libtiff, which is no longer in the tree) */
 
 int _open(const char *path, int flags, ...)
 {

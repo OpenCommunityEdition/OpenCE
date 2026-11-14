@@ -1,7 +1,3 @@
-/*
-PROFILE.H
-*/
-
 #ifndef __PROFILE_H
 #define __PROFILE_H
 #pragma once

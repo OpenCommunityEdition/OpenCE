@@ -1,6 +1,4 @@
 /*
-VEHICLE_DATUM.H
-
 Private runtime vehicle datum ownership shared by vehicles.c and physics.c.
 */
 

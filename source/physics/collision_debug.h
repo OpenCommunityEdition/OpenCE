@@ -1,9 +1,3 @@
-/*
-COLLISION_DEBUG.H
-
-header included in hcex build.
-*/
-
 #ifndef __COLLISION_DEBUG_H
 #define __COLLISION_DEBUG_H
 #pragma once

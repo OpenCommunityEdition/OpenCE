@@ -1,9 +1,3 @@
-/*
-TRIANGLE_STRIPS.H
-
-header included in hcex build.
-*/
-
 #ifndef __TRIANGLE_STRIPS_H
 #define __TRIANGLE_STRIPS_H
 #pragma once

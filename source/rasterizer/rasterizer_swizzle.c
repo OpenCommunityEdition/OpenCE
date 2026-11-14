@@ -1,7 +1,3 @@
-/*
-RASTERIZER_SWIZZLE.C
-*/
-
 /* ---------- headers */
 
 #include "cseries/cseries.h"

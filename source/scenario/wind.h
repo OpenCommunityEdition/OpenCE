@@ -1,7 +1,3 @@
-/*
-WIND.H
-*/
-
 #ifndef __WIND_H
 #define __WIND_H
 #pragma once

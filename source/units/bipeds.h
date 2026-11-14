@@ -1,9 +1,3 @@
-/*
-BIPEDS.H
-
-header included in hcex build.
-*/
-
 #ifndef __BIPEDS_H
 #define __BIPEDS_H
 #pragma once

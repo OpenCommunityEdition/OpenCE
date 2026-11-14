@@ -1,9 +1,3 @@
-/*
-HUD_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __HUD_DEFINITIONS_H
 #define __HUD_DEFINITIONS_H
 #pragma once

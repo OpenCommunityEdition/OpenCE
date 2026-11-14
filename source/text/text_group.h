@@ -1,9 +1,3 @@
-/*
-TEXT_GROUP.H
-
-header included in hcex build.
-*/
-
 #ifndef __TEXT_GROUP_H
 #define __TEXT_GROUP_H
 #pragma once

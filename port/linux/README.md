@@ -1891,9 +1891,8 @@ definition. Without this check, the linker gives the reference the address
   the compiler examines each definition against the SDK prototype.
 - `src/halo_linker_common.c` gives weak storage for some globals of the
   January link, and for `fast_ftol_C` and `main_crash`.
-- `main/d3d_intimacy.cpp` reads a private structure of the Xbox Direct3D.
-  The Linux build does not use this file. `src/d3d8_gl.c` gives
-  `d3d_find_flipcount`.
+- `main/d3d_intimacy.h` declares `d3d_find_flipcount`, which the Xbox read
+  out of a private structure of its Direct3D. `src/d3d8_gl.c` gives it.
 - The build returns small structures and unions in registers
   (`-freg-struct-return`), as on Win32.
 - The GPU driver cannot open the kernel's `trace_marker`
