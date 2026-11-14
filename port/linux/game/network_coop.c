@@ -1894,6 +1894,15 @@ static void client_apply_attach(
 	/* a resent attach this machine already has */
 	if (event->type == _coop_attach && object_get(child_index)->object.parent_object_index == parent_index)
 		return;
+	/* an item picked up on the host right after a script dropped it.
+	Its update came first and keeps it off the map until it is in its carrier's inventory (network_objects.c),
+	but object_attach_to_marker needs an object on the map. */
+	if (event->type == _coop_attach && !TEST_FLAG(object_get(child_index)->object.flags, _object_connected_to_map_bit))
+	{
+		error(_error_silent, "co-op: skipped attaching object %08lX to %08lX, it is off the map",
+			child_index, parent_index);
+		return;
+	}
 	/* (not to one of its own children, which objects.c cannot do: copies
 	of the hierarchy that differ here, or a host's mistake) */
 	for (ancestor_index = object_get(parent_index)->object.parent_object_index; event->type == _coop_attach &&
