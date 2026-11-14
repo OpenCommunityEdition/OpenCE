@@ -4073,6 +4073,56 @@ static void forge_register_d3d_bitmap_texture(struct bitmap_data *bmp, D3DBaseTe
 	bmp->hardware_format = tex;
 }
 
+static void upsert_dynamic_tag_entry(
+	uint32_t req_group,
+	char const *req_path,
+	long root_handle,
+	float bounding_radius)
+{
+	int i;
+	struct forge_dynamic_tag_entry *entry = NULL;
+
+	if (!req_path || !req_path[0] || root_handle == NONE)
+		return;
+	if (!(bounding_radius > 0.1f && bounding_radius < 100.0f))
+		bounding_radius = 1.5f;
+
+	for (i = 0; i < s_dyn_tags.count; i++)
+	{
+		if (s_dyn_tags.entries[i].group_tag == req_group &&
+			_stricmp(s_dyn_tags.entries[i].tag_path, req_path) == 0)
+		{
+			entry = &s_dyn_tags.entries[i];
+			break;
+		}
+	}
+	if (!entry)
+	{
+		for (i = 0; i < s_dyn_tags.count; i++)
+		{
+			if (_stricmp(s_dyn_tags.entries[i].tag_path, req_path) == 0 &&
+				s_dyn_tags.entries[i].definition_index == NONE)
+			{
+				entry = &s_dyn_tags.entries[i];
+				break;
+			}
+		}
+	}
+	if (!entry)
+	{
+		if (s_dyn_tags.count >= FORGE_MAX_DYNAMIC_TAGS)
+			return;
+		entry = &s_dyn_tags.entries[s_dyn_tags.count++];
+	}
+
+	memset(entry, 0, sizeof(*entry));
+	entry->group_tag = req_group;
+	snprintf(entry->tag_path, sizeof(entry->tag_path), "%s", req_path);
+	entry->definition_index = root_handle;
+	entry->part_count = 0;
+	entry->bounding_radius = bounding_radius;
+}
+
 static long load_native_xbox_tag_from_source(
 	char const *cache_map_path,
 	uint8_t const *mem_image,
@@ -4803,23 +4853,13 @@ static long load_native_xbox_tag_from_source(
 	root_handle = cl.runtime_handles[root_abs_idx];
 	if (root_handle != NONE)
 	{
+		float rad = cl.cloned_roots[root_abs_idx]
+			? *(float const *)(cl.cloned_roots[root_abs_idx] + 0x04u)
+			: 1.5f;
 		if (req_group == 'vehi')
 			patch_vehicle_tag_for_player_driving(root_handle, req_path);
 		patch_forge_device_and_light_tag_runtime(root_handle, req_group, req_path);
-		if (s_dyn_tags.count < FORGE_MAX_DYNAMIC_TAGS)
-		{
-			struct forge_dynamic_tag_entry *entry = &s_dyn_tags.entries[s_dyn_tags.count++];
-			memset(entry, 0, sizeof(*entry));
-			entry->group_tag = req_group;
-			snprintf(entry->tag_path, sizeof(entry->tag_path), "%s", req_path);
-			entry->definition_index = root_handle;
-			entry->part_count = 0; /* 0 = rendered natively by Halo's render_model! */
-			entry->bounding_radius = cl.cloned_roots[root_abs_idx]
-				? *(float const *)(cl.cloned_roots[root_abs_idx] + 0x04u)
-				: 1.5f;
-			if (!(entry->bounding_radius > 0.1f && entry->bounding_radius < 100.0f))
-				entry->bounding_radius = 1.5f;
-		}
+		upsert_dynamic_tag_entry(req_group, req_path, root_handle, rad);
 		if (out_actual_group)
 			*out_actual_group = (uint32_t)tag_get_group_tag(root_handle);
 	}
@@ -5630,22 +5670,12 @@ static long install_faber_bundle_from_source(
 	root_handle = datums[0];
 	if (root_handle != NONE)
 	{
+		uint8_t const *root0 = loaded.data + *(uint32_t const *)(loaded.tags + TAG_BUNDLE_TAG_ROOT_OFFSET);
+		float rad = *(float const *)(root0 + 0x04u);
 		if (req_group == 'vehi')
 			patch_vehicle_tag_for_player_driving(root_handle, req_path);
 		patch_forge_device_and_light_tag_runtime(root_handle, req_group, req_path);
-		if (s_dyn_tags.count < FORGE_MAX_DYNAMIC_TAGS)
-		{
-			struct forge_dynamic_tag_entry *d_entry = &s_dyn_tags.entries[s_dyn_tags.count++];
-			uint8_t const *root0 = loaded.data + *(uint32_t const *)(loaded.tags + TAG_BUNDLE_TAG_ROOT_OFFSET);
-			memset(d_entry, 0, sizeof(*d_entry));
-			d_entry->group_tag = req_group;
-			snprintf(d_entry->tag_path, sizeof(d_entry->tag_path), "%s", req_path);
-			d_entry->definition_index = root_handle;
-			d_entry->part_count = 0;
-			d_entry->bounding_radius = *(float const *)(root0 + 0x04u);
-			if (!(d_entry->bounding_radius > 0.1f && d_entry->bounding_radius < 100.0f))
-				d_entry->bounding_radius = 1.5f;
-		}
+		upsert_dynamic_tag_entry(req_group, req_path, root_handle, rad);
 		if (out_actual_group)
 			*out_actual_group = (uint32_t)tag_get_group_tag(root_handle);
 	}
@@ -13619,6 +13649,7 @@ long forge_install_ephemeral_tag_bundle(
 		uint32_t base_cnt = forge_get_base_map_tag_count();
 		if (base_cnt > 0 && (uint32_t)DATUM_INDEX_TO_ABSOLUTE_INDEX(existing_hdl) < base_cnt)
 			return NONE;
+		upsert_dynamic_tag_entry(root_group, root_tag_path, existing_hdl, 1.5f);
 		if (out_actual_group)
 			*out_actual_group = (uint32_t)tag_get_group_tag(existing_hdl);
 		return existing_hdl;

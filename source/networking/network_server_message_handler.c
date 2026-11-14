@@ -1518,6 +1518,7 @@ boolean network_game_server_handle_client_message(
 				{
 					long machine_index;
 
+					network_game_server_client_machine_heard(server, machine);
 					network_game_server_get_client_machine(server, machine, &machine_index);
 					/* (port: from its stream, which only it can send on) */
 					network_distributed_handle_stream_message(machine_index, message, message_buffer_size);

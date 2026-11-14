@@ -1005,7 +1005,7 @@ static struct network_connection *network_connection_create_client_from_endpoint
 		connection->reliable_endpoint = reliable_endpoint;
 		connection->reliable_incoming_queue = circular_queue_new(
 			"incoming-reliable",
-			0x8000);
+			0x40000); /* port: raised from 0x8000 for client-to-host Forge tag streaming */
 		if (!connection->reliable_incoming_queue)
 		{
 			network_connection_delete(connection);

@@ -38,6 +38,7 @@
 
 extern int config_boolean(const char *name);
 extern boolean network_distributed_client_send_reliably(void *message, word size);
+extern long network_distributed_client_reliable_backlog(void);
 extern boolean network_distributed_server_send_to_machine_reliably(long machine_index, void *message, word size);
 extern long network_distributed_server_machine_reliable_backlog(long machine_index);
 extern unsigned long system_milliseconds(void);
@@ -233,6 +234,7 @@ struct forge_client_pending_instance
 struct forge_host_pending_client_spawn
 {
 	uint8_t active;
+	uint8_t is_held;
 	int32_t machine_index;
 	uint32_t hash;
 	float x, y, z;
@@ -1023,6 +1025,17 @@ void forge_network_send_transform_ext(
 		g_net_obj_is_held[obj_abs] = is_held ? 1 : 0;
 	}
 
+	/* If this client instance has not yet been linked to a Host slot (e.g. while the Host
+	 * is downloading a custom/MCC tag from this client), send live_idx = -1 and obj_abs = -1
+	 * so the Host updates g_host_pending_client_spawns instead of moving an existing Host slot. */
+	if (game_connection() == _game_connection_network_client &&
+		live_idx >= 0 && live_idx < g_forge.live_instance_count &&
+		(g_forge.live_instances[live_idx].pad_inst & 0x80u) != 0)
+	{
+		live_idx = -1;
+		obj_abs = -1;
+	}
+
 	if (immediate && obj_abs < 0 && live_idx >= 0 && live_idx < g_forge.live_instance_count)
 	{
 		struct forge_live_instance const *inst = &g_forge.live_instances[live_idx];
@@ -1458,6 +1471,29 @@ static void forge_client_handle_host_spawn(
 					g_forge.grabbed_live_index = host_live_idx;
 				if (g_forge.hovered_live_index == match_idx)
 					g_forge.hovered_live_index = host_live_idx;
+				match_idx = host_live_idx;
+			}
+			else
+			{
+				struct forge_live_instance tmp_inst = g_forge.live_instances[host_live_idx];
+				int k_map;
+				g_forge.live_instances[host_live_idx] = g_forge.live_instances[match_idx];
+				g_forge.live_instances[match_idx] = tmp_inst;
+				for (k_map = 0; k_map < FORGE_MAX_TRACKED_NET_OBJECTS; k_map++)
+				{
+					if (g_net_obj_live_index[k_map] == host_live_idx)
+						g_net_obj_live_index[k_map] = match_idx;
+					else if (g_net_obj_live_index[k_map] == match_idx)
+						g_net_obj_live_index[k_map] = host_live_idx;
+				}
+				if (g_forge.grabbed_live_index == match_idx)
+					g_forge.grabbed_live_index = host_live_idx;
+				else if (g_forge.grabbed_live_index == host_live_idx)
+					g_forge.grabbed_live_index = match_idx;
+				if (g_forge.hovered_live_index == match_idx)
+					g_forge.hovered_live_index = host_live_idx;
+				else if (g_forge.hovered_live_index == host_live_idx)
+					g_forge.hovered_live_index = match_idx;
 				match_idx = host_live_idx;
 			}
 		}
@@ -1943,6 +1979,7 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 						if (!g_host_pending_client_spawns[ps_i].active)
 						{
 							g_host_pending_client_spawns[ps_i].active = 1u;
+							g_host_pending_client_spawns[ps_i].is_held = 1u;
 							g_host_pending_client_spawns[ps_i].machine_index = (int32_t)machine_index;
 							g_host_pending_client_spawns[ps_i].hash = (uint32_t)hash;
 							g_host_pending_client_spawns[ps_i].x = x;
@@ -2019,6 +2056,7 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 							g_host_pending_client_spawns[ps_i].yaw_cr = yaw_cr;
 							g_host_pending_client_spawns[ps_i].pitch_cr = pitch_cr;
 							g_host_pending_client_spawns[ps_i].roll_cr = roll_cr;
+							g_host_pending_client_spawns[ps_i].is_held = (uint8_t)((n >= 9 && is_held) ? 1 : 0);
 							break;
 						}
 					}
@@ -3103,7 +3141,10 @@ void forge_tag_stream_handle_message(
 				uint32_t fin_hash = g_client_tag_rx.hash;
 				uint8_t fin_fmt = g_client_tag_rx.bundle_format;
 				uint32_t fin_grp = g_client_tag_rx.root_group;
+				uint32_t fin_comp_sz = g_client_tag_rx.compressed_size;
 				uint32_t fin_uncomp_sz = g_client_tag_rx.uncompressed_size;
+				uint16_t fin_chunks = g_client_tag_rx.chunk_count;
+				uint8_t *fin_comp_buf = NULL;
 				char fin_path[256];
 				char fin_disp[64];
 				uint32_t actual_grp = fin_grp;
@@ -3140,9 +3181,17 @@ void forge_tag_stream_handle_message(
 				snprintf(fin_path, sizeof(fin_path), "%s", g_client_tag_rx.tag_path);
 				snprintf(fin_disp, sizeof(fin_disp), "%s", g_client_tag_rx.display_name);
 
-				/* Release compressed buffer before installing uncompressed tag structures into session RAM */
-				free(g_client_tag_rx.comp_buf);
-				g_client_tag_rx.comp_buf = NULL;
+				if (is_server)
+				{
+					fin_comp_buf = g_client_tag_rx.comp_buf;
+					g_client_tag_rx.comp_buf = NULL;
+				}
+				else
+				{
+					/* Release compressed buffer before installing uncompressed tag structures into session RAM */
+					free(g_client_tag_rx.comp_buf);
+					g_client_tag_rx.comp_buf = NULL;
+				}
 				forge_client_mark_hash_settled(fin_hash);
 				g_client_tag_rx.state = _forge_tag_rx_idle;
 				g_client_tag_rx.source_machine_index = -1;
@@ -3164,6 +3213,8 @@ void forge_tag_stream_handle_message(
 				if (installed_def == NONE)
 				{
 					int ps_i;
+					if (fin_comp_buf)
+						free(fin_comp_buf);
 					for (ps_i = 0; ps_i < FORGE_TAG_STREAM_MAX_SESSION_TAGS; ps_i++)
 					{
 						if (g_host_pending_client_spawns[ps_i].active &&
@@ -3181,19 +3232,42 @@ void forge_tag_stream_handle_message(
 				g_client_tag_rx.downloaded_count++;
 				if (is_server)
 				{
-					/* Host finished receiving a custom tag from a Client: invalidate any prior missing-cache entry
-					 * so the Host can re-serve this tag to other Clients, and spawn all pending Client instances! */
-					int cs_i, ps_i;
+					/* Host finished receiving a custom tag from a Client: store the verified compressed bundle
+					 * in g_host_tag_cache so the Host can re-serve this tag to other Clients without disk files,
+					 * and spawn all pending Client instances! */
+					int cs_i, cache_slot = -1, ps_i;
 					for (cs_i = 0; cs_i < FORGE_TAG_STREAM_MAX_SESSION_TAGS; cs_i++)
 					{
-						if (g_host_tag_cache[cs_i].valid &&
-							g_host_tag_cache[cs_i].missing &&
-							g_host_tag_cache[cs_i].hash == fin_hash)
+						if (g_host_tag_cache[cs_i].valid && g_host_tag_cache[cs_i].hash == fin_hash)
 						{
-							g_host_tag_cache[cs_i].valid = 0;
-							g_host_tag_cache[cs_i].missing = 0;
+							cache_slot = cs_i;
+							break;
 						}
+						if (!g_host_tag_cache[cs_i].valid && cache_slot < 0)
+							cache_slot = cs_i;
 					}
+					if (cache_slot >= 0 && fin_comp_buf)
+					{
+						struct forge_host_cached_tag_bundle *cb = &g_host_tag_cache[cache_slot];
+						if (cb->comp_bytes && cb->comp_bytes != fin_comp_buf)
+							free(cb->comp_bytes);
+						memset(cb, 0, sizeof(*cb));
+						cb->valid = 1;
+						cb->missing = 0;
+						cb->hash = fin_hash;
+						cb->bundle_format = fin_fmt;
+						cb->root_group = fin_grp;
+						cb->compressed_size = fin_comp_sz;
+						cb->uncompressed_size = fin_uncomp_sz;
+						cb->chunk_count = fin_chunks;
+						memcpy(cb->blake2b_256, calc_digest, 32);
+						snprintf(cb->tag_path, sizeof(cb->tag_path), "%s", fin_path);
+						snprintf(cb->display_name, sizeof(cb->display_name), "%s", fin_disp);
+						cb->comp_bytes = fin_comp_buf;
+						fin_comp_buf = NULL;
+					}
+					if (fin_comp_buf)
+						free(fin_comp_buf);
 					for (ps_i = 0; ps_i < FORGE_TAG_STREAM_MAX_SESSION_TAGS; ps_i++)
 					{
 						struct forge_host_pending_client_spawn *ps = &g_host_pending_client_spawns[ps_i];
@@ -3211,6 +3285,24 @@ void forge_tag_stream_handle_message(
 							(float)ps->roll_cr / 100.0f,
 							ps->team,
 							1);
+						if (spawned_idx >= 0 && spawned_idx < FORGE_MAX_LIVE_INSTANCES && ps->is_held)
+						{
+							long sp_obj = g_forge.live_instances[spawned_idx].object_index;
+							if (sp_obj != NONE && forge_object_is_network_shared(sp_obj))
+							{
+								int sp_abs = (int)DATUM_INDEX_TO_ABSOLUTE_INDEX(sp_obj);
+								if (sp_abs >= 0 && sp_abs < FORGE_MAX_TRACKED_NET_OBJECTS)
+									g_net_obj_is_held[sp_abs] = 1;
+							}
+							forge_3d_move_instance_ext(
+								spawned_idx,
+								ps->x, ps->y, ps->z,
+								(float)ps->yaw_cr / 100.0f,
+								(float)ps->pitch_cr / 100.0f,
+								(float)ps->roll_cr / 100.0f,
+								1,
+								0);
+						}
 						if (spawned_idx >= 0 && spawned_idx < FORGE_MAX_LIVE_INSTANCES &&
 							g_pending_slot_props[spawned_idx].valid)
 						{
@@ -3365,6 +3457,16 @@ static void forge_tag_stream_tick(unsigned long now)
 			{
 				/* Check per-client outgoing reliable queue so streaming never overflows the 256 KB engine buffer */
 				backlog = network_distributed_server_machine_reliable_backlog(m);
+				if (backlog == NONE)
+				{
+					tx->active = 0;
+					continue;
+				}
+			}
+			else
+			{
+				/* Check client outgoing reliable queue when streaming a tag bundle from Joiner to Host */
+				backlog = network_distributed_client_reliable_backlog();
 				if (backlog == NONE)
 				{
 					tx->active = 0;

@@ -6585,6 +6585,8 @@ void network_distributed_handle_message(
 {
 	if (forge_tag_stream_handles_message(message, size))
 	{
+		if (machine_index >= 0 && machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES)
+			distributed_round_trips[machine_index].heard = system_milliseconds();
 		forge_tag_stream_handle_message(machine_index, message, size, machine_index != NONE ?
 			distributed_handling_stream_message : !network_connection_last_read_was_unreliable());
 		return;
