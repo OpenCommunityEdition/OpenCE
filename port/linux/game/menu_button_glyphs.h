@@ -17,4 +17,9 @@ boolean menu_button_glyph_keyboard_active(short port);
 short menu_button_glyph_key_width(short button);
 short menu_button_glyph_compact_key_width(short button);
 
+/* The virtual keyboard's background's painted B and A buttons, drawn over
+ * from the button keys' bitmaps (their redraws with the high-res text). */
+struct bitmap_data;
+void menu_button_glyph_keyboard_legend(long background_index, struct bitmap_data const *background);
+
 #endif

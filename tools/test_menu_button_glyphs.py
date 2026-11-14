@@ -27,7 +27,7 @@ typedef int boolean;typedef float real;typedef unsigned long pixel32;
 typedef struct {short x0,y0,x1,y1;}rectangle2d;
 typedef struct {real x0,y0,x1,y1;}real_rectangle2d;
 typedef struct {real alpha,red,green,blue;}real_argb_color;
-struct bitmap_data {int dummy;};
+struct bitmap_data {int dummy;short width,height;};
 struct dynamic_screen_vertex {struct {real x,y;}position,texture_coordinates;pixel32 color;};
 struct rasterizer_dynamic_screen_geometry_parameters {
  struct bitmap_data *map[3];struct {real i,j;}map_texture_scale[3],map_scale[3];int framebuffer_blend_function;
@@ -43,11 +43,28 @@ static real_argb_color current_color={.5f,.2f,.3f,.4f};
 static real bx,by,bw,bh,tx,ty,ts;
 static wchar_t last_text[32];
 static struct dynamic_screen_vertex drawn[4];
-int config_boolean(char const *n){assert(!strcmp(n,"display.menu_button_glyphs"));return enabled;}
+/* the virtual keyboard's legend: its background, the button keys' bitmaps and where they are drawn */
+static int high_res_text=1,legend_draws;
+static char const *background_name="ui\\bkd_virtual_keyboard";
+static struct bitmap_data button_bitmap={0,32,32},background_bitmap={0,1024,512};
+static rectangle2d legend_rects[4];
+int config_boolean(char const *n){
+ if(!strcmp(n,"display.high_res_text"))return high_res_text;
+ assert(!strcmp(n,"display.menu_button_glyphs"));return enabled;}
 char const *config_string(char const *n){assert(!strcmp(n,"display.menus"));return menus;}
 static int keyboard_prompt_enabled(short p){observed_port=p;return keyboard;}
 static int controller_button_style_for_port(short p){observed_port=p;return style_choice;}
-static long tag_loaded(long tag,char const *name){assert(!strcmp(name,"ui\\small_ui"));return fail==1?NONE:9;}
+static long tag_loaded(long tag,char const *name){
+ if(!strcmp(name,"ui\\shell\\bitmaps\\b_butn")){assert(tag=='bitm');return 31;}
+ if(!strcmp(name,"ui\\shell\\bitmaps\\a_butn")){assert(tag=='bitm');return 32;}
+ assert(!strcmp(name,"ui\\small_ui"));return fail==1?NONE:9;}
+static char *tag_get_name(long tag){assert(tag==40);return (char *)background_name;}
+static struct bitmap_data *bitmap_group_get_bitmap_from_sequence(long tag,short sequence,short frame){
+ assert((tag==31||tag==32)&&!sequence&&!frame);return &button_bitmap;}
+static void draw_bitmap_in_rect(struct bitmap_data *b,rectangle2d *r,rectangle2d *br,rectangle2d *clip,pixel32 argb,
+ struct rasterizer_dynamic_screen_geometry_parameters *m,boolean no_plasma){
+ assert(b==&button_bitmap&&br&&!clip&&argb==0xffffffffUL&&!m&&!no_plasma&&legend_draws<4);
+ assert(br->x0==r->x0&&br->y0==r->y0&&br->x1==r->x1&&br->y1==r->y1);legend_rects[legend_draws++]=*r;}
 static long draw_string_get_font(void){return current_font;}
 static void draw_string_get_color(real_argb_color *c){*c=current_color;}
 static void draw_string_set_color(real_argb_color const *c){current_color=*c;}
@@ -129,6 +146,19 @@ int main(void){
  assert(!menu_button_glyph_join_draw(L"No icon",0,&box));
  assert(!menu_button_glyph_join_draw(L"Press %a-button %b-button",0,&box));
  menus="xbox";assert(!menu_button_glyph_join_draw(L"Press %a-button to Join",0,&box));restored();
+ /* the keyboard's legend: its B and A, a texel to the pixel, on the background's own */
+ menu_button_glyph_keyboard_legend(40,&background_bitmap);
+ assert(legend_draws==2);
+ assert(legend_rects[0].x0==371&&legend_rects[0].y0==414&&legend_rects[0].x1==403&&legend_rects[0].y1==446);
+ assert(legend_rects[1].x0==471&&legend_rects[1].y0==414&&legend_rects[1].x1==503&&legend_rects[1].y1==446);
+ /* nothing without the high-res text, on another background, or a background of another size */
+ legend_draws=0;high_res_text=0;menu_button_glyph_keyboard_legend(40,&background_bitmap);high_res_text=1;
+ background_name="ui\\bkd_other";menu_button_glyph_keyboard_legend(40,&background_bitmap);
+ background_name="ui\\bkd_virtual_keyboard";background_bitmap.width=512;menu_button_glyph_keyboard_legend(40,&background_bitmap);
+ background_bitmap.width=1024;menu_button_glyph_keyboard_legend(NONE,&background_bitmap);
+ menu_button_glyph_keyboard_legend(40,NULL);
+ button_bitmap.width=16;menu_button_glyph_keyboard_legend(40,&background_bitmap);button_bitmap.width=32;
+ assert(!legend_draws);
  return 0;
 }
 """)
@@ -203,3 +233,11 @@ int main(void){
  return 0;
 }
 """)
+
+
+def test_keyboard_legend_drawn_over_its_background():
+    keyboard = function((ROOT/'source/interface/virtual_keyboard.c').read_text().replace('\r\n', '\n'),
+                        'virtual_keyboard_render_internal')
+    background = keyboard.index('draw_bitmap_in_rect(bitmap, &bounds, &bounds, NULL, 0xffffffff, NULL, FALSE);')
+    legend = keyboard.index('menu_button_glyph_keyboard_legend(virtual_keyboard_globals.keyboard->background_bitmap_tag.index, bitmap);')
+    assert background < legend < keyboard.index('draw_string_set_draw_mode(')

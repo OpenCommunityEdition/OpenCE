@@ -93,6 +93,7 @@ symbols in this file:
 #include "saved games/saved_game_files.h"
 #include "tag_files/tag_groups.h"
 #include "text/draw_string.h"
+#include "menu_button_glyphs.h" /* port: port/linux/game/menu_button_glyphs.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
@@ -675,6 +676,9 @@ static void virtual_keyboard_render_internal(
 			1046,
 			bitmap);
 		draw_bitmap_in_rect(bitmap, &bounds, &bounds, NULL, 0xffffffff, NULL, FALSE);
+		/* port: its painted B and A buttons, from the button keys' bitmaps
+		(their high-res redraws) */
+		menu_button_glyph_keyboard_legend(virtual_keyboard_globals.keyboard->background_bitmap_tag.index, bitmap);
 	}
 
 	draw_string_set_draw_mode(virtual_keyboard_globals.keyboard->font_tag.index, NONE, 0, 0, &caption_color);

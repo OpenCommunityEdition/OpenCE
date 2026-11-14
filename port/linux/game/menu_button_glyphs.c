@@ -7,6 +7,9 @@
 #include "keyboard_glyphs.h"
 #include "hud_button_layout.h"
 #include "bitmaps/bitmaps.h"
+#include "bitmaps/bitmap_group.h"
+#include "interface/ui_widget.h"
+#include "tag_files/tag_files.h"
 #include "tag_files/tag_groups.h"
 #include "text/draw_string.h"
 #include "rasterizer/rasterizer.h"
@@ -230,4 +233,38 @@ boolean menu_button_glyph_join_draw(wchar_t const *text, short port, rectangle2d
 boolean menu_button_glyph_keyboard_active(short port)
 {
     return menu_button_glyph_enabled(0, port) && keyboard_prompt_enabled(port);
+}
+
+/* The virtual keyboard's background (ui.map's ui\bkd_virtual_keyboard, the
+ * screen a player profile's name is typed on) has its key legend painted
+ * in at the menus' scale: "B=BACK A=ENTER", the B and A the button keys'
+ * own icons (ui\shell\bitmaps\b_butn and a_butn) at a texel to the pixel.
+ * With the high-res text those two bitmaps are drawn from their redraws
+ * (tools/button_assets.py), so they are drawn over the background's, on
+ * the texels their art covers there, and the legend's buttons are as sharp
+ * as the menus' button keys. */
+void menu_button_glyph_keyboard_legend(long background_index, struct bitmap_data const *background)
+{
+    static struct { char const *tag; short x, y; } const icons[] = {
+        {"ui\\shell\\bitmaps\\b_butn", 371, 414},
+        {"ui\\shell\\bitmaps\\a_butn", 471, 414}};
+    short i;
+
+    if (background_index == NONE || !background || background->width != 1024 || background->height != 512 ||
+        !config_boolean("display.high_res_text") ||
+        strcmp(tag_get_name(background_index), "ui\\bkd_virtual_keyboard"))
+        return;
+    for (i = 0; i < (short)NUMBEROF(icons); i++)
+    {
+        long index = tag_loaded('bitm', icons[i].tag);
+        struct bitmap_data *bitmap = index != NONE ? bitmap_group_get_bitmap_from_sequence(index, 0, 0) : NULL;
+        rectangle2d bounds;
+
+        if (!bitmap || bitmap->width != 32 || bitmap->height != 32) continue;
+        bounds.x0 = icons[i].x;
+        bounds.y0 = icons[i].y;
+        bounds.x1 = (short)(icons[i].x + 32);
+        bounds.y1 = (short)(icons[i].y + 32);
+        draw_bitmap_in_rect(bitmap, &bounds, &bounds, NULL, 0xffffffffUL, NULL, FALSE);
+    }
 }
