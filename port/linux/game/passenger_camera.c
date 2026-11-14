@@ -17,7 +17,9 @@ and the deterministic camera used for shooting keeps its original view.
 #include "objects/objects.h"
 #include "physics/collisions.h"
 #include "render/render.h"
-#include "render/render_cameras.h"
+/* (render_camera_world_to_screen's declaration: without it the call took its
+boolean, a byte, as an int, whose other bytes nothing sets) */
+#include "render/render_cameras_internal.h"
 #include "tag_files/tag_groups.h"
 #include "units/unit_definitions.h"
 #include "units/units.h"
