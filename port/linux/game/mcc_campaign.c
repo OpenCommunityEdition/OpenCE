@@ -283,6 +283,17 @@ boolean mcc_campaign_unlimited_ammo(void)
         (game_connection()==_game_connection_network_client ? (mcc_campaign.flags&1u)!=0 : cheat.infinite_ammo);
 }
 
+/* The values physics_set_gravity and sound_set_music_gain set. */
+real mcc_campaign_gravity_scale(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_campaign.gravity : 1.0f;
+}
+
+real mcc_campaign_music_gain(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_campaign.music_gain : 1.0f;
+}
+
 /* Script muting is additional to the player's audio settings, and belongs
  * to this map's checkpoint/network state. Music is muted too. */
 real mcc_campaign_mix_gain(boolean music)

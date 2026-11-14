@@ -14,7 +14,84 @@
 #include "game/game.h"
 #include "networking/network_server_manager.h"
 #include "networking/network_game_manager.h"
+#include "mcc_identity.h"
+#include "mcc_package.h"
 #include "../src/port_config.h"
+#include <string.h>
+
+/* MCC's map_name: the map it names, and the map whose script named it. */
+static char mcc_main_requested[64], mcc_main_requesting[64];
+
+static char const *mcc_main_current_map(void)
+{
+    struct network_game *game = game_connection() == _game_connection_network_server ?
+        network_game_get_game() : NULL;
+    return game ? game->map.name : main_get_map_name();
+}
+
+/* A map in the same package as the current one, by its file name (MCC
+ * scripts name maps as Halo's levels do, without a folder or extension). */
+static boolean mcc_main_sibling_map(char const *current, char const *name, char next[64])
+{
+    char canonical[64];
+    char const *base, *separator;
+    size_t prefix;
+    if (!name || !mcc_package_name(mcc_identity_local_name(current), canonical)) return FALSE;
+    base = name;
+    for (separator = name; *separator; separator++)
+        if (*separator == '\\' || *separator == '/') base = separator + 1;
+    separator = strrchr(canonical, '\\');
+    prefix = (size_t)(separator - canonical) + 1;
+    if (!*base || prefix + strlen(base) >= 64) return FALSE;
+    memcpy(next, canonical, prefix);
+    strcpy(next + prefix, base);
+    if (!mcc_package_name(next, canonical)) return FALSE;
+    strcpy(next, canonical);
+    return TRUE;
+}
+
+void mcc_main_request_map(char const *name)
+{
+    char const *current;
+    if (!mcc_cache_tags_loaded() || game_connection() == _game_connection_network_client || !name) return;
+    current = mcc_main_current_map();
+    if (!mcc_main_sibling_map(current, name, mcc_main_requested)) {
+        error(_error_silent, "mcc: map_name names no map of this package: %.64s", name);
+        csstrncpy(mcc_main_requested, name, sizeof(mcc_main_requested) - 1);
+        mcc_main_requested[sizeof(mcc_main_requested) - 1] = 0;
+    }
+    csstrncpy(mcc_main_requesting, current, sizeof(mcc_main_requesting) - 1);
+    mcc_main_requesting[sizeof(mcc_main_requesting) - 1] = 0;
+    /* Change maps where a won mission does: after the scripts' update, in
+     * the main loop, with the host moving every machine of a network game. */
+    main_won_map();
+}
+
+/* A map named by map_name, or an error when it is not installed here. The
+ * request belongs to the map that made it; a stale one is dropped. */
+static boolean mcc_main_requested_map(char const *current, boolean server)
+{
+    wchar_t text[512];
+    boolean requested = mcc_main_requested[0] && !csstrcasecmp(current, mcc_main_requesting);
+    char next[64];
+    strcpy(next, mcc_main_requested);
+    mcc_main_requested[0] = mcc_main_requesting[0] = 0;
+    if (!requested) return FALSE;
+    if (mcc_maps_find(next) == NONE) {
+        error(_error_silent, "mcc: map_name's map %s is unavailable", next);
+        mcc_error_text(current, "The map its script changes to is not installed.", text, 512);
+        display_error_text_deferred(text, 0);
+        if (server) mcc_ui_network_campaign_won(NULL);
+        else main_goto_main_menu();
+    } else if (server) {
+        mcc_ui_network_campaign_won(next);
+    } else {
+        error(_error_silent, "mcc: map_name changes from %s to %s", current, next);
+        main_set_map_name(next);
+        main_disallow_persistent_storage();
+    }
+    return TRUE;
+}
 
 boolean mcc_main_campaign_won(void)
 {
@@ -24,6 +101,9 @@ boolean mcc_main_campaign_won(void)
     wchar_t text[512];
     int state;
     boolean server;
+    if (mcc_cache_tags_loaded() && game_connection() != _game_connection_network_client &&
+        mcc_main_requested_map(mcc_main_current_map(), game_connection() == _game_connection_network_server))
+        return TRUE;
     if (!mcc_cache_tags_loaded() || mcc_cache_scenario_type() != 0 ||
         !config_boolean("game.mcc_campaigns")) return FALSE;
     /* Clients follow the host's existing round/settings messages. */

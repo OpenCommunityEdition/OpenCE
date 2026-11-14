@@ -624,7 +624,8 @@ are not an MCC implementation dependency. The independent components are:
 | `port/linux/game/mcc_hud.c` | MCC bitmap/placement scaling, including nested weapon and grenade HUD items. |
 | `port/linux/game/mcc_hud_draw.c` | MCC canvas, glyph geometry and text advances; neutral dispatch for Xbox/CE. |
 | `port/linux/game/mcc_terminal.c` | MCC terminal-only font scaling; preserves the map's HUD fonts and all legacy rendering. |
-| `port/linux/game/mcc_scripts.c` | Name-based MCC function/global linking and supported MCC native functions. |
+| `port/linux/game/mcc_scripts.c` | Name-based MCC function/global linking, map-local MCC globals and supported MCC native functions. |
+| `port/linux/game/mcc_script_library.c` | The editing kit's other MCC-only functions, MCC's `map_name` and `cheat_active_camouflage`, and inert debug commands. |
 | `port/linux/game/mcc_campaign.c` | Local-player/authority queries, gravity, campaign markers and scoped global permissions. |
 | `port/linux/game/mcc_syntax.c` | MCC's 32,767-slot syntax validation and traversal workspace. |
 | `port/linux/game/mcc_script_parameters.c`, `mcc_script_runtime.inl`, `mcc_script_threads.inl` | MCC parameter metadata/scopes and bounded, checkpointed interpreter stacks. |
@@ -970,11 +971,10 @@ Navigation has eight independently owned team markers and uses the native
 HUD drawing services; the host replicates the complete marker state and
 gravity periodically, including after changes and late joins.
 
-The recognized `debug_ice_cream_flavor_status_*` globals for IWHBYD,
-Grunt Birthday Party and Bandanna report false. This does not implement
-skull gameplay. A literal assignment of false is accepted because the
-skull is already disabled; attempts to enable one or assign a computed
-value are refused. MCC maps may
+The `debug_ice_cream_flavor_status_*` skull globals are map-local
+booleans that scripts may read and set; no skull's gameplay is applied
+except Bandanna's (see [MCC editing kit script names](#mcc-editing-kit-script-names)).
+MCC maps may
 set `sound_gain_under_dialog` and `cheat_infinite_ammo`; the adapter captures
 their previous values and restores them on unload. The native global table
 and Xbox/CE write permissions remain unchanged.
@@ -1461,9 +1461,9 @@ are migrated with defaults for the added state. Network compatibility advances
 from 27 to 28: **all peers must use matching versions**, including when playing
 Xbox or Custom Edition maps. There is no separate MCC transport or matchmaking.
 
-Boom, Sputnik, and Catch skull globals report disabled. Literal assignments
-that keep them disabled are accepted; enabling them or computing an assignment
-is refused rather than pretending their gameplay effects exist. Similarly,
+Boom, Sputnik, and Catch skull globals reported disabled, and enabling one
+was refused. They are now map-local state; see
+[MCC editing kit script names](#mcc-editing-kit-script-names).
 `object_prediction` reports enabled and accepts a literal enable only, matching
 the existing engine prediction policy. Converted constant expressions preserve
 their expected result types, including a void result for a `set` statement.
@@ -2068,9 +2068,9 @@ were not modified.
 Remaining limitations established during this investigation:
 
 - **CE Third Person Armory** enables I Would Have Been Your Daddy and Grunt
-  Birthday Party. These skull effects are not implemented. The refusal now names
-  the offending global and syntax node; accepting an enable as a no-op would
-  change authored gameplay and is intentionally not done.
+  Birthday Party. These skull effects are not implemented. The map was refused
+  at the time; it is now accepted with the skulls recorded but without effect
+  (see [MCC editing kit script names](#mcc-editing-kit-script-names)).
 - **PFD** loads and advances simulation during a three-minute idle run, without
   reproducing the reported post-transition crash. Its assault rifle and M4A1
   reference the model shader `deathstar\project_subterfuge\shader model\tag_334`
@@ -2227,3 +2227,96 @@ The final Windows binary also completed a single-process sequence from Ruby
 C20 to Xbox `a10`, to Custom Edition `deathisland`, then back to Ruby C20,
 with console responses after each load and a normal timed exit. This checks
 bounded loading and activation transitions, not full legacy visual parity.
+
+## MCC editing kit script names
+
+MCC's editing kit writes the script functions and external globals its Sapien
+knows to `hs_doc.txt` (the Steam Halo CE editing kit's copy was compared;
+[c20 hosts a copy](https://github.com/Sigmmma/c20/blob/master/src/data/hs_docs/h1/hs_doc_sapien.txt)).
+It lists 78 functions and 38 globals that neither the Xbox table nor the
+sections above provided, and six skull globals that were accepted only when a
+script kept them off. A map naming any of the others was refused at
+"converting scripts". All are now accepted, with the kit's return and
+parameter types.
+The other functions the kit lists have the Xbox table's signatures.
+
+The globals are map-local. Each one a map names is given scenario storage, as
+`developer_mode` was. It starts at zero or false and lasts as checkpoints do.
+Scripts may read and set it; nothing else reads it.
+
+- **Skulls.** The 29 `debug_ice_cream_flavor_*` globals record which skulls a
+  script turned on. No skull's gameplay is applied, except Bandanna's, which
+  reads and sets the existing `cheat_infinite_ammo`. That control gives
+  infinite reserve ammunition and grenades, and still requires reloading.
+  The earlier rule, which accepted only a literal `false` and refused maps
+  that enabled a skull, is withdrawn.
+- **Debug and settings switches** (`rasterizer_fps`, `hs_verbose`,
+  `breakpoints_enabled`, `director_camera_switching`, `mouse_acceleration`,
+  `game_paused` and nine more) have no effect.
+- The f0–f5 counters, `game_speed_value`, `debug_score` and
+  `developer_mode` keep their earlier behaviour. They share one table in
+  `mcc_scripts.c`.
+
+A scenario global's name has at most 31 characters. Longer MCC names use an
+internal name appended to the script strings, which the native recompiler
+resolves (`__mcc_skull_catch`, for example). The console reaches these
+globals only by their internal names.
+
+[`mcc_script_library.c`](../port/linux/game/mcc_script_library.c) holds the
+functions:
+
+- **Implemented:** `pin`, `bitwise_xor`, `bitwise_flags_toggle` (unsigned
+  32-bit, like the other bitwise functions), `script_started`,
+  `physics_get_gravity`, `sound_get_music_gain`, `log_print`,
+  `TestPrintBool` and `TestPrintReal`. `script_started` is true once a dormant
+  script has been woken, and always true for startup and continuous scripts.
+  It is never true for a disabled script. The two getters return the values
+  `physics_set_gravity` and `sound_set_music_gain` set. The print functions
+  write `hs:` lines to `debug.txt`.
+- **MCC's versions of two native functions.** A map's scripts may not call
+  either Xbox version.
+  - `cheat_active_camouflage` camouflages every player's unit on the host.
+    The Xbox version camouflages only the first player's. Each unit's
+    camouflage reaches the other machines with its state. The Halo 1
+    Firefight package calls it from its round setup, when the camouflage
+    option is on.
+  - `map_name` names another map of the same package by its file name.
+    The change happens where a won mission's does: after the scripts'
+    update, and in a network game the host moves every machine. A map that
+    is not installed shows an error and returns to the menu, or a network
+    game to its lobby. Nothing else is loaded in its place. The request
+    belongs to the map that made it. It does not record campaign progress.
+- **Inert (69):** the script debugger, cheats that place particular tags,
+  the debug camera's files, `quit`, screenshots, reloads, dumps, the player's
+  sound settings (EAX, hardware buffers, rolloff, the master gain), look
+  rates, key bindings, `sv_map`, profiles, checkpoint files, network events,
+  saved films, determinism debugging, the debug menu and `net_never_timeout`.
+  Their arguments are still evaluated, so sleeps and side effects inside them
+  happen. They return zero or false; `sound_get_master_gain` returns one.
+  The first call of each in a run is noted in `debug.txt`.
+
+The Steam Workshop items examined used only a few of these names. All nine
+maps of the Halo 1 Firefight package (Workshop 2898809930) read and set
+skulls, Bandanna among them. That package also calls
+`cheat_active_camouflage`. Its maps were refused, and now load. The skulls
+their scripts turn on have no effect, except Bandanna. Lumoria (Workshop
+3323672581) calls `map_name episode_2a` on Impossible. The native version of
+that function disabled the script that calls it; the script now runs, and the
+missing map returns to the menu.
+
+Checked on Windows with the headless runner (`init.txt`'s `map_name`, a hidden
+window, `debug.network_test` set to `log`, and console cues):
+
+- `ff_snowfield_night`, the other eight Firefight maps and Lumoria load with
+  no script refused or disabled.
+- Console calls of `pin`, `bitwise_xor`, `bitwise_flags_toggle`, the gravity
+  and gain getters, an inert command and `script_started` return the values
+  above. A skull global reads false, then true after it is set.
+- `map_name geomar_final` changed Lumoria to that map. `map_name episode_2a`
+  logged the missing map and returned to the menu.
+- Maps that use the refactored globals load with the values above:
+  `game_speed_value` (3512468479 `c10`), `developer_mode` (`crashsite`) and
+  `object_prediction` (`mercury2`).
+
+Skull effects, the network-game path of `map_name` and camouflage seen from
+a client were not exercised.
