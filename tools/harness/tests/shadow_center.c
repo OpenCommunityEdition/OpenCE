@@ -43,6 +43,12 @@ static void render_interpolation_object_point(long object_index, real_point3d *p
 	point->y += drawn_offset.j;
 	point->z += drawn_offset.k;
 }
+/* the lighting's shadow vector as this frame draws it: here, as the lighting
+has it (render_interpolation_shadow_vector; shadow_vector_glide tests its turn) */
+static void render_interpolation_shadow_vector(long object_index, real_vector3d const *lighting, real_vector3d *drawn)
+{
+	*drawn = *lighting;
+}
 
 static void perpendicular3d(real_vector3d const *vector, real_vector3d *perpendicular)
 {
