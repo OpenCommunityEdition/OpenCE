@@ -553,6 +553,32 @@ static long lens_flare_occlusion_visible_pixels(
 	return visible_pixels;
 }
 
+/* port: how much of the brightness a reflection of that radius, so far away,
+keeps: as much of a pixel of the game's 480 lines as it covers, when it is
+smaller than one. The Xbox drew such a sprite on the pixels whose centres it
+fell on, which a sprite a fraction of a pixel wide does only now and then,
+as faint specks that came and went; drawn at several of the display's pixels
+to one of those (halo_screen_scale), every one of its sprites lands on some,
+as steady bright dots. d40's opening showed two over the Pillar of Autumn:
+the flames on its hull, where the level has it, a fifth of a pixel across
+in the sky of the area the opening flies through, which has the ship
+elsewhere. A reflection of a pixel or more keeps all of it. */
+static real lens_flare_reflection_coverage(
+	real radius,
+	real depth)
+{
+	real half_height = (real)(global_window_parameters.camera.viewport_bounds.y1 -
+		global_window_parameters.camera.viewport_bounds.y0) * 0.5f;
+	real tangent = (real)tan(global_window_parameters.camera.vertical_field_of_view * 0.5f);
+	real diameter;
+
+	if (!(depth > 0.0f) || !(tangent > 0.0f) || !(half_height > 0.0f))
+		return 1.0f;
+	diameter = 2.0f * radius / depth * half_height / tangent;
+
+	return diameter >= 1.0f || !(diameter >= 0.0f) ? 1.0f : diameter * diameter;
+}
+
 static real lens_flare_evaluate_corona_rotation_function(
 	short corona_rotation_function,
 	struct rasterizer_lens_flare_submit_parameters const *lens_flare_parameters)
@@ -1196,6 +1222,19 @@ void rasterizer_lens_flares_draw(
 								real rotation;
 								pixel32 pixel;
 								real tint_factor;
+
+								/* port: one smaller than a pixel of the game's
+								480 lines dimmed by what of it it covers, the
+								radius as drawn (below)
+								(lens_flare_reflection_coverage) */
+								brightness *= lens_flare_reflection_coverage(
+									(TEST_FLAG(reflection->flags, _lens_flare_reflection_radius_scaled_by_occlusion_bit) ?
+										(occlusion_fraction+1.0f)*radius*0.5f :
+										radius)*
+									(TEST_FLAG(reflection->flags, _lens_flare_reflection_radius_not_scaled_by_distance_bit) ?
+										depth :
+										1.0f),
+									depth);
 
 								if (reflection->tint_color.alpha == 0.0f &&
 									reflection->tint_color.red == 0.0f &&
