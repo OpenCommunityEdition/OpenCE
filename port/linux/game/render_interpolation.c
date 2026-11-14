@@ -135,6 +135,11 @@ struct interpolated_camera
 	struct observer_result previous;
 	struct observer_result latest;
 	struct observer_result blended;
+	/* how far into its tick each snapshot was taken (of 1), and whether the
+	two were taken a tick apart (camera_snapshot_blend) */
+	real previous_taken;
+	real latest_taken;
+	boolean taken_a_tick_apart;
 	/* its player's unit (or what it rides) corrected: as an object's */
 	real_vector3d correction;
 	real_vector3d correction_pending;
@@ -814,12 +819,56 @@ static boolean observer_cut(
 		!(a->forward.i * b->forward.i + a->forward.j * b->forward.j + a->forward.k * b->forward.k >= CAMERA_CUT_COSINE);
 }
 
+/* the previous snapshot of a camera that moves every frame, carried by its
+velocity (the observer's, world units a second) to when the latest was
+taken: a cut is a move away from there (observer_cut), not a long one. (A
+move strays from there by 0.8 world units a tick squared at most: the
+observer accelerates a camera set to a point by no more than 1500 world
+units a second squared, observer_maximum_accelerations, or puts it at the
+point at once, where it stops.) A cinematic's camera can fly further than
+CAMERA_CUT_DISTANCE in a tick (d40's, over the ring, 3.1 world units),
+which was taken for a cut every few frames there: drawn from the observer,
+a tick ahead, then from its snapshots, it jumped back and forth a tick's
+move. */
+static void camera_snapshot_carried(
+	struct observer_result const *previous,
+	real previous_taken,
+	real latest_taken,
+	struct observer_result *carried)
+{
+	real seconds = (1.0f + latest_taken - previous_taken) / (real)TICKS_PER_SECOND;
+
+	*carried = *previous;
+	carried->position.x += previous->velocity.i * seconds;
+	carried->position.y += previous->velocity.j * seconds;
+	carried->position.z += previous->velocity.k * seconds;
+}
+
+/* how far from the previous snapshot to the latest a camera that moves every
+frame is drawn (of 1; below 0 a little before the previous): at the frame's
+part of a tick after the previous tick, the moment the objects are drawn
+at. Its snapshots are taken at the first frames after the last two ticks,
+each some part of a tick (previous_taken, latest_taken) after its tick, so
+that they are 1 + latest_taken - previous_taken ticks apart, more or less
+than one from tick to tick: blended by the fraction itself, a camera moving
+steadily sped up and slowed down every tick. */
+static real camera_snapshot_blend(real fraction, real previous_taken, real latest_taken)
+{
+	real span = 1.0f + latest_taken - previous_taken;
+
+	if (!(span > 0.0f))
+		return fraction;
+	return (fraction - previous_taken) / span;
+}
+
 static struct observer_result const *render_interpolation_blended_camera(
 	short local_player_index,
 	struct observer_result const *observer)
 {
 	struct interpolated_camera *camera;
 	real t = interpolation_fraction;
+	struct observer_result carried;
+	boolean moving_to_point;
 
 	if (!interpolation_rendering || !observer)
 	{
@@ -875,6 +924,9 @@ static struct observer_result const *render_interpolation_blended_camera(
 		camera->has_previous = camera->valid;
 		camera->previous = camera->latest;
 		camera->latest = *observer;
+		camera->previous_taken = camera->latest_taken;
+		camera->latest_taken = t;
+		camera->taken_a_tick_apart = camera->has_previous && interpolation_tick - camera->tick == 1;
 		/* Several ticks since the last snapshot (a long frame): the objects
 		are drawn between the last two ticks, so the camera's previous is
 		where it was a tick ago, as nearly as a steady move from the last
@@ -892,11 +944,24 @@ static struct observer_result const *render_interpolation_blended_camera(
 		camera->tick = interpolation_tick;
 		camera->valid = TRUE;
 	}
-	if (!camera->has_previous || observer_cut(&camera->previous, &camera->latest))
+
+	/* A cinematic's camera set to a point (camera_set) moves there every
+	frame (observer_update, main.c): blended by the time its snapshots were
+	taken, not as though a tick apart, and cut by a move away from where its
+	velocity carries it. (A player's camera moves with its unit, once a tick,
+	and an animated camera by its animation's frames.) */
+	moving_to_point = camera->taken_a_tick_apart &&
+		director_get_perspective(local_player_index) == _director_perspective_scripted &&
+		scripted_camera_moving_to_point();
+	if (moving_to_point)
+		camera_snapshot_carried(&camera->previous, camera->previous_taken, camera->latest_taken, &carried);
+	if (!camera->has_previous ||
+		observer_cut(moving_to_point ? &carried : &camera->previous, &camera->latest))
 	{
 		return observer;
 	}
-
+	if (moving_to_point)
+		t = camera_snapshot_blend(t, camera->previous_taken, camera->latest_taken);
 	observer_blend(&camera->previous, &camera->latest, t, &camera->blended);
 	if (correction_significant(&camera->correction) || correction_significant(&camera->correction_pending))
 	{
