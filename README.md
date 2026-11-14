@@ -11,6 +11,14 @@
   <a href="https://discord.gg/9gqcHyr5km"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
   <a href="https://zenith.hosting/host/opence"><img src="https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg" alt="Deploy with Zenith" height="28"></a>
 </p>
+> **This fork carries the dedicated server.** `main` here is
+> [OpenCE](https://github.com/OpenCommunityEdition/OpenCE) with the dedicated
+> host carried on top: a copy of the game that holds a list of maps on its own,
+> with no screen, no GPU and no sound card, on **Linux and Windows** from the
+> same `config.toml`, and a client of either platform joins it. It is network
+> version 38. The build, the settings and what to expect are in
+> [docs/dedicated_server.md](docs/dedicated_server.md).
+>
 
 **OpenCE** (Open Community Edition) is an open source port of the Halo: Combat Evolved decompilation (Halo CE) based on an early Xbox development build (2342) and forked from
 [bnunu/halo-1](https://github.com/bnunu/halo-1). The project aims to enhance the existing game and adds many features, such as 128-player multiplayer, online campaign co-op, mod packs, field-of-view settings, a server browser, peer-to-peer hosting, automatic map downloads, voice chat, support for Custom Edition maps and much more! 
@@ -85,6 +93,8 @@ The Arch-based distribution release is available on the [AUR](https://aur.archli
 - **Supports up to 128 players** on up to 128 machines and up to 4 players on each device in split screen.
 - **Every platform plays together:** Windows, Linux, Android and the browser all support cross-play! On a local network, the native builds can play LAN. Browser players can play each other in rooms over WebRTC ([port/web/README.md](port/web/README.md)).
 - **Peer-to-peer internet hosting:** join through the server browser or an invite link. A host lists a game as public in the server browser, or keeps it private for players with the invite link. With the Discord integration, the host can also send the invite through Discord.
+
+- **A dedicated host:** a copy of the game left running on its own, on Linux or on Windows, with a list of maps that it hosts and rotates by itself. No screen, GPU or sound card needed. Refer to [docs/dedicated_server.md](docs/dedicated_server.md).
 - **Online co-op campaign:** with settings for friendly fire, player collisions and the number of enemies as a multiplier based on per player or static. 
 - **New gametypes:** SWAT, Infection, Gun Game and Hardcore (Slayer, CTF, Oddball and King), in Select Gametype's OPENCE bank; Edit Gametypes' OPENCE OPTIONS gives any gametype their rules ([port/linux/README.md](port/linux/README.md), "OpenCE gametypes").
 - **Voice Chat:** push to talk (V) or an open microphone (can be changed in the menu's audio settings)
