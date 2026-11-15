@@ -757,6 +757,13 @@ void ui_widget_game_data_function_invoke(
 			pc_menu_audio_description(widget);
 			return;
 		}
+		if (function == 47 && widget->name && !strcmp(widget->name, "gamepad_setup_options"))
+		{
+			extern void pc_menu_gamepad_update(struct widget_instance *options);
+
+			pc_menu_gamepad_update(widget);
+			return;
+		}
 		if (function == 52)
 		{
 			extern void pc_menu_map_list_update(struct widget_instance *widget);
@@ -767,6 +774,19 @@ void ui_widget_game_data_function_invoke(
 		{
 			extern void pc_menu_gametype_list_update(struct widget_instance *list);
 			pc_menu_gametype_list_update(widget);
+			return;
+		}
+		if (function == 46 && widget->parent && widget->parent->name &&
+			strcmp(widget->parent->name, "select_screen_list_template"))
+		{
+			struct widget_instance *settings_list = widget->parent;
+
+			/* port: the settings list's side text and picture, from its button bar's update */
+			if (settings_list->parameters.list.extended_description && settings_list->focused_child &&
+				settings_list->focused_child != widget)
+			{
+				player_profile_edit_select_menu_update_extended_description(settings_list);
+			}
 			return;
 		}
 		if (function == 46 && widget->parent)
@@ -2313,7 +2333,11 @@ static void player_profile_edit_select_menu_update_extended_description(
 			list_widget->parameters.list.extended_description->definition_tag_index);
 		/* port: a Custom Edition map's description widget has its own layout,
 		not the Xbox's text and picture pair: its description is left as it is */
-		if (description_definition->child_count != 2)
+		if (!(description_definition->child_count >= 2 && description_definition->child_count <= 3 &&
+			list_widget->parameters.list.extended_description->child &&
+			list_widget->parameters.list.extended_description->child->type == _ui_widget_type_text_box &&
+			list_widget->parameters.list.extended_description->child->next &&
+			list_widget->parameters.list.extended_description->child->next->type == _ui_widget_type_bitmap))
 			index = NONE;
 	}
 	if (index != NONE)

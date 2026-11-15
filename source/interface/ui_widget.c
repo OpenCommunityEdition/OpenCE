@@ -2699,6 +2699,21 @@ takes no events and has nothing in it that does, which its game passes over
 (its rows of settings take none themselves, but their spinners do), or one
 hidden (a list's rows past its items: port/linux/game/menu_functions.c) or
 disabled (the server browser's column titles, which sort nothing) */
+/* port: pulls the arrows of the Gamepads screen's sliders this many units toward each other, and narrows
+their text to match (the donor spinner's arrows are far apart for a column this narrow) */
+#define GAMEPAD_TEXT_MARGIN 27
+short pc_menu_gamepad_arrow_pull(struct widget_instance *spinner);
+#define GAMEPAD_ARROW_PULL pc_menu_gamepad_arrow_pull(widget)
+
+static boolean ui_widget_port_gamepad_spinner(
+	struct widget_instance *widget)
+{
+	struct widget_instance *list = widget->parent ? widget->parent->parent : NULL;
+
+	return list && list->name &&
+		(!strcmp(list->name, "gamepad_avail_list") || !strcmp(list->name, "gamepad_used_list"));
+}
+
 static boolean widget_instance_port_is_label(
 	struct widget_instance *widget)
 {
@@ -4050,17 +4065,9 @@ static void widget_instance_initialize(
 		{
 			struct ui_widget_event_handler_reference *denied_handler =
 				(struct ui_widget_event_handler_reference *)definition->event_handlers.address + denied_index;
-
-			/* port: a Custom Edition map's Gamepads item opens its own Halo PC
-			screen (device lists this build does not have), and the port's
-			screen is not on such a map: the item is disabled, as Custom
-			Edition has it */
 			if (widget->parent && denied_handler->event_type != _widget_event_created &&
-				(((denied_handler->flags & 0x80) &&
-				ui_widget_port_function_denied(widget, (word)denied_handler->function)) ||
-				((denied_handler->flags & 0x08) && denied_handler->widget_tag.index != NONE &&
-				!pc_menu_tag(denied_handler->widget_tag.index) &&
-				!strcmp(widget->name, "gamepads_profile_item"))))
+				(denied_handler->flags & 0x80) &&
+				ui_widget_port_function_denied(widget, (word)denied_handler->function))
 			{
 				widget->disabled = TRUE;
 				widget->alpha_modifier = 0.5f;
@@ -4269,6 +4276,100 @@ void ui_widget_port_description_clear(
 	ui_widget_port_description_extent(description, base, &top, &bottom);
 	if (rows_bottom != NONE && top < rows_bottom + 8)
 		description->vertical_offset = (short)(rows_bottom + 8 - top);
+}
+
+/* port: a copy of a row of a list, last in it (the Gamepads screen of a map's own pause menu) */
+struct widget_instance *ui_widget_port_clone_row(struct widget_instance *source)
+{
+	struct widget_instance *row;
+
+	if (!source->parent)
+		return NULL;
+	row = ui_widget_load_by_name_or_tag(NULL, source->definition_tag_index, source->parent,
+		source->local_player_index, NONE, NONE, NONE);
+	if (!row)
+		return NULL;
+	row->horizontal_offset = source->horizontal_offset;
+	row->vertical_offset = source->vertical_offset;
+	ui_widget_add_child(source->parent, row);
+	return row;
+}
+
+
+/* port: a definition of the name below a screen's, through its children and what its handlers open */
+static long ui_widget_port_find_definition(long tag_index, char const *name, long depth)
+{
+	struct ui_widget_definition *definition;
+	long index;
+	long found;
+
+	if (tag_index == NONE || depth > 6)
+		return NONE;
+	definition = ui_widget_definition_get(tag_index);
+	if (!strcmp(definition->name, name))
+		return tag_index;
+	for (index = 0; index < definition->child_widgets.count; index++)
+	{
+		struct ui_widget_child_reference *reference =
+			(struct ui_widget_child_reference *)definition->child_widgets.address + index;
+
+		found = ui_widget_port_find_definition(reference->widget_tag.index, name, depth + 1);
+		if (found != NONE)
+			return found;
+	}
+	for (index = 0; index < definition->event_handlers.count; index++)
+	{
+		struct ui_widget_event_handler_reference *handler =
+			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + index;
+
+		found = ui_widget_port_find_definition(handler->widget_tag.index, name, depth + 1);
+		if (found != NONE)
+			return found;
+	}
+	return NONE;
+}
+
+/* port: the donor settings screen's spinner (found from the screen this one was opened from), or NONE */
+long ui_widget_port_donor_spinner(struct widget_instance *screen)
+{
+	short stack = screen->local_player_index == NONE ? 0 : screen->local_player_index;
+	struct widget_stack_node *node = widget_globals.widget_stack[stack];
+
+	if (!node || node->data.previous_widget_tag == NONE)
+		return NONE;
+	return ui_widget_port_find_definition(node->data.previous_widget_tag, "specular_spinner", 0);
+}
+
+/* port: a spinner of the definition given, as a child of a row, its values the names given */
+struct widget_instance *ui_widget_port_add_spinner(
+	struct widget_instance *row,
+	long spinner_tag,
+	short x,
+	short y,
+	wchar_t const *const *values,
+	short value_count)
+{
+	struct widget_instance *spinner;
+	short slot;
+
+	for (slot = 0; slot < PORT_MAXIMUM_ROWS && ui_widget_port_rows[slot].row; slot++)
+		;
+	if (slot == PORT_MAXIMUM_ROWS || spinner_tag == NONE)
+		return NULL;
+	spinner = ui_widget_load_by_name_or_tag(NULL, spinner_tag, row, row->local_player_index, NONE, NONE, NONE);
+	if (!spinner)
+		return NULL;
+	spinner->horizontal_offset = x;
+	spinner->vertical_offset = y;
+	ui_widget_add_child(row, spinner);
+	ui_widget_port_rows[slot].row = row;
+	ui_widget_port_rows[slot].spinner = spinner;
+	ui_widget_port_rows[slot].label = NULL;
+	ui_widget_port_rows[slot].description = NULL;
+	ui_widget_port_rows[slot].values = values;
+	ui_widget_port_rows[slot].value_count = value_count;
+	spinner->parameters.list.number_of_items = (word)value_count;
+	return spinner;
 }
 
 /* port: back to the screen before, for the menus' functions */
@@ -5707,6 +5808,27 @@ static void widget_instance_render_text_box(
 			widget->parameters.text_box.text = L"<out of memory>";
 		}
 	}
+	{
+		extern wchar_t const *pc_menu_gamepad_text(struct widget_instance *widget);
+		wchar_t const *port_text = pc_menu_gamepad_text(widget);
+
+		if (port_text)
+		{
+			unsigned long port_length = ustrlen(port_text);
+
+			widget->parameters.text_box.text = pool_resize_pointer(
+				widget_memory_pool,
+				widget->parameters.text_box.text,
+				2 * port_length + 2,
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+				4421);
+			if (widget->parameters.text_box.text)
+			{
+				csmemcpy(widget->parameters.text_box.text, port_text, 2 * port_length);
+				widget->parameters.text_box.text[port_length] = 0;
+			}
+		}
+	}
 	text = &widget->parameters.text_box.text;
 	if (!*text || !**text)
 		return;
@@ -5745,6 +5867,8 @@ static void widget_instance_render_text_box(
 		return;
 	}
 	justification = definition->justification;
+	if (widget->name && !strcmp(widget->name, "gamepad_item_label"))
+		justification = _text_justification_left;
 	if (justification < 0 || justification >= NUMBER_OF_TEXT_JUSTIFICATIONS)
 	{
 		error(
@@ -5782,6 +5906,8 @@ static void widget_instance_render_text_box(
 			color_alpha = color.alpha;
 		}
 	}
+	if (widget->name && !strcmp(widget->name, "gamepad_item_label"))
+		bounds.x0 += GAMEPAD_TEXT_MARGIN;
 	/* port: a colour of the port's for the text (its alpha the box's) */
 	pc_menu_text_color(widget, &color);
 	color.alpha = alpha_modifier * color_alpha;
@@ -5900,6 +6026,11 @@ static void widget_instance_render_spinner_list(
 
 		csmemset(&parameters, 0, sizeof(parameters));
 		bounds = definition->list_header_bounds;
+		if (ui_widget_port_gamepad_spinner(widget))
+		{
+			bounds.x0 += GAMEPAD_ARROW_PULL;
+			bounds.x1 += GAMEPAD_ARROW_PULL;
+		}
 		/* port: a spinner with extra items is wider, to the left, its arrow
 		with it */
 		if (spinner_string_list_extra_count(definition->text_label_string_list.index))
@@ -5931,6 +6062,11 @@ static void widget_instance_render_spinner_list(
 
 		csmemset(&parameters, 0, sizeof(parameters));
 		bounds = definition->list_footer_bounds;
+		if (ui_widget_port_gamepad_spinner(widget))
+		{
+			bounds.x0 -= GAMEPAD_ARROW_PULL;
+			bounds.x1 -= GAMEPAD_ARROW_PULL;
+		}
 		bounds.x0 += offset.x;
 		bounds.y0 += offset.y;
 		bounds.x1 += offset.x;
@@ -6053,6 +6189,11 @@ static void widget_instance_render_spinner_list(
 					{
 						color_alpha = color.alpha;
 					}
+				}
+				if (ui_widget_port_gamepad_spinner(widget))
+				{
+					bounds.x0 += GAMEPAD_ARROW_PULL;
+					bounds.x1 -= GAMEPAD_ARROW_PULL;
 				}
 				color.alpha = text_alpha_modifier * color_alpha;
 				if (TEST_FLAG(
@@ -6611,7 +6752,7 @@ static void ui_mouse_note_target(
 	}
 	else if (widget->type == _ui_widget_type_spinner_list)
 	{
-		if (!widget_instance_can_receive_events(widget))
+		if (!ui_widget_port_gamepad_spinner(widget) && !widget_instance_can_receive_events(widget))
 			return;
 		/* a list showing several items is picked through them, and stepped
 		by the band beside them */
@@ -8128,7 +8269,10 @@ static void column_list_update(
 
 	/* port: a map's own lists have rows of three frames */
 	boolean own_list = !strcmp(widget->name, "select_screen_list_template") ||
-		!strcmp(widget->name, "gametype_select_list");
+		!strcmp(widget->name, "gametype_select_list") ||
+		!strcmp(widget->name, "color_select_list") ||
+		!strcmp(widget->name, "gamepad_avail_list") ||
+		!strcmp(widget->name, "gamepad_used_list");
 	for (child = widget->child; child; child = child->next)
 	{
 		boolean has_frames = child->animation.number_of_sprite_frames == 2 ||
@@ -8395,8 +8539,9 @@ static void widget_instance_process_one_event_recursive(
 			if (!handled_by_event_handler && event->data.button.index == _widget_event_b_button)
 			{
 				extern boolean pc_menu_network_back(struct widget_instance *widget);
+				extern boolean pc_menu_gamepad_back(struct widget_instance *widget);
 
-				if (pc_menu_network_back(widget))
+				if (pc_menu_gamepad_back(widget) || pc_menu_network_back(widget))
 				{
 					handled_by_event_handler = TRUE;
 					event_handled = TRUE;
@@ -8439,6 +8584,22 @@ static void widget_instance_process_one_event_recursive(
 	if (!widget_deleted)
 	{
 		widget_instance_update_animation_parameters(widget);
+		if (event_for_this_widget && !event_handled && !widget->parent &&
+			event->type == _event_type_button && event->data.button.value == 1)
+		{
+			extern boolean pc_menu_gamepad_button(struct widget_instance *widget, short button);
+
+			if (pc_menu_gamepad_button(widget, event->data.button.index))
+				event_handled = TRUE;
+		}
+		if (event_for_this_widget && event->type == _event_type_button &&
+			event->data.button.index == _gamepad_analog_button_a && event->data.button.value == 1)
+		{
+			extern boolean pc_menu_network_open(struct widget_instance *widget);
+
+			if (pc_menu_network_open(widget))
+				event_handled = TRUE;
+		}
 		if (widget->type == _ui_widget_type_spinner_list)
 			spinner_list_update(widget);
 		else if (widget->type == _ui_widget_type_column_list)

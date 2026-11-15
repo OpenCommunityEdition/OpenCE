@@ -3489,7 +3489,7 @@ boolean ui_widget_event_handler_function_invoke(
 	(failed, as an invalid function is, so the handler opens and closes no
 	screens after it) */
 	if (ui_widget_function_denied(widget, function_index))
-		return FALSE;
+		return function_index == 65; /* port: end editing: nothing to do for a map's widget, but it must not fail, or its go back is skipped */
 	/* port: MCC's additional in-map functions have their own dispatcher (mcc_ui.c) */
 	if (mcc_ui_event_function(widget, event, function_index, widget_deleted, &result))
 		return result;
@@ -3508,8 +3508,9 @@ boolean ui_widget_event_handler_function_invoke(
 	if (function_index == _halo_pc_function_back)
 	{
 		extern boolean pc_menu_network_back(struct widget_instance *widget);
+		extern boolean pc_menu_gamepad_back(struct widget_instance *widget);
 
-		if (pc_menu_network_back(widget))
+		if (pc_menu_gamepad_back(widget) || pc_menu_network_back(widget))
 			return TRUE;
 	}
 	if (function_index == _halo_pc_function_back)
@@ -3648,7 +3649,22 @@ boolean ui_widget_event_handler_function_invoke(
 		if (mouse_result != NONE)
 			return mouse_result;
 	}
-	if (function_index >= 102 && function_index < PC_MENU_FUNCTION_BASE)
+
+	if (function_index >= 129 && function_index <= 132)
+	{
+		extern short pc_menu_gamepad_function(struct widget_instance *widget, word function);
+		short gamepad_result = pc_menu_gamepad_function(widget, function_index);
+
+		if (gamepad_result != NONE)
+			return gamepad_result;
+	}
+	if (function_index == 152 && widget->name && !strcmp(widget->name, "controls_settings_screen"))
+	{
+		extern boolean pc_menu_controls_back(struct widget_instance *widget, boolean *widget_deleted);
+
+		return pc_menu_controls_back(widget, widget_deleted);
+	}
+	if (function_index >= 102 && function_index < PC_MENU_FUNCTION_BASE)		
 		return TRUE;
 	if ((short)function_index >= 0 && function_index < 102)
 	{
