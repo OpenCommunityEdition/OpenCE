@@ -388,6 +388,15 @@ boolean players_coop_waiting_to_start(
 /* port: the co-op host's bringto command: everyone comes to the host */
 boolean players_coop_bring_to_host(
 	void);
+/* port: network co-op: a script's switch_bsp that would switch the BSP back
+while players still stand in the volume another switched it for waits
+(hs.c's switch_bsp; `asks_again`: a continuous script's) */
+boolean players_coop_script_bsp_switch_allowed(
+	short structure_bsp_index,
+	boolean asks_again);
+void players_coop_note_script_bsp_switch(
+	short from_structure_bsp_index,
+	short trigger_volume_index);
 /* port: TRUE if `position` is inside a switch trigger for the BSP that is
 loaded. A player left there switches the level on the next tick. */
 boolean player_position_switches_bsp(

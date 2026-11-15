@@ -487,6 +487,12 @@ static struct
 	a script or a skipped cutscene (players_coop_bsp_switch_ready) */
 	short structure_bsp_index;
 	long bsp_switch_time;
+	/* a script's switch_bsp made for the players of a trigger volume, and
+	the BSP it switched from (players_coop_script_bsp_switch_allowed) */
+	boolean script_switch_held;
+	short script_switch_volume;
+	short script_switch_from;
+	boolean script_switch_logged;
 	/* when each local player was last told the host's crossing switches
 	the BSP (players_coop_show_host_wait) */
 	long host_wait_message_times[MAXIMUM_LOCAL_PLAYERS];
@@ -2644,11 +2650,15 @@ static boolean players_coop_danger_near(
 }
 
 /* TRUE if the unit (or the vehicle it rides) is inside the loaded structure
-BSP. In network co-op players can be left outside it after a BSP switch. */
+BSP. In network co-op players can be left outside it after a BSP switch.
+(An object moved outside the map keeps the location it had, a cluster of the
+BSP it left: only its flag says it is outside, object_reconnect_to_map.) */
 static boolean players_coop_unit_in_structure(
 	long unit_index)
 {
-	return object_get(object_get_ultimate_parent(unit_index))->object.location.cluster_index != NONE;
+	struct object_datum *root = object_get(object_get_ultimate_parent(unit_index));
+
+	return root->object.location.cluster_index != NONE && !TEST_FLAG(root->object.flags, _object_outside_of_map_bit);
 }
 
 /* TRUE if a living player's unit is on solid ground: inside the structure
@@ -3041,7 +3051,8 @@ static boolean players_coop_unit_grounded_anywhere(
 forever: on foot, or in a vehicle that is empty or player-driven. AI-driven
 vehicles are ignored because the intro Pelicans fly outside the BSP. */
 static boolean players_coop_unit_stranded(
-	long unit_index)
+	long unit_index,
+	boolean switched)
 {
 	long vehicle_index = object_get_ultimate_parent(unit_index);
 	long driver_index;
@@ -3049,9 +3060,11 @@ static boolean players_coop_unit_stranded(
 	if (players_coop_unit_in_structure(unit_index))
 		return FALSE;
 	/* (on foot: only while falling, not standing on something the BSP
-	doesn't hold, such as an elevator in its shaft) */
+	doesn't hold, such as an elevator in its shaft. Just after a switch,
+	whatever it stands on: a player left standing still where the old BSP's
+	floor was is at rest, and hangs in the void without falling) */
 	if (vehicle_index == unit_index)
-		return !players_coop_unit_grounded_anywhere(unit_index);
+		return switched || !players_coop_unit_grounded_anywhere(unit_index);
 	driver_index = object_try_and_get_and_verify_type(vehicle_index, _object_mask_unit) ?
 		unit_get(vehicle_index)->unit.driver_object_index : NONE;
 	return driver_index == NONE || unit_get(driver_index)->unit.player_index != NONE;
@@ -3075,13 +3088,23 @@ the host's crossing switches the BSP */
 /* Co-op host, each tick: a player stranded for COOP_STRANDED_TICKS is moved
 beside a grounded teammate inside the BSP, else any teammate inside it, else
 to the last checkpoint. Skipped while scripts hold the controls, since
-cutscenes place the players themselves. A BSP switch already moves everyone
-(players_reconnect_to_structure_bsp); this catches anyone it missed. */
+cutscenes place the players themselves. A loading zone's switch already
+moves everyone (players_reconnect_to_structure_bsp); this catches anyone it
+missed. A script's switch_bsp moves no one: a campaign switches for whoever
+stands in a volume ((volume_test_objects <volume> (players))), and anyone
+elsewhere is left outside the new BSP, falling through the floor or hanging
+in the void, with nothing drawn round them. So for
+COOP_BSP_SWITCH_SETTLE_TICKS after a switch, a player stranded is moved
+beside a teammate in the new BSP at once (called in the switch's tick too:
+players_update_after_game). */
 static void players_coop_rescue_stranded(
 	void)
 {
 	struct data_iterator iterator;
 	struct player_datum *player;
+	long since_switch = game_time_get() - players_coop_state.bsp_switch_time;
+	/* (a revert can take the game's time back before the last switch) */
+	boolean switched = since_switch >= 0 && since_switch < COOP_BSP_SWITCH_SETTLE_TICKS;
 
 	if (!network_coop_active() || game_connection() != _game_connection_network_server)
 		return;
@@ -3091,15 +3114,18 @@ static void players_coop_rescue_stranded(
 		long *since = &players_coop_state.stranded_since[DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index)];
 		long teammate_index;
 		boolean rescued;
+		/* (at once only for a first try: one that failed waits, below) */
+		boolean at_once = switched && *since == 0;
 
-		if (player->unit_index == NONE || !player_input_enabled() || !players_coop_unit_stranded(player->unit_index))
+		if (player->unit_index == NONE || !player_input_enabled() ||
+			!players_coop_unit_stranded(player->unit_index, switched))
 		{
 			*since = 0;
 			continue;
 		}
 		if (*since == 0)
 			*since = game_time_get() + 1;
-		if (game_time_get() + 1 - *since < COOP_STRANDED_TICKS)
+		if (!at_once && game_time_get() + 1 - *since < COOP_STRANDED_TICKS)
 			continue;
 		teammate_index = players_coop_unit_where(players_coop_unit_grounded);
 		if (teammate_index == NONE)
@@ -3109,11 +3135,25 @@ static void players_coop_rescue_stranded(
 			rescued = player_teleport(iterator.datum_index, teammate_index,
 				&object_get(teammate_index)->object.bounding_sphere_center);
 		}
+		else if (at_once)
+		{
+			/* (nobody is in the new BSP yet, as when the scripts are still
+			placing everyone: tried again next tick, and after the switch's
+			settling, the wait as before) */
+			*since = 0;
+			continue;
+		}
 		else
 		{
 			real_point3d const *position = players_checkpoint_position(iterator.datum_index);
 
 			rescued = position && player_teleport(iterator.datum_index, NONE, position);
+		}
+		if (rescued)
+		{
+			error(_error_silent, "co-op: player %ld was outside structure bsp #%d for %ld ticks: moved %s",
+				(long)DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index), (int)global_structure_bsp_index,
+				game_time_get() + 1 - *since, teammate_index != NONE ? "beside a teammate" : "to the last checkpoint");
 		}
 		/* (port: and one that found no spot waits as long again before the
 		next try, rather than being moved about every tick) */
@@ -3545,6 +3585,64 @@ static boolean players_coop_bsp_switch_allowed(
 	if (network_coop_bsp_switch_majority())
 		return players_coop_bsp_switch_majority(bsp_switch_trigger_volume_index);
 	return player_get(player_index)->local_player_index != NONE || !players_coop_host_alive();
+}
+
+/* port: network co-op host: whether a script's switch_bsp may switch the
+BSP now. A campaign's scripts switch it for whoever stands in one of their
+volumes ((volume_test_objects <volume> (players))). With one player in a
+volume that switches to a BSP and another in the volume that switches back,
+a continuous script would switch it back and forth each time round
+(Operation Purgepoint's x05: twice a second), the level vanishing round
+whoever is outside the overlap. So once a script has switched the BSP for a
+volume's players (players_coop_note_script_bsp_switch), a continuous
+script's switch back waits while a player still stands in that volume; it
+asks again each time round, so it switches once they leave. Not in a
+cutscene, whose scripts place the players themselves. */
+boolean players_coop_script_bsp_switch_allowed(
+	short structure_bsp_index,
+	boolean asks_again)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	if (!network_coop_active() || game_connection() != _game_connection_network_server ||
+		!players_coop_state.script_switch_held || !asks_again || !player_input_enabled() ||
+		structure_bsp_index != players_coop_state.script_switch_from ||
+		structure_bsp_index == global_structure_bsp_index)
+	{
+		return TRUE;
+	}
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->unit_index != NONE &&
+			scenario_trigger_volume_test_object(players_coop_state.script_switch_volume, player->unit_index))
+		{
+			if (!players_coop_state.script_switch_logged)
+			{
+				players_coop_state.script_switch_logged = TRUE;
+				error(_error_silent, "co-op: a script's switch back to structure bsp #%d waits while players stand in the volume that switched to #%d",
+					(int)structure_bsp_index, (int)global_structure_bsp_index);
+			}
+			return FALSE;
+		}
+	}
+	players_coop_state.script_switch_held = FALSE;
+
+	return TRUE;
+}
+
+/* port: a script's switch_bsp switched the BSP from `from_structure_bsp_index`,
+for the players its thread found in `trigger_volume_index` this tick (NONE:
+for no volume's) */
+void players_coop_note_script_bsp_switch(
+	short from_structure_bsp_index,
+	short trigger_volume_index)
+{
+	players_coop_state.script_switch_held = trigger_volume_index != NONE;
+	players_coop_state.script_switch_volume = trigger_volume_index;
+	players_coop_state.script_switch_from = from_structure_bsp_index;
+	players_coop_state.script_switch_logged = FALSE;
 }
 
 /* port: tells a co-op client's players standing on a loading zone that the
@@ -5169,6 +5267,9 @@ void players_update_after_game(
 	{
 		players_coop_state.structure_bsp_index = global_structure_bsp_index;
 		players_coop_state.bsp_switch_time = game_time_get();
+		/* port: a script's switch (this tick's hs_update) strands its players
+		before this tick's frame: they are moved now, not a tick later */
+		players_coop_rescue_stranded();
 	}
 	/* (a dedicated server's clients are told how many more players a zone
 	needs by the server instead: players_coop_bsp_switch_majority) */

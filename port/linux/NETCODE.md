@@ -90,7 +90,14 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   none of the host's players are alive, anyone's crossing does); a client
   standing on a loading zone is told it waits for the host. A player
   outside the loaded BSP and falling for two seconds is brought back beside
-  the host, else a teammate. A dead
+  the host, else a teammate. A level's scripts switch the BSP too
+  (`switch_bsp`), for whoever stands in one of their volumes, and move no
+  one else (Operation Purgepoint's x05): in the two seconds after any
+  switch, a player it left outside the new BSP, falling or standing in the
+  void, is brought at once beside a teammate in it. And with players in two
+  volumes whose scripts switch to different BSPs, a continuous script's
+  switch back waits while anyone still stands in the volume a script
+  switched it for, rather than switching it back and forth. A dead
   player watches a living teammate (`coop_spectate.c`) and comes back
   beside one once it is safe. With everyone dead, TEAM WIPE in Co-op
   Options (`network.coop_team_wipe`) defaults to AUTO: private games revert

@@ -385,7 +385,8 @@ part of the level) switches only once more than half of the living players
 who are not away stand in zones to the same part (`server.coop_bsp_switch`
 `majority`, the default; `anyone`: the first player in one). The others see
 "Waiting for N more players to cross"; a mission script's switch is not
-held. After a switch the zones wait `server.coop_bsp_switch_cooldown_seconds`
+held, except one back while players still stand in the volume a script
+switched it for (`port/linux/NETCODE.md`). After a switch the zones wait `server.coop_bsp_switch_cooldown_seconds`
 (15) before another, the players told when they open; each switch is told
 to everyone, logged and a `coop_bsp_switch` event names who crossed.
 
