@@ -250,3 +250,16 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [tools/stagekit/README.md](tools/stagekit/README.md) | Scenarios staged and instrumented on the real engine, no retail assets |
 | `port/third_party/*/README.md` | Each vendored library |
 | [AUTHORS.md](AUTHORS.md) | Art credits |
+
+## Mandatory Release Packaging Rule (GitHub Releases)
+
+Whenever building and publishing a GitHub release (e.g., `halo-windows-release.zip` and `opence-windows-x86.zip`), **ALL required runtime files, configuration files, documentation, credits, and asset directories MUST be packaged in the release archives** — never ship a stripped archive containing only `halo.exe` and `SDL3.dll`:
+
+- `halo.exe` (freshly built binary from `build/windows/halo.exe`)
+- `SDL3.dll` (from `build/windows/SDL3.dll`)
+- `brokers.txt` and `masters.txt` (network brokers and master server lists)
+- `config.toml` (if present in root/release template)
+- `README.md`, `LICENSE`, `AUTHORS.md`, `credits.md`
+- `OpenCE Forge/` (`OpenCE Forge/credits.md`, `OpenCE Forge/ui/`, and required Forge runtime assets, excluding personal user save/cache test files)
+- Always list and verify the full contents of every `.zip` archive before uploading with `gh release create` or `gh release upload`.
+

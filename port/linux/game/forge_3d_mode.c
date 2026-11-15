@@ -2940,6 +2940,8 @@ int32_t forge_3d_spawn_object_at_slot(
 				inst->spawned_once = 1;
 				if (inst->light_color_preset || inst->light_intensity_preset || inst->light_radius_preset)
 					forge_apply_instance_light_settings(live_idx);
+				if (game_connection() != _game_connection_network_client)
+					forge_network_register_host_object(live_idx, inst->object_index, def_idx, group_tag, tag_path);
 			}
 		}
 
@@ -3411,6 +3413,7 @@ static void update_save_modal_input(void)
 		int esc_down = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
 		int bk_down = (GetAsyncKeyState(VK_BACK) & 0x8000) != 0;
 		int ent_down = (GetAsyncKeyState(VK_RETURN) & 0x8000) != 0;
+		int f5_down = forge_action_down(FORGE_BIND_QUICK_SAVE);
 		int gp_a_down = forge_gp_button_down(FORGE_GP_A);
 		int gp_b_down = forge_gp_button_down(FORGE_GP_B);
 
@@ -3427,7 +3430,7 @@ static void update_save_modal_input(void)
 			/* Return to map name input box to change the name */
 			s_save_confirm_overwrite = 0;
 		}
-		else if ((ent_down && !prev_key[VK_RETURN]) || (gp_a_down && !prev_gp_a))
+		else if ((ent_down && !prev_key[VK_RETURN]) || (f5_down && !prev_key[VK_F5]) || (gp_a_down && !prev_gp_a))
 		{
 			if (s_save_confirm_choice == 0)
 			{
@@ -3503,9 +3506,11 @@ static void update_save_modal_input(void)
 	}
 	{
 		int ent_down = (GetAsyncKeyState(VK_RETURN) & 0x8000) != 0;
+		int f5_down = forge_action_down(FORGE_BIND_QUICK_SAVE);
 		int gp_a_down = forge_gp_button_down(FORGE_GP_A);
-		if ((ent_down && !prev_key[VK_RETURN]) || (gp_a_down && !prev_gp_a))
+		if ((ent_down && !prev_key[VK_RETURN]) || (f5_down && !prev_key[VK_F5]) || (gp_a_down && !prev_gp_a))
 		{
+			prev_key[VK_F5] = f5_down;
 			if (!g_forge.save_map_name[0])
 			{
 				char const *cur = forge_get_active_map_name();
@@ -3532,6 +3537,7 @@ static void update_save_modal_input(void)
 			}
 		}
 		prev_key[VK_RETURN] = ent_down;
+		prev_key[VK_F5] = f5_down;
 		prev_gp_a = gp_a_down;
 	}
 	prev_gp_left = forge_gp_button_down(FORGE_GP_DPAD_LEFT) || forge_gp_button_down(FORGE_GP_DPAD_UP) || (s_gp_lx < -0.55f);
@@ -7253,7 +7259,7 @@ void forge_3d_update(float dt)
 			forge_set_status("3rd-Person View: %s", g_forge.third_person_view ? "ON" : "OFF");
 		}
 		/* F5 in-game is for Quick Save (opens the Save Map prompt if not yet saved in this session) */
-		if (cur_f5 && !prev_f5 && allow_f5)
+		if (cur_f5 && !prev_f5 && allow_f5 && modal_before_hotkeys != _forge_modal_save_copy_as)
 		{
 			if (g_forge.has_saved_map_once && g_forge.save_map_name[0])
 			{
@@ -9793,7 +9799,7 @@ void forge_3d_draw_hud(
 			}
 			else
 			{
-				char const *save_ext = mcc_cache_tags_loaded() ? "txt" : "map";
+				char const *save_ext = "txt";
 				draw_ce_menu_str(1, font_index, (short)(px0 + 18), (short)(py0 + 4),
 					"SAVE MAP..", 0xFFFFFFFFu);
 
@@ -9831,8 +9837,10 @@ void forge_3d_draw_hud(
 		/* Status Toast Banner dynamically sized to fit text pixel width */
 		{
 			char dl_status[128];
+			int stream_pct = 0;
+			int stream_is_upload = 0;
 			int has_toast = (g_forge.status_message[0] && (uint32_t)system_milliseconds() < g_forge.status_message_until_ms) ? 1 : 0;
-			int has_dl = forge_network_get_tag_download_status(dl_status, sizeof(dl_status));
+			int has_dl = forge_network_get_tag_stream_progress(dl_status, sizeof(dl_status), &stream_pct, &stream_is_upload);
 			if (has_toast)
 			{
 				draw_sized_bottom_pill_bar(
@@ -9842,9 +9850,30 @@ void forge_3d_draw_hud(
 			if (has_dl && dl_status[0])
 			{
 				short dl_bottom_y = (short)(bar_top_y - (has_toast ? 34 : 4));
+				short bar_w = 260;
+				short bar_h = 8;
+				short bar_x0 = (short)((window_x0 + window_x1 - bar_w) / 2);
+				short bar_y0 = (short)(dl_bottom_y - 34);
+				short fill_w;
+				uint32_t accent = stream_is_upload ? 0xFFFFB038u : 0xFF50B8FFu;
+				if (stream_pct < 0)
+					stream_pct = 0;
+				if (stream_pct > 100)
+					stream_pct = 100;
+				fill_w = (short)((bar_w * stream_pct) / 100);
 				draw_sized_bottom_pill_bar(
 					font_index, window_x0, window_x1, dl_bottom_y,
-					dl_status, NULL, 1, _forge_ui_area_toast_bar, 0xFF50B8FFu, NULL);
+					dl_status, NULL, 1, _forge_ui_area_toast_bar, accent, NULL);
+				{
+					rectangle2d bg_rect = { (short)(bar_y0 - 2), (short)(bar_x0 - 2), (short)(bar_y0 + bar_h + 2), (short)(bar_x0 + bar_w + 2) };
+					draw_quad(&bg_rect, 0xD80A121Eu);
+					draw_box_border((short)(bar_x0 - 2), (short)(bar_y0 - 2), (short)(bar_x0 + bar_w + 2), (short)(bar_y0 + bar_h + 2), 1, accent);
+				}
+				if (fill_w > 0)
+				{
+					rectangle2d fill_rect = { bar_y0, bar_x0, (short)(bar_y0 + bar_h), (short)(bar_x0 + fill_w) };
+					draw_quad(&fill_rect, accent);
+				}
 			}
 		}
 	}

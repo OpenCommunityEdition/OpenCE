@@ -209,9 +209,12 @@ struct forge_host_client_tag_tx
 	uint32_t hash;
 	uint32_t transfer_id;
 	uint16_t next_chunk;
+	uint16_t total_chunks;
 	int req_count;
 	unsigned long last_send_ms;
+	unsigned long completed_ms;
 	int32_t byte_budget;
+	char label[64];
 };
 
 enum forge_client_tag_rx_state
@@ -754,14 +757,28 @@ void forge_network_sync_tick(void)
 
 	if (game_connection() == _game_connection_network_client)
 	{
-		if (!g_client_requested_full_sync &&
-			(g_forge.monitor_cam_initialized || !g_forge_session_enabled) &&
-			(now - g_client_join_ms >= 250))
+		if (g_client_requested_full_sync == 0 && (now - g_client_join_ms >= 250))
 		{
 			g_client_requested_full_sync = 1;
 			forge_send_packet_to_host("!FQ");
 			if (g_forge.mode == _forge_mode_3d_monitor)
 				forge_network_send_monitor_mode(1, g_forge.cam_x, g_forge.cam_y, g_forge.cam_z, g_forge.cam_yaw, g_forge.cam_pitch);
+		}
+		else if ((g_client_requested_full_sync == 1 && (now - g_client_join_ms >= 1500)) ||
+				 (g_client_requested_full_sync == 2 && (now - g_client_join_ms >= 4000)))
+		{
+			int k, need_retry = (g_forge.live_instance_count == 0) ? 1 : 0;
+			g_client_requested_full_sync++;
+			for (k = 0; k < FORGE_MAX_TRACKED_NET_OBJECTS && !need_retry; k++)
+			{
+				if (g_net_obj_has_deferred_create[k] &&
+					(g_net_obj_def_index[k] == NONE || g_net_obj_live_index[k] < 0))
+				{
+					need_retry = 1;
+				}
+			}
+			if (need_retry)
+				forge_send_packet_to_host("!FQ");
 		}
 	}
 	else if (game_connection() == _game_connection_network_server)
@@ -917,6 +934,37 @@ void forge_network_sync_tick(void)
 	forge_tag_stream_tick(now);
 	forge_deferred_client_save_tick();
 	forge_server_autosave_tick();
+}
+
+void forge_network_register_host_object(
+	int32_t live_idx,
+	long object_index,
+	long definition_index,
+	uint32_t group_tag,
+	char const *tag_path)
+{
+	int m;
+	(void)group_tag;
+	(void)tag_path;
+	if (object_index != NONE && forge_object_is_network_shared(object_index))
+	{
+		int obj_abs = (int)DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+		if (obj_abs >= 0 && obj_abs < FORGE_MAX_TRACKED_NET_OBJECTS)
+		{
+			if (definition_index != NONE)
+				g_net_obj_def_index[obj_abs] = definition_index;
+			if (live_idx >= 0)
+				g_net_obj_live_index[obj_abs] = live_idx;
+		}
+	}
+	if (game_connection() == _game_connection_network_server)
+	{
+		for (m = 0; m < FORGE_MAX_CLIENT_MACHINES; m++)
+		{
+			if (g_host_machine_known[m])
+				g_host_machine_sync_cursor[m] = 0;
+		}
+	}
 }
 
 void forge_network_send_spawn_ext(
@@ -2994,8 +3042,14 @@ void forge_tag_stream_handle_message(
 		tx->hash = req.hash;
 		tx->transfer_id = req.transfer_id;
 		tx->next_chunk = 0;
+		tx->total_chunks = g_host_tag_cache[slot].chunk_count;
 		tx->last_send_ms = system_milliseconds();
+		tx->completed_ms = 0;
 		tx->byte_budget = (int32_t)FORGE_TAG_STREAM_MAX_BURST_BYTES;
+		snprintf(tx->label, sizeof(tx->label), "%s",
+			g_host_tag_cache[slot].display_name[0]
+				? g_host_tag_cache[slot].display_name
+				: g_host_tag_cache[slot].tag_path);
 		return;
 	}
 
@@ -3588,16 +3642,25 @@ static void forge_tag_stream_tick(unsigned long now)
 			}
 
 			if (tx->next_chunk >= cb->chunk_count)
+			{
 				tx->active = 0;
+				tx->completed_ms = now;
+			}
 		}
 	}
 }
 
-int forge_network_get_tag_download_status(char *out_text, size_t out_sz)
+int forge_network_get_tag_stream_progress(char *out_text, size_t out_sz, int *out_pct, int *out_is_upload)
 {
+	int m;
+	unsigned long now;
 	if (!out_text || out_sz < 8)
 		return 0;
 	out_text[0] = '\0';
+	if (out_pct)
+		*out_pct = 0;
+	if (out_is_upload)
+		*out_is_upload = 0;
 
 	if (game_connection() != _game_connection_network_client &&
 		game_connection() != _game_connection_network_server)
@@ -3609,22 +3672,58 @@ int forge_network_get_tag_download_status(char *out_text, size_t out_sz)
 	{
 		int pct = (int)(((uint32_t)g_client_tag_rx.chunks_received * 100u) / (uint32_t)g_client_tag_rx.chunk_count);
 		char const *label = g_client_tag_rx.display_name[0] ? g_client_tag_rx.display_name : g_client_tag_rx.tag_path;
+		if (out_pct)
+			*out_pct = pct;
 		if (g_client_tag_rx.queue_count > 0)
 		{
-			snprintf(out_text, out_sz, "STREAMING CUSTOM TAG: %s (%d%%, +%d queued)",
+			snprintf(out_text, out_sz, "DOWNLOADING TAG: %s (%d%%, +%d queued)",
 				label, pct, g_client_tag_rx.queue_count);
 		}
 		else
 		{
-			snprintf(out_text, out_sz, "STREAMING CUSTOM TAG: %s (%d%%)", label, pct);
+			snprintf(out_text, out_sz, "DOWNLOADING TAG: %s (%d%%)", label, pct);
 		}
 		return 1;
 	}
 	if (g_client_tag_rx.state == _forge_tag_rx_wait_offer || g_client_tag_rx.queue_count > 0)
 	{
+		if (out_pct)
+			*out_pct = 5;
 		snprintf(out_text, out_sz, "REQUESTING CUSTOM TAG... (%d remaining)",
 			g_client_tag_rx.queue_count + (g_client_tag_rx.state == _forge_tag_rx_wait_offer ? 1 : 0));
 		return 1;
 	}
+
+	now = system_milliseconds();
+	for (m = 0; m < FORGE_MAX_CLIENT_MACHINES; m++)
+	{
+		struct forge_host_client_tag_tx const *tx = &g_host_tag_tx[m];
+		if (tx->active && tx->total_chunks > 0)
+		{
+			int pct = (int)(((uint32_t)tx->next_chunk * 100u) / (uint32_t)tx->total_chunks);
+			char const *label = tx->label[0] ? tx->label : "Custom Tag";
+			if (out_pct)
+				*out_pct = pct;
+			if (out_is_upload)
+				*out_is_upload = 1;
+			snprintf(out_text, out_sz, "STREAMING TAG TO PEER: %s (%d%%)", label, pct);
+			return 1;
+		}
+		if (!tx->active && tx->completed_ms != 0 && (now - tx->completed_ms) < 1600ul)
+		{
+			char const *label = tx->label[0] ? tx->label : "Custom Tag";
+			if (out_pct)
+				*out_pct = 100;
+			if (out_is_upload)
+				*out_is_upload = 1;
+			snprintf(out_text, out_sz, "TAG STREAM COMPLETE: %s (100%%)", label);
+			return 1;
+		}
+	}
 	return 0;
+}
+
+int forge_network_get_tag_download_status(char *out_text, size_t out_sz)
+{
+	return forge_network_get_tag_stream_progress(out_text, out_sz, NULL, NULL);
 }

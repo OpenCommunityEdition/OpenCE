@@ -2765,6 +2765,50 @@ static long append_runtime_tag_instance(
 	new_abs_idx = existing_count;
 	new_tag_index = ((max_salt + 1) << 16) | (new_abs_idx & 0xFFFF);
 
+	if (parent0 == (uint32_t)NONE)
+	{
+		switch (group_tag)
+		{
+			case 'vehi':
+			case 'bipd':
+				parent0 = 'unit';
+				parent1 = 'obje';
+				break;
+			case 'weap':
+			case 'eqip':
+			case 'garb':
+				parent0 = 'item';
+				parent1 = 'obje';
+				break;
+			case 'mach':
+			case 'ctrl':
+			case 'lifi':
+				parent0 = 'devi';
+				parent1 = 'obje';
+				break;
+			case 'scen':
+			case 'proj':
+			case 'ssce':
+			case 'plac':
+				parent0 = 'obje';
+				parent1 = (uint32_t)NONE;
+				break;
+			case 'soso':
+			case 'senv':
+			case 'schi':
+			case 'scex':
+			case 'sotr':
+			case 'sgla':
+			case 'smet':
+			case 'swat':
+			case 'spla':
+				parent0 = 'shdr';
+				parent1 = (uint32_t)NONE;
+				break;
+			default:
+				break;
+		}
+	}
 	memset(&grown[new_abs_idx], 0, sizeof(grown[new_abs_idx]));
 	grown[new_abs_idx].group_tag = group_tag;
 	grown[new_abs_idx].parent_group_tags[0] = parent0;
@@ -6309,15 +6353,6 @@ int forge_ui_save_copy_as(char const *new_map_name)
 		snprintf(clean_name, sizeof(clean_name), "%s", new_map_name);
 	}
 
-	{
-		char dl_status[128];
-		if (forge_network_get_tag_download_status(dl_status, sizeof(dl_status)))
-		{
-			snprintf(s_deferred_client_save_name, sizeof(s_deferred_client_save_name), "%s", clean_name);
-			forge_set_status("Waiting for custom tags to finish streaming before saving '%s'...", clean_name);
-			return 1;
-		}
-	}
 	s_deferred_client_save_name[0] = '\0';
 	forge_commit_session_ephemeral_tags_to_disk();
 
@@ -6352,8 +6387,6 @@ int forge_ui_save_copy_as(char const *new_map_name)
 			slash = slash2;
 		active_leaf = slash ? (slash + 1) : (cur && cur[0] ? cur : "");
 		ok = forge_write_sidecar_state_file(clean_name);
-		if (ok)
-			snprintf(s_pending_sidecar_leaf, sizeof(s_pending_sidecar_leaf), "%s", clean_name);
 		if (ok && active_leaf[0] && _stricmp(active_leaf, clean_name) != 0)
 		{
 			/* Remove any leftover default-named sidecar save (e.g. custom_maps/<active_leaf>.txt)
@@ -6516,12 +6549,39 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 			{
 				if (!baked || !is_baked_flg1 || grp == 'lifi' || grp == 'mach' || grp == 'ctrl')
 				{
-					/* Sidecar-only map, device/light fixture, or cached tag object not baked into base_map:
-					 * always spawn live now so placed objects never claim or hijack nearby stock scenario objects! */
-					last_object_li = forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
-					last_object_po = (last_object_li >= 0) ? g_forge.live_instances[last_object_li].edit_entry_index : -1;
-					if (last_object_po >= 0 && last_object_po < FORGE_MAX_PLACED_OBJECTS)
-						placed_to_li[last_object_po] = (int16_t)last_object_li;
+					int dup_li = -1;
+					int32_t chk_li;
+					for (chk_li = 0; chk_li < g_forge.live_instance_count; ++chk_li)
+					{
+						struct forge_live_instance const *ci = &g_forge.live_instances[chk_li];
+						float dx, dy, dz;
+						if (!ci->active || ci->is_default_scenario_object)
+							continue;
+						if (ci->group_tag != (uint32_t)grp || strcmp(ci->tag_path, tpath) != 0)
+							continue;
+						dx = ci->x - x;
+						dy = ci->y - y;
+						dz = ci->z - z;
+						if (dx * dx + dy * dy + dz * dz < 0.0025f)
+						{
+							dup_li = (int)chk_li;
+							break;
+						}
+					}
+					if (dup_li >= 0)
+					{
+						last_object_li = dup_li;
+						last_object_po = g_forge.live_instances[dup_li].edit_entry_index;
+					}
+					else
+					{
+						/* Sidecar-only map, device/light fixture, or cached tag object not baked into base_map:
+						 * always spawn live now so placed objects never claim or hijack nearby stock scenario objects! */
+						last_object_li = forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
+						last_object_po = (last_object_li >= 0) ? g_forge.live_instances[last_object_li].edit_entry_index : -1;
+						if (last_object_po >= 0 && last_object_po < FORGE_MAX_PLACED_OBJECTS)
+							placed_to_li[last_object_po] = (int16_t)last_object_li;
+					}
 				}
 				else
 				{
@@ -7259,6 +7319,7 @@ void forge_load_saved_map_state_if_present(char const *map_name)
 		if (has_pending_sidecar)
 		{
 			snprintf(leaf, sizeof(leaf), "%s", s_pending_sidecar_leaf);
+			s_pending_sidecar_leaf[0] = '\0';
 			snprintf(s_active_sidecar_base_map, sizeof(s_active_sidecar_base_map), "%s", forge_get_active_map_name());
 		}
 		else
@@ -7516,6 +7577,96 @@ static int forge_write_sidecar_state_file(char const *leaf)
 		else
 		{
 			snprintf(base_map_str, sizeof(base_map_str), "%s", forge_get_active_map_name());
+		}
+
+		/* Ensure any network-replicated live instances on a Joiner (edit_entry_index < 0) are synced into edit_state before saving,
+		 * and deduplicate any identical placed_objects entries. */
+		{
+			int32_t li_idx;
+			int p_i, p_j;
+			for (li_idx = 0; li_idx < g_forge.live_instance_count; ++li_idx)
+			{
+				struct forge_live_instance *inst = &g_forge.live_instances[li_idx];
+				if (!inst->active || inst->is_default_scenario_object ||
+					!inst->tag_path[0] || inst->x < -90000.0f)
+				{
+					continue;
+				}
+				if (inst->group_tag == 'actv')
+				{
+					if (inst->edit_entry_index < 0 && g_forge.edit_state.ai_spawn_count < FORGE_MAX_AI_SPAWNS)
+					{
+						struct forge_ai_spawn_entry *ai = &g_forge.edit_state.ai_spawns[g_forge.edit_state.ai_spawn_count];
+						inst->edit_entry_index = g_forge.edit_state.ai_spawn_count++;
+						memset(ai, 0, sizeof(*ai));
+						snprintf(ai->actor_variant_path, sizeof(ai->actor_variant_path), "%s", inst->tag_path);
+						ai->x = inst->x;
+						ai->y = inst->y;
+						ai->z = inst->z;
+						ai->yaw = inst->yaw;
+						ai->team_designator = inst->team_designator;
+						ai->respawn_timer_sec = inst->respawn_timer_sec;
+						ai->ai_order = inst->ai_order;
+						ai->group_id = inst->group_id;
+					}
+				}
+				else if (inst->group_tag != 'spwn' && inst->group_tag != 'tele' && inst->group_tag != 'flag')
+				{
+					if (inst->edit_entry_index < 0 && g_forge.edit_state.placed_object_count < FORGE_MAX_PLACED_OBJECTS)
+					{
+						struct forge_placed_object_entry *po = &g_forge.edit_state.placed_objects[g_forge.edit_state.placed_object_count];
+						inst->edit_entry_index = g_forge.edit_state.placed_object_count++;
+						memset(po, 0, sizeof(*po));
+						po->active = 1;
+						po->source_cache_id = inst->source_cache_id;
+						po->group_tag = inst->group_tag;
+						po->gametype_flags = inst->gametype_flags;
+						po->respawn_timer_sec = inst->respawn_timer_sec;
+						po->physics_mode = inst->physics_mode;
+						po->group_id = inst->group_id;
+						po->light_color_preset = inst->light_color_preset;
+						po->light_intensity_preset = inst->light_intensity_preset;
+						po->light_radius_preset = inst->light_radius_preset;
+						snprintf(po->tag_path, sizeof(po->tag_path), "%s", inst->tag_path);
+						po->x = inst->x;
+						po->y = inst->y;
+						po->z = inst->z;
+						po->yaw = inst->yaw;
+						po->pitch = inst->pitch;
+						po->roll = inst->roll;
+						po->team_index = inst->team_designator;
+					}
+					else if (inst->edit_entry_index >= 0 && inst->edit_entry_index < g_forge.edit_state.placed_object_count)
+					{
+						struct forge_placed_object_entry *po = &g_forge.edit_state.placed_objects[inst->edit_entry_index];
+						po->x = inst->x;
+						po->y = inst->y;
+						po->z = inst->z;
+						po->yaw = inst->yaw;
+						po->pitch = inst->pitch;
+						po->roll = inst->roll;
+						po->team_index = inst->team_designator;
+					}
+				}
+			}
+			for (p_i = 0; p_i < g_forge.edit_state.placed_object_count; ++p_i)
+			{
+				struct forge_placed_object_entry *a = &g_forge.edit_state.placed_objects[p_i];
+				if (!a->active || !a->tag_path[0] || a->x < -90000.0f)
+					continue;
+				for (p_j = p_i + 1; p_j < g_forge.edit_state.placed_object_count; ++p_j)
+				{
+					struct forge_placed_object_entry *b = &g_forge.edit_state.placed_objects[p_j];
+					float dx, dy, dz;
+					if (!b->active || b->group_tag != a->group_tag || strcmp(b->tag_path, a->tag_path) != 0)
+						continue;
+					dx = a->x - b->x;
+					dy = a->y - b->y;
+					dz = a->z - b->z;
+					if (dx * dx + dy * dy + dz * dz < 0.0025f)
+						b->active = 0;
+				}
+			}
 		}
 
 		fprintf(f,

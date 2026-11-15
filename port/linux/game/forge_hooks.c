@@ -3368,9 +3368,17 @@ void network_chat_draw(short local_player_index)
 
 	orig_network_chat_draw(local_player_index);
 
-	/* Never draw Forge HUD overlay on the main menu (levels\ui\ui) or outside a Forge session */
-	if (!g_forge_session_enabled || forge_is_main_menu_active())
+	/* Never draw Forge HUD overlay on the main menu (levels\ui\ui) */
+	if (forge_is_main_menu_active())
 		return;
+	if (!g_forge_session_enabled)
+	{
+		char dl_status[128];
+		int stream_pct = 0;
+		int stream_is_upload = 0;
+		if (!forge_network_get_tag_stream_progress(dl_status, sizeof(dl_status), &stream_pct, &stream_is_upload))
+			return;
+	}
 
 	font_index = hud_get_font_index();
 	if (font_index != NONE)
@@ -3759,7 +3767,10 @@ extern int forge_has_pending_or_active_sidecar(void);
 long game_engine_remap_object_definition(long definition_index)
 {
 	if (g_forge_session_enabled || g_forge.has_saved_map_once || g_forge.save_map_name[0] != 0 ||
-		forge_has_pending_or_active_sidecar() || custom_edition_cache_tags_loaded())
+		forge_has_pending_or_active_sidecar() || custom_edition_cache_tags_loaded() ||
+		game_connection() == _game_connection_network_client ||
+		(definition_index != NONE &&
+		 (uint32_t)DATUM_INDEX_TO_ABSOLUTE_INDEX(definition_index) >= forge_get_base_map_tag_count()))
 	{
 		/* Never remap or reject Scorpion, Banshee, Rocket Warthog, Shade Turret, or custom Forge vehicles! */
 		return definition_index;
@@ -3854,7 +3865,7 @@ void menu_tags_loaded(char const *map_name)
 			}
 		}
 		forge_reset_transient_session_state(1);
-
+		snprintf(g_last_forge_map_name, sizeof(g_last_forge_map_name), "%s", forge_get_active_map_name());
 	}
 
 	forge_normalize_mcc_hud_tags();
