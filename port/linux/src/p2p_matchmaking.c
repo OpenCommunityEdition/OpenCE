@@ -663,6 +663,8 @@ static int pick_game(struct mm_search *search, unsigned long now, struct mm_out 
 	search->decision.size = search->choice.size;
 	search->decision.public_game = 1;
 	snprintf(search->decision.invite, sizeof(search->decision.invite), "%s", games[index].invite);
+	memcpy(search->picked, games[index].identifier, sizeof(search->picked));
+	search->picked_set = 1;
 	memset(search->joining, 0, sizeof(search->joining));
 	search->joining_since = now;
 	search->state = P2P_MM_FOUND;
@@ -718,6 +720,7 @@ static int join(struct mm_search *search, unsigned long now, struct mm_out *out,
 		memcpy(bytes + P2P_KEY_HASH_SIZE, best->record.token, P2P_TOKEN_SIZE);
 	}
 	p2p_hex(bytes, sizeof(bytes), text);
+	search->picked_set = 0;
 	search->decision.kind = P2P_MM_DECIDE_JOIN;
 	search->decision.playlist = best->playlist;
 	search->decision.size = best->size;
@@ -1092,6 +1095,9 @@ void p2p_mm_joined(int ok)
 	pthread_mutex_lock(&p2p_lock);
 	if (mm.search.state == P2P_MM_FOUND && mm.search.decided == P2P_MM_DECIDE_JOIN)
 	{
+		if (!ok && mm.search.picked_set)
+			lobby_mark_failed_unlocked(mm.search.picked);
+		mm.search.picked_set = 0;
 		mm_joined(&mm.search, ok, p2p_now());
 		mm.in_game = ok;
 		if (!ok)

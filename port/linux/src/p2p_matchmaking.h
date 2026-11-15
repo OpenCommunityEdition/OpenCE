@@ -145,6 +145,8 @@ struct mm_search
 	struct p2p_mm_decision decision;
 	int decided;
 	int games_checked;
+	unsigned char picked[P2P_IDENTIFIER_SIZE];
+	int picked_set;
 };
 
 void mm_wanted(const struct mm_search *search, struct p2p_lobby_wanted *wanted);

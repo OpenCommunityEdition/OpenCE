@@ -363,6 +363,7 @@ int p2p_lobby_browsing(void);
 enum { MAXIMUM_GAMES = 256 };
 /* caller holds p2p_lock */
 int lobby_games_unlocked(struct p2p_listing *games, int maximum_count);
+void lobby_mark_failed_unlocked(const unsigned char *identifier);
 int p2p_lobby_pick_unpinged(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted);
 /* a message on a slot (its key hash in hex) through a broker; retained: the
 slot's retained copy, sent on subscribing */

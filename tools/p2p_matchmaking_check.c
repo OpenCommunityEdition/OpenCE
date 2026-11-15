@@ -54,6 +54,7 @@ void p2p_signal_mm_topics(const char topics[][P2P_MM_TOPIC_SIZE], int count) { (
 int lobby_games_unlocked(struct p2p_listing *games, int maximum_count) { return 0; }
 int p2p_lobby_pick(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted) { return -1; }
 int p2p_lobby_pick_unpinged(const struct p2p_listing *games, int count, const struct p2p_lobby_wanted *wanted) { return 0; }
+void lobby_mark_failed_unlocked(const unsigned char *identifier) { (void)identifier; }
 int p2p_lobby_browsing(void) { return 0; }
 void p2p_lobby_browse(int on) { (void)on; }
 

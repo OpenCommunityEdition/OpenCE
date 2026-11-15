@@ -1342,11 +1342,16 @@ int p2p_lobby_newer_games(void)
 	return count;
 }
 
+void lobby_mark_failed_unlocked(const unsigned char *identifier)
+{
+	if (!identifier_failed(identifier) && lobby.failed_count < MAXIMUM_GAMES)
+		memcpy(lobby.failed[lobby.failed_count++], identifier, P2P_IDENTIFIER_SIZE);
+}
+
 void p2p_lobby_mark_failed(const unsigned char *identifier)
 {
 	pthread_mutex_lock(&p2p_lock);
-	if (!identifier_failed(identifier) && lobby.failed_count < MAXIMUM_GAMES)
-		memcpy(lobby.failed[lobby.failed_count++], identifier, P2P_IDENTIFIER_SIZE);
+	lobby_mark_failed_unlocked(identifier);
 	pthread_mutex_unlock(&p2p_lock);
 }
 
