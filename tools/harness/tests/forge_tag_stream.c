@@ -497,7 +497,7 @@ static void forge_broadcast_packet_to_clients(char const *text, long excl)
 	(void)text; (void)excl;
 }
 
-static void forge_server_mark_dirty(void)
+void forge_server_mark_dirty(void)
 {
 }
 
