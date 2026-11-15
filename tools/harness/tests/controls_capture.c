@@ -15,6 +15,9 @@ struct widget_instance {
  union {struct {short selected_index;} list;} parameters;
 };
 static struct widget_instance screen,spinner,row;
+/* generated controls keep the legacy binding path */
+static boolean custom_edition_menu_widget(struct widget_instance const *widget)
+{(void)widget;return FALSE;}
 static struct widget_instance *named(struct widget_instance *w,char const *name,long nth)
 {(void)w;(void)nth;return !strcmp(name,"group_spinner")?&spinner:NULL;}
 static struct widget_instance *screen_of(struct widget_instance *w){(void)w;return &screen;}
