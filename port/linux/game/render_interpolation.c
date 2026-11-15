@@ -132,6 +132,8 @@ struct interpolated_camera
 	long tick;
 	boolean valid;
 	boolean has_previous;
+	/* the director's perspective when the latest snapshot was taken */
+	short perspective;
 	struct observer_result previous;
 	struct observer_result latest;
 	struct observer_result blended;
@@ -943,6 +945,22 @@ static struct observer_result const *render_interpolation_blended_camera(
 		}
 		camera->tick = interpolation_tick;
 		camera->valid = TRUE;
+		camera->perspective = director_get_perspective(local_player_index);
+	}
+	/* The view changed hands after this tick's snapshot was taken, a frame
+	or more into the tick: b40's opening gives the player the view back one
+	frame into its tick, the director then first person. The view turned to
+	the player's aim (render_interpolation_direct_camera) while its position
+	stayed where the cinematic's camera was for the rest of the tick, 2.8
+	world units away. It is a cut: the snapshot is taken again, from no
+	previous. */
+	else if (camera->perspective != director_get_perspective(local_player_index))
+	{
+		camera->has_previous = FALSE;
+		camera->latest = *observer;
+		camera->latest_taken = t;
+		camera->taken_a_tick_apart = FALSE;
+		camera->perspective = director_get_perspective(local_player_index);
 	}
 
 	/* A cinematic's camera set to a point (camera_set) moves there every

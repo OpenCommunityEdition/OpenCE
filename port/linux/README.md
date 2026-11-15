@@ -807,6 +807,10 @@ Each frame shows the world between the last two ticks
   the last tick.
 - Rotations use quaternions. Positions and scales are linear.
 - A teleport, a respawn or a cut of the camera does not mix. It jumps.
+- A view that changes hands a frame or more into a tick, after the camera
+  was kept for it (b40's opening gives the player the view back so), is a
+  cut too: it had turned to the player's aim while it stayed where the
+  cinematic's camera was until the next tick.
 - After a long frame (several ticks in one frame), the camera mixes the
   last tick only, as the objects do.
 - In cinematics, a camera that moves with an object (the lifepod in a30,
