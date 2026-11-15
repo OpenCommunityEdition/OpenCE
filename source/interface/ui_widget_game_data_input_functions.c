@@ -334,6 +334,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "custom_edition_menu.h" /* port: CE-owned widget and session boundaries */
 #include "cseries/cseries.h"
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
@@ -723,10 +724,9 @@ void ui_widget_game_data_function_invoke(
 		return;
 	}
 
-	/* port: Halo PC's own game data functions (past the Xbox's, below the
-	menus' numbers): this build has none of them, so they do nothing; said
-	once, with the number */
-	if (function < PC_MENU_FUNCTION_BASE)
+	/* port: dispatch the supported Halo PC game-data functions only for
+	the CE map's own widgets; unsupported PC functions have no adapter. */
+	if (custom_edition_menu_widget(widget) && function < PC_MENU_FUNCTION_BASE)
 	{
 		if (function == 43 && widget->name && !strcmp(widget->name, "controls_options_menu"))
 		{
@@ -2333,12 +2333,20 @@ static void player_profile_edit_select_menu_update_extended_description(
 			list_widget->parameters.list.extended_description->definition_tag_index);
 		/* port: a Custom Edition map's description widget has its own layout,
 		not the Xbox's text and picture pair: its description is left as it is */
-		if (!(description_definition->child_count >= 2 && description_definition->child_count <= 3 &&
+		if (custom_edition_menu_widget(list_widget) && !(description_definition->child_count >= 2 && description_definition->child_count <= 3 &&
 			list_widget->parameters.list.extended_description->child &&
 			list_widget->parameters.list.extended_description->child->type == _ui_widget_type_text_box &&
 			list_widget->parameters.list.extended_description->child->next &&
 			list_widget->parameters.list.extended_description->child->next->type == _ui_widget_type_bitmap))
 			index = NONE;
+		if (!custom_edition_menu_widget(list_widget))
+		{
+		match_vassert(
+			"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+			0x844,
+			description_definition->child_count == 2,
+			"expected a container widget w/ 2 children for the player profile edit settings list extended description");
+		}
 	}
 	if (index != NONE)
 	{
@@ -2392,13 +2400,18 @@ static void game_options_menu_update_text_desc(
 			/* port: a Custom Edition map's list items need not hold a spinner
 			list (its gamepads screen's are buttons): such an item has no
 			description of its own, and the shown one is left as it is */
-			if (!spinner_list)
+			if (custom_edition_menu_widget(widget) && !spinner_list)
 			{
 				if (column == widget->focused_child)
 					return;
 				column = column->next;
 				continue;
 			}
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x90C,
+				spinner_list,
+				"expected a spinner list somewhere in the multiplayer game options settings list item makeup");
 
 			if (column == widget->focused_child)
 			{
@@ -2480,13 +2493,18 @@ static void game_options_menu_update_pic_desc(
 			/* port: a Custom Edition map's list items need not hold a spinner
 			list: such an item has no picture of its own, and the shown one is
 			left as it is */
-			if (!spinner_list)
+			if (custom_edition_menu_widget(widget) && !spinner_list)
 			{
 				if (column == widget->focused_child)
 					return;
 				column = column->next;
 				continue;
 			}
+			match_vassert(
+				"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+				0x996,
+				spinner_list,
+				"expected a spinner list somewhere in the multiplayer game options settings list item makeup");
 
 			if (column == widget->focused_child)
 			{
@@ -4228,18 +4246,39 @@ static void player_profile_color_picker_update(
 	/* port: a Custom Edition map's colour screen is laid out as its own, not
 	as the Xbox's spinner list of three (player_profile_color_picker_menu_initialize
 	leaves it as it is): its items are not set here */
-	if (list_widget->name && !strcmp(list_widget->name, "color_select_list"))
+	if (custom_edition_menu_widget(list_widget) && list_widget->name && !strcmp(list_widget->name, "color_select_list"))
 	{
 		extern void pc_menu_color_update(struct widget_instance *list);
 
 		pc_menu_color_update(list_widget);
 		return;
 	}
-	if (!list_widget->parameters.list.list_items ||
+	if (custom_edition_menu_widget(list_widget) && (!list_widget->parameters.list.list_items ||
 		definition->type != _ui_widget_type_spinner_list ||
-		definition->child_count != 3)
+		definition->child_count != 3))
 	{
 		return;
+	}
+
+	if (!custom_edition_menu_widget(list_widget))
+	{
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+		0x944,
+		list_widget->parameters.list.list_items,
+		"no list items associated with color picker!");
+
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+		0x949,
+		definition->type == _ui_widget_type_spinner_list,
+		"expected a spinner list for 'player color picker' widget");
+	match_vassert(
+		"c:\\halo\\SOURCE\\interface\\ui_widget_game_data_input_functions.c",
+		0x94A,
+		definition->child_count == 3,
+		"expected 3 children (list items) for 'player color picker' widget");
+
 	}
 
 	spinner_list_3wide_determine_displayed_item_indices(

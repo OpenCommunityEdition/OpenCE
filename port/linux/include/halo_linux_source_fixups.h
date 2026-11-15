@@ -60,6 +60,7 @@ port/linux/game/cache_file_formats.h), which the renderer then samples in
 this build's order; forgotten together when the map goes
 (port/linux/src/xbox_textures.c) */
 void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order);
+void halo_custom_edition_texels_register(const void *texels, unsigned char channel_order, int normalized);
 void halo_custom_edition_texels_forget(void);
 void halo_custom_edition_hud_meter(int active);
 /* whether a Halo Custom Edition map's multiplayer vehicles are chosen by

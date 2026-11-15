@@ -292,6 +292,9 @@ void custom_edition_bitmap_pixels_arrived(
 	long offset,
 	void *pixels);
 
+struct D3DBaseTexture;
+boolean custom_edition_bitmap_hardware_format(struct bitmap_data *bitmap, struct D3DBaseTexture *texture);
+
 /* ---------- prototypes/CUSTOM_EDITION_SCRIPTS.C */
 
 /* Gives every function call and engine global reference of the scripts of

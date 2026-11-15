@@ -1503,3 +1503,46 @@ def test_real_maps_convert_as_recorded(report_tool, real_maps):
         name = Path(block["file"]).name
         assert block["convert"] == "ok", name
         assert {key: block[key] for key in recorded[name]} == recorded[name], name
+
+
+
+def test_ce_pause_buttons_and_event_functions_survive_conversion(report_tool, tmp_path):
+    """The runtime CE adapter needs the original children and PC function IDs."""
+    pause = r"ui\shell\multiplayer_game\pause_game\mp_pause_list"
+    names = [pause, r"test\resume_game_button", r"test\change_settings_button", r"test\quit_netgame_button"]
+
+    class WidgetMap(Map):
+        def build(self):
+            data = bytearray(super().build())
+            extra = Blob(BASE + len(data) - self.where["tag_data"])
+            definitions = [extra.reserve(0x3EC) for _ in names]
+            children = extra.reserve(3 * 0x50)
+            handlers = extra.reserve(0x48)
+            extra.block(definitions[0] + 0x3E0, 3, children)
+            extra.block(definitions[2] + 0x54, 1, handlers)
+            extra.u32(handlers, 0x80)
+            extra.u16(handlers + 6, 137)
+            for index, name in enumerate(names):
+                tag = self.tag_indices[name]
+                instance = self.where["instances"] + tag * 0x20
+                struct.pack_into("<I", data, instance + 0x14, definitions[index])
+                if index:
+                    child = children + (index - 1) * 0x50
+                    extra.u32(child, code("DeLa"))
+                    extra.u32(child + 0xC, ((self.salt + tag) << 16) | tag)
+                    extra.u16(child + 0x36, index * 30)
+            data += extra.bytes
+            struct.pack_into("<I", data, 8, len(data))
+            struct.pack_into("<I", data, 0x14, len(data) - self.where["tag_data"])
+            self.pause_address, self.children_address, self.handler_address = definitions[0], children, handlers
+            return data
+
+    cache = WidgetMap(extra_tags=[("DeLa", name, False) for name in names])
+    returncode, report, tags = converted(report_tool, cache, tmp_path)
+    assert returncode == 0 and report["convert"] == "ok"
+    assert u32_at(tags, cache.pause_address + 0x3E0) == 3
+    assert [u16_at(tags, cache.children_address + index * 0x50 + 0x36) for index in range(3)] == [30, 60, 90]
+    assert u32_at(tags, cache.handler_address) & 0x80
+    assert u16_at(tags, cache.handler_address + 6) == 137
+    assert report["widget_functions_cleared"] == "0"
+    assert report["pause_menu_trimmed"] == "0"

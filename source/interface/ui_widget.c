@@ -627,6 +627,7 @@ symbols in this file:
 
 struct widget_instance;
 
+#include "custom_edition_menu.h" /* port: CE-owned widget and session boundaries */
 #include "cseries.h"
 #include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c; HUD prompts only */
 #include "menu_button_glyphs.h" /* port: port/linux/game/menu_button_glyphs.c */
@@ -1476,129 +1477,6 @@ Edition maps' display indices (custom_edition_maps.c keeps them below 0x7000) */
 /* ... and the pixels a spinner with extra items is wider (for three digits) */
 #define SPINNER_EXTRA_WIDTH 12
 
-/* port: rows added to a map's own list at run time (ui_widget_port_inject_row), up to 16 at once. A row's
-label and description are text of the port's own, drawn through string list indices from PORT_ROW_TEXT_BASE
-up (two each: the label's, then the description's); its spinner may have values of the port's own too */
-#define PORT_ROW_TEXT_BASE 0x7100
-#define PORT_MAXIMUM_ROWS 16
-
-static struct
-{
-	struct widget_instance *row;
-	struct widget_instance *spinner;
-	wchar_t const *label;
-	wchar_t const *description;
-	wchar_t const *const *values;
-	short value_count;
-} ui_widget_port_rows[PORT_MAXIMUM_ROWS];
-
-wchar_t const *ui_widget_port_row_text(short string_list_index)
-{
-	short slot = (short)((string_list_index - PORT_ROW_TEXT_BASE) / 2);
-
-	if (string_list_index < PORT_ROW_TEXT_BASE || slot >= PORT_MAXIMUM_ROWS || !ui_widget_port_rows[slot].row)
-		return NULL;
-	return ((string_list_index - PORT_ROW_TEXT_BASE) % 2) ? ui_widget_port_rows[slot].description :
-		ui_widget_port_rows[slot].label;
-}
-
-short ui_widget_port_row_description(struct widget_instance *row)
-{
-	short slot;
-
-	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
-	{
-		if (ui_widget_port_rows[slot].row == row)
-			return (short)(PORT_ROW_TEXT_BASE + 2 * slot + 1);
-	}
-	return NONE;
-}
-
-wchar_t const *ui_widget_port_spinner_string(struct widget_instance *spinner, short index)
-{
-	short slot;
-
-	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
-	{
-		if (ui_widget_port_rows[slot].row && ui_widget_port_rows[slot].spinner == spinner &&
-			ui_widget_port_rows[slot].values && index >= 0 && index < ui_widget_port_rows[slot].value_count)
-		{
-			return ui_widget_port_rows[slot].values[index];
-		}
-	}
-	return NULL;
-}
-
-static void ui_widget_port_row_forget(struct widget_instance *widget)
-{
-	short slot;
-
-	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
-	{
-		if (ui_widget_port_rows[slot].row == widget)
-			memset(&ui_widget_port_rows[slot], 0, sizeof(ui_widget_port_rows[slot]));
-	}
-}
-
-/* a copy of the row `source` (a child of a list), put in the list before `before` (NULL: last) at the
-vertical offset given, its label and description the text given; values: the names of its spinner's values
-(NULL: the source's own), value_count of them. NULL if it could not be made. */
-struct widget_instance *ui_widget_port_inject_row(
-	struct widget_instance *source,
-	struct widget_instance *before,
-	short vertical_offset,
-	wchar_t const *label,
-	wchar_t const *description,
-	wchar_t const *const *values,
-	short value_count)
-{
-	struct widget_instance *row;
-	struct widget_instance *child;
-	struct widget_instance *label_box = NULL;
-	short slot;
-
-	for (slot = 0; slot < PORT_MAXIMUM_ROWS && ui_widget_port_rows[slot].row; slot++)
-		;
-	if (slot == PORT_MAXIMUM_ROWS || !source->parent)
-		return NULL;
-	row = ui_widget_load_by_name_or_tag(NULL, source->definition_tag_index, source->parent,
-		source->local_player_index, NONE, NONE, NONE);
-	if (!row)
-		return NULL;
-	row->horizontal_offset = source->horizontal_offset;
-	row->vertical_offset = vertical_offset;
-	if (before && before->parent == source->parent)
-	{
-		row->previous = before->previous;
-		row->next = before;
-		if (before->previous)
-			before->previous->next = row;
-		else
-			source->parent->child = row;
-		before->previous = row;
-	}
-	else
-		ui_widget_add_child(source->parent, row);
-	ui_widget_port_rows[slot].row = row;
-	ui_widget_port_rows[slot].spinner = NULL;
-	ui_widget_port_rows[slot].label = label;
-	ui_widget_port_rows[slot].description = description;
-	ui_widget_port_rows[slot].values = values;
-	ui_widget_port_rows[slot].value_count = values ? value_count : 0;
-	for (child = row->child; child; child = child->next)
-	{
-		if (child->type == _ui_widget_type_text_box && !label_box)
-			label_box = child;
-		else if (child->type == _ui_widget_type_spinner_list && !ui_widget_port_rows[slot].spinner)
-			ui_widget_port_rows[slot].spinner = child;
-	}
-	if (label_box)
-		label_box->parameters.text_box.string_list_index = (short)(PORT_ROW_TEXT_BASE + 2 * slot);
-	if (values && ui_widget_port_rows[slot].spinner)
-		ui_widget_port_rows[slot].spinner->parameters.list.number_of_items = (word)value_count;
-	return row;
-}
-
 /* port: the strings a spinner's string list has past the tag's own, as more
 items: the higher kills to win of the Slayer game type editor
 (ui_widget_event_handler_functions.c saves and loads them) */
@@ -1649,6 +1527,8 @@ static struct stack_memory_pool_medium __medium_widget_memory_pool =
 };
 
 struct stack_memory_pool *widget_memory_pool = &__medium_widget_memory_pool.pool;
+
+#include "custom_edition_ui_rows.inl" /* port: CE-owned injected widget rows */
 
 static boolean main_screen_shell_first_load = TRUE;
 
@@ -2501,6 +2381,8 @@ void ui_widget_delete(
 			}
 		}
 	}
+	/* port: release CE-owned rows and settings state at widget destruction. */
+	custom_edition_menu_widget_deleted(widget);
 	ui_widget_port_row_forget(widget);
 	ui_widget_delete_children_recursive(widget);
 	if (widget->previous)
@@ -2710,7 +2592,7 @@ static boolean ui_widget_port_gamepad_spinner(
 {
 	struct widget_instance *list = widget->parent ? widget->parent->parent : NULL;
 
-	return list && list->name &&
+	return custom_edition_menu_widget(widget) && list && list->name &&
 		(!strcmp(list->name, "gamepad_avail_list") || !strcmp(list->name, "gamepad_used_list"));
 }
 
@@ -3151,6 +3033,8 @@ void ui_widgets_close_all(
 {
 	long local_player_index;
 
+	/* port: closing the UI discards an unconfirmed CE map selection. */
+	custom_edition_menu_cancel_draft();
 	/* port: the virtual keyboard goes with the widgets (while the widget
 	whose text it edits is still there): left open, it drew on after a game
 	loaded, with the menu map's font, which the game's tags no longer have
@@ -3198,6 +3082,8 @@ void ui_widgets_close_all_for_local_player(
 				dispose_widget_stack(&widget_globals.widget_stack[widget_index]);
 		}
 	}
+	/* port: discard an unconfirmed CE map selection on pause-menu closure. */
+	custom_edition_menu_cancel_draft();
 	/* port: and MCC's pause menu's settings (mcc_ui.c) */
 	mcc_ui_settings_close(local_player_index);
 
@@ -4013,7 +3899,7 @@ static void widget_instance_initialize(
 	/* port: a network co-op game never pauses (it opens the campaign's pause
 	screen, which would) */
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
-	!network_coop_active() && !network_game_is_active();
+	!network_coop_active() && !(custom_edition_menu_widget(widget) && network_game_is_active());
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -4065,7 +3951,7 @@ static void widget_instance_initialize(
 		{
 			struct ui_widget_event_handler_reference *denied_handler =
 				(struct ui_widget_event_handler_reference *)definition->event_handlers.address + denied_index;
-			if (widget->parent && denied_handler->event_type != _widget_event_created &&
+			if (custom_edition_menu_widget(widget) && widget->parent && denied_handler->event_type != _widget_event_created &&
 				(denied_handler->flags & 0x80) &&
 				ui_widget_port_function_denied(widget, (word)denied_handler->function))
 			{
@@ -4202,174 +4088,6 @@ short ui_widget_port_list_index(
 			index++;
 	}
 	return index;
-}
-
-/* port: the top and bottom, on screen, of the visible widgets with a size under a widget (as
-widget_instance_render_recursive places them: each widget's offset is added on the way down) */
-static void ui_widget_port_description_extent(
-	struct widget_instance *widget,
-	long y,
-	long *top,
-	long *bottom)
-{
-	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
-	struct widget_instance *child;
-
-	if (!widget->visible)
-		return;
-	y += widget->vertical_offset;
-	if (!widget->child && definition->bounds.y1 > definition->bounds.y0)
-	{
-		long y0 = y + definition->bounds.y0 + definition->vertical_offset;
-		long y1 = y + definition->bounds.y1 + definition->vertical_offset;
-
-		if (y0 < *top)
-			*top = y0;
-		if (y1 > *bottom)
-			*bottom = y1;
-	}
-	for (child = widget->child; child; child = child->next)
-		ui_widget_port_description_extent(child, y, top, bottom);
-}
-
-/* port: a map's own list that has had rows injected into it (ui_widget_port_inject_row) is taller than its
-screen was made for, so its side description (the extended description, which the map placed below the rows
-it had) is drawn over the new rows. Each frame, while the list has injected rows, the description is moved
-down to just below the lowest row if it would overlap them. Lists with none are left as the map made them. */
-void ui_widget_port_description_clear(
-	struct widget_instance *list)
-{
-	struct widget_instance *description = list->parameters.list.extended_description;
-	struct widget_instance *row;
-	struct widget_instance *ancestor;
-	long base = 0;
-	long rows_bottom = NONE;
-	long top = 10000;
-	long bottom = -10000;
-	boolean injected = FALSE;
-	short slot;
-	static boolean logged = FALSE;
-
-	if (!description)
-		return;
-	for (slot = 0; slot < PORT_MAXIMUM_ROWS; slot++)
-	{
-		if (ui_widget_port_rows[slot].row && ui_widget_port_rows[slot].row->parent == list)
-			injected = TRUE;
-	}
-	if (!injected)
-		return;
-	for (ancestor = list; ancestor; ancestor = ancestor->parent)
-		base += ancestor->vertical_offset;
-	for (row = list->child; row; row = row->next)
-	{
-		if (row->visible && row->type == _ui_widget_type_container)
-		{
-			long row_bottom = base + row->vertical_offset +
-				ui_widget_definition_get(row->definition_tag_index)->bounds.y1;
-
-			if (row_bottom > rows_bottom)
-				rows_bottom = row_bottom;
-		}
-	}
-	description->vertical_offset = 0;
-	ui_widget_port_description_extent(description, base, &top, &bottom);
-	if (rows_bottom != NONE && top < rows_bottom + 8)
-		description->vertical_offset = (short)(rows_bottom + 8 - top);
-}
-
-/* port: a copy of a row of a list, last in it (the Gamepads screen of a map's own pause menu) */
-struct widget_instance *ui_widget_port_clone_row(struct widget_instance *source)
-{
-	struct widget_instance *row;
-
-	if (!source->parent)
-		return NULL;
-	row = ui_widget_load_by_name_or_tag(NULL, source->definition_tag_index, source->parent,
-		source->local_player_index, NONE, NONE, NONE);
-	if (!row)
-		return NULL;
-	row->horizontal_offset = source->horizontal_offset;
-	row->vertical_offset = source->vertical_offset;
-	ui_widget_add_child(source->parent, row);
-	return row;
-}
-
-
-/* port: a definition of the name below a screen's, through its children and what its handlers open */
-static long ui_widget_port_find_definition(long tag_index, char const *name, long depth)
-{
-	struct ui_widget_definition *definition;
-	long index;
-	long found;
-
-	if (tag_index == NONE || depth > 6)
-		return NONE;
-	definition = ui_widget_definition_get(tag_index);
-	if (!strcmp(definition->name, name))
-		return tag_index;
-	for (index = 0; index < definition->child_widgets.count; index++)
-	{
-		struct ui_widget_child_reference *reference =
-			(struct ui_widget_child_reference *)definition->child_widgets.address + index;
-
-		found = ui_widget_port_find_definition(reference->widget_tag.index, name, depth + 1);
-		if (found != NONE)
-			return found;
-	}
-	for (index = 0; index < definition->event_handlers.count; index++)
-	{
-		struct ui_widget_event_handler_reference *handler =
-			(struct ui_widget_event_handler_reference *)definition->event_handlers.address + index;
-
-		found = ui_widget_port_find_definition(handler->widget_tag.index, name, depth + 1);
-		if (found != NONE)
-			return found;
-	}
-	return NONE;
-}
-
-/* port: the donor settings screen's spinner (found from the screen this one was opened from), or NONE */
-long ui_widget_port_donor_spinner(struct widget_instance *screen)
-{
-	short stack = screen->local_player_index == NONE ? 0 : screen->local_player_index;
-	struct widget_stack_node *node = widget_globals.widget_stack[stack];
-
-	if (!node || node->data.previous_widget_tag == NONE)
-		return NONE;
-	return ui_widget_port_find_definition(node->data.previous_widget_tag, "specular_spinner", 0);
-}
-
-/* port: a spinner of the definition given, as a child of a row, its values the names given */
-struct widget_instance *ui_widget_port_add_spinner(
-	struct widget_instance *row,
-	long spinner_tag,
-	short x,
-	short y,
-	wchar_t const *const *values,
-	short value_count)
-{
-	struct widget_instance *spinner;
-	short slot;
-
-	for (slot = 0; slot < PORT_MAXIMUM_ROWS && ui_widget_port_rows[slot].row; slot++)
-		;
-	if (slot == PORT_MAXIMUM_ROWS || spinner_tag == NONE)
-		return NULL;
-	spinner = ui_widget_load_by_name_or_tag(NULL, spinner_tag, row, row->local_player_index, NONE, NONE, NONE);
-	if (!spinner)
-		return NULL;
-	spinner->horizontal_offset = x;
-	spinner->vertical_offset = y;
-	ui_widget_add_child(row, spinner);
-	ui_widget_port_rows[slot].row = row;
-	ui_widget_port_rows[slot].spinner = spinner;
-	ui_widget_port_rows[slot].label = NULL;
-	ui_widget_port_rows[slot].description = NULL;
-	ui_widget_port_rows[slot].values = values;
-	ui_widget_port_rows[slot].value_count = value_count;
-	spinner->parameters.list.number_of_items = (word)value_count;
-	return spinner;
 }
 
 /* port: back to the screen before, for the menus' functions */
@@ -5776,9 +5494,9 @@ static void widget_instance_render_text_box(
 		{
 			string = (wchar_t *)kills_to_win_extra_descriptions[string_list_index - SPINNER_EXTRA_DESCRIPTION_BASE];
 		}
-		if (string_list_index >= PORT_ROW_TEXT_BASE && ui_widget_port_row_text(string_list_index))
+		if (custom_edition_menu_widget(widget) && string_list_index >= PORT_ROW_TEXT_BASE && ui_widget_port_row_text(string_list_index))
 			string = (wchar_t *)ui_widget_port_row_text(string_list_index);
-		if (string_list_index >= CONTROL_LABEL_BASE &&
+		if (custom_edition_menu_widget(widget) && string_list_index >= CONTROL_LABEL_BASE &&
 			string_list_index < CONTROL_LABEL_BASE + (short)NUMBEROF(control_labels))
 		{
 			string = (wchar_t *)control_labels[string_list_index - CONTROL_LABEL_BASE];
@@ -5867,7 +5585,7 @@ static void widget_instance_render_text_box(
 		return;
 	}
 	justification = definition->justification;
-	if (widget->name && !strcmp(widget->name, "gamepad_item_label"))
+	if (custom_edition_menu_widget(widget) && widget->name && !strcmp(widget->name, "gamepad_item_label"))
 		justification = _text_justification_left;
 	if (justification < 0 || justification >= NUMBER_OF_TEXT_JUSTIFICATIONS)
 	{
@@ -5906,7 +5624,7 @@ static void widget_instance_render_text_box(
 			color_alpha = color.alpha;
 		}
 	}
-	if (widget->name && !strcmp(widget->name, "gamepad_item_label"))
+	if (custom_edition_menu_widget(widget) && widget->name && !strcmp(widget->name, "gamepad_item_label"))
 		bounds.x0 += GAMEPAD_TEXT_MARGIN;
 	/* port: a colour of the port's for the text (its alpha the box's) */
 	pc_menu_text_color(widget, &color);
@@ -6690,7 +6408,7 @@ static void ui_mouse_note_target(
 	}
 	if (widget->disabled)
 	{
-		if (ui_mouse_dead_count < 16)
+		if (custom_edition_menu_widget(widget) && ui_mouse_dead_count < 16)
 		{
 			ui_mouse_dead_bounds[ui_mouse_dead_count] = definition->bounds;
 			offset_rectangle2d(&ui_mouse_dead_bounds[ui_mouse_dead_count], offset.x, offset.y);
@@ -7324,13 +7042,13 @@ port/assets/menus) */
 static boolean ui_mouse_selection_row(
 	struct widget_instance *widget)
 {
-	if (widget && widget->parent && !strcmp(widget->parent->name, "select_screen_list_template") &&
+	if (custom_edition_menu_widget(widget) && widget->parent && !strcmp(widget->parent->name, "select_screen_list_template") &&
 		(!strcmp(widget->name, "list_item_0") || !strcmp(widget->name, "list_item_10")))
 		return FALSE;
 	return widget && widget->parent &&
 		(pc_menu_tag(widget->parent->definition_tag_index) ||
-		!strcmp(widget->parent->name, "select_screen_list_template") ||
-		!strcmp(widget->parent->name, "gametype_select_list")) &&		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
+		(custom_edition_menu_widget(widget) && (!strcmp(widget->parent->name, "select_screen_list_template") ||
+		!strcmp(widget->parent->name, "gametype_select_list")))) &&		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
 			!strncmp(widget->name, "op_mod_", 7));
 }
 
@@ -7577,7 +7295,8 @@ static void ui_widgets_process_mouse(
 					/* port: a click on a column list itself, not on one of its
 					items (a map's label drawn over the list, which is no
 					target), does nothing: A would press the item last focused */
-					if (target->widget->type == _ui_widget_type_column_list && target->widget->focused_child)
+					if (custom_edition_menu_widget(target->widget) &&
+						target->widget->type == _ui_widget_type_column_list && target->widget->focused_child)
 						break;
 					/* (a selection list's row: chosen by a click, used by
 					a click on it chosen) */
@@ -7839,7 +7558,7 @@ static void widget_instance_render_recursive(
 					clip,
 					color,
 					&multitexture_params,
-					widget->disabled);
+					custom_edition_menu_widget(widget) && widget->disabled);
 			}
 		}
 		if (use_nifty_plasma_fx)
@@ -8268,11 +7987,11 @@ static void column_list_update(
 	struct widget_instance *child;
 
 	/* port: a map's own lists have rows of three frames */
-	boolean own_list = !strcmp(widget->name, "select_screen_list_template") ||
+	boolean own_list = custom_edition_menu_widget(widget) && (!strcmp(widget->name, "select_screen_list_template") ||
 		!strcmp(widget->name, "gametype_select_list") ||
 		!strcmp(widget->name, "color_select_list") ||
 		!strcmp(widget->name, "gamepad_avail_list") ||
-		!strcmp(widget->name, "gamepad_used_list");
+		!strcmp(widget->name, "gamepad_used_list"));
 	for (child = widget->child; child; child = child->next)
 	{
 		boolean has_frames = child->animation.number_of_sprite_frames == 2 ||
@@ -8541,7 +8260,7 @@ static void widget_instance_process_one_event_recursive(
 				extern boolean pc_menu_network_back(struct widget_instance *widget);
 				extern boolean pc_menu_gamepad_back(struct widget_instance *widget);
 
-				if (pc_menu_gamepad_back(widget) || pc_menu_network_back(widget))
+				if (custom_edition_menu_widget(widget) && (pc_menu_gamepad_back(widget) || pc_menu_network_back(widget)))
 				{
 					handled_by_event_handler = TRUE;
 					event_handled = TRUE;
@@ -8589,7 +8308,7 @@ static void widget_instance_process_one_event_recursive(
 		{
 			extern boolean pc_menu_gamepad_button(struct widget_instance *widget, short button);
 
-			if (pc_menu_gamepad_button(widget, event->data.button.index))
+			if (custom_edition_menu_widget(widget) && pc_menu_gamepad_button(widget, event->data.button.index))
 				event_handled = TRUE;
 		}
 		if (event_for_this_widget && event->type == _event_type_button &&
@@ -8597,7 +8316,7 @@ static void widget_instance_process_one_event_recursive(
 		{
 			extern boolean pc_menu_network_open(struct widget_instance *widget);
 
-			if (pc_menu_network_open(widget))
+			if (custom_edition_menu_widget(widget) && pc_menu_network_open(widget))
 				event_handled = TRUE;
 		}
 		if (widget->type == _ui_widget_type_spinner_list)

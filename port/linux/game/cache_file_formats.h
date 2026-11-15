@@ -326,6 +326,7 @@ struct custom_edition_conversion_report
 	/* widget event handlers that ran Halo PC's own functions, made to run
 	none, and 1 when the multiplayer pause menu was made the Xbox's resume
 	and quit */
+	/* Legacy report fields; CE widget actions and children are now preserved. */
 	int32_t widget_functions_cleared;
 	int32_t pause_menu_trimmed;
 	/* the Halo PC behaviours the map relies on (enum

@@ -444,6 +444,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "custom_edition_menu.h" /* port: CE-owned widget and session boundaries */
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "bungie_net/common/message_header.h"
@@ -1439,6 +1440,8 @@ void network_game_server_dispose(
 
 	/* port: this server's MCC validation, pending map and restarts end with it */
 	mcc_ui_network_server_dispose(server);
+	/* port: CE pause-menu requests must not outlive their server. */
+	custom_edition_menu_server_dispose(server);
 
 	/* port: a won co-op round's next level belongs to this server alone */
 	network_game_server_cooperative_next_map[0] = 0;

@@ -1697,7 +1697,7 @@ static long pause_list_patch(struct cache_file_tag_instance *instances, struct u
 		short off_centre = (short)(children[0].vertical_offset - (room - old_column) / 2);
 
 		*growth = 0;
-		if (column <= room && off_centre >= -4 && off_centre <= 4)
+		if (column <= room && (!custom_edition_cache_tags_loaded() || (off_centre >= -4 && off_centre <= 4)))
 		{
 			for (child = 0; child < count + added; child++)
 				grown[child].vertical_offset = (short)((room - column) / 2 + child * spacing);
@@ -2042,6 +2042,8 @@ static boolean pause_rebuild(struct tag_block const *screens, long quit_function
 	return TRUE;
 }
 
+#include "custom_edition_menu_tags.inl"
+
 static void pause_patch(struct cache_file_tag_instance *instances)
 {
 	long collection = tag_loaded('Soul', MULTIPLAYER_COLLECTION);
@@ -2058,6 +2060,8 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 	if (collection == NONE || quit_function == NONE)
 		return;
 	screens = tag_get('Soul', collection);
+	if (custom_edition_pause_has_settings(screens, quit_function))
+		return;
 	rebuilt = pause_rebuild(screens, quit_function, host || build.coop ? 2 : 1);
 	for (screen = 0; screen < screens->count; screen++)
 	{

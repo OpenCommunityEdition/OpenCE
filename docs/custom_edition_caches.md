@@ -311,14 +311,32 @@ changed:
 - **Bitmaps.** Every bitmap must pass the game's own `bitmap_verify` and be
   of a kind the texture cache and the swizzling code handle (a format with a
   hardware texture, a compressed flag that agrees with the format,
-  power-of-two sizes unless linear, square cube maps, all its pixels
-  present). Halo PC draws a 2D bitmap of any size, so an uncompressed one
+  power-of-two sizes unless linear or a supported 2D DXT bitmap, square cube
+  maps, all its pixels present). Halo PC draws a 2D bitmap of any size, so an uncompressed one
   whose sides are not powers of two is made linear as the map loads, and
   drawn from its first level (birdcage-plus's 3840 by 64 needler plasma).
   Its pixels are laid out for Halo PC, levels as the tag stores them,
   unswizzled; as they arrive, the game's own
   `rasterizer_xbox_bitmap_rebuild_hardware_format` lays them out as an Xbox
-  cache would (swizzled, cube maps face by face, padded).
+  cache would (swizzled, cube maps face by face, padded). Non-power-of-two
+  DXT1, DXT3 and DXT5 textures retain their packed mip levels; the CE-owned
+  header adapter stores their actual dimensions. Unsupported volumes,
+  swizzled non-power-of-two data and sizes beyond the header are refused.
+  Linear CE pixels are registered with the renderer for normalized sampling;
+  engine-created textures such as the Xbox loading picture keep texel
+  coordinates. Address reuse and unloading clear that registration.
+- **Map-authored menus.** CE event numbers and pause-menu buttons survive
+  conversion. The runtime adapters in `custom_edition_menu_events.inl` and
+  `custom_edition_menu_settings.inl` run only for CE map widgets, excluding
+  generated menus and MCC. An authored Change Settings action keeps its
+  own pause layout instead of adding a duplicate generated Settings button.
+  Settings pages stage replacement rows before deleting old ones. New Game
+  records a draft map path, then snapshots the confirmed variant before
+  ending the match. Only that server can apply it; cancellation, Restart
+  and server disposal clear the relevant pending state. These changes use
+  the existing host map/variant messages and do not change the protocol.
+  `tools/test_custom_edition_ui_regressions.py` exercises these boundaries
+  without retail assets; runtime UI checks are still needed for each layout.
 - **Chicago extra layers.** January's transparent chicago shader draws its
   extra layers in a loop that never advances
   (`rasterizer_xbox_transparent_geometry.c`, marked as a preserved bug). No

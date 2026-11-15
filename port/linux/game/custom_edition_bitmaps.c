@@ -37,13 +37,16 @@ in the loaded map's tags, once the mods' bitmaps are in them.
 #include "bitmaps/bitmaps.h"
 #include "bitmaps/bitmap_group.h"
 #include "rasterizer/rasterizer_swizzle.h"
+#include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "shaders/shader_definitions.h"
 #include "interface/unit_hud_interface_definition.h"
 #include "cache/cache_files.h"
 #include "cache_file_formats.h"
 #include "custom_edition_cache.h"
+#include "mcc_cache.h"
 
 #include <stdlib.h>
+#include <xtl.h>
 
 /* ---------- constants */
 
@@ -337,8 +340,17 @@ static boolean bitmap_format_drawable(
 	}
 }
 
-/* what every bitmap must satisfy for the texture cache to read it at all
-(see below): everything but the swizzle's requirement on its sides */
+/* CE may retain tightly packed DXT mip levels with non-power-of-two sides. */
+static boolean bitmap_npot_compressed(struct bitmap_data *bitmap)
+{
+	return bitmap->type == _bitmap_type_2d && bitmap->depth == 1 &&
+		!TEST_FLAG(bitmap->flags, _bitmap_linear_bit) &&
+		!TEST_FLAG(bitmap->flags, _bitmap_swizzled_bit) &&
+		bitmap->width <= 4096 && bitmap->height <= 4096 &&
+		bitmap->format >= _bitmap_format_dxt1 && bitmap->format <= _bitmap_format_dxt5 &&
+		(!power_of_two(bitmap->width) || !power_of_two(bitmap->height));
+}
+
 static boolean bitmap_readable(
 	struct bitmap_data *bitmap)
 {
@@ -349,6 +361,9 @@ static boolean bitmap_readable(
 		bitmap_format_drawable(bitmap->format, linear) &&
 		(TEST_FLAG(bitmap->flags, _bitmap_compressed_bit) != 0) == compressed_format &&
 		(bitmap->type != _bitmap_type_cube_map || bitmap->width == bitmap->height) &&
+		(TEST_FLAG(bitmap->flags, _bitmap_linear_bit) ? bitmap->type == _bitmap_type_2d :
+			(power_of_two(bitmap->width) && power_of_two(bitmap->height) && power_of_two(bitmap->depth)) ||
+			bitmap_npot_compressed(bitmap)) &&
 		bitmap->pixels_size >= bitmap_get_pixel_data_size(bitmap);
 }
 
@@ -364,8 +379,8 @@ static boolean bitmap_swizzle_possible(
 
 /* Whether the texture cache can draw `bitmap` after the swizzle: what
 bitmap_readable checks, and bitmap_swizzle_possible. One that is readable
-and not swizzle-able (Halo PC draws bitmaps of any sides, its HUD's among
-them) is drawn from its pixels as the tag lays them out. */
+and not swizzle-able is a supported 2D DXT bitmap, drawn from its packed
+mip levels. Other unsupported layouts are refused by bitmap_readable. */
 boolean custom_edition_bitmap_drawable(
 	struct bitmap_data *bitmap)
 {
@@ -911,11 +926,12 @@ void custom_edition_bitmap_pixels_arrived(
 
 			/* the texture cache reuses its memory for other bitmaps, so the
 			renderer is told of every bitmap arriving */
-			halo_custom_edition_texels_channels(
+			halo_custom_edition_texels_register(
 				pixels,
 				reordered_index != NONE ?
 					custom_edition_bitmaps_globals.reordered_bitmaps[reordered_index].channel_order :
-					_custom_edition_channels_xbox);
+					_custom_edition_channels_xbox,
+				TEST_FLAG(bitmap->flags, _bitmap_linear_bit));
 			/* on failure it logs, and the texture shows the pixels as read */
 			if (custom_edition_bitmap_drawable(bitmap))
 				rasterizer_xbox_bitmap_rebuild_hardware_format(bitmap);
@@ -924,4 +940,29 @@ void custom_edition_bitmap_pixels_arrived(
 	}
 
 	return;
+}
+
+/* The Xbox header cannot express non-power-of-two DXT dimensions. CE uses
+its otherwise-unused Size word and retains the tag's complete mip chain.
+Only CE's verified bitmap layouts may opt into this representation. */
+boolean custom_edition_bitmap_hardware_format(struct bitmap_data *bitmap, struct D3DBaseTexture *texture)
+{
+	long block_bytes;
+	long row_bytes;
+
+	if (!custom_edition_cache_tags_loaded() || mcc_cache_tags_loaded() ||
+		!bitmap_npot_compressed(bitmap) || !bitmap_readable(bitmap))
+		return FALSE;
+	block_bytes = bitmap->format == _bitmap_format_dxt1 ? 8 : 16;
+	row_bytes = ((bitmap->width + 3) / 4) * block_bytes;
+	texture->Format =
+		(bitmap_format_to_d3d_format(bitmap->format, bitmap->flags) << D3DFORMAT_FORMAT_SHIFT) |
+		((bitmap->mipmap_count + 1) << D3DFORMAT_MIPMAP_SHIFT) |
+		(2 << D3DFORMAT_DIMENSION_SHIFT) |
+		D3DFORMAT_BORDERSOURCE_COLOR | D3DFORMAT_DMACHANNEL_A;
+	texture->Size =
+		(((row_bytes + D3DTEXTURE_PITCH_ALIGNMENT - 1) / D3DTEXTURE_PITCH_ALIGNMENT - 1)
+			<< D3DSIZE_PITCH_SHIFT) |
+		((bitmap->height - 1) << D3DSIZE_HEIGHT_SHIFT) | (bitmap->width - 1);
+	return TRUE;
 }

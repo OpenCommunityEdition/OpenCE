@@ -170,7 +170,9 @@ void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_textu
 		linear DXT formats), so a Size word on one only gives the true sides
 		of a Custom Edition bitmap that is not a power of two; it is addressed
 		with normalized coordinates like any compressed texture */
-		description->linear = !description->compressed;	
+		description->linear = !description->compressed;
+		if (description->compressed)
+			description->levels = (format_word & D3DFORMAT_MIPMAP_MASK) >> D3DFORMAT_MIPMAP_SHIFT;
 	}
 	else
 	{
@@ -858,6 +860,7 @@ struct custom_edition_texels
 {
 	unsigned long address;
 	unsigned char channel_order;
+	int normalized;
 };
 
 static struct custom_edition_texels *custom_edition_texels;
@@ -884,7 +887,7 @@ static unsigned char custom_edition_texels_order(unsigned long address)
 	return _custom_edition_channels_xbox;
 }
 
-void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order)
+void halo_custom_edition_texels_register(const void *texels, unsigned char channel_order, int normalized)
 {
 	unsigned long address = (unsigned long)texels;
 	unsigned long index;
@@ -896,12 +899,15 @@ void halo_custom_edition_texels_channels(const void *texels, unsigned char chann
 	}
 	if (index < custom_edition_texel_count)
 	{
-		if (channel_order == _custom_edition_channels_xbox)
+		if (channel_order == _custom_edition_channels_xbox && !normalized)
 			custom_edition_texels[index] = custom_edition_texels[--custom_edition_texel_count];
 		else
+		{
 			custom_edition_texels[index].channel_order = channel_order;
+			custom_edition_texels[index].normalized = normalized;
+		}
 	}
-	else if (channel_order != _custom_edition_channels_xbox)
+	else if (channel_order != _custom_edition_channels_xbox || normalized)
 	{
 		if (custom_edition_texel_count == custom_edition_texel_capacity)
 		{
@@ -919,8 +925,28 @@ void halo_custom_edition_texels_channels(const void *texels, unsigned char chann
 		}
 		custom_edition_texels[custom_edition_texel_count].address = address;
 		custom_edition_texels[custom_edition_texel_count].channel_order = channel_order;
+		custom_edition_texels[custom_edition_texel_count].normalized = normalized;
 		custom_edition_texel_count++;
 	}
+}
+
+/* Existing callers register only channel order; replacing an address also
+clears the CE coordinate convention previously associated with its pixels. */
+void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order)
+{
+	halo_custom_edition_texels_register(texels, channel_order, FALSE);
+}
+
+static int custom_edition_texels_normalized(unsigned long address)
+{
+	unsigned long index;
+
+	for (index = 0; index < custom_edition_texel_count; index++)
+	{
+		if (custom_edition_texels[index].address == address)
+			return custom_edition_texels[index].normalized;
+	}
+	return FALSE;
 }
 
 void halo_custom_edition_texels_forget(void)
@@ -1385,14 +1411,11 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 	*target = entry->target;
 	*description = entry->description;
 
-	/* port: a Custom Edition bitmap whose Size word gives sides that are 
-	any uncompressed linear bitmap: sampled with normalized
-	coordinates like any other texture, not in texels as an Xbox's linear
-	texture is. Decoding keeps the entry's own description (its pitch). */
-	if (entry->description.linear && !entry->description.compressed)
-	{
+	/* CE's linear bitmap pixels use normalized coordinates. Engine-created
+	textures, including the Xbox loading picture, retain texel coordinates.
+	Keep the stored description unchanged: decoding still needs its pitch. */
+	if (entry->description.linear && custom_edition_texels_normalized(entry->address))
 		description->linear = FALSE;
-	}
 	/* (the high-res text's atlas, for its placeholder bitmap: text_hires.h) */
 	{
 		GLuint atlas = text_hires_atlas_texture(entry->data);
