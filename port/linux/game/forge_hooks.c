@@ -1,7 +1,9 @@
 /*
- * OpenCE : Forge
- * Engine Symbol Bridge Hooks.
- */
+FORGE_HOOKS.C
+
+Engine, menu, camera, rendering, and network hooks connecting the 3D Forge
+editor and sidecar map loader to the game loop.
+*/
 
 #ifndef HALO_RELEASE
 #define HALO_RELEASE
@@ -599,9 +601,9 @@ boolean forge_menu_multiplayer_map_choose(short level_index)
 	ensure_forge_ce_map_partition_built();
 
 	/* In menu_functions.c (map_list_choose), when kind is CUSTOM MULTIPLAYER (3) or FORGE MAPS (6),
-	 * it passes: xbox_multiplayer_map_count(map_list.map_count) + chosen, where
-	 * xbox_multiplayer_map_count(c) = MAX(c - forge_menu_custom_edition_maps_count(FALSE), 0).
-	 * Recover the exact 0-based `chosen` index regardless of how many Forge or non-Forge CE maps exist! */
+	   it passes: xbox_multiplayer_map_count(map_list.map_count) + chosen, where
+	   xbox_multiplayer_map_count(c) = MAX(c - forge_menu_custom_edition_maps_count(FALSE), 0).
+	   Recover the exact 0-based `chosen` index regardless of how many Forge or non-Forge CE maps exist! */
 	if (s_forge_active_map_kind == FORGE_MAP_KIND_FORGE_MAPS || s_forge_active_map_kind == 3)
 	{
 		short active_ce = forge_menu_custom_edition_maps_count(FALSE);
@@ -2567,7 +2569,7 @@ boolean pc_menu_event_function_invoke(
 	}
 
 	/* In-Game Escape Pause Menu -> "SAVE MAP.." button handler
-	 * Note: ui_widget_event_handler_function_invoke subtracts PC_MENU_FUNCTION_BASE (0x100 = 256) before calling pc_menu_event_function_invoke */
+	   Note: ui_widget_event_handler_function_invoke subtracts PC_MENU_FUNCTION_BASE (0x100 = 256) before calling pc_menu_event_function_invoke */
 	if (function_index == 0x7777 ||
 		function_index == (0x7777 - 256) ||
 		function_index == (0x7777 - 102) ||
@@ -3100,12 +3102,12 @@ void pc_menu_game_data_function_invoke(
 	}
 
 	/* Point 5: Cycle Forge map chooser across 4 multiplayer tabs when in Forge mode:
-	 *   1 = MULTIPLAYER
-	 *   3 = CUSTOM MULTIPLAYER (non-Forge custom maps only)
-	 *   5 = MCC MULTIPLAYER
-	 *   6 = FORGE MAPS (Forge-made/edited maps only)
-	 * Single-player map tabs (0 = SINGLEPLAYER, 2 = CUSTOM SINGLEPLAYER, 4 = MCC SINGLEPLAYER)
-	 * are hidden in Forge mode.
+	     1 = MULTIPLAYER
+	     3 = CUSTOM MULTIPLAYER (non-Forge custom maps only)
+	     5 = MCC MULTIPLAYER
+	     6 = FORGE MAPS (Forge-made/edited maps only)
+	   Single-player map tabs (0 = SINGLEPLAYER, 2 = CUSTOM SINGLEPLAYER, 4 = MCC SINGLEPLAYER)
+	   are hidden in Forge mode.
 	 */
 	if (g_forge_session_enabled && fn_name &&
 		(strcmp(fn_name, "mp map list update") == 0 ||
@@ -3309,8 +3311,8 @@ void network_chat_update(void)
 	orig_network_chat_update();
 
 	/* When on the UI main menu (levels\ui\ui), main_load_ui_scenario leaves main_get_map_name()
-	 * set to the previous playable map while global_scenario_get()->type == _scenario_type_main_menu (2).
-	 * Reset Forge monitor/modal state and never run Forge camera/update hooks on the UI background scene! */
+	   set to the previous playable map while global_scenario_get()->type == _scenario_type_main_menu (2).
+	   Reset Forge monitor/modal state and never run Forge camera/update hooks on the UI background scene! */
 	if (forge_is_main_menu_active())
 	{
 		g_last_forge_map_name[0] = 0;
@@ -3515,8 +3517,8 @@ void game_engine_post_rasterize_objects(void)
 		(g_forge_session_enabled || g_forge.live_instance_count > 0))
 	{
 		/* Render 3D Translucent Objective/Spawn/Teleporter Markers and 3D Spawn Menu Preview
-		 * AFTER sky, opaque objects, BSP lightmaps, BSP diffuse textures, and fog have been drawn!
-		 * Reset stencil mode to NONE and restore camera frustum constants so world markers never get rejected! */
+		   AFTER sky, opaque objects, BSP lightmaps, BSP diffuse textures, and fog have been drawn!
+		   Reset stencil mode to NONE and restore camera frustum constants so world markers never get rejected! */
 		rasterizer_set_stencil_mode(0);
 		rasterizer_set_frustum_z(0.0f, 0.0f);
 		rasterizer_models_begin(FALSE);
@@ -3592,7 +3594,7 @@ void render_model(
 	}
 
 	/* Ensure custom scenery/device/weapon/unit models inside .map files never disappear at distance due to
-	 * non-zero super_low detail_cutoff_pixels[0] or missing low-LOD permutation geometry_indices */
+	   non-zero super_low detail_cutoff_pixels[0] or missing low-LOD permutation geometry_indices */
 	if (unique_identifier != NONE && model_index != NONE)
 	{
 		struct object_datum *scen_obj = (struct object_datum *)object_try_and_get_and_verify_type(
@@ -4328,8 +4330,8 @@ void platform_input_read(struct forge_sdl_input_state *state, BOOL consume_motio
 	else if (state && g_forge_session_enabled && g_forge.initialized && !forge_is_main_menu_active())
 	{
 		/* Suppress SDL_SCANCODE_ESCAPE (41) from opening the native Pause Menu when Escape is pressed
-		 * to cancel/return a held object on the Physics Beam or close a Forge modal, and keep it
-		 * suppressed until the Escape key is released. */
+		   to cancel/return a held object on the Physics Beam or close a Forge modal, and keep it
+		   suppressed until the Escape key is released. */
 		if (state->keys[41])
 		{
 			if (g_forge.active_modal != _forge_modal_none ||
@@ -4562,7 +4564,7 @@ void hud_draw_bitmap_direct(
 		int16_t bh = bitmap ? *(int16_t const *)((uint8_t const *)bitmap + 0x06) : 0;
 		float clip_w = clip ? (clip->x1 - clip->x0) : 0.0f;
 		/* 2x bitmaps (hud_waypoints 256x256, hud_damage_arrows 462/512) need 0.5f;
-		 * 4x bitmaps (hud_counter_numbers 72x48, hud_msg_icons 93x93) need 0.25f. */
+		   4x bitmaps (hud_counter_numbers 72x48, hud_msg_icons 93x93) need 0.25f. */
 		if ((bw == 256 && bh == 256) || clip_w > 0.5f)
 			scale *= 0.5f;
 		else

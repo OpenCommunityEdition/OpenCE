@@ -1,7 +1,9 @@
 /*
- * OpenCE Forge - Custom Edition & Map Share File I/O Redirection
- * Serves embedded .bmp / .txt sidecars from the 2048-byte map header.
- */
+FORGE_CE_IO_REDIRECT.H
+
+Redirects Custom Edition and MCC cache file opens to the active custom map or
+donor map path during runtime tag loading.
+*/
 
 #ifndef FORGE_CE_IO_REDIRECT_H
 #define FORGE_CE_IO_REDIRECT_H

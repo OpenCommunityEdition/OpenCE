@@ -1,220 +1,412 @@
-<div align="center">
-
-# OpenCE : Forge
-
-**Halo: Combat Evolved for Windows, Linux & Android — Full [OpenCE](https://github.com/OpenCommunityEdition/OpenCE) Port with Integrated 3D Forge Mode (`v2.10.14`)**
+# OpenCE - Halo: Combat Evolved for Linux, Windows, Android and the web
 
 <p align="center">
   <img src="port/assets/icon/opence-icon.png" alt="OpenCE" width="128">
 </p>
 
-[![Latest Release](https://img.shields.io/github/v/release/SutlabSol/OpenCE-Forge?label=Download%20Release&style=for-the-badge&color=2ea44f)](https://github.com/SutlabSol/OpenCE-Forge/releases/latest)
-[![Upstream OpenCE](https://img.shields.io/badge/Upstream-OpenCommunityEdition%2FOpenCE-0078D6?style=for-the-badge)](https://github.com/OpenCommunityEdition/OpenCE)
-[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue?style=for-the-badge)](LICENSE)
 
-[**Download Latest Release**](https://github.com/SutlabSol/OpenCE-Forge/releases/latest) ·
-[Overview](#overview--unified-opence-integration) ·
-[Architecture](#architecture-overview) ·
-[Forge Menu & Tag Vault](#forge-menu--unified-tag-vault) ·
-[In-Game Features](#in-game-forge-features) ·
-[Security & Zero-Trust Streaming](#security-architecture--zero-trust-custom-tag-streaming-ftrq--ftst) ·
-[Controls](#controls-in-forge) ·
-[Building](#building-from-source)
+<p align="center">
+  <a href="https://github.com/OpenCommunityEdition/OpenCE/releases/latest"><img src="https://img.shields.io/github/v/release/OpenCommunityEdition/OpenCE?label=Download&style=for-the-badge" alt="Download"></a>
+  <a href="https://halocombatevolved.com/"><img src="https://img.shields.io/badge/Play-in_browser-blue?style=for-the-badge" alt="Play in browser"></a>
+  <a href="https://discord.gg/9gqcHyr5km"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://zenith.hosting/host/opence"><img src="https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg" alt="Deploy with Zenith" height="28"></a>
+</p>
 
-</div>
+**OpenCE** (Open Community Edition) is an open source port of the Halo: Combat Evolved decompilation (Halo CE) based on an early Xbox development build (2342) and forked from
+[bnunu/halo-1](https://github.com/bnunu/halo-1). The project aims to enhance the existing game and adds many features, such as 128-player multiplayer, online campaign co-op, mod packs, field-of-view settings, a server browser, peer-to-peer hosting, automatic map downloads, voice chat, support for Custom Edition maps and much more! 
 
----
+The game runs natively on **Windows, Linux, Android** and in the **web browser** with nothing to install. A macOS port is in progress. Worth noting that it is not an emulator, **the game's own code is compiled for each platform** with a new layer in place of the Xbox's hardware. Runs on OpenGL (Android is on OpenGL ES and WebGL 2 in the browser). Sound, input, gamepads are all handled through SDL3. The game currently draws a frame every refresh of your display with Smooth Motion enabled, while the simulation runs at 30 ticks just like the original Xbox. 
 
-## Overview — Unified OpenCE Integration
+<img width="1284" height="1007" alt="The game running on Windows" src="https://github.com/user-attachments/assets/0a4412e1-f6d3-48ed-8e17-0a374c2122f1" />
+<p align="center"><em>OpenCE running on Windows (release build)</em></p>
 
-**OpenCE : Forge** builds on [**OpenCE** (Open Community Edition)](https://github.com/OpenCommunityEdition/OpenCE), the native C port of the Halo: Combat Evolved Xbox decompilation (`01.01.14.2342`).
+## A copy of Halo: Combat Evolved is required
 
-**Forge Mode is natively integrated directly into `halo.exe`** alongside the complete Campaign, Standard Multiplayer, Online Co-Op, MCC Map Support, and Mods experience:
+OpenCE does not include the game data. You **must provide your own Xbox disc image** (`.xiso` or `.iso`) of Halo: Combat Evolved. Every version of the game works. The maps of the European (PAL) version were made for a slower console - the game changes them to play as the North American (NTSC) maps do, so players of the two versions can play together.
 
-- **Full Campaign & Standard Multiplayer Intact:** Play solo or online Co-Op Campaign, browse the 128-player Internet/LAN Server Browser, play SWAT, Infection, Gun Game, or Hardcore, and load Mods or MCC Workshop packages from the main menu just like upstream OpenCE.
-- **Unified `SELECT GAMEMODE` Multiplayer Hub:** Selecting **Multiplayer** on the main menu opens the **Select Gamemode** screen with two modes and live right-panel artwork/descriptions:
-  - **STANDARD:** Normal OpenCE Multiplayer (Internet Server Browser, LAN, Split-Screen, Create Game). Standard sessions use stock OpenCE network protocol versioning so Forge builds can join stock OpenCE servers seamlessly.
-  - **FORGE:** Opens the dedicated Forge Hub (**Solo Forge**, **Multiplayer Forge**, **Edit Maps**, and **Tag Options**).
-- **Forging on Xbox, Custom Edition & MCC Multiplayer Maps:** Edit any retail Xbox multiplayer map, Halo Custom Edition multiplayer map (`custom_maps/`), or Halo 1 MCC multiplayer/Workshop map (`mcc_maps/`). *(Singleplayer campaign maps can be opened in the Tag Browser to extract custom tags, while map editing is restricted to multiplayer maps.)*
-- **Unified Faber Tag Vault (`.fbrtag` + `faber_vault.bin`):** Custom tags extracted from **Xbox**, **MCC**, and **Custom Edition** maps are stored in a single unified, content-addressed, deduplicated storage format (`tag_profiles/*.fbrtag` + `tag_profiles/faber_vault.bin`). Shared bitmaps and sound permutations across multiple custom tags are stored once in `faber_vault.bin` and paged on demand.
-- **Unified Sidecar Map Saving (`F5` / `Pause -> SAVE MAP..`):** Saving a forged map exports a lightweight `.txt` sidecar overlay in `custom_maps/` storing all placed objects, spawns, objectives, weld groups, light overrides, and custom tag references so forged maps play natively in both Forge and Standard Mode Multiplayer and Dedicated Servers without duplicating large `.map` files.
+1. Start the game (`halo.exe` on Windows and `halo` on Linux). 
+2. At the first start you will get a pop up message asking for the disc image. Select it in the
+   file picker. On Linux and Windows, a disc image (`.iso` or `.xiso`) next
+   to the executable is used without the file picker. Where no file picker
+   can be shown (on Linux, without the desktop portal or `zenity`), the game
+   says to put the disc image next to the executable, and stops.
+3. The game extracts the `maps` folder. Then the game starts.
 
-> [!IMPORTANT]
-> **Network Protocol & Stock Session Isolation:** Standard (non-Forge) multiplayer sessions continue to advertise and validate OpenCE's stock `HALO_PORT_NETWORK_VERSION` via [`forge_get_network_version`](port/linux/game/forge_runtime_tags.c), while active Forge sessions use `FORGE_NETWORK_VERSION` (`0x4631`) and `FORGE_GAME_KIND` (`0x46`) in [`forge_engine.h`](port/linux/game/forge_engine.h). Stock OpenCE clients and servers remain 100% compatible with non-Forge games.
+The `maps` folder holds the Xbox maps only. If it holds Halo PC's maps
+instead (a Halo PC or Custom Edition install's `maps` folder), the game says
+so and stops: Custom Edition maps go in `custom_maps` folder, beside `maps` folder.
 
-> [!NOTE]
-> **No proprietary game maps or copyrighted assets are included in this repository or its releases.** You must provide your own Halo: Combat Evolved `maps/` (or Xbox `.iso` / `.xiso` disc image), optional Halo Custom Edition `custom_maps/` (`bitmaps.map`, `sounds.map`, `loc.map`), and optional MCC `mcc_maps/`.
+On Linux and Windows, the game puts `maps` next to the executable. On
+Android, copy the disc image to the phone first. The app puts `maps/` in its
+data folder. Refer to [port/android/README.md](port/android/README.md). On
+the web, the page copies `maps/` out of the disc image into the browser's
+storage for the site - nothing is uploaded ([port/web/README.md](port/web/README.md)).
 
----
+## Download
 
-## Architecture Overview
+GitHub Actions builds the game for each commit. 
 
-```mermaid
-flowchart LR
-    subgraph Sources["Map & Tag Donor Sources"]
-        XBOX["Xbox Retail (v5)"]
-        CE["Custom Edition (v609)"]
-        MCC["MCC CEA / Workshop (v13)"]
-    end
+Builds for latest release:
 
-    subgraph Vault["Unified Faber Tag Vault & Runtime Loader"]
-        FBRTAG["Unified .fbrtag + faber_vault.bin\n(Content-Addressed Deduplicated Regions)"]
-        PREVIEW["3D Tag Previewer\n(Live Orbiting Mesh + Textures)"]
-    end
+| Platform | Release | Debug | Guide |
+| --- | --- | --- | --- |
+| Linux | [halo-linux-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-linux-debug.zip) | [Linux](port/linux/README.md) |
+| Windows | [halo-windows-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-windows-debug.zip) | [Windows](port/windows/README.md) |
+| Android | [halo-android-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-android-debug.zip) | [Android](port/android/README.md) |
+| Web | [halocombatevolved.com](https://halocombatevolved.com/) (or [halo-web-release.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-release.zip) for your own server) | [halo-web-debug.zip](https://github.com/OpenCommunityEdition/OpenCE/releases/latest/download/halo-web-debug.zip) | [Web](port/web/README.md) |
 
-    subgraph Network["Zero-Trust Multiplayer Sync"]
-        STREAM["Solicited Reliable Tag Stream\n(FTRQ 107 / FTST 108 + BLAKE2b-256)"]
-        RAM["Ephemeral Session RAM\n(24 MB Cap, 0 Disk Writes on Join)"]
-    end
 
-    subgraph Storage["Unified Sidecar-Overlay Saves"]
-        SIDECAR["custom_maps/<name>.txt\n(Base Map Reference + Live State)"]
-        COMMIT["On-Save Tag Persistence\n(Commits Session [C] Tags to Vault)"]
-    end
+Release build is recommended for regular play. 
 
-    XBOX --> FBRTAG
-    MCC --> FBRTAG
-    CE --> FBRTAG
-    FBRTAG --> PREVIEW
-    FBRTAG --> STREAM
-    STREAM --> RAM
-    RAM -->|"Joiner clicks SAVE MAP AS"| COMMIT
-    COMMIT --> SIDECAR
+The debug build stops at the first failed check (assertion) and writes it to the log, so use it when you want to find and report problems.
+
+The game updates itself. At start-up it looks for a newer release, and asks
+if you want to install it. Refer to "Updates" in
+[port/linux/README.md](port/linux/README.md#updates). The web site offers
+each new build when it is out.
+
+Each build of the `main` branch that passes on all four platforms is a new
+release, and the web site then plays it. The [Releases](https://github.com/OpenCommunityEdition/OpenCE/releases)
+page keeps the last five releases. If the latest build has a problem, get
+an older build from that page.
+
+Each release also has `SHA256SUMS`, the SHA-256 of each of its files, and
+`SHA256SUMS.sig`, that file's Ed25519 signature by the project's release
+key, whose public key is [deploy/release-key.pub](deploy/release-key.pub).
+`sha256sum -c --ignore-missing SHA256SUMS` checks the downloads, and
+`tools/release_sign.sh verify SHA256SUMS` (OpenSSL 3) the signature.
+
+The Linux README also covers the controls, every setting and the multiplayer features. These are almost the same on all platforms. The settings are in `config.toml` next to the game, and many are in the menus too.
+
+The Arch-based distribution release is available on the [AUR](https://aur.archlinux.org/packages/opence-bin).
+
+## Multiplayer 
+
+- **Supports up to 128 players** on up to 128 machines and up to 4 players on each device in split screen.
+- **Every platform plays together:** Windows, Linux, Android and the browser all support cross-play! On a local network, the native builds can play LAN. Browser players can play each other in rooms over WebRTC ([port/web/README.md](port/web/README.md)).
+- **Peer-to-peer internet hosting:** join through the server browser or an invite link. A host lists a game as public in the server browser, or keeps it private for players with the invite link. With the Discord integration, the host can also send the invite through Discord.
+- **Online co-op campaign:** with settings for friendly fire, player collisions and the number of enemies as a multiplier based on per player or static. 
+- **New gametypes:** SWAT, Infection, Gun Game and Hardcore (Slayer, CTF, Oddball and King), in Select Gametype's OPENCE bank; Edit Gametypes' OPENCE OPTIONS gives any gametype their rules ([port/linux/README.md](port/linux/README.md), "OpenCE gametypes").
+- **Voice Chat:** push to talk (V) or an open microphone (can be changed in the menu's audio settings)
+- **Map sharing:** a player who does not have the game's Custom Edition map downloads it from the other players.
+- **Moderation:** the host can kick and ban players from the scoreboard menu or the `kick` and `ban` console commands. Players can vote to kick. 
+- **Scrollable Scoreboard:** the mouse wheel or PageUp / PageDown scrolls through list of players in large multiplayer lobbies. 
+- **A new netcode:** each machine moves its own player at once, and the host makes the decision for the game. Refer to [port/linux/NETCODE.md](port/linux/NETCODE.md).
+- **Official dedicated server hosting:** [Zenith Hosting](https://zenith.hosting/host/opence) is the official host for OpenCE Fleet. Get your own dedicated servers in one click, managed from one dashboard.
+
+[![Deploy with Zenith](https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg)](https://zenith.hosting/host/opence)
+
+## Custom Edition Maps
+
+Halo Custom Edition maps are placed in `custom_maps` folder, not in the `maps` folder itself. It requires `bitmaps.map`, `sounds.map`, and `loc.map` in the `custom_maps` folder, which you must copy over from your existing installed copy of Halo Custom Edition. The maps folder is only for Xbox maps that's extracted from your disc image, not Halo Custom Edition. 
+
+Halo PC Gearbox exclusive maps (Ice Fields, Death Island, Danger Canyon, Infinity, Timberland and Gephyrophobia) **are not included by default**. They would need to be copied over from your existing Halo Custom Edition install's `maps` folder into `custom_maps` folder too.
+
+Once that's setup, the maps will appear on CUSTOM SINGLEPLAYER and CUSTOM MULTIPLAYER in the map list in Campaign's New Game, and on the Map screen of Create Game (Internet or LAN). A CUSTOM SINGLEPLAYER map plays as a campaign level, alone or as
+online co-op.
+
+Maps that require OpenSauce are not compatible.
+
+Both the server browser and the LAN browser support automatic map downloads - when you join a game it will download the custom maps from other players, with any of `bitmaps.map`, `sounds.map` and `loc.map` you are missing. This works on a LAN and on the
+Internet, when the host has map sharing enabled (on by default).
+Refer to [docs/custom_edition_caches.md](docs/custom_edition_caches.md).
+
+## MCC maps
+
+OpenCE supports Halo 1 MCC maps through Steam discovery on Windows/Linux,
+package imports on Android, and local installation. You still need the
+[Xbox game data](#a-copy-of-halo-combat-evolved-is-required) to run OpenCE.
+Obtain required MCC resources from your own installed copy of Halo 1 in MCC.
+
+### Windows and Linux
+
+Subscribe to a Halo 1 MCC Workshop mod and let Steam finish downloading it.
+OpenCE reads the installed package directly; Steam can be closed while playing.
+Steam discovery, campaign mission ordering and package collections are enabled
+by default. Their controls are under **Settings > Network Setup > Map Sharing >
+MCC Packages**. Reopen the map list after changing them or restart OpenCE after
+installing a new package.
+
+If your Steam library is not detected, set `steam = 'C:\Steam'` under `[paths]`
+in `config.toml` to point to your Steam installation or library.
+
+### Local installation
+
+Copy the complete folder from `steamapps/workshop/content/976730/<workshop ID>`
+into `mcc_maps`, beside `maps` and `custom_maps`. Keep its maps, JSON files,
+resources and artwork together. OpenCE reads the mod's name and supported PNG
+previews from its metadata, even with Steam discovery disabled.
+
+You can also make your own folder, such as `mcc_maps/MyMod`, and place `.map`
+files directly inside it. Keep package-supplied `bitmaps.map` and `sounds.map`
+with that package; do not mix resources from different mods. Metadata is
+optional for map-only installs, but needed for authored titles, previews and
+campaign ordering. See the [package layout guide](docs/mcc_maps.md#installation-and-menus).
+
+### Android
+
+Copy the complete Workshop folder or a ZIP of it to your phone. Quit OpenCE,
+long-press its launcher icon, choose **Import MCC maps > Workshop package**,
+and select the folder or ZIP. Import required shared resources separately.
+See the [Android import guide](port/android/README.md#importing-mcc-packages).
+
+### Shared MCC resources
+
+With Steam discovery enabled, desktop builds can read required base resources
+from your installed Halo 1 MCC files. They are not copied into the mod. For
+manual setup, or when that installation is unavailable, use these locations:
+
+| File in your MCC installation | Destination in OpenCE |
+| --- | --- |
+| `halo1/maps/bitmaps.map` | `mcc_maps/_shared/singleplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/bitmaps.map` | `mcc_maps/_shared/multiplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/sounds.map` | `mcc_maps/_shared/multiplayer/sounds.map` |
+
+Use MCC's files, not standalone Custom Edition resources. Package-supplied
+resources take priority. On Android, use the shared-resource import options.
+Self-contained maps need no shared files; missing or incompatible resources
+produce a diagnostic.
+
+### Hosting and sharing
+
+**Share Maps** in **Server Setup > Map Sharing** covers CE maps and eligible
+MCC packages automatically. MCC downloads ask for the joining player's consent
+and install separately, preserving their existing copy. Actual base resources
+are never sent: each player must provide matching local copies when required.
+A Workshop link opens Steam on desktop, with an explicit browser fallback.
+OpenCE does not update manually installed or host-downloaded packages for you.
+
+Dedicated servers use the same sharing setting and can host MCC multiplayer
+maps and co-op campaigns. See the [dedicated-server guide](docs/dedicated_server.md#mcc-maps).
+MCC loading remains separate from Xbox and Custom Edition loading; see
+[MCC support and limits](docs/mcc_maps.md) for details.
+
+## Mods
+
+Mods go in a `mods` folder next to `maps`. Each mod is a folder of Halo PC tag files, as the Halo Editing Kit and Invader make them, with a `mod.toml` describing it. Every mod in the folder is on by default. Mods in the main menu turns them on and off and sets their order. Think of it like a resource pack list, the mod at the top plays over the ones below it. The game also refuses mods that say they cannot be played together. 
+
+Refer to [docs/mods.md](docs/mods.md) to make your own.
+
+## Forge
+
+Multiplayer > **Forge** opens the in-game 3D map editor on any Xbox, Custom Edition or MCC multiplayer map, alone or together over system link, internet play and dedicated servers.
+
+- **Switch between Play and Monitor mode** (`F1`, or D-Pad Up on a controller) to fly as 343 Guilty Spark and grab, move, rotate (`15°` / `45°` / `90°`), weld (`Ctrl+G`) or delete objects.
+- **Spawn Palette & Object Properties** (`F2` and `X`): place weapons, vehicles, equipment, scenery, barriers, dynamic lights, teleporters, spawn points, objectives and AI squads, and set physics mode (`Normal`, `Fixed`, `Phased`), respawn timers, team alignment and gametype filters.
+- **Tag Options**: browse and preview 3D models from any installed Xbox (`maps/`), Custom Edition (`custom_maps/`) or MCC (`mcc_maps/`) map and import them into the palette. When a player spawns a custom tag in a multiplayer game, peers without the tag stream it in RAM automatically (`network.forge_tag_download`, on by default).
+- **Save & play in Standard multiplayer** (`F5`): maps save as lightweight `.txt` sidecar files in `custom_maps/` without modifying any `.map` files on disk, and appear under **Forge Maps** in both **Forge** and **Standard** multiplayer.
+
+Refer to [docs/forge.md](docs/forge.md).
+
+
+## Graphics
+
+The game retains the original look and feel as it did on the Xbox by default. The video settings menus have additional options that go beyond it.
+
+**Display**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| DISPLAY MODE, RESOLUTION, WINDOW SIZE | Fullscreen, borderless or windowed, at any resolution (F11 switches) | Borderless, at the display's resolution |
+| RESOLUTION SCALING | Draw at the window's resolution, or at the Xbox's 640x480 and scale it up | Native resolution |
+| V-SYNC, FRAME RATE LIMIT | Wait for the display, or run free up to a frame cap; works with G-Sync and FreeSync | V-sync on |
+| SMOOTH MOTION | A frame for every refresh of the display (60, 120, 240 Hz and more), blended between the game's 30 ticks a second | On |
+| INSTANT AIM | In first person, the view turns the frame the mouse moves, not up to two ticks later | On |
+| FOV, VIEWMODEL FOV | Field of view of the view and of the weapon and hands, from 80 to 150 degrees | Stock |
+
+**Image quality**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| ANTI-ALIASING | FXAA, SMAA, MSAA or SSAA | Off, as on the Xbox |
+| TEXTURE FILTERING | Anisotropic filtering, from 2 to 16 - provides sharper floors, walls and terrain at an angle | Off, as on the Xbox |
+| SHADOW RESOLUTION | Object shadows at 128 (the Xbox's), 256, 512 or 1024 pixels | 128 |
+| PER-PIXEL LIGHTING | Lights models for each pixel, without the facets of the Xbox's per-vertex lighting | Off |
+| MODEL DETAIL | Keep more model detail at a distance at high resolutions, or always the most detailed | Stock |
+| HDR, HDR DISPLAY | Keeps explosions, plasma and the sun's glare past white and tone maps them; on an HDR monitor, shows them brighter than white | Off |
+| HIGH-RES HUD, HIGH-RES TEXT | The HUD from hand-drawn redraws at 8x the size, and text in the Overpass font, sharp at any resolution | On |
+
+**Extras**
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| LEGS | See your own legs when you look down in first person | Off |
+| ARM SHIELDS | The energy shield's flare on your first-person arms too | Off |
+| SHIELD GLOW, GLOW INTENSITY | Energy shields light up what is around them as they flare | Off |
+| SHIELD COLOR | Your own shield in a multiplayer armor color, as your machine draws it | Default |
+| OVERSHIELD | The overshield's own color, rising up the body as it charges | Off |
+| PASSENGER THIRD PERSON | Third-person view for Warthog and Scorpion passengers (Campaign-only) | Off |
+
+
+## How to build the game
+
+You do not need the Xbox SDK. The port supplies the SDK declarations that
+the game uses. Refer to [port/include/xdk](port/include/xdk/README.md).
+
+To build the game:
+
+1. Install Python and [ninja](https://ninja-build.org/).
+2. Install the tools for your platform. Refer to the README for the
+   platform.
+3. In the root folder of the repository, enter `python configure.py`.
+4. Enter `ninja` with the target for the platform:
+
+| Target | Result |
+| --- | --- |
+| `ninja linux` | `build/linux/halo` |
+| `ninja windows` (on Windows, or on Linux after `configure.py --windows-cross`) | `build/windows/halo.exe` and `SDL3.dll` |
+| `ninja android_apk` | `port/android/app/build/outputs/apk/debug/app-debug.apk` |
+| `ninja web` | `build/web/site/`, the web site (`python tools/web_serve.py` serves it) |
+
+If you enter `ninja` without a target, ninja builds the game for the
+computer that you use.
+
+`tools/ci_build.py` makes the same builds as GitHub Actions. For example,
+enter `python tools/ci_build.py linux release`.
+
+### Build options
+
+Give these options to `configure.py`:
+
+| Option | Result |
+| --- | --- |
+| (none) | A debug build. A failed assertion stops the game. |
+| `--release` | A release build. The game does not examine assertions, as in the retail game. |
+| `--portable` | The Linux and Windows builds operate on all x86-64 processors. The Linux build also operates on older distributions and on SteamOS: refer to "Portable build" in [port/linux/README.md](port/linux/README.md#portable-build). Use this option for builds that you give to other persons. |
+| `--lto=thin`, `--lto=off` | Less link-time optimization. The link is faster. |
+| `--pgo=off` | No profile-guided optimization. |
+| `--pgo=train` | Records a new optimization profile. Refer to "Optimization profiles". |
+| `--profile` | A profiling build. It records CPU times. Refer to "Profiling builds". |
+| `--web-emcc PATH` | The Emscripten `emcc` for `ninja web` (else the one on the PATH, or `~/emsdk`'s). |
+
+Without `--portable`, the Linux and Windows builds use all the instructions
+of the processor that builds them (`-march=native`). Such a build does not
+always start on a different computer.
+
+## For developers
+
+### Testing
+
+The tests are listed in [AGENTS.md](AGENTS.md) ("Testing"). Most run
+without the game data, in GitHub Actions too.
+
+One check needs the retail maps, so it runs on your own computer (or on a
+self-hosted runner), not in GitHub Actions: `tools/net_compare.py` plays
+two builds together in a network game on one computer and checks that they
+stay in step. Run it when a change can alter how a build calculates the
+game, as a change to the simulation, the compiler or the maths does,
+before it is merged. For example, to check a build with such a change
+against a build without it:
+
+```sh
+python tools/net_compare.py --a build/linux/halo --b <other checkout>/build/linux/halo \
+    --data <folder with maps/> --maps bloodgulch,beavercreek,hangemhigh --swap
 ```
 
----
+Each game prints PASS or FAIL. A FAIL names the first player, tick and
+value that differ. Refer to "Comparing two builds" in
+[port/linux/NETCODE.md](port/linux/NETCODE.md).
 
-## Forge Menu & Unified Tag Vault
+### Optimization profiles
 
-Navigating to **`MULTIPLAYER -> FORGE`** opens the Forge Hub:
+The builds use profiles of the game to optimize the code:
 
-1. **SOLO FORGE:** Choose any Xbox Multiplayer, Custom Edition Multiplayer, MCC Multiplayer, or saved Forge map (`FORGE MAPS` tab) and load directly into an endless single-player Forge editing session.
-2. **MULTIPLAYER FORGE:** Host an Internet, LAN, or Split-Screen collaborative Forge lobby where up to 16 players can toggle between **343 Guilty Spark Monitor** (`F1`) and **Spartan** in real time and build together.
-3. **EDIT MAPS:** Browse, rename, or delete **User Created** and **Downloaded** Forge maps with preview bitmaps and author metadata.
-4. **TAG OPTIONS:** Complete in-menu tag extraction and cache management suite across Xbox, MCC, and Custom Edition maps:
-   - **`ADD TAGS`:**
-     - Opens a Map Picker (`RETAIL / XBOX`, `CUSTOM SINGLEPLAYER`, `CUSTOM MULTIPLAYER`, and `MCC MAPS`) for browsing any installed map.
-     - Selecting any map opens the **Map Tag Browser** across 6 categories (`SCENERY`, `VEHICLES`, `BIPEDS`, `DEVICES`, `WEAPONS`, `EQUIPMENT`).
-     - Features a **live rotating 3D wireframe model preview** on the right-hand panel along with `- <tag name>`, `- <tag type>`, and `- <tag size>`.
-     - Pressing **`CHOOSE`** prompts you to enter a custom Forge menu name (`[C] <your_name>`), converts MCC/Xbox/CE geometry, shaders, bitmaps, and sounds as needed, and stores the tag and its full dependency closure into the deduplicated **Faber Tag Vault** (`tag_profiles/*.fbrtag` + `tag_profiles/faber_vault.bin`).
-   - **`INSTALLED TAGS`:**
-     - Browse all tags currently installed in your cache across all categories with the live rotating 3D preview and byte size breakdown.
-     - Choosing any tag opens a confirmation dialog allowing you to **delete** individual tags from the vault.
-   - **`RESET STOCK TAGS` / `RESET CUSTOM TAGS`:**
-     - Confirmation dialogs (`CONFIRM` / `BACK`) to rebuild or clear stock cached tags or custom `[C]` tags independently.
+- `pgo/halo_linux.profdata` for Linux and Android.
+- `pgo/halo_windows.profdata` for Windows.
 
----
+The profiles need clang 22 or later. With an older clang, the builds do not
+use the profiles.
 
-## In-Game Forge Features
+To record a new profile:
 
-### 1. 3D Monitor Mode (`F1`) & Precision Manipulation
-- **Instant Spartan ↔ Monitor Toggle (`F1` / D-Pad Up):** Seamless transition between playing as a Spartan and flying as 343 Guilty Spark Monitor with 1st/3rd-person view toggle (`F4`) and adjustable fly speed (`Shift`).
-- **Line-of-Sight Raycast Selection & Push/Pull Distance:** Accurately select, grab, move, and place visible objects within **20m** (never through walls); use the **Mouse Wheel** (or `Page Up` / `Page Down`) to push/pull held objects smoothly between **1m and 30m**.
-- **Hover or Hold Object Properties (`X`):** Open **Object Properties (`X`)** either while holding an object or simply while facing/hovering an object (so you can edit weld groups, physics modes, or light settings without disturbing placement).
-- **3-Axis Gimbal Rotation & Snapping:** Hold **`R`** + Mouse (or `LT` on controller) to rotate Yaw and Pitch (`Q` / `E` rolls when holding `R`). Press **`G`** to cycle rotation snap increments (`Off -> 15° -> 45° -> 90°`), hold **`Z`** to snap to the floor, or hold **`F`** to snap to any surface.
+1. Delete the profile.
+2. Enter `python configure.py --pgo=train`.
+3. Enter `ninja linux` or `ninja windows`.
 
-### 2. Tabbed Object Palette (`F2`) & Live 3D Previews
-- Spawn **Weapons**, **Equipment**, **Vehicles**, **Scenery**, **Doors / Barriers**, **Lights**, **Spawns & Objectives**, and **Custom (`[C]`) Tags** with an interactive 3D preview window.
-- **Playable Multiplayer Covenant Wraith:** Includes an indestructible, multiplayer-ready Covenant Wraith in the Vehicles menu with a functional parabolic plasma mortar and wing-mounted plasma cannons.
+The build then plays the main menu and the first minute of each campaign
+level. This procedure continues for approximately 15 minutes. The game
+data must be in `assets/`.
 
-### 3. Multi-Part Group Welding (`Ctrl+G` / `X -> WELD GROUP`)
-- **Multi-Part Welding (`Ctrl+G`):** Link up to **64 objects** into a rigid weld group (`GROUP 1..16`, cycle active group with `Shift+Ctrl+G` or assign directly via `X -> WELD GROUP` while facing or holding an item).
-- Grabbing, rotating (`R`), duplicating (`C`), or deleting any member manipulates the entire welded assembly while preserving exact relative local-space transforms.
+### Profiling builds
 
-### 4. Dynamic Runtime Lights (`F2 -> LIGHTS`)
-- Spawn light fixtures and emitters from **`F2 -> LIGHTS`** and customize **LIGHT COLOR** (`DEFAULT`, `WHITE`, `RED`, `BLUE`, `GREEN`, `AMBER`, `PURPLE`, `CYAN`), **INTENSITY** (`100%`, `25%`, `50%`, `150%`, `200%`, `300%`), and **LIGHT RADIUS** (`DEFAULT`, `2U`, `4U`, `8U`, `12U`, `20U`) via **Object Properties (`X`)**.
+A profiling build records where the game spends its time.
 
-### 5. Gametype Objectives, Teleporters & 3D Boundary Markers
-- Existing and newly placed **Player Spawns**, **CTF Flags**, **Oddball Spawns**, **King of the Hill Zones** (with live 3D boundary rings), **Race Track Points**, and **Teleporters** render as 3D markers in Monitor Mode and can be moved, rotated, or configured in real time.
+1. Enter `python configure.py --profile`, then build as usual.
+2. Start a recording. Enter `profile_record` in the console (or the telnet
+   console), or set `debug.profile_record = true` in `config.toml`. To
+   record each game of a session, also set
+   `debug.profile_record_when = "game"`.
+3. Stop the recording. Enter `profile_stop`, load another map, or quit.
 
-### 6. In-Session Peer-to-Peer Custom Tag Streaming
-- When a host spawns a custom `[C]` tag that a connected client does not have installed, Forge automatically streams the compressed tag bundle over the reliable distributed channel with a live HUD progress bar and BLAKE2b-256 verification.
-- Streamed tags install into a sandboxed **session-ephemeral RAM slot** (`24 MB` session cap, zero disk writes during gameplay) and are only committed to the client's local Faber Tag Vault if the client explicitly saves the Forge map (`F5` / `Pause -> Save Map`).
+The game writes numbered `.part<n>.json` files under `profiles/` in its data root
+and logs their paths. Parts are retained after the recording stops. Logs go to
+standard error; a Windows release build without standard error writes them to
+`halo.log` next to `halo.exe`.
 
----
+`tools/net_report.py` is a helper for developers. Enter
+`python tools/net_report.py <recording.part1.json>` to read a recording
+as tables. The command also writes `<recording>.summary.txt`, a short text
+file.
 
-## Security Architecture & Zero-Trust Custom Tag Streaming (`FTRQ` / `FTST`)
+| Command | Result |
+| --- | --- |
+| `profile_record [seconds]` | Starts a recording. With a number of seconds, the recording stops after that time. |
+| `profile_stop` | Stops the recording. |
 
-When a client joins a Forge server whose map uses custom `[C]` tags not yet in the joiner's vault, the client streams those tags from the host under a strict **zero-trust security model** ([`forge_network.c`](port/linux/game/forge_network.c), [`forge_runtime_tags.c`](port/linux/game/forge_runtime_tags.c)):
+`debug.profile_memory` sets the memory of a recording in MB (default 256,
+from 4 to 1024). A recording has no length limit:
+the game writes a part each time the memory is full. Refer to "Settings" in
+[port/linux/README.md](port/linux/README.md).
 
-| Security Control | Enforcement Mechanism |
-| :--- | :--- |
-| **User Opt-Out Setting** | Gated by `network.forge_tag_download` (`HALO_FORGE_TAG_DOWNLOAD`, default `true`) in [`port_config.c`](port/linux/src/port_config.c). When disabled, clients never request or accept tag streams and render lightweight 3D proxy markers instead. |
-| **Reliable-Stream Admission Only** | [`forge_tag_stream_handle_message`](port/linux/game/forge_network.c) rejects any packet where `from_stream == FALSE`, preventing unauthenticated UDP datagram spoofing or injection. |
-| **Solicited Single-Flight Transfer Tokens** | Clients only accept `OFFER` and `CHUNK` packets matching the currently solicited `hash` and a randomized 32-bit `transfer_id` token (`g_client_tag_rx.transfer_id`). Unsolicited offers or mismatched tokens are rejected immediately. |
-| **Strict Tag Group & Path Allowlisting** | Only placeable object root groups (`scen`, `vehi`, `weap`, `eqip`, `mach`, `lifi`, `ctrl`, `bipd`) are permitted. Rejects non-ASCII characters, drive letters (`:`), leading/trailing/double slashes, and `..` path traversal sequences, and verifies `FNV-1a(group, tag_path) == expected_hash` against bait-and-switch offers. |
-| **Cryptographic BLAKE2b-256 Pre-Parse Verification** | All chunks are reassembled with duplicate/out-of-bounds bitmap tracking (`chunk_seen[]`), inflated with exact size verification (`forge_zlib_uncompress_exact`), and verified in constant time against the offer's **BLAKE2b-256** digest **before** any tag or bundle parser ever touches the payload. |
-| **Base-Map Anti-Shadowing** | [`forge_install_ephemeral_tag_bundle`](port/linux/game/forge_runtime_tags.c) refuses to install any streamed tag whose `(group, path)` matches a tag already present in the base map (`abs_index < forge_get_base_map_tag_count()`), preventing a malicious host from overriding stock game assets. |
-| **Bounded Session RAM & Strike Cutoff** | Enforces per-bundle caps (`<= 8 MB` compressed, `<= 14 MB` uncompressed), a `24 MB` per-session RAM cap (`FORGE_TAG_STREAM_MAX_SESSION_BYTES`), a 32-tag session limit, and a **3-strike host cutoff** (`FORGE_TAG_STREAM_MAX_STRIKES = 3`) that halts all tag streaming from a misbehaving peer. |
-| **Backlog & Rate Pacing** | Host transmission in [`forge_tag_stream_tick`](port/linux/game/forge_network.c) is gated by per-client `reliable_outgoing_queue` backlog (`<= 16 KB`) and a `128 KB/s` wall-clock token bucket so high-FPS hosts never starve gameplay traffic or overflow the 256 KB reliable queue. |
-| **Zero Disk Writes Unless Explicitly Saved by Joiner** | Streamed tags live exclusively in session RAM (`source_cache_id = 4`) and are wiped on map unload unless the joiner explicitly chooses `SAVE MAP AS` (or `F5`). When the joiner saves the map, [`forge_commit_session_ephemeral_tags_to_disk`](port/linux/game/forge_runtime_tags.c) persists the already-verified session bundles into the unified Faber Tag Vault (`.fbrtag` + `faber_vault.bin`) so the saved Forge map works offline on future boots. |
+On Android, the files are in `/sdcard/Android/data/com.halo.decomp/files/profiles/`.
+Enter `adb pull` to copy the recording parts to a computer.
 
----
+A profiling build plays with normal builds. It does not use
+`--pgo=train`.
 
-## Dedicated Server Support
 
-- Dedicated server rotation `<map>:forge` entry ([`docs/dedicated_server.md`](docs/dedicated_server.md)) and flags `--forge-map <map>` and `--forge-autosave` ([`server_mode.c`](port/linux/src/server_mode.c), [`forge_server_autosave_tick`](port/linux/game/forge_runtime_tags.c)) flush a lightweight `.txt` sidecar 5 seconds after edits and commit full state when the last player leaves or via `!FW`.
+## Credits
 
----
+The decompilation is of the Xbox build 2342 (`cachebeta.exe`, SHA-256
+`4cc87b45f721270392a96f1674ed2b5cd4a7bb4355faeab4531d1cf1884d9520`).
+OpenCE starts from the decompilation of
+[bnunu/halo-1](https://github.com/bnunu/halo-1), which is a fork of
+[punpckhdq/halo](https://github.com/punpckhdq/halo). The artists of the
+high-res redraws are in [AUTHORS.md](AUTHORS.md). The main contributors are Jonas Volman (@bnunu) and MrBruh (@cybersecurity). Everyone else who has contributed is on the
+[contributors page](https://github.com/OpenCommunityEdition/OpenCE/graphs/contributors).
 
-## Installation
+## Licence
 
-| Platform | Release Download | Debug Download |
-| :--- | :--- | :--- |
-| **Windows (x86)** | [**OpenCE-Forge-v2.10.4-windows-x86.zip**](https://github.com/SutlabSol/OpenCE-Forge/releases/latest/download/OpenCE-Forge-v2.10.4-windows-x86.zip) / [halo-windows-release.zip](https://github.com/SutlabSol/OpenCE-Forge/releases/latest/download/halo-windows-release.zip) | [halo-windows-debug.zip](https://github.com/SutlabSol/OpenCE-Forge/releases/latest/download/halo-windows-debug.zip) |
-| **Linux (x86)** | [halo-linux-release.zip](https://github.com/SutlabSol/OpenCE-Forge/releases/latest/download/halo-linux-release.zip) | [halo-linux-debug.zip](https://github.com/SutlabSol/OpenCE-Forge/releases/latest/download/halo-linux-debug.zip) |
-| **Android (ARM64)** | [halo-android-release.zip](https://github.com/SutlabSol/OpenCE-Forge/releases/latest/download/halo-android-release.zip) | [halo-android-debug.zip](https://github.com/SutlabSol/OpenCE-Forge/releases/latest/download/halo-android-debug.zip) |
+OpenCE is free software: you can give it to others and change it under the
+terms of the GNU Affero General Public License as published by the Free
+Software Foundation, version 3 of the License or (at your option) any later
+version (`AGPL-3.0-or-later`). It comes with no warranty. The full text is in
+[LICENSE](LICENSE).
 
-### Quick Start (Windows / Linux)
-1. Download the latest release archive from the [**Releases**](https://github.com/SutlabSol/OpenCE-Forge/releases/latest) page and extract it to a folder.
-2. Place your Halo Xbox `maps/` folder (or Halo Xbox `.iso` / `.xiso` disc image) next to `halo.exe` (`halo` on Linux), along with your optional `custom_maps/` (`bitmaps.map`, `sounds.map`, `loc.map`, and Custom Edition `.map` files) and `mcc_maps/` folders.
-3. Launch **`halo.exe`**.
-4. Select **`MULTIPLAYER -> FORGE`** to start forging or manage custom tags under **`TAG OPTIONS`**.
+- **From the change.** The AGPL applies from the commit that made the change,
+  and to each release built from that commit or a later one. Earlier
+  releases, and the source at every earlier commit, were released under
+  [CC0 1.0](LICENSES/CC0-1.0.txt) and stay that way.
+- **What OpenCE builds on.** The decompilation of
+  [punpckhdq/halo](https://github.com/punpckhdq/halo) is under the AGPL 3.0
+  from 17 October 2026, and under CC0 1.0 before that date.
+  [bnunu/halo-1](https://github.com/bnunu/halo-1) is under CC0 1.0.
+- **Contributions** are under `AGPL-3.0-or-later`. A change taken from a
+  project under GPL 3.0 keeps that licence and its notices; the GPL 3.0 and
+  the AGPL 3.0 let the two be combined (section 13 of each).
+- **Hosts and servers.** If you change the game and let other persons play
+  with your version over a network (for example, as the host of an internet
+  game, or on a web site), the AGPL asks you to offer them the source of
+  your version (section 13). The game as released has its source here, and
+  each release's source is its tag (`build-<n>`).
+- **Third-party code, fonts and art** keep their own licences, which are
+  next to them (`port/third_party`, `port/assets/fonts`,
+  `port/assets/icons`, `port/assets/text_filter`). The release downloads and
+  the web site's `licenses.txt` carry their notices.
+- **Halo is not covered.** The licence covers the work of OpenCE's authors.
+  It gives no rights in Halo, its maps or anything else that Microsoft owns.
 
----
 
-## Controls in Forge
-
-All Forge keyboard/mouse and controller bindings can be customized in-game under **`SETTINGS -> CONTROLS SETUP -> FORGE / FORGE PAD`**.
-
-| Key / Input | Controller Default | Action |
-| :--- | :--- | :--- |
-| **`F1`** | **D-Pad Up** | Switch Play (Spartan) / Edit (3D Monitor) Mode |
-| **`F2`** | **X** *(when not targeting item)* | Open / Close Inventory (Forge Object Palette) |
-| **`X`** | **X** *(while holding or facing item)* | Open Object Properties (Physics, Respawn, Weld Group, Lighting) |
-| **`Left Click`** | **A** | Grab / Drop Object |
-| **`Mouse Wheel`** | **`Page Up` / `Page Down`** | Push / Pull Held Object (`1m` – `30m`) |
-| **`Delete` / `Backspace`** | **Y** | Delete Hovered / Held Object (or Weld Group) |
-| **`Hold R` + Mouse** | **Hold Left Trigger (LT) + RS** | Rotate Held / Hovered Object (`Q` / `E` rolls while holding `R`) |
-| **`Ctrl+G`** | **Object Properties -> Weld Group** | Toggle Weld Membership in Active Weld Group (`1..16`; `Shift+Ctrl+G` cycles group) |
-| **`C`** | **D-Pad Right** | Duplicate Hovered Object (or entire Weld Group) |
-| **`G`** | **Right Thumb (RS)** | Cycle Rotation Snap (`Off`, `15°`, `45°`, `90°`) |
-| **`Hold Z`** | **D-Pad Left** | Snap held object to floor |
-| **`Hold F`** | **—** | Snap held object to surface |
-| **`F4`** | **Back** | Toggle 1st-Person / 3rd-Person Monitor View |
-| **`F5`** | **D-Pad Down** | Quick Save Forge Map (`custom_maps/<name>.txt`) |
-| **`Ctrl+Z` / `Ctrl+Y`** | **—** | Undo / Redo Forge Action |
-
----
-
-## Building from Source
-
-```powershell
-python configure.py --release
-ninja windows      # build/windows/halo.exe and SDL3.dll
-ninja linux        # build/linux/halo
-ninja android_apk  # port/android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-If you modify menu definitions in `tools/ce_menus.py` or `tools/port_settings.py`, regenerate the embedded menu XML before building:
-```powershell
-python tools/port_settings.py
-```
-
----
-
-## Licence & Credits
-
-- **OpenCE : Forge** is developed by **Mota-Lev** on top of [OpenCommunityEdition/OpenCE](https://github.com/OpenCommunityEdition/OpenCE) ([bnunu/halo-1](https://github.com/bnunu/halo-1) / [punpckhdq/halo](https://github.com/punpckhdq/halo)).
-- High-resolution HUD and menu art redraws are credited in [AUTHORS.md](AUTHORS.md).
-- Licensed under the [GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`)](LICENSE).
+## Disclaimer
+OpenCE (Open Community Edition) is an unofficial fan project. It is not endorsed by or affiliated with Microsoft, Xbox Game Studios, Halo Studios, Activision or Bungie. Halo and Halo: Combat Evolved are trademarks of Microsoft Corporation; Halo © Microsoft Corporation.
+No game data is included. You must provide your own copy of the game.

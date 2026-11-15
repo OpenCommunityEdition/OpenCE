@@ -1,7 +1,9 @@
 /*
- * OpenCE : Forge
- * Runtime Engine Header - Shared across all Forge runtime modules.
- */
+FORGE_ENGINE.H
+
+Shared data structures, limits, and entry points for the in-game 3D Forge
+editor, runtime tag loader, and multiplayer synchronization.
+*/
 
 #ifndef FORGE_ENGINE_H
 #define FORGE_ENGINE_H
@@ -17,15 +19,15 @@ extern "C" {
 
 #include "halo_port_limits.h"
 
-#define FORGE_VERSION_STRING "2.10.14"
+#define FORGE_VERSION_STRING "2.10.15"
 #define FORGE_NETWORK_VERSION 0x4633
 #define FORGE_GAME_KIND 0x46
 #ifndef HALO_PORT_NETWORK_VERSION_STOCK
 #define HALO_PORT_NETWORK_VERSION_STOCK HALO_PORT_NETWORK_VERSION
 #endif
 /* Standard (non-Forge) sessions use OpenCE's own HALO_PORT_NETWORK_VERSION
- * (port/linux/include/halo_port_limits.h), read in forge_get_network_version(),
- * so an upstream protocol bump never leaves Forge unable to join stock games. */
+   (port/linux/include/halo_port_limits.h), read in forge_get_network_version(),
+   so an upstream protocol bump never leaves Forge unable to join stock games. */
 
 extern int g_forge_session_enabled;
 long forge_get_network_version(void);

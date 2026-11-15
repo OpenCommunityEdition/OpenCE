@@ -1,11 +1,9 @@
 /*
- * OpenCE : Forge
- * Collaborative P2P Forge Network Synchronization:
- * - Bidirectional Spawn (!FS: / !FH:), Transform (!FM:), and Delete (!FD:) replication
- * - Per-Player Monitor vs. Spartan mode & 3D Monitor flight state synchronization (!FT:)
- * - Late-join / full-session state synchronization (!FQ)
- * - Automatic client-side external tag faulting on object creation
- */
+FORGE_NETWORK.C
+
+Multiplayer Forge synchronization and bidirectional custom tag streaming
+(FTRQ / FTST) between host and clients.
+*/
 
 #ifndef HALO_RELEASE
 #define HALO_RELEASE
@@ -414,7 +412,7 @@ static struct forge_catalog_entry const *forge_find_catalog_entry_by_hash(uint32
 		}
 	}
 	/* Fallback 3: check stock Xbox donor credits database (OpenCE Forge/credits.md) so late-joiners and peers
-	 * can resolve any stock Xbox campaign/MP tag (e.g. Pelican from b30.map) directly from their local maps/ folder! */
+	   can resolve any stock Xbox campaign/MP tag (e.g. Pelican from b30.map) directly from their local maps/ folder! */
 	{
 		uint32_t cred_grp = 0;
 		char cred_path[128];
@@ -613,7 +611,7 @@ void forge_network_reset_session(void)
 		g_net_obj_live_index[i] = -1;
 		g_net_obj_is_held[i] = 0;
 		/* Note: do not clear g_net_obj_has_deferred_create[i] here because on client join,
-		 * _distributed_message_object_changes can arrive before forge_runtime_init() runs on tick 0. */
+		   _distributed_message_object_changes can arrive before forge_runtime_init() runs on tick 0. */
 	}
 	for (i = 0; i < FORGE_MAX_CLIENT_MACHINES; i++)
 	{
@@ -1074,8 +1072,8 @@ void forge_network_send_transform_ext(
 	}
 
 	/* If this client instance has not yet been linked to a Host slot (e.g. while the Host
-	 * is downloading a custom/MCC tag from this client), send live_idx = -1 and obj_abs = -1
-	 * so the Host updates g_host_pending_client_spawns instead of moving an existing Host slot. */
+	   is downloading a custom/MCC tag from this client), send live_idx = -1 and obj_abs = -1
+	   so the Host updates g_host_pending_client_spawns instead of moving an existing Host slot. */
 	if (game_connection() == _game_connection_network_client &&
 		live_idx >= 0 && live_idx < g_forge.live_instance_count &&
 		(g_forge.live_instances[live_idx].pad_inst & 0x80u) != 0)
@@ -1380,7 +1378,7 @@ static void forge_client_handle_host_spawn(
 	int i;
 
 	/* Ensure default scenario entities (spawns, flags, teleporters) are initialized at indices 0..N-1
-	 * before inserting any host-replicated objects, even if !FH: arrives on Frame 0 before forge_3d_update()! */
+	   before inserting any host-replicated objects, even if !FH: arrives on Frame 0 before forge_3d_update()! */
 	if (g_forge.live_instance_count == 0)
 		forge_init_map_scenario_entities();
 
@@ -1421,7 +1419,7 @@ static void forge_client_handle_host_spawn(
 	}
 
 	/* Only units and items share lower-1024 obj_abs indices across the network (network_objects.c).
-	 * Non-networked objects (scen, mach, lifi) are spawned locally on each machine at independent indices. */
+	   Non-networked objects (scen, mach, lifi) are spawned locally on each machine at independent indices. */
 	is_net_obj = (actual_grp == 'vehi' || actual_grp == 'weap' || actual_grp == 'eqip' ||
 				  actual_grp == 'bipd' || ce->group_tag == 'actv');
 	if (!is_net_obj)
@@ -1758,7 +1756,7 @@ static void forge_client_handle_host_spawn(
 	else if (matched_client_unlinked && match_idx >= 0 && match_idx < g_forge.live_instance_count)
 	{
 		/* Non-networked object (scen, mach, lifi, ctrl, spwn, tele, flag) spawned by Client and now linked to host_live_idx:
-		 * immediately send Client's current held/placed transform so Host updates from initial spawn position! */
+		   immediately send Client's current held/placed transform so Host updates from initial spawn position! */
 		struct forge_live_instance const *inst = &g_forge.live_instances[match_idx];
 		int effective_held = (g_forge.grabbed_live_index == match_idx) ? 1 : 0;
 		forge_network_send_transform_ext(
@@ -1791,8 +1789,8 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 		forge_runtime_init();
 
 	/* In Standard Mode (!g_forge_session_enabled), only allow initial map state sync (!FQ from client,
-	 * and host-to-client state sync packets). Never enable g_forge_session_enabled from network packets,
-	 * and ignore client-to-host Forge edit commands when the server is not in Forge Mode. */
+	   and host-to-client state sync packets). Never enable g_forge_session_enabled from network packets,
+	   and ignore client-to-host Forge edit commands when the server is not in Forge Mode. */
 	if (!g_forge_session_enabled && is_from_client_to_host && strcmp(text, "!FQ") != 0)
 		return 1;
 
@@ -2019,7 +2017,7 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 				else if (machine_index >= 0 && machine_index < FORGE_MAX_CLIENT_MACHINES)
 				{
 					/* Client placed a custom tag (e.g. from a Custom Edition or MCC map) that the Host does not have locally:
-					 * record pending spawn, ensure machine_index is marked known, and request the custom tag bundle from the Client! */
+					   record pending spawn, ensure machine_index is marked known, and request the custom tag bundle from the Client! */
 					int ps_i;
 					g_host_machine_known[machine_index] = 1;
 					for (ps_i = 0; ps_i < FORGE_TAG_STREAM_MAX_SESSION_TAGS; ps_i++)
@@ -2345,9 +2343,7 @@ void forge_network_post_handle_object_changes(void const *entries, short count)
 	}
 }
 
-/* ============================================================================
- * ZERO-TRUST SOLICITED SINGLE-FLIGHT CUSTOM TAG STREAMING (SESSION RAM ONLY)
- * ============================================================================ */
+/* ---------- ZERO-TRUST SOLICITED SINGLE-FLIGHT CUSTOM TAG STREAMING (SESSION RAM ONLY) */
 
 static void forge_tag_stream_fill_header(struct distributed_message_header *hdr, byte type, word size)
 {
@@ -3318,8 +3314,8 @@ void forge_tag_stream_handle_message(
 				if (is_server)
 				{
 					/* Host finished receiving a custom tag from a Client: store the verified compressed bundle
-					 * in g_host_tag_cache so the Host can re-serve this tag to other Clients without disk files,
-					 * and spawn all pending Client instances! */
+					   in g_host_tag_cache so the Host can re-serve this tag to other Clients without disk files,
+					   and spawn all pending Client instances! */
 					int cs_i, cache_slot = -1, ps_i;
 					for (cs_i = 0; cs_i < FORGE_TAG_STREAM_MAX_SESSION_TAGS; cs_i++)
 					{

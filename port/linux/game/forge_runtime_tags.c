@@ -1,9 +1,9 @@
 /*
- * OpenCE : Forge
- * Runtime Tag Catalog, Cached Tag Folder System (OpenCE Forge/cached_tags/),
- * Dynamic Runtime Tag Table Expansion, Multiplayer Asset Guard, Custom Tag Extraction,
- * Standalone Map Baking, Dynamic Network Version & 343 Guilty Spark Hardware Model Renderer.
- */
+FORGE_RUNTIME_TAGS.C
+
+Runtime tag extraction, recursive dependency cloning, MCC and Custom Edition tag
+conversion, .fbrtag bundle serialization, and sidecar map state persistence.
+*/
 
 #ifndef HALO_RELEASE
 #define HALO_RELEASE
@@ -1478,7 +1478,7 @@ static void scan_loaded_map_into_catalog(void)
 			continue;
 
 		/* Require a valid 3D model on object definitions (or light/emitter classification)
-		 * so invisible script-anchor scenery or sound-only dummy objects do not clutter the palette. */
+		   so invisible script-anchor scenery or sound-only dummy objects do not clutter the palette. */
 		odef = (struct _object_definition const *)inst->base_address;
 		if (grp != 'lifi' && odef->model.index == NONE)
 		{
@@ -1545,7 +1545,7 @@ void forge_runtime_reload_catalogs(void)
 	add_catalog_entry('flag', _forge_cat_objectives, 0, "objective\\race_track", "[RACE] Race Marker / Checkpoint");
 
 	/* Load custom tag vault catalog first (so [C] items appear at the top of each category),
-	 * then Xbox default catalog, then any map-local tags ([MAP]) from the currently loaded map */
+	   then Xbox default catalog, then any map-local tags ([MAP]) from the currently loaded map */
 	scan_faber_tag_vault_into_catalog();
 	for (ep_i = 0; ep_i < saved_ephemeral_count; ep_i++)
 	{
@@ -1560,7 +1560,7 @@ void forge_runtime_reload_catalogs(void)
 	scan_loaded_map_into_catalog();
 
 	/* 3. Stable-sort custom cached entries ([C], source_cache_id == 2 or 4) first,
-	 *    then map-local entries ([MAP], source_cache_id == 3), then donor/stock entries */
+	      then map-local entries ([MAP], source_cache_id == 3), then donor/stock entries */
 	if (g_forge.catalog_count > 10)
 	{
 		struct forge_catalog_entry *sorted =
@@ -1630,10 +1630,10 @@ static int is_mcc_version13_map_file(char const *map_path)
 }
 
 /*
- * Checks if a pre-existing decompressed Xbox cache file already exists for `map_path`
- * in OpenCE's Xbox hard-drive cache (z:\cache000.map..z:\cache005.map or z:\cache_donor.map)
- * or if `map_path` itself is already uncompressed on disk.
- * If not, decompresses the Xbox v5 map payload using zlib into OpenCE's z:\cache_donor.map.
+   Checks if a pre-existing decompressed Xbox cache file already exists for `map_path`
+   in OpenCE's Xbox hard-drive cache (z:\cache000.map..z:\cache005.map or z:\cache_donor.map)
+   or if `map_path` itself is already uncompressed on disk.
+   If not, decompresses the Xbox v5 map payload using zlib into OpenCE's z:\cache_donor.map.
  */
 static int ensure_xbox_map_decompressed_cache(
 	char const *map_path,
@@ -1690,7 +1690,7 @@ static int ensure_xbox_map_decompressed_cache(
 	snprintf(z_donor_named, sizeof(z_donor_named), "z:\\cache_donor_%s.map", clean_name);
 
 	/* 1. Check if OpenCE's Xbox hard-drive cache (z:\cache_donor_<name>.map, z:\cache000.map .. z:\cache005.map, or z:\cache_donor.map)
-	 * already holds this decompressed Xbox map; if so, use it directly without duplicating! */
+	   already holds this decompressed Xbox map; if so, use it directly without duplicating! */
 	for (slot = 0; slot <= 7; slot++)
 	{
 		char z_xbox[64];
@@ -2326,11 +2326,7 @@ void forge_runtime_init(void)
 	forge_runtime_reload_catalogs();
 }
 
-/* ============================================================================
- * NATIVE XBOX & CUSTOM EDITION MAP TAG CACHE LOADER
- * Tags are loaded natively from extracted map tag bundles and Xbox map caches
- * (using OpenCE's exact tag schema & hardware vertex/triangle/texture registration).
- * ============================================================================ */
+/* ---------- NATIVE XBOX & CUSTOM EDITION MAP TAG CACHE LOADER — Tags are loaded natively from extracted map tag bundles and Xbox map caches — (using OpenCE's exact tag schema & hardware vertex/triangle/texture registration). */
 
 #define FORGE_MAX_HW_PARTS       48
 #define FORGE_MAX_DYNAMIC_TAGS   1024
@@ -2535,7 +2531,7 @@ void forge_runtime_on_map_unload(void)
 	forge_ui_close_map_tag_browser();
 
 	/* Dispose injected Custom Edition model buffers FIRST while their gbxmodel
-	 * part definitions in s_forge_phys_allocs are still mapped in memory! */
+	   part definitions in s_forge_phys_allocs are still mapped in memory! */
 	custom_edition_injected_models_dispose();
 
 	for (i = 0; i < s_forge_phys_allocs.count; i++)
@@ -2927,7 +2923,7 @@ static void patch_light_definition_buffer(uint8_t *lbuf)
 	if (!lbuf)
 		return;
 	/* Bit 0 (_light_definition_dynamic_bit = 1) must be set and radius_modifier_upper_bound > 0
-	 * for Halo's object_lights.c to illuminate surrounding world geometry and objects! */
+	   for Halo's object_lights.c to illuminate surrounding world geometry and objects! */
 	*(uint32_t *)(lbuf + 0x00) |= 1u;
 	if (*(float const *)(lbuf + 0x04) < 3.5f)
 		*(float *)(lbuf + 0x04) = 4.5f;
@@ -3442,7 +3438,7 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 		return;
 
 	/* Ensure scenery, devices, weapons, equipment, and light fixtures have valid bounding and render radii so Forge raycasting
-	 * and long-distance frustum/LOD visibility never cull custom items early */
+	   and long-distance frustum/LOD visibility never cull custom items early */
 	if (grp == 'weap' || grp == 'eqip')
 	{
 		if (*(float const *)(obuf + 0x04u) < 0.6f)
@@ -3461,7 +3457,7 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 					*(uint16_t *)(obuf + 0x330u + w_j * 2u) = (uint16_t)(val - 2u);
 			}
 			/* Ensure weapon.label matches a valid cyborg animation class on stock Xbox maps
-			 * so unit_can_use_weapon allows Spartans to pick up, switch to, and fire the weapon! */
+			   so unit_can_use_weapon allows Spartans to pick up, switch to, and fire the weapon! */
 			if (strcmp(wlabel, "ar") != 0 && strcmp(wlabel, "pr") != 0 &&
 				strcmp(wlabel, "pp") != 0 && strcmp(wlabel, "hp") != 0 &&
 				strcmp(wlabel, "sr") != 0 && strcmp(wlabel, "rl") != 0 &&
@@ -3483,8 +3479,8 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 		*(float *)(obuf + 0x104u) = *(float const *)(obuf + 0x04u) * 2.0f;
 
 	/* Patch the object's model ('mode'/'mod2') LOD cutoffs and permutation geometry_indices[0..4]
-	 * so custom items with missing low-LOD geometries or positive super_low pixel cutoffs
-	 * render across the entire map just like base-game objects! */
+	   so custom items with missing low-LOD geometries or positive super_low pixel cutoffs
+	   render across the entire map just like base-game objects! */
 	model_idx = *(int32_t const *)(obuf + 0x34u);
 	if (model_idx != NONE)
 	{
@@ -3747,7 +3743,7 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 	}
 
 	/* Reuse any dependency tag that was already dynamically injected during this session,
-	 * or reuse shared base-map dependencies (including sounds) on the active map. */
+	   or reuse shared base-map dependencies (including sounds) on the active map. */
 	if (cl->order_count > 0 && !cl->is_red_beam_variant && !cl->include_all_dependencies)
 	{
 		char donor_name[256];
@@ -4611,8 +4607,8 @@ static long load_native_xbox_tag_from_source(
 							if (mem_image != NULL)
 							{
 								/* MCC sound sample offsets in decompressed maps that are smaller than 2048 + tag_sz
-								 * are external sound-bank offsets (not decompressed cache file offsets) and would
-								 * read tag metadata as raw Xbox ADPCM audio, corrupting the sound mixer. */
+								   are external sound-bank offsets (not decompressed cache file offsets) and would
+								   read tag metadata as raw Xbox ADPCM audio, corrupting the sound mixer. */
 								if ((uint32_t)perm->samples.file_offset >= 2048u + tag_sz &&
 									(uint64_t)(uint32_t)perm->samples.file_offset + (uint64_t)(uint32_t)perm->samples.size <= (uint64_t)mem_image_size)
 								{
@@ -4787,7 +4783,7 @@ static long load_native_xbox_tag_from_source(
 		else if (grp == 'antr')
 		{
 			/* Clear _animation_world_relative_bit (0x0002) on scenery/character animations (e.g. flood_captain in d20)
-			 * so placed objects render at their placed world position rather than teleporting to campaign cutscene coordinates. */
+			   so placed objects render at their placed world position rather than teleporting to campaign cutscene coordinates. */
 			int32_t anim_cnt = *(int32_t const *)(root_buf + 0x74u);
 			uint8_t *anim_base = *(uint8_t **)(root_buf + 0x78u);
 			float n0_tx = 0.0f, n0_ty = 0.0f, n0_tz = 0.0f;
@@ -5253,7 +5249,7 @@ static long load_native_xbox_tag_runtime(
 	}
 
 	/* 4. Fallback: if the tag is in an MCC map (e.g. rwarthog, banshee_mp, c_gun_turret_mp, or MCC-only donor),
-	 * extract and convert it from mcc_maps/ into the Tag Vault and load it! */
+	   extract and convert it from mcc_maps/ into the Tag Vault and load it! */
 	if (try_extract_tag_from_mcc_maps_to_vault(req_group, req_path))
 	{
 		long mcc_hdl = load_faber_vault_tag_bundle_runtime(req_group, req_path, out_actual_group);
@@ -6190,7 +6186,7 @@ static void resolve_current_base_map_path(char *out_path, size_t out_sz)
 		else
 		{
 			/* Active map is an Xbox v5 map: check maps/<leaf>.map and d:\maps\<leaf>.map first,
-			 * then custom_maps/<leaf>.map for an already-saved Xbox FLG1 map. Never substitute a Custom Edition map! */
+			   then custom_maps/<leaf>.map for an already-saved Xbox FLG1 map. Never substitute a Custom Edition map! */
 			char d_path[160];
 			snprintf(candidate, sizeof(candidate), "maps/%s.map", map_leaf);
 			if ((f = fopen(candidate, "rb")) != NULL)
@@ -6390,7 +6386,7 @@ int forge_ui_save_copy_as(char const *new_map_name)
 		if (ok && active_leaf[0] && _stricmp(active_leaf, clean_name) != 0)
 		{
 			/* Remove any leftover default-named sidecar save (e.g. custom_maps/<active_leaf>.txt)
-			 * so saving with a custom name never leaves two saves or pollutes the stock base map. */
+			   so saving with a custom name never leaves two saves or pollutes the stock base map. */
 			char d_map[160], d_txt[160], host_map[512], host_txt[512];
 			FILE *f_check;
 			snprintf(d_map, sizeof(d_map), "d:\\custom_maps\\%s.map", active_leaf);
@@ -6576,7 +6572,7 @@ static void parse_forge_state_text_buffer(char const *text_buf, char const *leaf
 					else
 					{
 						/* Sidecar-only map, device/light fixture, or cached tag object not baked into base_map:
-						 * always spawn live now so placed objects never claim or hijack nearby stock scenario objects! */
+						   always spawn live now so placed objects never claim or hijack nearby stock scenario objects! */
 						last_object_li = forge_3d_spawn_object_at((uint32_t)grp, tpath, (uint8_t)src_cache, x, y, z, yaw, pitch, roll, (int16_t)team, 0);
 						last_object_po = (last_object_li >= 0) ? g_forge.live_instances[last_object_li].edit_entry_index : -1;
 						if (last_object_po >= 0 && last_object_po < FORGE_MAX_PLACED_OBJECTS)
@@ -7395,8 +7391,8 @@ void forge_load_saved_map_state_if_present(char const *map_name)
 		}
 
 		/* 0. If a sidecar custom_maps/<leaf>.txt exists (either explicitly selected via Edit Maps / Forge Maps
-		 *    or crash-recovery sidecar for a custom FLG1 .map), load it now.
-		 *    When launching a stock Xbox, CE, or MCC map directly without selecting a custom sidecar, do NOT auto-load a sidecar. */
+		      or crash-recovery sidecar for a custom FLG1 .map), load it now.
+		      When launching a stock Xbox, CE, or MCC map directly without selecting a custom sidecar, do NOT auto-load a sidecar. */
 		f = NULL;
 		if (has_pending_sidecar || is_flg1_map || halo_server_mode())
 		{
@@ -7580,7 +7576,7 @@ static int forge_write_sidecar_state_file(char const *leaf)
 		}
 
 		/* Ensure any network-replicated live instances on a Joiner (edit_entry_index < 0) are synced into edit_state before saving,
-		 * and deduplicate any identical placed_objects entries. */
+		   and deduplicate any identical placed_objects entries. */
 		{
 			int32_t li_idx;
 			int p_i, p_j;
@@ -7898,11 +7894,7 @@ void forge_server_autosave_tick(void)
 	s_forge_server_prev_player_count = player_cnt;
 }
 
-/* ============================================================================
- * MONITOR ("characters\monitor\monitor") & NATIVE MODEL RENDERER
- * - Renders 343 Guilty Spark ("characters\monitor\monitor") and 3D Spawn Menu
- *   previews directly through OpenCE's native orig_render_model!
- * ============================================================================ */
+/* ---------- MONITOR ("characters\monitor\monitor") & NATIVE MODEL RENDERER — - Renders 343 Guilty Spark ("characters\monitor\monitor") and 3D Spawn Menu — previews directly through OpenCE's native orig_render_model! */
 
 static int draw_native_object_model_at(
 	long obj_def_idx,
@@ -8749,9 +8741,9 @@ static void draw_translucent_koth_beam_3d(
 		return;
 
 	/*
-	 * Stretch the unit 3D beam (x in [0..1], y in [-0.015..+0.015], z in [0.025..0.055])
-	 * along forward = (p1 - p0) while keeping left and up unit-length so cross-section
-	 * thickness stays constant regardless of segment length!
+	   Stretch the unit 3D beam (x in [0..1], y in [-0.015..+0.015], z in [0.025..0.055])
+	   along forward = (p1 - p0) while keeping left and up unit-length so cross-section
+	   thickness stays constant regardless of segment length!
 	 */
 	memset(&node_matrix, 0, sizeof(node_matrix));
 	node_matrix.scale = 1.0f;
@@ -8927,7 +8919,7 @@ static void render_world_objective_and_spawn_markers(void)
 	}
 
 	/* Render 3D translucent KOTH boundary beams ONLY in Forge mode when a node of that hill is actually clicked/grabbed
-	 * (or actively being placed as a 10-point hill), connecting the exact 3D marker positions. */
+	   (or actively being placed as a 10-point hill), connecting the exact 3D marker positions. */
 	if (g_forge.mode != _forge_mode_3d_monitor)
 		return;
 	for (hill_id = 0; hill_id < 16; hill_id++)
@@ -9255,9 +9247,7 @@ int forge_monitor_render_player_unit(long object_index, void const *lighting_ptr
 }
 
 
-/* ============================================================================
- * FORGE TAG OPTIONS: ADD TAGS (MAP TAG BROWSER), INSTALLED TAGS & 3D PREVIEW
- * ============================================================================ */
+/* ---------- FORGE TAG OPTIONS: ADD TAGS (MAP TAG BROWSER), INSTALLED TAGS & 3D PREVIEW */
 
 #define FORGE_BROWSER_NUM_CATS 5
 
@@ -10319,7 +10309,7 @@ static int extract_xbox_map_tag_to_vault(
 	}
 
 	/* Pack external 'bitm' pixels and 'snd!' samples contiguously starting at file offset 2048,
-	 * and convert MCC 'mod2'/'scex'/'weap' tags into native Xbox v5 layout when extracting from MCC v13 maps. */
+	   and convert MCC 'mod2'/'scex'/'weap' tags into native Xbox v5 layout when extracting from MCC v13 maps. */
 	for (i = 0; i < cl.order_count; i++)
 	{
 		int32_t abs_idx = cl.order[i];
@@ -11392,9 +11382,9 @@ int forge_cache_active_map_tag(uint32_t group_tag, char const *tag_path)
 		}
 
 		/* Back up live [0x40440000, 0x40440000 + tag_data_sz) and temporarily restore
-		 * raw 'mod2' group tags (regrouped to 'mode' by custom_edition_models_convert),
-		 * geometry->parts (0x84-byte custom_edition_model_part), and model->flags
-		 * so tag_bundle_write & tag_bundle_load_tags_regions walk GBXMODEL_PART_DEFINITION_NAME cleanly. */
+		   raw 'mod2' group tags (regrouped to 'mode' by custom_edition_models_convert),
+		   geometry->parts (0x84-byte custom_edition_model_part), and model->flags
+		   so tag_bundle_write & tag_bundle_load_tags_regions walk GBXMODEL_PART_DEFINITION_NAME cleanly. */
 		memcpy(backup_tag_data, (void const *)0x40440000UL, tag_data_sz);
 		for (ti = 0; ti < ce_hdr->tag_count; ti++)
 		{
@@ -11534,7 +11524,7 @@ int forge_cache_active_map_tag(uint32_t group_tag, char const *tag_path)
 		snprintf(map_leaf, sizeof(map_leaf), "%s", m_slash ? (m_slash + 1) : cur_map);
 
 		/* If the active map is an MCC map, resolve its MCC package path FIRST so we don't
-		 * accidentally open a retail/Xbox map with the same leaf stem (e.g. bloodgulch.map). */
+		   accidentally open a retail/Xbox map with the same leaf stem (e.g. bloodgulch.map). */
 		if (_strnicmp(cur_map, "mcc_maps\\", 9) == 0 ||
 			_strnicmp(cur_map, "mcc_maps/", 9) == 0 ||
 			mcc_cache_tags_loaded())
@@ -11825,10 +11815,7 @@ int forge_ui_installed_tag_delete(int category_tab, int list_index)
 	return 1;
 }
 
-/* ============================================================================
- * 3D SOFTWARE MESH PREVIEW BUILDER (Supports CE 'mod2', Faber '.fbrtag',
- * and Xbox/MCC 'mode' tags!)
- * ============================================================================ */
+/* ---------- 3D SOFTWARE MESH PREVIEW BUILDER (Supports CE 'mod2', Faber '.fbrtag', — and Xbox/MCC 'mode' tags!) */
 
 #define FORGE_PREVIEW_MAX_VERTICES   131072
 #define FORGE_PREVIEW_MAX_TRIANGLES  196608
@@ -13219,7 +13206,7 @@ void forge_normalize_mcc_hud_tags(void)
 					*(int8_t *)(base + 0x10 + b) = (int8_t)((v >= 0 ? (v + 1) : (v - 1)) / 2);
 				}
 				/* Clear _bitmap_group_half_hud_scale_bit (0x10) on the 4x number bitmap
-				 * so hud_draw_bitmap_direct can apply a single 0.25f scale uniformly. */
+				   so hud_draw_bitmap_direct can apply a single 0.25f scale uniformly. */
 				if (bm_tag != NONE)
 				{
 					long bm_abs = bm_tag & 0xFFFF;
@@ -13555,9 +13542,7 @@ void forge_normalize_mcc_hud_tags(void)
 	}
 }
 
-/* ============================================================================
- * ZERO-TRUST SESSION-RAM-ONLY CUSTOM TAG STREAMING HELPERS
- * ============================================================================ */
+/* ---------- ZERO-TRUST SESSION-RAM-ONLY CUSTOM TAG STREAMING HELPERS */
 
 uint32_t forge_compute_catalog_hash(uint32_t group_tag, char const *tag_path)
 {
@@ -13817,8 +13802,8 @@ int forge_export_custom_tag_bundle(
 	}
 
 	/* 3. On-demand extraction: if the requested hash belongs to a tag in our catalog, live instances, or credits
-	 * that was not yet extracted into port_tag_profiles (e.g. a [MAP] vehicle/weapon on an MCC or CE map),
-	 * extract it into the Tag Vault now and export it! */
+	   that was not yet extracted into port_tag_profiles (e.g. a [MAP] vehicle/weapon on an MCC or CE map),
+	   extract it into the Tag Vault now and export it! */
 	{
 		uint32_t cand_grp = 0;
 		char cand_path[256];

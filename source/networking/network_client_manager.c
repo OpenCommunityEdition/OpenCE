@@ -3178,7 +3178,7 @@ static boolean network_game_client_idle_ingame(
 		else if (connection_stale && !client->connection_silent && started)
 		{
 			/* port: suppress the intrusive "Waiting for System Link..." modal popup during
-			 * brief tag-loading or map-sync stalls when joining a server. */
+			   brief tag-loading or map-sync stalls when joining a server. */
 			network_event("network client connection has been silent for a dangerously long amount of time");
 		}
 
@@ -3186,7 +3186,7 @@ static boolean network_game_client_idle_ingame(
 	}
 
 	/* port: progressing MCC conversion has an absolute limit too, even when
-	 * the host keeps writing while its synchronous map conversion runs. */
+	   the host keeps writing while its synchronous map conversion runs. */
 	if (success && mcc_load_network_client_expired())
 	{
 		network_event("MCC loading exceeded its bounded conversion window");

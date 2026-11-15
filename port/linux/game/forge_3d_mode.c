@@ -1,13 +1,10 @@
 /*
- * OpenCE : Forge
- * Mode 2: 3D In-Engine Mode (Single-Player & Online Multiplayer / Co-op)
- * - 6DOF 343 Guilty Spark Monitor flight with native Mouse Look
- * - 3rd-Person Monitor View toggle (F4 or console `third_person`)
- * - Physics Beam / Raycast Object Grab, Move, Rotate (15/45/90 deg snap) & Ground Snap
- * - Halo 3-Style Left-Aligned Compact Forge Menu & Object Properties using small terminal font
- * - Interactive AI Unit Placement (Friendly vs. Enemy)
- * - "Inject Custom Tags" UI Modal & "Save Copy As..." Standalone Map Export Modal
- */
+FORGE_3D_MODE.C
+
+3D in-game Forge editor: 343 Guilty Spark monitor flight, raycast object
+grabbing, rotation and ground snapping, spawn palette and object property
+menus, weld groups, dynamic lights, teleporters, and map saving.
+*/
 
 #ifndef HALO_RELEASE
 #define HALO_RELEASE
@@ -123,16 +120,16 @@ void forge_controls_init_defaults(void)
 	g_forge.bind_vk[FORGE_BIND_COPY_OBJECT]    = 'C';
 
 	/* Default Controller Layout:
-	 * Grab/Drop Item: A
-	 * Hold to Drop Item: B
-	 * Inventory/Item Options: X
-	 * Delete Item: Y
-	 * Move/Rotate Selected Item: Left Stick
-	 * Look/Rotate Selected Item: Right Stick
-	 * Rotate Selected Item: Hold Right Trigger
-	 * Switch Play/Edit Mode: D-Pad Up
-	 * Move Up: Right Bumper (FORGE_GP_BLACK)
-	 * Move Down: Left Bumper (FORGE_GP_WHITE) */
+	   Grab/Drop Item: A
+	   Hold to Drop Item: B
+	   Inventory/Item Options: X
+	   Delete Item: Y
+	   Move/Rotate Selected Item: Left Stick
+	   Look/Rotate Selected Item: Right Stick
+	   Rotate Selected Item: Hold Right Trigger
+	   Switch Play/Edit Mode: D-Pad Up
+	   Move Up: Right Bumper (FORGE_GP_BLACK)
+	   Move Down: Left Bumper (FORGE_GP_WHITE) */
 	g_forge.bind_gp[FORGE_BIND_TOGGLE_MODE]    = FORGE_GP_DPAD_UP;
 	g_forge.bind_gp[FORGE_BIND_PALETTE]        = FORGE_GP_X;
 	g_forge.bind_gp[FORGE_BIND_THIRD_PERSON]   = FORGE_GP_BACK;
@@ -520,9 +517,9 @@ static void forge_hide_spartan_linked_attachments_and_children(long unit_idx, in
 		return;
 
 	/* Never set u->unit.active_camouflage = 1.0f during simulation ticks!
-	 * Setting active_camouflage > 0.0f during simulation causes network_distributed.c on the host
-	 * to broadcast _distributed_unit_camouflaged_bit to all clients. Instead, active_camouflage
-	 * is applied only around the local render pass in forge_render_begin/end_monitor_visibility(). */
+	   Setting active_camouflage > 0.0f during simulation causes network_distributed.c on the host
+	   to broadcast _distributed_unit_camouflaged_bit to all clients. Instead, active_camouflage
+	   is applied only around the local render pass in forge_render_begin/end_monitor_visibility(). */
 	if (!hide_linked)
 	{
 		u->unit.active_camouflage = 0.0f;
@@ -677,9 +674,7 @@ static long get_forge_ui_font(int large, long fallback_font)
 #define get_small_forge_font(fb) get_forge_ui_font(0, (fb))
 #define get_large_forge_font(fb) get_forge_ui_font(1, (fb))
 
-/* ============================================================================
- * Editable Forge UI Theme & PNG Background System (OpenCE Forge/ui/forge_ui.xml)
- * ============================================================================ */
+/* ---------- Editable Forge UI Theme & PNG Background System (OpenCE Forge/ui/forge_ui.xml) */
 
 enum forge_ui_area_id
 {
@@ -1052,12 +1047,7 @@ static void draw_ui_png_quad(struct bitmap_data *bitmap, short x0, short y0, sho
 	draw_ui_png_quad_uv(bitmap, x0, y0, x1, y1, 0.0f, 0.0f, 1.0f, 1.0f, tint_argb);
 }
 
-/* ============================================================================
- * Base Game Menu Bitmap & Font Rendering Helpers
- * Draws authentic Halo CE / OpenCE menu tags (pausebox, objectives, option_bkds,
- * list_item_bkd, sel_list_item_bkd, text_button_background, arrow_sm_*, blue)
- * and ui\large_ui / ui\small_ui fonts directly in-game.
- * ============================================================================ */
+/* ---------- Base Game Menu Bitmap & Font Rendering Helpers — Draws authentic Halo CE / OpenCE menu tags (pausebox, objectives, option_bkds, — list_item_bkd, sel_list_item_bkd, text_button_background, arrow_sm_*, blue) — and ui\large_ui / ui\small_ui fonts directly in-game. */
 
 static int draw_ce_menu_bitmap_uv(
 	char const *tag_name,
@@ -1110,7 +1100,7 @@ static int draw_ce_menu_bitmap_cropped(
 }
 
 /* Draws a 3-slice horizontally rounded Halo CE option/row highlight bar
- * using pc\bitmaps\option_bkds_sm so both left and right ends have crisp rounded caps. */
+   using pc\bitmaps\option_bkds_sm so both left and right ends have crisp rounded caps. */
 static int draw_ce_rounded_row_bar(
 	short frame_idx,
 	short x0, short y0,
@@ -1158,7 +1148,7 @@ static void draw_ce_pause_box(short x0, short y0, short width, short height, int
 		return;
 
 	/* Top slice (rounded top corners; includes 29px dark header bar when with_header != 0,
-	 * or clean blue rounded top cap from pausebox when with_header == 0) */
+	   or clean blue rounded top cap from pausebox when with_header == 0) */
 	if (draw_ce_menu_bitmap_uv(top_left, frame_idx, x0, y0, (short)(x0 + 16), (short)(y0 + top_h), 0.0f, 0.0f, 1.0f, v_top_end, 0xFFFFFFFFu) &&
 		draw_ce_menu_bitmap_uv(top_center, frame_idx, (short)(x0 + 16), y0, (short)(x1 - 16), (short)(y0 + top_h), 0.0f, 0.0f, 1.0f, v_top_end, 0xFFFFFFFFu) &&
 		draw_ce_menu_bitmap_uv(top_right, frame_idx, (short)(x1 - 16), y0, x1, (short)(y0 + top_h), 0.0f, 0.0f, 1.0f, v_top_end, 0xFFFFFFFFu) &&
@@ -1576,7 +1566,7 @@ static void draw_ce_menu_str_box(
 		return;
 
 	/* Keep font size 100% consistent across all buttons and UI rows; only scale down if a full-width
-	 * HUD bar line exceeds the safezone width (box_w >= 480). */
+	   HUD bar line exceeds the safezone width (box_w >= 480). */
 	if (box_w >= 480 && total_w > box_w - 8)
 	{
 		fit_scale = (float)(box_w - 8) / (float)total_w;
@@ -1593,7 +1583,7 @@ static void draw_ce_menu_str_box(
 	fhdr = (font_idx != NONE) ? font_definition_get(font_idx) : NULL;
 
 	/* Fast path when no {ICON} tokens are present: use Halo's native text justification over wide symmetric bounds
-	 * so centering, right-alignment, and left-alignment are pixel-exact and never wrap or vary in size. */
+	   so centering, right-alignment, and left-alignment are pixel-exact and never wrap or vary in size. */
 	if (!str_has_xbox_icon_tokens(ascii))
 	{
 		wchar_t wbuf[256];
@@ -1908,7 +1898,7 @@ static boolean forge_collision_test_vector(
 	boolean res;
 
 	/* Temporarily mark the local player's unit, any Monitor-mode player units, ignore_object_index,
-	 * and any active Weld Group follower objects with _object_invisible_bit so collision_test_vector skips all of them. */
+	   and any active Weld Group follower objects with _object_invisible_bit so collision_test_vector skips all of them. */
 	{
 		long local_unit = player_control_get_unit_index(0);
 		if (local_unit != NONE && hidden_count < 192)
@@ -2242,7 +2232,7 @@ static uint8_t *s_orig_nf_addr = NULL;
 static int s_orig_nf_count = 0;
 
 /* Syncs all active 'spwn' live_instances into the in-memory scenario->players
- * AND into g_forge.edit_state.player_spawns so Red/Blue/FFA player spawns work live and save cleanly. */
+   AND into g_forge.edit_state.player_spawns so Red/Blue/FFA player spawns work live and save cleanly. */
 void sync_live_player_spawns_to_scenario(void)
 {
 	struct scenario *scen = global_scenario_try_and_get();
@@ -2342,7 +2332,7 @@ void sync_live_player_spawns_to_scenario(void)
 }
 
 /* Syncs all active 'tele' and 'flag' live_instances into the in-memory scenario->netgame_flags
- * AND into g_forge.edit_state.netgame_flags so teleporters and KOTH/Oddball/Race/CTF markers work live and save cleanly. */
+   AND into g_forge.edit_state.netgame_flags so teleporters and KOTH/Oddball/Race/CTF markers work live and save cleanly. */
 void sync_live_netgame_flags_to_scenario(void)
 {
 	struct scenario *scen = global_scenario_try_and_get();
@@ -2827,7 +2817,7 @@ int32_t forge_3d_spawn_object_at_slot(
 	else if (group_tag == 'flag')
 	{
 		/* _netgame_flag_ctf_flag = 0, _netgame_flag_ctf_vehicle = 1, _netgame_flag_oddball_ball_spawn = 2,
-		 * _netgame_flag_race_track = 3, _netgame_flag_race_vehicle = 4, _netgame_flag_vegas_bank = 5, _netgame_flag_hill_flag = 8 */
+		   _netgame_flag_race_track = 3, _netgame_flag_race_vehicle = 4, _netgame_flag_vegas_bank = 5, _netgame_flag_hill_flag = 8 */
 		inst->netgame_flag_type =
 			strstr(tag_path, "oddball") ? 2 :
 			strstr(tag_path, "koth") ? 8 :
@@ -3667,8 +3657,8 @@ void forge_init_map_scenario_entities(void)
 	}
 
 	/* 1. Load existing scenario player starting locations (scen->players) into g_forge.live_instances
-	 *    so Red Team, Blue Team, and FFA player spawns appear as coloured ground circles + facing arrows
-	 *    and can be grabbed, moved, rotated, deleted, or team-edited on any map! */
+	      so Red Team, Blue Team, and FFA player spawns appear as coloured ground circles + facing arrows
+	      and can be grabbed, moved, rotated, deleted, or team-edited on any map! */
 	for (i = 0; i < scen->players.count && g_forge.live_instance_count < FORGE_MAX_LIVE_INSTANCES; i++)
 	{
 		struct player_starting_location *loc = TAG_BLOCK_GET_ELEMENT(
@@ -3720,7 +3710,7 @@ void forge_init_map_scenario_entities(void)
 	}
 
 	/* 2. Load existing scenario netgame_flags (Teleporters In/Out, KOTH Hills, Oddballs, CTF Flags, Race Nodes)
-	 *    into g_forge.live_instances so they can be grabbed, moved, rotated, deleted, and linked via Reference ID! */
+	      into g_forge.live_instances so they can be grabbed, moved, rotated, deleted, and linked via Reference ID! */
 	for (i = 0; i < scen->netgame_flags.count && g_forge.live_instance_count < FORGE_MAX_LIVE_INSTANCES; i++)
 	{
 		struct scenario_netgame_flag *flg = TAG_BLOCK_GET_ELEMENT(
@@ -3797,8 +3787,8 @@ void forge_init_map_scenario_entities(void)
 	}
 
 	/* 3. Deterministically register all default non-networked scenario objects (scenery, machines,
-	 *    controls, light fixtures) in object_header_data slot order so Host and Clients share the
-	 *    exact same live_idx for every in-map scenery/device object before any player edits occur! */
+	      controls, light fixtures) in object_header_data slot order so Host and Clients share the
+	      exact same live_idx for every in-map scenery/device object before any player edits occur! */
 	if (object_header_data)
 	{
 		unsigned long default_mask =
@@ -3862,8 +3852,8 @@ void forge_init_map_scenario_entities(void)
 	}
 
 	/* 2. Points 7 & 13: In Single Player mode (!game_engine_running()), the engine skips spawning
-	 *    netgame_equipment (weapons/grenades/powerups) and multiplayer-flagged vehicles.
-	 *    Force every weapon, item, and vehicle present on the map to spawn! */
+	      netgame_equipment (weapons/grenades/powerups) and multiplayer-flagged vehicles.
+	      Force every weapon, item, and vehicle present on the map to spawn! */
 	if (!game_engine_running())
 	{
 		for (i = 0; i < scen->netgame_equipment.count; i++)
@@ -4101,9 +4091,7 @@ static void forge_sync_live_instance_from_engine_object(struct forge_live_instan
 		forward_up_to_euler(&obj->object.forward, &obj->object.up, &inst->yaw, &inst->pitch, &inst->roll);
 }
 
-/* =========================================================================
- * WELD GROUPS (Group 1..16) & TRANSACTION-BASED UNDO / REDO STACK (Ctrl+Z/Y)
- * ========================================================================= */
+/* ---------- WELD GROUPS (Group 1..16) & TRANSACTION-BASED UNDO / REDO STACK (Ctrl+Z/Y) */
 
 static void forge_weld_clear_followers(void)
 {
@@ -5024,11 +5012,11 @@ static real_point3d s_last_valid_spartan_pos = { 0.0f, 0.0f, 0.0f };
 static int s_has_valid_spartan_pos = 0;
 
 /* Computes a guaranteed-safe Spartan feet position from the Monitor camera position:
- * 1. Pushes horizontally clear of any walls within Spartan cylinder radius (0.38u).
- * 2. Pushes below any low ceiling within 0.25u above eye level.
- * 3. Raycasts down 0.75u: if a floor is closer than 0.75u, places Spartan feet 0.06u ABOVE the floor
- *    (never cam_z - 0.65f underneath the floor!).
- * 4. Verifies BSP leaf validity and falls back to the last known valid Spartan position if needed. */
+   1. Pushes horizontally clear of any walls within Spartan cylinder radius (0.38u).
+   2. Pushes below any low ceiling within 0.25u above eye level.
+   3. Raycasts down 0.75u: if a floor is closer than 0.75u, places Spartan feet 0.06u ABOVE the floor
+      (never cam_z - 0.65f underneath the floor!).
+   4. Verifies BSP leaf validity and falls back to the last known valid Spartan position if needed. */
 static void forge_compute_safe_spartan_stand_pos(float cam_x, float cam_y, float cam_z, real_point3d *out_pos)
 {
 	unsigned long both_flags = FLAG(_collision_test_structure_bit) |
@@ -6721,8 +6709,8 @@ void forge_3d_update(float dt)
 	}
 
 	/* On Singleplayer / Campaign maps (scen->type == 0), ensure all players and their controlled units
-	 * are on _game_team_player (1) and allied with _game_team_human (2, Campaign Marines/Keyes) so
-	 * friendly AI never treat the player as an enemy when entering or switching Forge mode. */
+	   are on _game_team_player (1) and allied with _game_team_human (2, Campaign Marines/Keyes) so
+	   friendly AI never treat the player as an enemy when entering or switching Forge mode. */
 	if (scen->type == 0 /* _scenario_type_single_player */)
 	{
 		extern boolean game_team_is_enemy(short team1_index, short team2_index);
@@ -6900,7 +6888,7 @@ void forge_3d_update(float dt)
 	}
 
 	/* Point 2 & Point 8: Always keep Monitor floating at cam_x/y/z, invulnerable, zero-velocity, and hide Spartan-linked
-	 * green lights/weapons EVEN when F2 Forge Menu, Save Modal, or Escape Pause Menu is open! */
+	   green lights/weapons EVEN when F2 Forge Menu, Save Modal, or Escape Pause Menu is open! */
 	if (g_forge.mode == _forge_mode_3d_monitor)
 	{
 		int local_p_abs = forge_get_local_player_abs_index();
@@ -6954,7 +6942,7 @@ void forge_3d_update(float dt)
 				if (p_abs != local_p_abs && s_player_last_unit_index[p_abs] != pl->unit_index)
 				{
 					/* Remote player just joined, rejoined, or respawned into a new biped: reset Monitor state so
-					 * the Host never teleports a newly rejoined player back to their pre-quit Monitor coordinates! */
+					   the Host never teleports a newly rejoined player back to their pre-quit Monitor coordinates! */
 					if (s_player_last_unit_index[p_abs] == NONE)
 					{
 						g_forge.player_is_monitor[p_abs] = 0;
@@ -7010,7 +6998,7 @@ void forge_3d_update(float dt)
 					}
 
 					/* Sync remote Monitor unit pose every frame on BOTH Host and Client with 0.0f distance threshold
-					 * so the hidden biped (and overhead player name tag) never falls under gravity and snaps back! */
+					   so the hidden biped (and overhead player name tag) never falls under gravity and snaps back! */
 					forge_sync_unit_to_monitor_pose(
 						pl->unit_index,
 						g_forge.player_monitor_render_pos[p_abs][0],
@@ -7026,7 +7014,7 @@ void forge_3d_update(float dt)
 	}
 
 	/* When the native in-game Escape Pause Menu is open, pause Forge flight/editor input
-	 * and suppress any held mouse click so clicking a pause menu option never grabs an object behind the menu! */
+	   and suppress any held mouse click so clicking a pause menu option never grabs an object behind the menu! */
 	if (ui_widgets_active())
 	{
 		s_suppress_lmb_until_release = 1;
@@ -7216,8 +7204,8 @@ void forge_3d_update(float dt)
 			}
 		}
 		/* Point 1: Inventory / Item Options (F2 / X on controller):
-		 * On controller, X opens Inventory (Spawn Palette) when not holding an item,
-		 * and opens Item Options (Object Properties) when holding an item. */
+		   On controller, X opens Inventory (Spawn Palette) when not holding an item,
+		   and opens Item Options (Object Properties) when holding an item. */
 		if (cur_f2 && !prev_f2)
 		{
 			if (g_forge.mode == _forge_mode_3d_monitor)
@@ -7509,7 +7497,7 @@ void forge_3d_update(float dt)
 				forge_drop_or_place_held_item();
 
 			/* Perform a fresh raycast along the current camera view ray so newly spawned items
-			 * stick directly to the placement cursor and camera angle! */
+			   stick directly to the placement cursor and camera angle! */
 			euler_to_forward_up(g_forge.cam_yaw, g_forge.cam_pitch, g_forge.cam_roll, &cam_fwd, &cam_up);
 			ray_orig.x = g_forge.cam_x;
 			ray_orig.y = g_forge.cam_y;
@@ -8059,7 +8047,7 @@ void forge_3d_update(float dt)
 		if (rot_holding)
 		{
 			/* Holding Left Alt (or Right Trigger on controller) locks camera look & movement and rotates the item:
-			 * Mouse / Right Stick -> Pitch & Yaw, Left Stick -> Roll & Pitch, [Q/E] -> Roll, [C] / R-Thumb -> Reset */
+			   Mouse / Right Stick -> Pitch & Yaw, Left Stick -> Roll & Pitch, [Q/E] -> Roll, [C] / R-Thumb -> Reset */
 			if (cur_rot && !prev_rot)
 			{
 				if (g_forge.using_controller)
@@ -8469,7 +8457,7 @@ void forge_3d_update(float dt)
 			}
 
 			/* Scan virtual markers (Player Spawns, CTF Flags, Oddballs, KOTH Hills, Race Nodes, Teleporters) within 20m!
-			 * Require line-of-sight so markers behind walls are never selected through geometry. */
+			   Require line-of-sight so markers behind walls are never selected through geometry. */
 			{
 				int i;
 				for (i = 0; i < g_forge.live_instance_count; i++)
@@ -8897,7 +8885,7 @@ void forge_3d_update(float dt)
 			if (g_forge.grab_distance > 30.0f) g_forge.grab_distance = 30.0f;
 
 			/* Keep the placement cursor and held object locked to the camera crosshair ray
-			 * (and clamped against any closer BSP/surface hit along the beam unless Physics Mode is PHASED) */
+			   (and clamped against any closer BSP/surface hit along the beam unless Physics Mode is PHASED) */
 			{
 				int is_phased = (g_forge.live_instances[g_forge.grabbed_live_index].physics_mode == _forge_physics_phased);
 				real_point3d beam_orig;
@@ -9160,8 +9148,8 @@ static void forge_compute_live_monitor_camera_pose(
 void forge_3d_apply_monitor_camera(short local_player_index)
 {
 	/* IMPORTANT: observer_set_camera() stores the pointer in observer->pending_command
-	 * and observer_update() reads/writes through that pointer AFTER director_update() returns!
-	 * Therefore s_cmd MUST be static (never a stack local). */
+	   and observer_update() reads/writes through that pointer AFTER director_update() returns!
+	   Therefore s_cmd MUST be static (never a stack local). */
 	static struct observer_command s_cmd;
 
 	if (!g_forge_session_enabled || local_player_index != 0)
@@ -9224,10 +9212,10 @@ static void draw_teleporter_and_objective_markers(
 	int i;
 
 	/* Player Spawns, Teleporter Origin/Destination, Race Markers, Oddball Markers,
-	 * and CTF Flags now render as true 3D translucent world models in
-	 * render_world_objective_and_spawn_markers() (forge_runtime_tags.c).
-	 * In 2D HUD space we only draw floating text labels while in Forge Mode.
-	 * In Spartan Play mode, hide Forge-only Spawn Point and Objective markers and labels completely! */
+	   and CTF Flags now render as true 3D translucent world models in
+	   render_world_objective_and_spawn_markers() (forge_runtime_tags.c).
+	   In 2D HUD space we only draw floating text labels while in Forge Mode.
+	   In Spartan Play mode, hide Forge-only Spawn Point and Objective markers and labels completely! */
 	if (g_forge.mode != _forge_mode_3d_monitor)
 		return;
 
@@ -9451,7 +9439,7 @@ void forge_3d_draw_hud(
 			}
 
 			/* Top-Right Forge Mode Status & Budget Box (positioned right below the health/shield HUD,
-			 * scaled down an additional 50% and styled with 9-slice rounded Halo CE box & UI fonts) */
+			   scaled down an additional 50% and styled with 9-slice rounded Halo CE box & UI fonts) */
 			px0 = (short)(window_x1 - 236);
 			py0 = (short)(window_y0 + 52);
 			px1 = (short)(window_x1 - 12);
@@ -9531,9 +9519,7 @@ void forge_3d_draw_hud(
 			}
 		}
 
-		/* ========================================================================
-		 * UNIFIED TABBED FORGE OBJECT PALETTE MENU (F2) - BASE GAME MENU STYLING
-		 * ======================================================================== */
+		/* ---------- UNIFIED TABBED FORGE OBJECT PALETTE MENU (F2) - BASE GAME MENU STYLING */
 		if (g_forge.active_modal == _forge_modal_spawn_palette)
 		{
 			int filtered[512];
@@ -9642,9 +9628,7 @@ void forge_3d_draw_hud(
 			}
 		}
 
-		/* ========================================================================
-		 * OBJECT PROPERTIES PANEL (X when holding or facing an object) - BASE GAME MENU STYLING
-		 * ======================================================================== */
+		/* ---------- OBJECT PROPERTIES PANEL (X when holding or facing an object) - BASE GAME MENU STYLING */
 		if (g_forge.active_modal == _forge_modal_object_properties && forge_get_active_props_live_index() >= 0)
 		{
 			uint8_t row_ids[FORGE_MAX_PROP_ROWS];
@@ -9719,9 +9703,7 @@ void forge_3d_draw_hud(
 				g_forge.using_controller ? "{B} DONE" : "[ESC] DONE");
 		}
 
-		/* ========================================================================
-		 * INITIAL SAVE MAP DIALOG BOX (Opened from Esc -> SAVE MAP..)
-		 * ======================================================================== */
+		/* ---------- INITIAL SAVE MAP DIALOG BOX (Opened from Esc -> SAVE MAP..) */
 		if (g_forge.active_modal == _forge_modal_save_copy_as)
 		{
 			short cx = (short)((window_x0 + window_x1) / 2);

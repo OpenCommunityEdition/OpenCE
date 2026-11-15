@@ -50,6 +50,7 @@ NETWORK_FUNCTIONS = (
     "forge_tag_stream_handles_message",
     "forge_tag_stream_handle_message",
     "forge_tag_stream_tick",
+    "forge_network_get_tag_stream_progress",
     "forge_network_get_tag_download_status",
 )
 

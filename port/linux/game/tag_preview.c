@@ -1,9 +1,9 @@
 /*
- * A software preview of the tag highlighted in the Forge Tag Browser, drawn
- * into a bitmap_data shown on the screen's tag_preview widget. The tag's first
- * LOD triangles are centred and scaled to fit, then drawn filled with diffuse
- * and rim lighting as they turn.
- */
+TAG_PREVIEW.C
+
+Software 3D model preview renderer for the Forge Tag Options browser, drawing
+the highlighted Xbox, Custom Edition, or MCC tag into the menu widget's bitmap.
+*/
 
 #ifndef HALO_RELEASE
 #define HALO_RELEASE
@@ -547,11 +547,11 @@ static void draw_triangle(
 				if (tint)
 				{
 					/*
-					 * shader_model color-change: the primary/secondary color
-					 * tints the base map where its alpha mask allows it (or
-					 * across the whole diffuse when the shader has no mask
-					 * and alpha is 255). When base_map_alpha_Replicates is set
-					 * (Cryo glass), alpha is a luminance/opacity mask instead.
+					   shader_model color-change: the primary/secondary color
+					   tints the base map where its alpha mask allows it (or
+					   across the whole diffuse when the shader has no mask
+					   and alpha is 255). When base_map_alpha_Replicates is set
+					   (Cryo glass), alpha is a luminance/opacity mask instead.
 					 */
 					if (alpha_replicates)
 					{

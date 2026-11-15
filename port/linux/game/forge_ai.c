@@ -1,10 +1,9 @@
 /*
- * OpenCE : Forge
- * Interactive In-Engine AI Placement System (source/ai/ integration).
- * Spawns native Halo: Combat Evolved NPC actors & bipeds (Marines, Elites,
- * Grunts, Jackals, Hunters, Flood, Sentinels) assigned to Friendly or Enemy
- * combat teams.
- */
+FORGE_AI.C
+
+Runtime AI actor and encounter spawning, orders, team alignment, vehicle entry,
+and respawn tracking for Forge maps.
+*/
 
 #ifndef HALO_RELEASE
 #define HALO_RELEASE

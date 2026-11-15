@@ -8269,7 +8269,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 	short attempt;
 
 	/* port: if a dynamically imported custom weapon has a custom weapon_label not present in the unit's
-	 * stock animation graph, fall back to "ar" on the second pass so players can pick up and use it */
+	   stock animation graph, fall back to "ar" on the second pass so players can pick up and use it */
 	for (attempt = 0; attempt < 2 && !result; ++attempt)
 	{
 		char const *effective_weapon_label = (attempt == 0) ? weapon_label : "ar";
@@ -12226,7 +12226,7 @@ static void unit_drop_item(
 
 		item->item.ignore_object_index = unit_index;
 		/* port: mark items (weapons/grenades/equipment) dropped by a unit so Forge Monitor mode cannot grab them,
-		 * while Spartan players can still pick them up or switch to them normally */
+		   while Spartan players can still pick them up or switch to them normally */
 		SET_FLAG(item->item.flags, _item_belongs_to_player_bit, TRUE);
 		if (unit->unit.player_index != NONE)
 			item->object.owner_player_index = unit->unit.player_index;

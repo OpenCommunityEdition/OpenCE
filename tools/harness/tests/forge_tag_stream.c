@@ -1,12 +1,8 @@
 /*
-FORGE_TAG_STREAM.C (test)
+FORGE_TAG_STREAM.C
 
-Zero-trust session-RAM custom tag streaming (port/linux/game/forge_network.c and
-port/linux/game/forge_runtime_tags.c): solicited single-flight requests over the
-reliable stream, host bundle caching and chunk pacing, offer/path/group/size
-admission, duplicate/out-of-bounds chunk rejection, BLAKE2b-256 verification
-prior to tag parsing, base-map anti-shadowing, session RAM caps, 3-strike host
-cutoff, opt-out, and proxy-to-live-object materialization.
+Harness regression tests for Forge custom tag streaming packets, bounds checks,
+strike limits, and bidirectional transfers.
 */
 
 #ifdef __clang__
@@ -499,6 +495,13 @@ static void forge_broadcast_packet_to_clients(char const *text, long excl)
 
 void forge_server_mark_dirty(void)
 {
+}
+
+boolean tag_index_is_group(long tag_index, unsigned long group_tag)
+{
+	(void)tag_index;
+	(void)group_tag;
+	return FALSE;
 }
 
 #include "under_test.inc"

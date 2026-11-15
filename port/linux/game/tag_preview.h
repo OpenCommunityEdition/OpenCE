@@ -1,7 +1,12 @@
+/*
+TAG_PREVIEW.H
+
+Entry points for the Forge Tag Options 3D model preview renderer.
+*/
+
 #ifndef HALO_PORT_TAG_PREVIEW_H
 #define HALO_PORT_TAG_PREVIEW_H
 
-#include "cseries.h"
 #include "bitmaps/bitmaps.h"
 
 #define TAG_PREVIEW_WIDTH 128
