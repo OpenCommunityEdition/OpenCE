@@ -2269,7 +2269,7 @@ void encounter_create(
 			}
 			/* port: Sergeant Johnson only where a10's and a50's story has him
 			(sergeant_johnson.c) */
-			initial_variant = sergeant_johnson_leader_variant(encounter_definition->name, initial_variant);
+			initial_variant = sergeant_johnson_leader_variant(initial_variant);
 
 			for (i = 0; i < count; ++i)
 			{

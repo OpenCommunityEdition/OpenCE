@@ -1122,8 +1122,6 @@ void objects_initialize_for_new_map(
 	/* port: the last map's waist and mesh forgotten
 	(port/linux/game/first_person_legs.c) */
 	first_person_legs_reset();
-	/* port: and its Sergeant Johnson (sergeant_johnson.c) */
-	sergeant_johnson_reset();
 	
 	data_make_valid(object_header_data);
 	/* port: (zeroed for a new map only: a revert or a load brings them back with the bipeds' snapshots) */

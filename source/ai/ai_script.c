@@ -470,7 +470,6 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "units/bipeds.h"
 #include "units/units.h"
-#include "sergeant_johnson.h" /* port: port/linux/game/sergeant_johnson.c */
 
 /* ---------- constants */
 
@@ -2963,9 +2962,6 @@ void ai_scripting_erase_all(
 		error(_error_silent, "%s: ai_erase_all", hs_runtime_get_executing_thread_name());
 	}
 
-	/* port: whether a50's Sergeant Johnson is alive, before he is erased
-	for the gravity lift (sergeant_johnson.c) */
-	sergeant_johnson_erasing_all();
 	ai_erase(NONE, NONE, NONE, FALSE);
 
 	return;
