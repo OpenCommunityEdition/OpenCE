@@ -880,6 +880,7 @@ static struct
 	struct p2p_mm_decision pending;
 	int subscribed[P2P_MM_MAXIMUM_TOPICS][2], subscribed_count;
 	int in_game;
+	int browser_held, browser_was;
 	int has_token;
 	unsigned char token[P2P_TOKEN_SIZE];
 	int notice;
@@ -1027,6 +1028,24 @@ static void cancel_search(void)
 	mm.queue_count = 0;
 }
 
+static void hold_browser(void)
+{
+	if (!mm.browser_held)
+	{
+		mm.browser_held = 1;
+		mm.browser_was = p2p_lobby_browsing();
+	}
+}
+
+/* under p2p_lock; restore the result after releasing it (-1: nothing to restore) */
+static int take_browser(void)
+{
+	int was = mm.browser_held ? mm.browser_was : -1;
+
+	mm.browser_held = 0;
+	return was;
+}
+
 void p2p_mm_search(const struct p2p_mm_choice *choice)
 {
 	pthread_mutex_lock(&p2p_lock);
@@ -1035,17 +1054,24 @@ void p2p_mm_search(const struct p2p_mm_choice *choice)
 	mm.in_game = 0;
 	mm_start(&mm.search, p2p_signing_seed(), choice, p2p_now(), (unsigned long)time(NULL));
 	mm.notice = P2P_MM_NOTICE_NONE;
+	hold_browser();
 	pthread_mutex_unlock(&p2p_lock);
+	p2p_lobby_browse(1);
 }
 
 void p2p_mm_cancel(void)
 {
+	int was;
+
 	pthread_mutex_lock(&p2p_lock);
 	if (mm.search.state != P2P_MM_OFF)
 		cancel_search();
 	mm.in_game = 0;
 	mm.notice = P2P_MM_NOTICE_NONE;
+	was = take_browser();
 	pthread_mutex_unlock(&p2p_lock);
+	if (was >= 0)
+		p2p_lobby_browse(was);
 }
 
 void p2p_mm_game(int players, int most_players, int under_way)
@@ -1061,6 +1087,8 @@ void p2p_mm_game(int players, int most_players, int under_way)
 
 void p2p_mm_joined(int ok)
 {
+	int was = -1;
+
 	pthread_mutex_lock(&p2p_lock);
 	if (mm.search.state == P2P_MM_FOUND && mm.search.decided == P2P_MM_DECIDE_JOIN)
 	{
@@ -1068,31 +1096,45 @@ void p2p_mm_joined(int ok)
 		mm.in_game = ok;
 		if (!ok)
 			mm.notice = P2P_MM_NOTICE_HOST_UNREACHED;
+		else
+			was = take_browser();
 	}
 	pthread_mutex_unlock(&p2p_lock);
+	if (was >= 0)
+		p2p_lobby_browse(was);
 }
 
 void p2p_mm_game_lost(void)
 {
+	int restarted = 0;
+
 	pthread_mutex_lock(&p2p_lock);
 	if (mm.search.state != P2P_MM_OFF || mm.in_game)
 	{
 		mm_game_lost(&mm.search, p2p_now());
 		mm.in_game = 0;
 		mm.notice = P2P_MM_NOTICE_HOST_LEFT;
+		hold_browser();
+		restarted = 1;
 	}
 	pthread_mutex_unlock(&p2p_lock);
+	if (restarted)
+		p2p_lobby_browse(1);
 }
 
 int p2p_mm_take_decision(struct p2p_mm_decision *decision)
 {
-	int kind;
+	int kind, was = -1;
 
 	pthread_mutex_lock(&p2p_lock);
 	*decision = mm.pending;
 	kind = mm.pending.kind;
 	mm.pending.kind = P2P_MM_DECIDE_NONE;
+	if (kind == P2P_MM_DECIDE_HOST)
+		was = take_browser();
 	pthread_mutex_unlock(&p2p_lock);
+	if (was >= 0)
+		p2p_lobby_browse(was);
 	return kind;
 }
 
