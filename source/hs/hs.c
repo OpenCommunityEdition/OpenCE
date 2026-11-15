@@ -2844,6 +2844,7 @@ symbols in this file:
 #include "units/units.h"
 #include "units/vehicles.h"
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
+#include "x20_chip.h" /* port: port/linux/game/x20_chip.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -15545,6 +15546,9 @@ boolean hs_scenario_postprocess(
 		/* port: before the console's expressions are compiled into the
 		same nodes */
 		hs_scenario_functions_check(scenario);
+		/* port: a10's bridge cinematic makes Keyes's chip in his hand at the
+		console, out of view, not as he raises it (x20_chip.c) */
+		x20_chip_scripts_loaded(scenario, hs_syntax_data);
 		if (scenario->hs_string_constants.size<0x400)
 		{
 			success = tag_data_resize(
