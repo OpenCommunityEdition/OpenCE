@@ -1866,6 +1866,23 @@ static BOOL surface_is_shadow_map(const D3DSurface *surface)
 		description.height == SHADOW_MAP_SIZE;
 }
 
+/* the sun glow's two targets, 64x64 A8R8G8B8 (rasterizer_xbox.c), which the
+motion sensor also draws its blips into before laying them over its disc, 84
+of the game's 480 lines across: kept at 64 pixels, each texel covered some 3
+pixels of a 1080-line screen, and the blips were soft octagons. They are
+drawn at twice the screen's scale. The sun glow's blur steps by the texture's
+own measure (0 to 1 across), so it blurs as far as before. */
+#define SUN_GLOW_TARGET_SIZE 64
+
+static BOOL surface_is_sun_glow(const D3DSurface *surface)
+{
+	struct xgpu_texture_description description;
+
+	xgpu_texture_describe(surface->Format, surface->Size, &description);
+	return description.format == D3DFMT_A8R8G8B8 && description.width == SUN_GLOW_TARGET_SIZE &&
+		description.height == SUN_GLOW_TARGET_SIZE;
+}
+
 /* the secondary render target, the size of the Xbox's (rasterizer_xbox.c) */
 #define SECONDARY_TARGET_WIDTH 320
 #define SECONDARY_TARGET_HEIGHT 240
@@ -1958,6 +1975,12 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		scale[0] = (float)halo_shadow_map_scale();
 		scale[1] = scale[0];
 		kind = _render_target_shadow_map;
+	}
+	else if (!depth && surface_is_sun_glow(surface))
+	{
+		scale[0] = 2.0f * (screen_scale[0] > screen_scale[1] ? screen_scale[0] : screen_scale[1]);
+		scale[1] = scale[0];
+		kind = _render_target_screen;
 	}
 	for (entry = *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
 	{
