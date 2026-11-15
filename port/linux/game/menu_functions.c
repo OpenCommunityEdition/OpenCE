@@ -70,6 +70,8 @@ their handlers open opens.
 */
 
 #include "cseries.h"
+#include "cseries/errors.h"
+
 #include "input/input.h"
 #include "interface/event_manager.h"
 #include "interface/player_ui.h"
@@ -88,6 +90,9 @@ their handlers open opens.
 #include "halo_menus.h"
 #include "controller_remap.h"
 #include "custom_edition_cache.h"
+#include "custom_edition_menu.h"
+#include "cache/cache_files.h"
+#include "saved games/saved_game_files.h"
 #include "mcc_ui.h"
 #include "mcc_pause.h"
 #include "custom_edition_maps.h"
@@ -148,6 +153,7 @@ short main_get_solo_level_from_name(char const *name);
 boolean player_name_clean(wchar_t *name, long count);
 short players_port_local_player_count(void);
 
+boolean pc_menu_tag(long tag_index);
 boolean pc_menu_event_function_invoke(struct widget_instance *widget, struct event_record *event,
 	long function_index, boolean *widget_deleted);
 void pc_menu_game_data_function_invoke(struct widget_instance *widget, long function);
@@ -1071,7 +1077,12 @@ static short map_kind_shown(struct widget_instance *list, boolean singleplayer, 
 	short kind;
 
 	if (!spinner)
+	{
+		/* port: a map's own screen has no chooser row: the multiplayer maps */
+		if (custom_edition_menu_widget(list) && !strcmp(list->name, "select_screen_list_template"))
+			return MAP_KIND_MULTIPLAYER;
 		return singleplayer ? MAP_KIND_SINGLEPLAYER : MAP_KIND_MULTIPLAYER;
+	}
 	kind = (short)PIN(spinner->parameters.list.selected_index, 0, NUMBER_OF_MAP_KINDS - 1);
 	if (!singleplayer && map_kind_singleplayer(kind))
 	{
@@ -1112,7 +1123,8 @@ focus */
 static short map_kind_rows_update(struct widget_instance *list, short *first, short count,
 	void (*entry_text)(short entry, wchar_t *text))
 {
-	short shown = (short)MIN(count, MAP_KIND_ROWS);
+	short rows = custom_edition_menu_widget(list) && !strcmp(list->name, "select_screen_list_template") ? 9 : MAP_KIND_ROWS;
+	short shown = (short)MIN(count, rows);
 	short row = focused_row(list), index = 0;
 	struct widget_instance *child;
 
@@ -1140,7 +1152,8 @@ static short map_kind_rows_update(struct widget_instance *list, short *first, sh
 			entry_text((short)(*first + index - 1), text);
 			text_set(named(child, "list_item_text", 0), text);
 		}
-		visible_set(named(child, "list_item_arrows", 0), child == list->focused_child);
+		visible_set(named(child, "list_item_arrows", 0),
+			child == list->focused_child && (!custom_edition_menu_widget(list) || strcmp(list->name, "select_screen_list_template")));
 		visible_set(named(child, "scroll_up_button", 0), FALSE);
 		visible_set(named(child, "scroll_down_button", 0), FALSE);
 	}
@@ -2114,6 +2127,13 @@ static struct
 	short color;
 } color_list;
 
+/* port: a Custom Edition map has not the port's string list: the game's 18 primary colours by name */
+static wchar_t const *const color_names[COLOR_COUNT] =
+{
+	L"White", L"Black", L"Red", L"Blue", L"Gray", L"Yellow", L"Green", L"Pink", L"Purple",
+	L"Cyan", L"Cobalt", L"Orange", L"Teal", L"Sage", L"Brown", L"Tan", L"Maroon", L"Salmon"
+};
+
 static void color_row_text(short row, wchar_t *text)
 {
 	string_get("pc\\main_menu\\settings_select\\player_setup\\player_profile_edit\\color_edit\\colors_list",
@@ -2129,6 +2149,13 @@ static boolean color_list_initialize(struct widget_instance *list)
 		return FALSE;
 	color_list.color = (short)PIN(profile->primary_color_index, 0, COLOR_COUNT - 1);
 	color_list.first = (short)PIN(color_list.color - COLOR_ROWS / 2, 0, COLOR_COUNT - COLOR_ROWS);
+	if (custom_edition_menu_widget(list) && list->name && !strcmp(list->name, "color_select_list"))
+	{
+		/* port: rows 1 to 9 hold the colours */
+		color_list.first = (short)PIN(color_list.color - 4, 0, COLOR_COUNT - 9);
+		focus_row(list, (short)(color_list.color - color_list.first + 1));
+		return TRUE;
+	}
 	focus_row(list, (short)(color_list.color - color_list.first));
 	return TRUE;
 }
@@ -2165,14 +2192,128 @@ static short list_scroll(struct widget_instance *list, short *first, short count
 	return row == NONE || row >= rows ? NONE : (short)(*first + row);
 }
 
+static boolean color_list_initialize(struct widget_instance *list);
+static boolean color_choose(void);
+static void color_list_update(struct widget_instance *list);
+static void hide_row_arrows(struct widget_instance *list);
+
+/* port: a Custom Edition map's colour screen runs Halo PC's own functions
+(61 on creation, 63 on OK, and the Xbox's game data update), which the
+port's colour screen's functions stand in for */
+boolean pc_menu_color_initialize(struct widget_instance *list)
+{
+	return color_list_initialize(list);
+}
+
+boolean pc_menu_color_choose(void)
+{
+	return color_choose();
+}
+
+void pc_menu_color_update(struct widget_instance *list)
+{
+	color_list_update(list);
+	hide_row_arrows(list);
+}
+
+/* port: a Custom Edition map's colour screen is laid out as its map lists are: row 0 pages up, row 10 pages
+down, rows 1 to 9 hold the colours (nine a page) */
+#define COLOR_OWN_ROWS 9
+
+/* the row clicked (ui_widget_event_handler_functions.c, Halo PC's 160): FALSE if it paged, TRUE if it is a colour */
+static boolean color_row_click_paging(struct widget_instance *row);
+
+boolean pc_menu_color_row_click(struct widget_instance *row)
+{
+	if (color_row_click_paging(row))
+	{
+		short color = (short)(color_list.first + sibling_index(row) - 1);
+
+		if (color >= 0 && color < COLOR_COUNT)
+		{
+			color_list.color = color;
+		}
+		return TRUE;
+	}
+	return FALSE;
+}
+
+static boolean color_row_click_paging(struct widget_instance *row)
+{
+	if (!strcmp(row->name, "list_item_0"))
+		color_list.first = (short)MAX(0, color_list.first - COLOR_OWN_ROWS);
+	else if (!strcmp(row->name, "list_item_10"))
+		color_list.first = (short)MIN(COLOR_COUNT - COLOR_OWN_ROWS, color_list.first + COLOR_OWN_ROWS);
+	else
+		return TRUE;
+	return FALSE;
+}
+
+static void color_own_list_update(struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct widget_instance *widget;
+	struct widget_instance *row;
+	short focused = focused_row(list);
+	short index = 0;
+
+	if (focused == COLOR_OWN_ROWS && color_list.first + COLOR_OWN_ROWS < COLOR_COUNT && list_scrolls_at_end())
+	{
+		color_list.first++;
+		focus_row(list, --focused);
+	}
+	else if (focused == 1 && color_list.first > 0 && list_scrolls_at_end())
+	{
+		color_list.first--;
+		focus_row(list, ++focused);
+	}
+	if ((widget = named(description, "awards_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = color_list.color;
+	if (focused >= 1 && focused <= COLOR_OWN_ROWS && !ui_widget_port_hover_focused())
+		color_list.color = (short)(color_list.first + focused - 1);
+	for (row = list->child; row; row = row->next, index++)
+	{
+		short color = (short)(color_list.first + index - 1);
+		boolean is_color = index >= 1 && index <= COLOR_OWN_ROWS;
+
+		if (strncmp(row->name, "list_item_", 10))
+			break;
+		row->visible = !is_color || color < COLOR_COUNT;
+		if (is_color && color < COLOR_COUNT)
+			text_set(named(row, "list_item_text", 0), color_names[color]);
+		visible_set(named(row, "list_item_text", 0), is_color);
+		visible_set(named(row, "list_item_arrows", 0), FALSE);
+		visible_set(named(row, "scroll_up_button", 0), index == 0 && color_list.first > 0);
+		visible_set(named(row, "scroll_down_button", 0),
+			index == COLOR_OWN_ROWS + 1 && color_list.first + COLOR_OWN_ROWS < COLOR_COUNT);
+		/* the bitmap shows only the colour the profile has (the third frame); passing the focus over a row
+		changes its text's colour alone */
+		if (row->animation.number_of_sprite_frames == 2)
+			row->animation.current_frame_index = (row == list->focused_child) ? 1 : 0;
+	}
+	if ((widget = named(description, "color_right_name", 0)) != NULL)
+		widget->parameters.text_box.string_list_index = color_list.color;
+	if ((widget = named(description, "color_right_pic", 0)) != NULL)
+		widget->animation.current_frame_index = color_list.color;
+	profile_name_show(description);
+}
+
+#include "custom_edition_menu_settings.inl"
+
 /* "color picker update": the list scrolled on at its ends, the colour's
 name and picture */
 static void color_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
 	struct widget_instance *widget;
-	short color = list_scroll(list, &color_list.first, COLOR_COUNT, COLOR_ROWS);
+	short color;
 
+	if (custom_edition_menu_widget(list) && list->name && !strcmp(list->name, "color_select_list"))
+	{
+		color_own_list_update(list);
+		return;
+	}
+	color = list_scroll(list, &color_list.first, COLOR_COUNT, COLOR_ROWS);
 	if (color != NONE)
 		color_list.color = color;
 	rows_update(list, COLOR_ROWS, color_row_text);
@@ -2644,6 +2785,20 @@ static short controls_group(struct widget_instance *screen)
 {
 	struct widget_instance *spinner = named(screen, "group_spinner", 0);
 
+	/* port: a Custom Edition map's controls screen has its command groups'
+	spinner beside the "command_group_label" of its second row */
+	if (!spinner && custom_edition_menu_widget(screen))
+	{
+		struct widget_instance *label = named(screen, "command_group_label", 0);
+
+		if (label && label->parent)
+		{
+			spinner = label->parent->child;
+			/* (2 is a spinner list: the type's name is not visible here) */
+			while (spinner && spinner->type != 2)
+				spinner = spinner->next;
+		}
+	}
 	return spinner ? spinner->parameters.list.selected_index : 0;
 }
 
@@ -2710,6 +2865,36 @@ static boolean controls_back(struct widget_instance *widget, boolean *widget_del
 	return TRUE;
 }
 
+/* port: "controls screen init" and "controls screen change set" for a map's
+own controls screen (ui_widget_event_handler_functions.c: Halo PC's 113 and 127) */
+/* port: Halo PC's controls screen's back handler (152): cancels a key being set, else goes back */
+boolean pc_menu_controls_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	return controls_back(widget, widget_deleted);
+}
+
+boolean pc_menu_controls_load(void)
+{
+	return controls_load(FALSE);
+}
+
+boolean pc_menu_controls_save(void)
+{
+	return controls_save();
+}
+
+boolean pc_menu_controls_defaults(void)
+{
+	return controls_load(TRUE);
+}
+
+/* port: the string of a map's own action label (its list, in the map's
+tag) for each of controls[], in order; NONE where it has none */
+static short const control_label_strings[] =
+{
+	1, 2, 3, 4, 16, 17, 9, 10, 14, 13, 19, 12, 11, 20, 18, 26, 0x7000, 27, 23, 23, 24, 0x7001, 0x7002
+};
+
 /* "controls update menu": the group's rows, their bindings (the one left
 and right choose marked on the row chosen), and the help */
 static void controls_update(struct widget_instance *list)
@@ -2723,6 +2908,7 @@ static void controls_update(struct widget_instance *list)
 	{
 		short control = control_of_row(row, group);
 		short slot;
+		struct widget_instance *label;
 
 		if (strncmp(row->name, "op_command_", 11))
 			continue;
@@ -2733,7 +2919,17 @@ static void controls_update(struct widget_instance *list)
 				focus_row(list, 0);
 			continue;
 		}
-		text_set(named(row, "command_label", 0), controls[control].label);
+		label = named(row, "command_label", 0);
+		if (label)
+			text_set(label, controls[control].label);
+		else if (custom_edition_menu_widget(list))
+		{
+			/* port: a map's own label draws from its string list */
+			label = named(row, "command_1_label", 0);
+			if (label)
+				label->parameters.text_box.string_list_index =
+					control < (short)NUMBEROF(control_label_strings) ? control_label_strings[control] : NONE;
+		}
 		for (slot = 0; slot < CONTROL_BINDINGS; slot++)
 		{
 			char const *binding = controls_screen.bindings[control][slot];
@@ -2741,6 +2937,7 @@ static void controls_update(struct widget_instance *list)
 			char name[CONTROL_NAME_LENGTH];
 			char shown[64];
 			short index;
+			struct widget_instance *field;
 
 			/* (the key as the keyboard's layout labels it: xinput_sdl.c) */
 			if (*binding)
@@ -2756,7 +2953,11 @@ static void controls_update(struct widget_instance *list)
 			for (index = 0; shown[index] && index < ROW_TEXT_LENGTH - 1; index++)
 				text[index] = (wchar_t)(unsigned char)shown[index];
 			text[index] = 0;
-			text_set(named(row, "command_binding", slot), text);
+			field = named(row, "command_binding", slot);
+			if (!field && custom_edition_menu_widget(list))
+				field = named(row, "command_mk_button_text", slot);
+			if (field)
+				text_set(field, text);
 		}
 	}
 	if (list->parameters.list.extended_description)
@@ -2764,6 +2965,18 @@ static void controls_update(struct widget_instance *list)
 		list->parameters.list.extended_description->parameters.text_box.string_list_index =
 			controls_screen.capturing_control != NONE ? 2 : focused_row ? 1 : 0;
 	}
+}
+
+/* port: "controls update menu" and "controls begin binding" for a map's own
+controls screen (ui_widget_event_handler_functions.c: Halo PC's 43 and 115) */
+void pc_menu_controls_update(struct widget_instance *list)
+{
+	controls_update(list);
+}
+
+boolean pc_menu_controls_begin_binding(struct widget_instance *widget)
+{
+	return control_capture_begin(widget);
 }
 
 #include "controller_remap_menu.inl"
@@ -3727,14 +3940,84 @@ static boolean map_list_initialize(struct widget_instance *list)
 	return TRUE;
 }
 
-/* "mp map list update": the chooser's kind, the step's rows, and beside
-them the level or map chosen: its picture, name and words */
+/* the menus' names for the stock maps, in the order of ui.map's mp_map_list
+(0 to 18): the Xbox's 13, then Halo PC's six */
+static wchar_t const *const stock_map_names[19] =
+{
+	L"Battle Creek", L"Sidewinder", L"Damnation", L"Rat Race", L"Prisoner", L"Hang 'Em High",
+	L"Chill Out", L"Derelict", L"Boarding Action", L"Blood Gulch", L"Wizard", L"Chiron TL34",
+	L"Longest", L"Ice Fields", L"Death Island", L"Danger Canyon", L"Infinity", L"Timberland",
+	L"Gephyrophobia"
+};
+
+static short ce_menu_stock_map(short entry)
+{
+	static char const *const leaves[] =
+	{
+		"beavercreek", "sidewinder", "damnation", "ratrace", "prisoner", "hangemhigh",
+		"chillout", "carousel", "boardingaction", "bloodgulch", "wizard", "putput",
+		"longest", "icefields", "deathisland", "dangercanyon", "infinity", "timberland",
+		"gephyrophobia"
+	};
+	char const *const *names;
+	char const *leaf;
+	short count = ui_widget_port_multiplayer_maps(&names, NULL);
+	short index;
+
+	if (entry < 0 || entry >= count)
+		return NONE;
+	leaf = strrchr(names[entry], '\\');
+	leaf = leaf ? leaf + 1 : names[entry];
+	for (index = 0; index < NUMBEROF(leaves); index++)
+	{
+		if (!_stricmp(leaf, leaves[index]))
+			return index;
+	}
+	return NONE;
+}
+
+/* port: a map's own screen has no port string list: the names the
+multiplayer maps list gives (the leaf of the level path) */
+static void map_screen_row_text(short entry, wchar_t *text)
+{
+	char const *const *names;
+	short last_used;
+	short count = ui_widget_port_multiplayer_maps(&names, &last_used);
+	char const *name;
+	char const *leaf;
+	short index;
+	short stock = ce_menu_stock_map(entry);
+
+	text[0] = 0;
+	if (entry < 0 || entry >= count)
+		return;
+	if (stock != NONE)
+	{
+		ustrncpy(text, stock_map_names[stock], ROW_TEXT_LENGTH - 1);
+		text[ROW_TEXT_LENGTH - 1] = 0;
+		return;
+	}
+	name = names[entry];
+	leaf = strrchr(name, '\\');
+	leaf = leaf ? leaf + 1 : name;
+	for (index = 0; leaf[index] && index < ROW_TEXT_LENGTH - 1; index++)
+		text[index] = (wchar_t)(unsigned char)leaf[index];
+	text[index] = 0;
+}
+
+/* port: the row clicked on a map's own New Game screen (not just hovered) */
 static void map_list_update(struct widget_instance *list)
 {
 	struct widget_instance *description = list->parameters.list.extended_description;
 	short kind = map_kind_shown(list, map_list.hosting, map_list.kind), count, entry;
 	short shown;
+	boolean own_screen = custom_edition_menu_widget(list) && !strcmp(list->name, "select_screen_list_template");
 
+	if (own_screen)
+	{
+		/* port: a map's own screen has no chooser, so its kind never changes */
+		kind = map_list.kind;
+	}
 	if (kind != map_list.kind)
 	{
 		if (map_kind_mcc(kind))
@@ -3760,6 +4043,15 @@ static void map_list_update(struct widget_instance *list)
 		return;
 	}
 	count = map_step_count();
+	if (own_screen)
+	{
+		char const *const *screen_names;
+		short screen_last_used;
+
+		count = ui_widget_port_multiplayer_maps(&screen_names, &screen_last_used);
+		entry = map_kind_rows_update(list, &map_list.first, count, map_screen_row_text);
+	}
+	else
 	entry = map_kind_rows_update(list, &map_list.first, count, map_list.step == MAP_STEP_DIFFICULTIES ?
 		map_difficulty_text : kind == MAP_KIND_SINGLEPLAYER ? map_level_text :
 		kind == MAP_KIND_MULTIPLAYER ? multiplayer_map_text :
@@ -3767,6 +4059,14 @@ static void map_list_update(struct widget_instance *list)
 	if (entry != NONE)
 		map_list.chosen = entry;
 	visible_set(named(description, "mp_map_right_item", 0), map_list.chosen < count);
+	if (own_screen)
+	{
+		/* port: entries 0 to 18 are the stock maps, in the strings' order; any other map is "Unknown Level" (19) */
+		map_description_show(description, NONE, ce_menu_stock_map(map_list.chosen) != NONE ?
+			ce_menu_stock_map(map_list.chosen) : 19);
+		profile_name_show(description);
+		return;
+	}
 	/* (the map whose difficulties are listed, else the one chosen) */
 	shown = map_list.step == MAP_STEP_DIFFICULTIES ? map_list.level : map_list.chosen;
 	if (kind == MAP_KIND_SINGLEPLAYER)
@@ -8672,6 +8972,17 @@ static void gametype_engine_name(struct widget_instance *text_box)
 		text_box->parameters.text_box.string_list_index = strings[PIN(variant->game_engine_index, 0, 5)];
 }
 
+/* port: a map's own lists mark no row with the menus' arrows */
+static void hide_row_arrows(struct widget_instance *list)
+{
+	struct widget_instance *child;
+
+	for (child = list->child; child; child = child->next)
+		visible_set(named(child, "list_item_arrows", 0), FALSE);
+}
+
+#include "custom_edition_menu_gamepad.inl"
+
 /* ---------- public code */
 
 boolean pc_menu_event_function_invoke(
@@ -9283,4 +9594,91 @@ void pc_menu_game_data_function_invoke(
 		coop_friendly_fire_text(widget);
 	else if (!strcmp(name, "port playlist edit desc"))
 		playlist_edit_description(widget);
+}
+/* port: a Custom Edition map's own New Game screen names Halo PC's functions
+26 (the list's start) and 46 or 52 (its update): the menus' map list runs for it */
+boolean pc_menu_map_list_initialize(struct widget_instance *widget)
+{
+	custom_edition_menu_cancel_draft();
+	return map_list_initialize(widget);
+}
+/* port: the map list's update for a map's own screen, with its arrows placed and the menus' row marks hidden */
+void pc_menu_map_list_update(struct widget_instance *widget)
+{
+	char const *const *names;
+	short last;
+
+	map_list_update(widget);
+
+	{
+		struct widget_instance *row_top = named(widget, "list_item_0", 0);
+		struct widget_instance *row_end = named(widget, "list_item_10", 0);
+		short total = ui_widget_port_multiplayer_maps(&names, &last);
+
+		if (row_top)
+		{
+			visible_set(named(row_top, "scroll_up_button", 0), map_list.first > 0);
+			visible_set(named(row_top, "scroll_down_button", 0), FALSE);
+		}
+		if (row_end)
+		{
+			/* port: the last row is the down arrow's, not a map's */
+			row_end->visible = TRUE;
+			visible_set(named(row_end, "list_item_text", 0), FALSE);
+			visible_set(named(row_end, "list_item_arrows", 0), FALSE);
+			visible_set(named(row_end, "scroll_up_button", 0), FALSE);
+			visible_set(named(row_end, "scroll_down_button", 0), map_list.first + 9 < total);
+		}
+	}
+	hide_row_arrows(widget);
+}
+
+#include "custom_edition_menu_session.inl"
+
+/* port: the menus' gametype list, for a map's own gametype screen */
+boolean pc_menu_gametype_list_initialize(struct widget_instance *list)
+{
+	boolean result;
+	result = gametype_list_initialize(list);
+	return result;
+}
+/* port: the menus' gametype list, for a map's own gametype screen */
+void pc_menu_gametype_list_update(struct widget_instance *list)
+{
+	gametype_list_update(list);
+	hide_row_arrows(list);
+}
+/* port: a map's own list's first and last rows are its scroll arrows: a page up or down */
+void pc_menu_map_row_click(struct widget_instance *row)
+{
+	char const *const *names;
+	short last_used;
+	short total;
+
+	if (!strcmp(row->name, "list_item_0"))
+		map_list.first = (short)MAX(0, map_list.first - 9);
+	else if (!strcmp(row->name, "list_item_10"))
+	{
+		total = ui_widget_port_multiplayer_maps(&names, &last_used);
+		map_list.first = (short)MIN(MAX(0, total - 9), map_list.first + 9);
+	}
+}
+
+/* port: a map's own OK button (Halo PC's function 164) runs the handlers its
+screen's list has for the custom activation event */
+boolean pc_menu_activate_screen(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	struct widget_instance *top = widget;
+	boolean deleted = FALSE;
+	boolean found;
+
+	while (top->parent)
+		top = top->parent;
+	found = ui_widget_port_dispatch_event(top, EVENT_CUSTOM_ACTIVATION, event_controller(widget, event), &deleted);
+	if (deleted)
+		*widget_deleted = TRUE;
+	return found;
 }

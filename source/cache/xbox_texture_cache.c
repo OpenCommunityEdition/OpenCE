@@ -653,6 +653,10 @@ static void texture_cache_initialize_hardware_format(
 			((bitmap->height - 1) << D3DSIZE_HEIGHT_SHIFT) |
 			(bitmap->width - 1);
 	}
+	else if (custom_edition_bitmap_hardware_format(bitmap, texture))
+	{
+		/* port: CE-owned non-power-of-two DXT header; legacy headers below. */
+	}
 	else
 	{
 		texture->Format =

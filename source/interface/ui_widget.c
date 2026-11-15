@@ -627,6 +627,7 @@ symbols in this file:
 
 struct widget_instance;
 
+#include "custom_edition_menu.h" /* port: CE-owned widget and session boundaries */
 #include "cseries.h"
 #include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c; HUD prompts only */
 #include "menu_button_glyphs.h" /* port: port/linux/game/menu_button_glyphs.c */
@@ -1527,6 +1528,8 @@ static struct stack_memory_pool_medium __medium_widget_memory_pool =
 
 struct stack_memory_pool *widget_memory_pool = &__medium_widget_memory_pool.pool;
 
+#include "custom_edition_ui_rows.inl" /* port: CE-owned injected widget rows */
+
 static boolean main_screen_shell_first_load = TRUE;
 
 short dashboard_abort_error = NONE;
@@ -2378,6 +2381,9 @@ void ui_widget_delete(
 			}
 		}
 	}
+	/* port: release CE-owned rows and settings state at widget destruction. */
+	custom_edition_menu_widget_deleted(widget);
+	ui_widget_port_row_forget(widget);
 	ui_widget_delete_children_recursive(widget);
 	if (widget->previous)
 		widget->previous->next = widget->next;
@@ -2575,6 +2581,21 @@ takes no events and has nothing in it that does, which its game passes over
 (its rows of settings take none themselves, but their spinners do), or one
 hidden (a list's rows past its items: port/linux/game/menu_functions.c) or
 disabled (the server browser's column titles, which sort nothing) */
+/* port: pulls the arrows of the Gamepads screen's sliders this many units toward each other, and narrows
+their text to match (the donor spinner's arrows are far apart for a column this narrow) */
+#define GAMEPAD_TEXT_MARGIN 27
+short pc_menu_gamepad_arrow_pull(struct widget_instance *spinner);
+#define GAMEPAD_ARROW_PULL pc_menu_gamepad_arrow_pull(widget)
+
+static boolean ui_widget_port_gamepad_spinner(
+	struct widget_instance *widget)
+{
+	struct widget_instance *list = widget->parent ? widget->parent->parent : NULL;
+
+	return custom_edition_menu_widget(widget) && list && list->name &&
+		(!strcmp(list->name, "gamepad_avail_list") || !strcmp(list->name, "gamepad_used_list"));
+}
+
 static boolean widget_instance_port_is_label(
 	struct widget_instance *widget)
 {
@@ -2958,6 +2979,16 @@ boolean widget_event_function_list_widget_goto_previous_item(
 			{
 				child = widget->child;
 				item_index = 0;
+				/* port: a list with no items (a Custom Edition map's spinner
+				that nothing has filled) has nothing to step to, as in
+				goto_next_item */
+				if (!child)
+				{
+					error(
+						_error_silent,
+						"failed to set focus to the previous list item of a list widget");
+					return FALSE;
+				}
 				while (child->next)
 				{
 					child = child->next;
@@ -3002,6 +3033,8 @@ void ui_widgets_close_all(
 {
 	long local_player_index;
 
+	/* port: closing the UI discards an unconfirmed CE map selection. */
+	custom_edition_menu_cancel_draft();
 	/* port: the virtual keyboard goes with the widgets (while the widget
 	whose text it edits is still there): left open, it drew on after a game
 	loaded, with the menu map's font, which the game's tags no longer have
@@ -3049,6 +3082,8 @@ void ui_widgets_close_all_for_local_player(
 				dispose_widget_stack(&widget_globals.widget_stack[widget_index]);
 		}
 	}
+	/* port: discard an unconfirmed CE map selection on pause-menu closure. */
+	custom_edition_menu_cancel_draft();
 	/* port: and MCC's pause menu's settings (mcc_ui.c) */
 	mcc_ui_settings_close(local_player_index);
 
@@ -3864,7 +3899,7 @@ static void widget_instance_initialize(
 	/* port: a network co-op game never pauses (it opens the campaign's pause
 	screen, which would) */
 	widget->pause_game_time = TEST_FLAG(definition->flags, _widget_pause_game_time_bit) &&
-		!network_coop_active();
+	!network_coop_active() && !(custom_edition_menu_widget(widget) && network_game_is_active());
 	widget->creation_time = widget_globals.current_system_milliseconds;
 	widget->milliseconds_to_auto_close = MAX(definition->milliseconds_to_auto_close, 0);
 	widget->auto_close_fade_time = MAX(definition->auto_close_fade_time, 0);
@@ -3902,6 +3937,28 @@ static void widget_instance_initialize(
 
 			event.controller_index = widget->local_player_index;
 			event_handler_dispatch(widget, definition, &event, handler, &widget_deleted);
+		}
+	}
+	/* port: a button of a map's whose handler runs a function the map may
+	not run (ui_widget_function_denied) does nothing when pressed: it is
+	disabled, so it takes no focus, and drawn dimmed */
+	{
+		extern boolean ui_widget_port_function_denied(struct widget_instance *widget, word function_index);
+		extern boolean pc_menu_tag(long tag_index);
+		long denied_index;
+
+		for (denied_index = 0; denied_index < definition->event_handlers.count; denied_index++)
+		{
+			struct ui_widget_event_handler_reference *denied_handler =
+				(struct ui_widget_event_handler_reference *)definition->event_handlers.address + denied_index;
+			if (custom_edition_menu_widget(widget) && widget->parent && denied_handler->event_type != _widget_event_created &&
+				(denied_handler->flags & 0x80) &&
+				ui_widget_port_function_denied(widget, (word)denied_handler->function))
+			{
+				widget->disabled = TRUE;
+				widget->alpha_modifier = 0.5f;
+				break;
+			}
 		}
 	}
 	if (!widget->focused_child)
@@ -4805,6 +4862,8 @@ void display_error_damaged_media(
 	return;
 }
 
+void network_game_server_start_now(struct network_game_server *server);
+
 void network_game_reset_to_pregame_ui(
 	void)
 {
@@ -4848,13 +4907,24 @@ void network_game_reset_to_pregame_ui(
 	{
 		if (global_network_game_server_get())
 		{
-			network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
-			/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
-			if (!ui_widget_load_by_name_or_tag(
-				pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
-				NONE, NULL, NONE, NONE, NONE, NONE))
+			extern boolean pc_menu_new_game_apply(void);
+
+			if (pc_menu_new_game_apply())
 			{
-				error(_error_silent, "failed to load map select postgame screen");
+				/* port: a game set up from the pause menu starts at once */
+				network_game_server_pause_countdown(global_network_game_server_get(), FALSE);
+				network_game_server_start_now(global_network_game_server_get());
+			}
+			else
+			{
+				network_game_server_pause_countdown(global_network_game_server_get(), TRUE);
+				/* port: with the PC version's menus, theirs (port/linux/game/menu_tags.c) */
+				if (!ui_widget_load_by_name_or_tag(
+					pc_menus_screen("ui\\shell\\main_menu\\multiplayer_type_select\\connected\\connected_map_select_postgame_wrapper"),
+					NONE, NULL, NONE, NONE, NONE, NONE))
+				{
+					error(_error_silent, "failed to load map select postgame screen");
+				}
 			}
 		}
 		else
@@ -5375,6 +5445,14 @@ static boolean ui_widget_port_text_wrap(
 	return fits;
 }
 
+/* port: labels a map's own screens have no string for (the controls screen's
+PAUSE MENU and votes), chosen by a string list index from 0x7000 up
+(menu_functions.c, control_label_strings) */
+#define CONTROL_LABEL_BASE 0x7000
+static wchar_t const *const control_labels[] =
+{
+	L"PAUSE MENU", L"VOTE YES", L"VOTE NO"
+};
 /* port: port/linux/game/menu_functions.c; optional centered PC join legends. */
 boolean menu_functions_glyph_text(struct widget_instance *widget, rectangle2d const *bounds);
 /* port: MCC-owned keyboard legend identities, with native controller fallback. */
@@ -5416,6 +5494,21 @@ static void widget_instance_render_text_box(
 		{
 			string = (wchar_t *)kills_to_win_extra_descriptions[string_list_index - SPINNER_EXTRA_DESCRIPTION_BASE];
 		}
+		if (custom_edition_menu_widget(widget) && string_list_index >= PORT_ROW_TEXT_BASE && ui_widget_port_row_text(string_list_index))
+			string = (wchar_t *)ui_widget_port_row_text(string_list_index);
+		if (custom_edition_menu_widget(widget) && string_list_index >= CONTROL_LABEL_BASE &&
+			string_list_index < CONTROL_LABEL_BASE + (short)NUMBEROF(control_labels))
+		{
+			string = (wchar_t *)control_labels[string_list_index - CONTROL_LABEL_BASE];
+		}
+		/* port: a string list index past its strings gives no string: shown
+		empty (named in the log, to find what sets the index) */
+		if (!string || string == (wchar_t *)-1)
+		{
+			error(_error_silent, "text box '%s': no string at index %d of its list",
+				widget->name ? widget->name : "?", (long)string_list_index);
+			string = (wchar_t *)L"";
+		}
 		length = ustrlen(string);
 		widget->parameters.text_box.text = pool_resize_pointer(
 			widget_memory_pool,
@@ -5431,6 +5524,27 @@ static void widget_instance_render_text_box(
 		else
 		{
 			widget->parameters.text_box.text = L"<out of memory>";
+		}
+	}
+	{
+		extern wchar_t const *pc_menu_gamepad_text(struct widget_instance *widget);
+		wchar_t const *port_text = pc_menu_gamepad_text(widget);
+
+		if (port_text)
+		{
+			unsigned long port_length = ustrlen(port_text);
+
+			widget->parameters.text_box.text = pool_resize_pointer(
+				widget_memory_pool,
+				widget->parameters.text_box.text,
+				2 * port_length + 2,
+				"c:\\halo\\SOURCE\\interface\\ui_widget.c",
+				4421);
+			if (widget->parameters.text_box.text)
+			{
+				csmemcpy(widget->parameters.text_box.text, port_text, 2 * port_length);
+				widget->parameters.text_box.text[port_length] = 0;
+			}
 		}
 	}
 	text = &widget->parameters.text_box.text;
@@ -5471,6 +5585,8 @@ static void widget_instance_render_text_box(
 		return;
 	}
 	justification = definition->justification;
+	if (custom_edition_menu_widget(widget) && widget->name && !strcmp(widget->name, "gamepad_item_label"))
+		justification = _text_justification_left;
 	if (justification < 0 || justification >= NUMBER_OF_TEXT_JUSTIFICATIONS)
 	{
 		error(
@@ -5508,6 +5624,8 @@ static void widget_instance_render_text_box(
 			color_alpha = color.alpha;
 		}
 	}
+	if (custom_edition_menu_widget(widget) && widget->name && !strcmp(widget->name, "gamepad_item_label"))
+		bounds.x0 += GAMEPAD_TEXT_MARGIN;
 	/* port: a colour of the port's for the text (its alpha the box's) */
 	pc_menu_text_color(widget, &color);
 	color.alpha = alpha_modifier * color_alpha;
@@ -5626,6 +5744,11 @@ static void widget_instance_render_spinner_list(
 
 		csmemset(&parameters, 0, sizeof(parameters));
 		bounds = definition->list_header_bounds;
+		if (ui_widget_port_gamepad_spinner(widget))
+		{
+			bounds.x0 += GAMEPAD_ARROW_PULL;
+			bounds.x1 += GAMEPAD_ARROW_PULL;
+		}
 		/* port: a spinner with extra items is wider, to the left, its arrow
 		with it */
 		if (spinner_string_list_extra_count(definition->text_label_string_list.index))
@@ -5657,6 +5780,11 @@ static void widget_instance_render_spinner_list(
 
 		csmemset(&parameters, 0, sizeof(parameters));
 		bounds = definition->list_footer_bounds;
+		if (ui_widget_port_gamepad_spinner(widget))
+		{
+			bounds.x0 -= GAMEPAD_ARROW_PULL;
+			bounds.x1 -= GAMEPAD_ARROW_PULL;
+		}
 		bounds.x0 += offset.x;
 		bounds.y0 += offset.y;
 		bounds.x1 += offset.x;
@@ -5677,7 +5805,8 @@ static void widget_instance_render_spinner_list(
 		if (definition->text_label_string_list.index != NONE)
 		{
 			short string_index = widget->parameters.list.selected_index;
-			wchar_t *string = spinner_string_list_get_string(
+			wchar_t *string = ui_widget_port_spinner_string(widget, string_index) ?
+				(wchar_t *)ui_widget_port_spinner_string(widget, string_index) : spinner_string_list_get_string(
 				definition->text_label_string_list.index,
 				string_index);
 			unsigned long length = ustrlen(string);
@@ -5779,6 +5908,11 @@ static void widget_instance_render_spinner_list(
 						color_alpha = color.alpha;
 					}
 				}
+				if (ui_widget_port_gamepad_spinner(widget))
+				{
+					bounds.x0 += GAMEPAD_ARROW_PULL;
+					bounds.x1 -= GAMEPAD_ARROW_PULL;
+				}
 				color.alpha = text_alpha_modifier * color_alpha;
 				if (TEST_FLAG(
 						definition->text_box_flags,
@@ -5863,6 +5997,13 @@ struct ui_mouse_target
 
 static struct ui_mouse_target ui_mouse_targets[UI_MOUSE_MAXIMUM_TARGETS];
 static long ui_mouse_target_count = 0;
+/* port: the bounds of the disabled widgets with handlers noted this frame, and
+how many targets had been noted before each (those after it are drawn on top of
+it): a click on one does nothing, not what is under it */
+static rectangle2d ui_mouse_dead_bounds[16];
+static long ui_mouse_dead_after[16];
+static long ui_mouse_dead_count = 0;
+
 static boolean ui_mouse_noting_targets = FALSE;
 /* the frame's targets are noted and settled (ui_mouse_fit_button_targets,
 ui_mouse_merge_setting_rows, ui_mouse_widen_values) by one render only:
@@ -6261,9 +6402,19 @@ static void ui_mouse_note_target(
 	short kind;
 
 	if (!ui_mouse_noting_targets ||
-		ui_mouse_target_count >= UI_MOUSE_MAXIMUM_TARGETS ||
-		widget->disabled)
+		ui_mouse_target_count >= UI_MOUSE_MAXIMUM_TARGETS)
 	{
+		return;
+	}
+	if (widget->disabled)
+	{
+		if (custom_edition_menu_widget(widget) && ui_mouse_dead_count < 16)
+		{
+			ui_mouse_dead_bounds[ui_mouse_dead_count] = definition->bounds;
+			offset_rectangle2d(&ui_mouse_dead_bounds[ui_mouse_dead_count], offset.x, offset.y);
+			ui_mouse_dead_after[ui_mouse_dead_count] = ui_mouse_target_count;
+			ui_mouse_dead_count++;
+		}
 		return;
 	}
 	bounds.x0 += offset.x;
@@ -6319,7 +6470,7 @@ static void ui_mouse_note_target(
 	}
 	else if (widget->type == _ui_widget_type_spinner_list)
 	{
-		if (!widget_instance_can_receive_events(widget))
+		if (!ui_widget_port_gamepad_spinner(widget) && !widget_instance_can_receive_events(widget))
 			return;
 		/* a list showing several items is picked through them, and stepped
 		by the band beside them */
@@ -6601,7 +6752,8 @@ static void ui_mouse_fit_button_targets(
 	return;
 }
 
-/* the target drawn last (so on top, and the innermost) under a point */
+/* the target drawn last (so on top, and the innermost) under a point; none if
+a disabled widget is drawn over it */
 static struct ui_mouse_target *ui_mouse_target_at(
 	short x,
 	short y)
@@ -6613,7 +6765,21 @@ static struct ui_mouse_target *ui_mouse_target_at(
 		rectangle2d const *bounds = &ui_mouse_targets[index].bounds;
 
 		if (x >= bounds->x0 && x < bounds->x1 && y >= bounds->y0 && y < bounds->y1)
+		{
+			long dead;
+
+			for (dead = 0; dead < ui_mouse_dead_count; dead++)
+			{
+				rectangle2d const *dead_bounds = &ui_mouse_dead_bounds[dead];
+
+				if (ui_mouse_dead_after[dead] > index &&
+					x >= dead_bounds->x0 && x < dead_bounds->x1 && y >= dead_bounds->y0 && y < dead_bounds->y1)
+				{
+					return NULL;
+				}
+			}
 			return &ui_mouse_targets[index];
+		}
 	}
 
 	return NULL;
@@ -6876,8 +7042,13 @@ port/assets/menus) */
 static boolean ui_mouse_selection_row(
 	struct widget_instance *widget)
 {
-	return widget && widget->parent && pc_menu_tag(widget->parent->definition_tag_index) &&
-		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
+	if (custom_edition_menu_widget(widget) && widget->parent && !strcmp(widget->parent->name, "select_screen_list_template") &&
+		(!strcmp(widget->name, "list_item_0") || !strcmp(widget->name, "list_item_10")))
+		return FALSE;
+	return widget && widget->parent &&
+		(pc_menu_tag(widget->parent->definition_tag_index) ||
+		(custom_edition_menu_widget(widget) && (!strcmp(widget->parent->name, "select_screen_list_template") ||
+		!strcmp(widget->parent->name, "gametype_select_list")))) &&		(!strncmp(widget->name, "list_item_", 10) || !strncmp(widget->name, "server_item_", 12) ||
 			!strncmp(widget->name, "op_mod_", 7));
 }
 
@@ -7121,6 +7292,12 @@ static void ui_widgets_process_mouse(
 				switch (target->kind)
 				{
 				case _ui_mouse_target_item:
+					/* port: a click on a column list itself, not on one of its
+					items (a map's label drawn over the list, which is no
+					target), does nothing: A would press the item last focused */
+					if (custom_edition_menu_widget(target->widget) &&
+						target->widget->type == _ui_widget_type_column_list && target->widget->focused_child)
+						break;
 					/* (a selection list's row: chosen by a click, used by
 					a click on it chosen) */
 					if (ui_mouse_selection_row(target->widget) && target->widget->parent &&
@@ -7193,6 +7370,7 @@ static void ui_widgets_process_mouse(
 		}
 	}
 	ui_mouse_target_count = 0;
+	ui_mouse_dead_count = 0;
 	ui_mouse_targets_settled = FALSE;
 
 	return;
@@ -7380,7 +7558,7 @@ static void widget_instance_render_recursive(
 					clip,
 					color,
 					&multitexture_params,
-					FALSE);
+					custom_edition_menu_widget(widget) && widget->disabled);
 			}
 		}
 		if (use_nifty_plasma_fx)
@@ -7808,17 +7986,20 @@ static void column_list_update(
 {
 	struct widget_instance *child;
 
+	/* port: a map's own lists have rows of three frames */
+	boolean own_list = custom_edition_menu_widget(widget) && (!strcmp(widget->name, "select_screen_list_template") ||
+		!strcmp(widget->name, "gametype_select_list") ||
+		!strcmp(widget->name, "color_select_list") ||
+		!strcmp(widget->name, "gamepad_avail_list") ||
+		!strcmp(widget->name, "gamepad_used_list"));
 	for (child = widget->child; child; child = child->next)
 	{
-		if (child == widget->focused_child)
-		{
-			if (child->animation.number_of_sprite_frames == 2)
-				child->animation.current_frame_index = 1;
-		}
-		else if (child->animation.number_of_sprite_frames == 2)
-		{
-			child->animation.current_frame_index = 0;
-		}
+		boolean has_frames = child->animation.number_of_sprite_frames == 2 ||
+			(own_list && child->animation.number_of_sprite_frames == 3);
+
+		if (!has_frames)
+			continue;
+		child->animation.current_frame_index = child == widget->focused_child ? 1 : 0;
 	}
 
 	return;
@@ -8074,6 +8255,17 @@ static void widget_instance_process_one_event_recursive(
 			{
 				handled_by_event_handler = TRUE;
 			}
+			if (!handled_by_event_handler && event->data.button.index == _widget_event_b_button)
+			{
+				extern boolean pc_menu_network_back(struct widget_instance *widget);
+				extern boolean pc_menu_gamepad_back(struct widget_instance *widget);
+
+				if (custom_edition_menu_widget(widget) && (pc_menu_gamepad_back(widget) || pc_menu_network_back(widget)))
+				{
+					handled_by_event_handler = TRUE;
+					event_handled = TRUE;
+				}
+			}
 			if (!handled_by_event_handler)
 			{
 				widget_instance_go_back_to_previous(widget);
@@ -8111,6 +8303,22 @@ static void widget_instance_process_one_event_recursive(
 	if (!widget_deleted)
 	{
 		widget_instance_update_animation_parameters(widget);
+		if (event_for_this_widget && !event_handled && !widget->parent &&
+			event->type == _event_type_button && event->data.button.value == 1)
+		{
+			extern boolean pc_menu_gamepad_button(struct widget_instance *widget, short button);
+
+			if (custom_edition_menu_widget(widget) && pc_menu_gamepad_button(widget, event->data.button.index))
+				event_handled = TRUE;
+		}
+		if (event_for_this_widget && event->type == _event_type_button &&
+			event->data.button.index == _gamepad_analog_button_a && event->data.button.value == 1)
+		{
+			extern boolean pc_menu_network_open(struct widget_instance *widget);
+
+			if (custom_edition_menu_widget(widget) && pc_menu_network_open(widget))
+				event_handled = TRUE;
+		}
 		if (widget->type == _ui_widget_type_spinner_list)
 			spinner_list_update(widget);
 		else if (widget->type == _ui_widget_type_column_list)

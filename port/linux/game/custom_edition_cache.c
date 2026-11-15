@@ -755,14 +755,6 @@ static boolean custom_edition_cache_tags_convert(
 	{
 		error(_error_silent, "custom edition: the multiplayer score hint names the BACK button where Halo PC names a key");
 	}
-	if (conversion.widget_functions_cleared || conversion.pause_menu_trimmed)
-	{
-		error(
-			_error_silent,
-			"custom edition: %ld menu event handlers of Halo PC's own functions run none%s",
-			(long)conversion.widget_functions_cleared,
-			conversion.pause_menu_trimmed ? "; the multiplayer pause menu is the Xbox's resume and quit" : "");
-	}
 
 	return custom_edition_cache_tags_validate(tag_cache, report) &&
 		custom_edition_bitmaps_verify(tag_cache, loaded_bytes) &&

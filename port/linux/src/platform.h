@@ -177,6 +177,7 @@ void *halo_custom_edition_tag_cache(void);
 /* which textures hold their channels where Halo PC keeps them
 (xbox_textures.c; also declared for the game there) */
 void halo_custom_edition_texels_channels(const void *texels, unsigned char channel_order);
+void halo_custom_edition_texels_register(const void *texels, unsigned char channel_order, int normalized);
 void halo_custom_edition_texels_forget(void);
 
 /* ---------- guest memory write tracking (memory_watch.c)

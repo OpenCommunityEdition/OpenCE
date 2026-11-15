@@ -907,6 +907,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "custom_edition_menu.h" /* port: CE-owned widget and session boundaries */
 #include "cseries.h"
 #include "cache/cache_files.h"
 #include "bungie_net/network/transport.h"
@@ -934,6 +935,18 @@ symbols in this file:
 #include "mcc_ui.h" /* port: port/linux/game/mcc_ui.c */
 
 /* ---------- constants */
+
+/* port: Halo PC's own event handler functions that a Custom Edition map's pause
+menu names (numbers past the Xbox's 0 to 101, below the menus' own) and that
+the port runs for it; the others of Halo PC's succeed and do nothing */
+enum
+{
+	_halo_pc_function_back = 109,
+	_halo_pc_function_change_settings = 137,
+	_halo_pc_function_map_row = 160,
+	_halo_pc_function_restart = 163,
+	_halo_pc_function_map_ok = 164
+};
 
 /* ---------- macros */
 
@@ -2990,6 +3003,8 @@ static boolean create_and_begin_editing_new_player_profile(
 	return result;
 }
 
+/* port: a Custom Edition map's own New Game screen has a column list of rows,
+not the Xbox's spinner of three: the menus' map list fills it (menu_functions.c) */
 static boolean multiplayer_level_list_initialize(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -3000,6 +3015,12 @@ static boolean multiplayer_level_list_initialize(
 	short level_count = 13;
 	char **levels;
 
+	if (custom_edition_menu_widget(widget) && (definition->type != 2 || definition->child_count != 3))
+	{
+		extern boolean pc_menu_map_list_initialize(struct widget_instance *widget);
+
+		return pc_menu_map_list_initialize(widget); /* port: a map's own list */
+	}
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1228,
 		definition->type == 2,
 		"expected a spinner list widget for 'multiplayer level list' widget");
@@ -3181,6 +3202,10 @@ static boolean player_profile_color_picker_menu_initialize(
 	struct ui_widget_definition *definition = ui_widget_definition_get(widget->definition_tag_index);
 	long index;
 
+	/* port: a Custom Edition map's colour screen is laid out as its own, not
+	as the Xbox's spinner list of three: it is left as it is */
+	if (custom_edition_menu_widget(widget) && (definition->type != 2 || definition->child_count != 3))
+		return TRUE;
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 3576,
 		definition->type == 2,
 		"expected a spinner list widget for 'player color picker list' widget");
@@ -3338,6 +3363,12 @@ static boolean multiplayer_profiles_list_initialize(
 	event_handler_functions.profile_index = NONE;
 	memset(cached_variant_profile, -1, 0x144);
 	definition = ui_widget_definition_get(widget->definition_tag_index);
+	if (custom_edition_menu_widget(widget) && definition->type != 2)
+	{
+		/* port: a map's own gametype list: the menus' gametype list fills it */
+		extern boolean pc_menu_gametype_list_initialize(struct widget_instance *list);
+		return pc_menu_gametype_list_initialize(widget); /* port: a map's own list */
+	}
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1384,
 		definition->type == 2,
 		"expected a spinner list widget for 'multiplayer settings list' widget");
@@ -3409,6 +3440,7 @@ static boolean ui_widget_function_denied(
 		68, 69, 70, 71, /* player profile controller settings */
 		74, 75, 76, 77, 78, 79, 80, /* profile deletion and creation */
 		86, 87, /* the demos */
+		153 /* Halo PC's controls screen's advanced settings: not wired, its button is disabled as Custom Edition has it */
 	};
 	static boolean logged = FALSE;
 	boolean denied = FALSE;
@@ -3427,7 +3459,8 @@ static boolean ui_widget_function_denied(
 	{
 		for (index = 0; index < (short)NUMBEROF(main_menu_functions); index++)
 		{
-			if (function_index == (word)main_menu_functions[index])
+			if (function_index == (word)main_menu_functions[index] &&
+				(function_index != 153 || custom_edition_menu_widget(widget)))
 				denied = TRUE;
 		}
 	}
@@ -3440,6 +3473,15 @@ static boolean ui_widget_function_denied(
 
 	return denied;
 }
+
+/* port: ui_widget_function_denied, for ui_widget.c (a widget whose handlers
+only run denied functions is shown disabled) */
+boolean ui_widget_port_function_denied(struct widget_instance *widget, word function_index)
+{
+	return ui_widget_function_denied(widget, function_index);
+}
+
+#include "custom_edition_menu_events.inl" /* port: CE-owned event dispatch */
 
 boolean ui_widget_event_handler_function_invoke(
 	struct widget_instance *widget,
@@ -3457,7 +3499,7 @@ boolean ui_widget_event_handler_function_invoke(
 	(failed, as an invalid function is, so the handler opens and closes no
 	screens after it) */
 	if (ui_widget_function_denied(widget, function_index))
-		return FALSE;
+		return custom_edition_menu_widget(widget) && function_index == 65; /* port: end editing: nothing to do for a map's widget, but it must not fail, or its go back is skipped */
 	/* port: MCC's additional in-map functions have their own dispatcher (mcc_ui.c) */
 	if (mcc_ui_event_function(widget, event, function_index, widget_deleted, &result))
 		return result;
@@ -3468,6 +3510,13 @@ boolean ui_widget_event_handler_function_invoke(
 			long function_index, boolean *widget_deleted);
 
 		return pc_menu_event_function_invoke(widget, event, function_index - PC_MENU_FUNCTION_BASE, widget_deleted);
+	}
+	/* port: CE map-authored event numbers have their own guarded adapter. */
+	{
+		short ce_result = custom_edition_menu_event(widget, event, function_index, widget_deleted);
+
+		if (ce_result != NONE)
+			return ce_result;
 	}
 	if ((short)function_index >= 0 && function_index < 102)
 	{
@@ -5689,6 +5738,8 @@ static boolean playlist_profile_change_player_options(
 	return result;
 }
 
+/* port: a map's own screen: the map chosen is kept until the game ends,
+when the server is in pregame to take it (menu_functions.c, pc_menu_map_stash) */
 static boolean multiplayer_level_select(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -5702,7 +5753,13 @@ static boolean multiplayer_level_select(
 	struct ui_widget_definition *definition;
 	long level_index;
 
-	definition = ui_widget_definition_get(widget->definition_tag_index);
+definition = ui_widget_definition_get(widget->definition_tag_index);
+if (custom_edition_menu_widget(widget) && definition->child_count != 1)
+	{
+		extern boolean pc_menu_map_stash(struct widget_instance *list);
+
+		return pc_menu_map_stash(widget); /* port: a map's own screen */
+	}
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1280,
 		definition->child_count == 1,
 		"expected a wrapper widget around the multiplayer level select screen");
@@ -5793,6 +5850,13 @@ static boolean multiplayer_profile_set_for_game(
 	FILE *file;
 
 	definition = ui_widget_definition_get(widget->definition_tag_index);
+	if (custom_edition_menu_widget(widget) && definition->child_count != 1)
+	{
+		/* port: a map's own gametype screen: the gametype chosen is kept, and the game ends as its time
+		limit would; the map and gametype are applied in the pregame that follows (pc_menu_new_game_apply) */
+		extern boolean pc_menu_new_game_begin(struct widget_instance *list, boolean *widget_deleted);
+		return pc_menu_new_game_begin(widget, widget_deleted); /* port: a map's own screen */
+	}
 	match_vassert("c:\\halo\\SOURCE\\interface\\ui_widget_event_handler_functions.c", 1465,
 		definition->child_count == 1,
 		"expected a wrapper widget around the multiplayer profile select screen");

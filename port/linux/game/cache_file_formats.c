@@ -319,24 +319,6 @@ formats with the name of its score key: 'Hold "%s" for score' */
 #define MULTIPLAYER_GAME_TEXT_NAME "ui\\multiplayer_game_text"
 #define MULTIPLAYER_GAME_TEXT_SCORE_HINT_INDEX 100
 
-/* widget definitions (ui_widget.c's struct ui_widget_definition): their
-event handlers and child widgets. Halo PC's widgets run functions past the
-Xbox's 102 (ui_widget_event_handler_functions.c), which this build has not */
-#define UI_WIDGET_DEFINITION_GROUP_TAG 'DeLa'
-#define UI_WIDGET_DEFINITION_BYTES 0x3EC
-#define UI_WIDGET_EVENT_HANDLERS_OFFSET 0x54
-#define UI_WIDGET_EVENT_HANDLER_BYTES 0x48
-#define UI_WIDGET_EVENT_HANDLER_FLAGS_OFFSET 0x00
-#define UI_WIDGET_EVENT_HANDLER_FUNCTION_OFFSET 0x06
-#define UI_WIDGET_EVENT_HANDLER_RUN_FUNCTION_FLAG 0x80
-#define UI_WIDGET_CHILD_WIDGETS_OFFSET 0x3E0
-#define UI_WIDGET_CHILD_BYTES 0x50
-#define UI_WIDGET_CHILD_VERTICAL_OFFSET 0x36
-#define XBOX_WIDGET_FUNCTION_COUNT 102
-/* the multiplayer pause menu's list, and the Xbox's two items of it */
-#define MULTIPLAYER_PAUSE_LIST_NAME "ui\\shell\\multiplayer_game\\pause_game\\mp_pause_list"
-#define MULTIPLAYER_PAUSE_RESUME_NAME "resume_game_button"
-#define MULTIPLAYER_PAUSE_QUIT_NAME "quit_netgame_button"
 #define UNICODE_STRING_LIST_BYTES 0x0C
 #define UNICODE_STRING_LIST_STRINGS_OFFSET 0x00
 #define SCORE_KEY_PLACEHOLDER_CHARACTERS 4
@@ -3523,115 +3505,6 @@ static void multiplayer_score_hint_convert(
 	return;
 }
 
-/* Halo PC's widgets run its own functions besides the Xbox's, numbered past
-them: this build has none of those (its menus' own are other numbers, from
-PC_MENU_FUNCTION_BASE), and a handler running one would only log an invalid
-function. Those handlers run none. */
-static void widget_pc_functions_clear(
-	struct load_state const *state,
-	uint32_t widget_offset,
-	struct custom_edition_conversion_report *report)
-{
-	int32_t handler_count;
-	uint32_t handlers_offset;
-	int32_t handler_index;
-
-	if (!loaded_block_get(
-			state->tag_cache + widget_offset + UI_WIDGET_EVENT_HANDLERS_OFFSET,
-			CUSTOM_EDITION_TAG_CACHE_ADDRESS,
-			state->used_bytes,
-			UI_WIDGET_EVENT_HANDLER_BYTES,
-			&handler_count,
-			&handlers_offset))
-	{
-		return;
-	}
-	for (handler_index = 0; handler_index < handler_count; handler_index++)
-	{
-		uint8_t *handler = state->tag_cache + handlers_offset + (uint32_t)handler_index * UI_WIDGET_EVENT_HANDLER_BYTES;
-		uint32_t flags = read_u32(handler + UI_WIDGET_EVENT_HANDLER_FLAGS_OFFSET);
-
-		if ((flags & UI_WIDGET_EVENT_HANDLER_RUN_FUNCTION_FLAG) &&
-			read_s16(handler + UI_WIDGET_EVENT_HANDLER_FUNCTION_OFFSET) >= XBOX_WIDGET_FUNCTION_COUNT)
-		{
-			write_u32(handler + UI_WIDGET_EVENT_HANDLER_FLAGS_OFFSET, flags & ~UI_WIDGET_EVENT_HANDLER_RUN_FUNCTION_FLAG);
-			report->widget_functions_cleared++;
-		}
-	}
-
-	return;
-}
-
-/* whether a tag's name ends in `item` (the last part of its path) */
-static int tag_name_item_is(
-	char const *name,
-	char const *item)
-{
-	char const *last = strrchr(name, '\\');
-
-	return !strcmp(last ? last + 1 : name, item);
-}
-
-/* Halo PC's multiplayer pause menu has its game options and settings
-between the Xbox's resume and quit, and they open screens of Halo PC's
-functions (none here, widget_pc_functions_clear). The list keeps the Xbox's
-two, moved to the middle of its box of rows. */
-static void multiplayer_pause_list_convert(
-	struct load_state const *state,
-	uint32_t widget_offset,
-	struct custom_edition_conversion_report *report)
-{
-	uint8_t *block = state->tag_cache + widget_offset + UI_WIDGET_CHILD_WIDGETS_OFFSET;
-	int32_t child_count;
-	uint32_t children_offset;
-	uint8_t *children;
-	int16_t row;
-	int32_t child_index;
-	int32_t kept = 0;
-
-	if (!loaded_block_get(
-			block,
-			CUSTOM_EDITION_TAG_CACHE_ADDRESS,
-			state->used_bytes,
-			UI_WIDGET_CHILD_BYTES,
-			&child_count,
-			&children_offset) ||
-		child_count < 2)
-	{
-		return;
-	}
-	children = state->tag_cache + children_offset;
-	/* (the rows' spacing, from the first two) */
-	row = (int16_t)(read_s16(children + UI_WIDGET_CHILD_BYTES + UI_WIDGET_CHILD_VERTICAL_OFFSET) -
-		read_s16(children + UI_WIDGET_CHILD_VERTICAL_OFFSET));
-	for (child_index = 0; child_index < child_count; child_index++)
-	{
-		uint8_t *child = children + (uint32_t)child_index * UI_WIDGET_CHILD_BYTES;
-		uint32_t handle = read_u32(child + TAG_REFERENCE_INDEX_OFFSET);
-		char const *name = custom_edition_cache_tag_name(state->tag_cache, state->used_bytes, (int32_t)(handle & 0xFFFF));
-
-		if (name && (tag_name_item_is(name, MULTIPLAYER_PAUSE_RESUME_NAME) || tag_name_item_is(name, MULTIPLAYER_PAUSE_QUIT_NAME)))
-		{
-			if (kept != child_index)
-				memmove(children + (uint32_t)kept * UI_WIDGET_CHILD_BYTES, child, UI_WIDGET_CHILD_BYTES);
-			kept++;
-		}
-	}
-	if (kept == 0 || kept == child_count)
-	{
-		return;
-	}
-	for (child_index = 0; child_index < kept; child_index++)
-	{
-		write_u16(children + (uint32_t)child_index * UI_WIDGET_CHILD_BYTES + UI_WIDGET_CHILD_VERTICAL_OFFSET,
-			(uint16_t)(row * (child_index + (child_count - kept) / 2)));
-	}
-	write_u32(block + TAG_BLOCK_COUNT_OFFSET, (uint32_t)kept);
-	report->pause_menu_trimmed = 1;
-
-	return;
-}
-
 /* ---------- Halo PC behaviours */
 
 #define BEHAVIOUR(name) (1U << _custom_edition_behaviour_##name)
@@ -3845,13 +3718,6 @@ enum cache_file_status custom_edition_cache_convert(
 			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), UNICODE_STRING_LIST_BYTES, &offset))
 		{
 			multiplayer_score_hint_convert(&state, offset, report);
-		}
-		if (group_tag == UI_WIDGET_DEFINITION_GROUP_TAG &&
-			tag_cache_offset(&state, read_u32(instance + TAG_INSTANCE_ADDRESS_OFFSET), UI_WIDGET_DEFINITION_BYTES, &offset))
-		{
-			widget_pc_functions_clear(&state, offset, report);
-			if (!strcmp(custom_edition_cache_tag_name(tag_cache, loaded_bytes, tag_index), MULTIPLAYER_PAUSE_LIST_NAME))
-				multiplayer_pause_list_convert(&state, offset, report);
 		}
 		if (!shader_type)
 		{
