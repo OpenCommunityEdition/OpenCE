@@ -18,6 +18,7 @@ cutoff, opt-out, and proxy-to-live-object materialization.
 #endif
 
 #include "harness.h"
+#include <math.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -101,6 +102,7 @@ static int32_t g_net_obj_live_index[FORGE_MAX_TRACKED_NET_OBJECTS];
 static uint8_t g_net_obj_is_held[FORGE_MAX_TRACKED_NET_OBJECTS];
 static uint8_t g_net_obj_has_deferred_create[FORGE_MAX_TRACKED_NET_OBJECTS];
 static struct forge_distributed_object_change g_net_obj_deferred_create[FORGE_MAX_TRACKED_NET_OBJECTS];
+static int g_host_machine_known[FORGE_MAX_CLIENT_MACHINES];
 
 /* Captured wire queues (Client -> Host and Host -> Client) */
 #define MAX_WIRE_QUEUE 64
@@ -433,6 +435,70 @@ void forge_sync_instance_extended_props_to_edit_state(int32_t live_idx)
 void forge_apply_instance_light_settings(int32_t live_idx)
 {
 	(void)live_idx;
+}
+
+static void upsert_dynamic_tag_entry(uint32_t grp, char const *path, long hdl, float rad)
+{
+	(void)grp; (void)path; (void)hdl; (void)rad;
+}
+
+static long network_distributed_client_reliable_backlog(void)
+{
+	return 0;
+}
+
+static int forge_object_is_network_shared(long obj_idx)
+{
+	(void)obj_idx;
+	return 1;
+}
+
+int32_t forge_3d_spawn_object_at(
+	uint32_t grp,
+	char const *path,
+	uint8_t src,
+	float x, float y, float z,
+	float yaw, float pitch, float roll,
+	int16_t team,
+	int sync)
+{
+	(void)grp; (void)path; (void)src;
+	(void)x; (void)y; (void)z;
+	(void)yaw; (void)pitch; (void)roll;
+	(void)team; (void)sync;
+	return -1;
+}
+
+static void forge_apply_props_to_live_slot(
+	int32_t slot,
+	int16_t team,
+	uint16_t flags,
+	uint8_t phys,
+	int16_t resp,
+	uint8_t ai,
+	uint8_t grp,
+	uint8_t lc,
+	uint8_t li,
+	uint8_t lr)
+{
+	(void)slot; (void)team; (void)flags; (void)phys; (void)resp;
+	(void)ai; (void)grp; (void)lc; (void)li; (void)lr;
+}
+
+static void forge_format_props_packet(char *buf, size_t sz, int32_t idx, struct forge_live_instance const *inst)
+{
+	(void)idx; (void)inst;
+	if (buf && sz)
+		buf[0] = '\0';
+}
+
+static void forge_broadcast_packet_to_clients(char const *text, long excl)
+{
+	(void)text; (void)excl;
+}
+
+static void forge_server_mark_dirty(void)
+{
 }
 
 #include "under_test.inc"

@@ -3444,14 +3444,16 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 	model_idx = *(int32_t const *)(obuf + 0x34u);
 	if (model_idx != NONE)
 	{
-		uint8_t *mbuf = (uint8_t *)tag_get('mode', model_idx);
-		if (!mbuf)
+		uint8_t *mbuf = NULL;
+		if (tag_index_is_group(model_idx, 'mode'))
+			mbuf = (uint8_t *)tag_get('mode', model_idx);
+		else if (tag_index_is_group(model_idx, 'mod2'))
 			mbuf = (uint8_t *)tag_get('mod2', model_idx);
 		if (mbuf)
 		{
 			float *cutoffs = (float *)(mbuf + 0x08u);
 			int32_t model_node_cnt = *(int32_t const *)(mbuf + 0xB8u);
-			int32_t antr_idx = *(int32_t const *)(obuf + 0x3Cu);
+			int32_t antr_idx = *(int32_t const *)(obuf + 0x44u);
 			int32_t reg_cnt = *(int32_t const *)(mbuf + 0xC4u);
 			uint8_t *reg_base = *(uint8_t *const *)(mbuf + 0xC8u);
 			int32_t geom_cnt = *(int32_t const *)(mbuf + 0xD0u);
@@ -3460,10 +3462,11 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 
 			if (antr_idx != NONE && (grp == 'scen' || grp == 'eqip' || grp == 'weap'))
 			{
-				uint8_t const *abuf = (uint8_t const *)tag_get('antr', antr_idx);
+				uint8_t const *abuf = tag_index_is_group(antr_idx, 'antr') ?
+					(uint8_t const *)tag_get('antr', antr_idx) : NULL;
 				if (!abuf)
 				{
-					*(int32_t *)(obuf + 0x3Cu) = NONE;
+					*(int32_t *)(obuf + 0x44u) = NONE;
 				}
 				else
 				{
@@ -3472,7 +3475,7 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 					if (antr_anim_cnt <= 0 ||
 						(antr_node_cnt > 0 && model_node_cnt > 0 && antr_node_cnt != model_node_cnt))
 					{
-						*(int32_t *)(obuf + 0x3Cu) = NONE;
+						*(int32_t *)(obuf + 0x44u) = NONE;
 					}
 				}
 			}
@@ -7198,57 +7201,6 @@ void forge_load_saved_map_state_if_present(char const *map_name)
 	forge_undo_clear();
 	forge_ui_close_map_tag_browser();
 
-	/* Patch any baked vehicles and custom scenery/devices/lights in the loaded map so vehicle seats and long-distance LOD rendering work */
-	{
-		long tag_cnt = 0, ti;
-		struct forge_cache_file_tag_instance *instances =
-			(struct forge_cache_file_tag_instance *)cache_files_tag_instances(&tag_cnt);
-		if (instances && tag_cnt > 0)
-		{
-			for (ti = 0; ti < tag_cnt; ti++)
-			{
-				uint32_t g = (uint32_t)instances[ti].group_tag;
-				if (!instances[ti].base_address)
-					continue;
-				if (g == 'vehi')
-					patch_vehicle_tag_for_player_driving(instances[ti].tag_index, instances[ti].name);
-				else if (g == 'scen' || g == 'mach' || g == 'lifi' || g == 'ctrl')
-					patch_forge_device_and_light_tag_runtime(instances[ti].tag_index, g, instances[ti].name);
-			}
-		}
-		if (object_header_data)
-		{
-			unsigned long scen_mask =
-				_object_mask_scenery |
-				_object_mask_machine |
-				_object_mask_control |
-				_object_mask_light_fixture;
-			long o_idx;
-			for (o_idx = data_next_index(object_header_data, NONE);
-				 o_idx != NONE;
-				 o_idx = data_next_index(object_header_data, o_idx))
-			{
-				struct object_datum *obj = (struct object_datum *)object_try_and_get_and_verify_type(o_idx, scen_mask);
-				if (obj && obj->definition_index != NONE)
-				{
-					uint8_t const *obuf = (uint8_t const *)object_definition_get(obj->definition_index);
-					if (obuf)
-					{
-						float def_br = *(float const *)(obuf + 0x04u);
-						if (obj->object.bounding_sphere_radius < def_br)
-							obj->object.bounding_sphere_radius = def_br;
-					}
-				}
-			}
-		}
-	}
-	if (g_forge.initialized)
-		forge_runtime_reload_catalogs();
-
-	/* Clients receive the live Forge object state from the Host via !FH: / !FM: / !FD: packets */
-	if (game_connection() == _game_connection_network_client)
-		return;
-
 	slash = strrchr(map_name, '\\');
 	if (!slash)
 		slash = strrchr(map_name, '/');
@@ -7272,6 +7224,59 @@ void forge_load_saved_map_state_if_present(char const *map_name)
 			s_active_sidecar_base_map[0] = '\0';
 			is_flg1_map = is_existing_custom_map_file_flg1(leaf, NULL);
 		}
+
+		/* Patch any baked vehicles and custom scenery/devices/lights in the loaded map so vehicle seats and long-distance LOD rendering work */
+		if (g_forge_session_enabled || has_pending_sidecar || is_flg1_map ||
+			halo_server_mode() || forge_is_multiplayer_session())
+		{
+			long tag_cnt = 0, ti;
+			struct forge_cache_file_tag_instance *instances =
+				(struct forge_cache_file_tag_instance *)cache_files_tag_instances(&tag_cnt);
+			if (instances && tag_cnt > 0)
+			{
+				for (ti = 0; ti < tag_cnt; ti++)
+				{
+					uint32_t g = (uint32_t)instances[ti].group_tag;
+					if (!instances[ti].base_address)
+						continue;
+					if (g == 'vehi')
+						patch_vehicle_tag_for_player_driving(instances[ti].tag_index, instances[ti].name);
+					else if (g == 'scen' || g == 'mach' || g == 'lifi' || g == 'ctrl')
+						patch_forge_device_and_light_tag_runtime(instances[ti].tag_index, g, instances[ti].name);
+				}
+			}
+			if (object_header_data)
+			{
+				unsigned long scen_mask =
+					_object_mask_scenery |
+					_object_mask_machine |
+					_object_mask_control |
+					_object_mask_light_fixture;
+				long o_idx;
+				for (o_idx = data_next_index(object_header_data, NONE);
+					 o_idx != NONE;
+					 o_idx = data_next_index(object_header_data, o_idx))
+				{
+					struct object_datum *obj = (struct object_datum *)object_try_and_get_and_verify_type(o_idx, scen_mask);
+					if (obj && obj->definition_index != NONE)
+					{
+						uint8_t const *obuf = (uint8_t const *)object_definition_get(obj->definition_index);
+						if (obuf)
+						{
+							float def_br = *(float const *)(obuf + 0x04u);
+							if (obj->object.bounding_sphere_radius < def_br)
+								obj->object.bounding_sphere_radius = def_br;
+						}
+					}
+				}
+			}
+		}
+		if (g_forge.initialized)
+			forge_runtime_reload_catalogs();
+
+		/* Clients receive the live Forge object state from the Host via !FH: / !FM: / !FD: packets */
+		if (game_connection() == _game_connection_network_client)
+			return;
 
 		s_forge_server_dirty_txt = 0;
 		s_forge_server_dirty_map = 0;
@@ -7743,7 +7748,9 @@ static int draw_native_object_model_at(
 	model_idx = *(int32_t const *)(obj_def + 0x34u);
 	if (model_idx == NONE)
 		return 0;
-	mdef = (struct model const *)tag_get('mode', model_idx);
+	mdef = (struct model const *)(tag_index_is_group(model_idx, 'mode') ?
+		tag_get('mode', model_idx) :
+		(tag_index_is_group(model_idx, 'mod2') ? tag_get('mod2', model_idx) : NULL));
 	if (!mdef)
 		return 0;
 

@@ -2,7 +2,7 @@
 
 # OpenCE : Forge
 
-**Halo: Combat Evolved for Windows, Linux & Android — Full [OpenCE](https://github.com/OpenCommunityEdition/OpenCE) Port with Integrated 3D Forge Mode (`v2.10.11`)**
+**Halo: Combat Evolved for Windows, Linux & Android — Full [OpenCE](https://github.com/OpenCommunityEdition/OpenCE) Port with Integrated 3D Forge Mode (`v2.10.12`)**
 
 <p align="center">
   <img src="port/assets/icon/opence-icon.png" alt="OpenCE" width="128">
@@ -40,7 +40,7 @@
 - **Unified Sidecar Map Saving (`F5` / `Pause -> SAVE MAP..`):** Saving a forged map exports a lightweight `.txt` sidecar overlay in `custom_maps/` storing all placed objects, spawns, objectives, weld groups, light overrides, and custom tag references so forged maps play natively in both Forge and Standard Mode Multiplayer and Dedicated Servers without duplicating large `.map` files.
 
 > [!IMPORTANT]
-> **Network Protocol & Stock Session Isolation:** Standard (non-Forge) multiplayer sessions continue to advertise and validate OpenCE's stock `HALO_PORT_NETWORK_VERSION` via [`forge_get_network_version`](port/linux/game/forge_runtime_tags.c), while active Forge sessions use `FORGE_NETWORK_VERSION` (`0x462A`) and `FORGE_GAME_KIND` (`0x46`) in [`forge_engine.h`](port/linux/game/forge_engine.h). Stock OpenCE clients and servers remain 100% compatible with non-Forge games.
+> **Network Protocol & Stock Session Isolation:** Standard (non-Forge) multiplayer sessions continue to advertise and validate OpenCE's stock `HALO_PORT_NETWORK_VERSION` via [`forge_get_network_version`](port/linux/game/forge_runtime_tags.c), while active Forge sessions use `FORGE_NETWORK_VERSION` (`0x4631`) and `FORGE_GAME_KIND` (`0x46`) in [`forge_engine.h`](port/linux/game/forge_engine.h). Stock OpenCE clients and servers remain 100% compatible with non-Forge games.
 
 > [!NOTE]
 > **No proprietary game maps or copyrighted assets are included in this repository or its releases.** You must provide your own Halo: Combat Evolved `maps/` (or Xbox `.iso` / `.xiso` disc image), optional Halo Custom Edition `custom_maps/` (`bitmaps.map`, `sounds.map`, `loc.map`), and optional MCC `mcc_maps/`.

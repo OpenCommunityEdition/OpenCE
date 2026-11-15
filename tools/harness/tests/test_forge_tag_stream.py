@@ -34,11 +34,13 @@ RUNTIME_FUNCTIONS = (
 )
 
 NETWORK_FUNCTIONS = (
+    "forge_net_euler_to_vectors",
     "forge_tag_stream_fill_header",
     "forge_tag_stream_reset_state",
     "forge_client_is_hash_settled",
     "forge_client_mark_hash_settled",
     "forge_client_abort_rx",
+    "forge_enqueue_tag_download_from",
     "forge_client_enqueue_tag_download",
     "forge_client_upsert_stream_proxy_instance",
     "forge_client_materialize_streamed_hash",
@@ -93,7 +95,7 @@ NEGATIVE_CONTROLS = {
         "base-map-shadow-and-ram-cap",
     ),
     "ram-cap-ignored": (
-        ("uncomp_size > FORGE_TAG_STREAM_MAX_SESSION_BYTES - s_streamed_phys_bytes", "0"),
+        ("(uncomp_size > 4u * 1024u * 1024u ? 4u * 1024u * 1024u : uncomp_size) > FORGE_TAG_STREAM_MAX_SESSION_BYTES - s_streamed_phys_bytes", "0"),
         "forge_install_ephemeral_tag_bundle",
         "base-map-shadow-and-ram-cap",
     ),
@@ -107,7 +109,7 @@ NEGATIVE_CONTROLS = {
     ),
     "opt-out-ignored": (
         ('if (!config_boolean("network.forge_tag_download"))', "if (0)"),
-        "forge_client_enqueue_tag_download",
+        "forge_enqueue_tag_download_from",
         "opt-out-and-stall-timeout",
     ),
     "opt-out-tick-ignored": (
@@ -164,6 +166,7 @@ def generated(fault=None, faulty_function=None):
         "forge_host_cached_tag_bundle",
         "forge_host_client_tag_tx",
         "forge_client_pending_instance",
+        "forge_host_pending_client_spawn",
         "forge_pending_slot_props",
     ):
         config += structure(net_src, name) + "\n"

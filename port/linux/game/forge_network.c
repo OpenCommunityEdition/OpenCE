@@ -3357,74 +3357,77 @@ static void forge_tag_stream_tick(unsigned long now)
 			forge_client_abort_rx(0);
 		g_client_tag_rx.queue_count = 0;
 	}
-	else if (g_client_tag_rx.state != _forge_tag_rx_idle)
-	{
-		if (now - g_client_tag_rx.last_progress_ms > FORGE_TAG_STREAM_STALL_TIMEOUT_MS)
-			forge_client_abort_rx(2);
-	}
 	else
 	{
-		while (g_client_tag_rx.queue_count > 0 &&
-			   g_client_tag_rx.downloaded_count < FORGE_TAG_STREAM_MAX_SESSION_TAGS)
+		if (g_client_tag_rx.state != _forge_tag_rx_idle &&
+			now - g_client_tag_rx.last_progress_ms > FORGE_TAG_STREAM_STALL_TIMEOUT_MS)
 		{
-			uint32_t next_hash = g_client_tag_rx.queue[0];
-			uint8_t next_attempts = g_client_tag_rx.queue_attempts[0];
-			int32_t next_src = g_client_tag_rx.queue_source_machine[0];
-			struct forge_tag_request_packet req;
-			uint32_t tid;
-			boolean sent_ok;
-			int q;
-
-			for (q = 1; q < g_client_tag_rx.queue_count; q++)
+			forge_client_abort_rx(2);
+		}
+		if (g_client_tag_rx.state == _forge_tag_rx_idle)
+		{
+			while (g_client_tag_rx.queue_count > 0 &&
+				   g_client_tag_rx.downloaded_count < FORGE_TAG_STREAM_MAX_SESSION_TAGS)
 			{
-				g_client_tag_rx.queue[q - 1] = g_client_tag_rx.queue[q];
-				g_client_tag_rx.queue_attempts[q - 1] = g_client_tag_rx.queue_attempts[q];
-				g_client_tag_rx.queue_source_machine[q - 1] = g_client_tag_rx.queue_source_machine[q];
-			}
-			g_client_tag_rx.queue_count--;
+				uint32_t next_hash = g_client_tag_rx.queue[0];
+				uint8_t next_attempts = g_client_tag_rx.queue_attempts[0];
+				int32_t next_src = g_client_tag_rx.queue_source_machine[0];
+				struct forge_tag_request_packet req;
+				uint32_t tid;
+				boolean sent_ok;
+				int q;
 
-			if (forge_client_is_hash_settled(next_hash))
-				continue;
-			if (is_server && (next_src < 0 || next_src >= FORGE_MAX_CLIENT_MACHINES || !g_host_machine_known[next_src]))
-				continue;
-
-			g_client_tag_rx.next_transfer_seq++;
-			tid = (g_client_tag_rx.next_transfer_seq * 2654435761u) ^ (uint32_t)now ^ next_hash;
-			if (tid == 0u)
-				tid = 1u;
-
-			memset(&req, 0, sizeof(req));
-			forge_tag_stream_fill_header(&req.header, _distributed_message_forge_tag_request, (word)sizeof(req));
-			req.magic = FORGE_TAG_REQUEST_MAGIC;
-			req.hash = next_hash;
-			req.transfer_id = tid;
-
-			sent_ok = is_server
-				? network_distributed_server_send_to_machine_reliably(next_src, &req, (word)sizeof(req))
-				: network_distributed_client_send_reliably(&req, (word)sizeof(req));
-			if (!sent_ok)
-			{
-				/* Reliable stream busy: put back at head of queue and retry next tick */
-				for (q = g_client_tag_rx.queue_count; q > 0; q--)
+				for (q = 1; q < g_client_tag_rx.queue_count; q++)
 				{
-					g_client_tag_rx.queue[q] = g_client_tag_rx.queue[q - 1];
-					g_client_tag_rx.queue_attempts[q] = g_client_tag_rx.queue_attempts[q - 1];
-					g_client_tag_rx.queue_source_machine[q] = g_client_tag_rx.queue_source_machine[q - 1];
+					g_client_tag_rx.queue[q - 1] = g_client_tag_rx.queue[q];
+					g_client_tag_rx.queue_attempts[q - 1] = g_client_tag_rx.queue_attempts[q];
+					g_client_tag_rx.queue_source_machine[q - 1] = g_client_tag_rx.queue_source_machine[q];
 				}
-				g_client_tag_rx.queue[0] = next_hash;
-				g_client_tag_rx.queue_attempts[0] = next_attempts;
-				g_client_tag_rx.queue_source_machine[0] = next_src;
-				g_client_tag_rx.queue_count++;
+				g_client_tag_rx.queue_count--;
+
+				if (forge_client_is_hash_settled(next_hash))
+					continue;
+				if (is_server && (next_src < 0 || next_src >= FORGE_MAX_CLIENT_MACHINES || !g_host_machine_known[next_src]))
+					continue;
+
+				g_client_tag_rx.next_transfer_seq++;
+				tid = (g_client_tag_rx.next_transfer_seq * 2654435761u) ^ (uint32_t)now ^ next_hash;
+				if (tid == 0u)
+					tid = 1u;
+
+				memset(&req, 0, sizeof(req));
+				forge_tag_stream_fill_header(&req.header, _distributed_message_forge_tag_request, (word)sizeof(req));
+				req.magic = FORGE_TAG_REQUEST_MAGIC;
+				req.hash = next_hash;
+				req.transfer_id = tid;
+
+				sent_ok = is_server
+					? network_distributed_server_send_to_machine_reliably(next_src, &req, (word)sizeof(req))
+					: network_distributed_client_send_reliably(&req, (word)sizeof(req));
+				if (!sent_ok)
+				{
+					/* Reliable stream busy: put back at head of queue and retry next tick */
+					for (q = g_client_tag_rx.queue_count; q > 0; q--)
+					{
+						g_client_tag_rx.queue[q] = g_client_tag_rx.queue[q - 1];
+						g_client_tag_rx.queue_attempts[q] = g_client_tag_rx.queue_attempts[q - 1];
+						g_client_tag_rx.queue_source_machine[q] = g_client_tag_rx.queue_source_machine[q - 1];
+					}
+					g_client_tag_rx.queue[0] = next_hash;
+					g_client_tag_rx.queue_attempts[0] = next_attempts;
+					g_client_tag_rx.queue_source_machine[0] = next_src;
+					g_client_tag_rx.queue_count++;
+					break;
+				}
+
+				g_client_tag_rx.state = _forge_tag_rx_wait_offer;
+				g_client_tag_rx.source_machine_index = next_src;
+				g_client_tag_rx.hash = next_hash;
+				g_client_tag_rx.transfer_id = tid;
+				g_client_tag_rx.active_attempts = (uint8_t)(next_attempts + 1u);
+				g_client_tag_rx.last_progress_ms = now;
 				break;
 			}
-
-			g_client_tag_rx.state = _forge_tag_rx_wait_offer;
-			g_client_tag_rx.source_machine_index = next_src;
-			g_client_tag_rx.hash = next_hash;
-			g_client_tag_rx.transfer_id = tid;
-			g_client_tag_rx.active_attempts = (uint8_t)(next_attempts + 1u);
-			g_client_tag_rx.last_progress_ms = now;
-			break;
 		}
 	}
 
