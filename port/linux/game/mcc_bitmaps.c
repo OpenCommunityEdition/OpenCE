@@ -848,10 +848,6 @@ int mcc_forge_convert_single_bitmap(
         normalized.mipmap_count = 0;
         decoded_size = (uint64_t)(unsigned)bitmap->width * (unsigned)bitmap->height * 4;
     }
-    else
-    {
-        normalized.flags = (normalized.flags & ~16u) | 1u;
-    }
     normalized.flags &= ~0x1000;
     if (convert)
     {

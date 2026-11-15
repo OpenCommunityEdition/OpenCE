@@ -2399,6 +2399,14 @@ static void forge_client_abort_rx(int mode)
 					g_host_pending_client_spawns[ps_i].active = 0u;
 				}
 			}
+			for (ps_i = 0; ps_i < g_forge.live_instance_count && ps_i < FORGE_MAX_LIVE_INSTANCES; ps_i++)
+			{
+				if (g_pending_inst_stream[ps_i].active && g_pending_inst_stream[ps_i].hash == prev_hash)
+				{
+					g_pending_inst_stream[ps_i].active = 0u;
+					g_forge.live_instances[ps_i].pad_inst &= (uint8_t)~0x40u;
+				}
+			}
 		}
 	}
 
@@ -2570,12 +2578,30 @@ static void forge_client_materialize_streamed_hash(
 	uint32_t actual_grp)
 {
 	int32_t idx;
-	int is_net_obj = (actual_grp == 'vehi' || actual_grp == 'weap' ||
-					  actual_grp == 'eqip' || actual_grp == 'bipd');
+	int is_net_obj;
 	long weap0_def_idx = NONE;
 
 	if (def_idx == NONE || !tag_path || !tag_path[0])
 		return;
+
+	if (root_group == 'actv' || actual_grp == 'actv')
+	{
+		uint8_t const *actv_def = tag_index_is_group(def_idx, 'actv') ? (uint8_t const *)tag_get('actv', def_idx) : NULL;
+		if (actv_def)
+		{
+			int32_t unit_idx = *(int32_t const *)(actv_def + 0x10u);
+			if (unit_idx != NONE && tag_index_is_group(unit_idx, 'bipd'))
+			{
+				def_idx = unit_idx;
+				actual_grp = 'bipd';
+			}
+			if (*(int32_t const *)(actv_def + 0x6Cu) != NONE)
+				weap0_def_idx = *(int32_t const *)(actv_def + 0x6Cu);
+		}
+	}
+
+	is_net_obj = (actual_grp == 'vehi' || actual_grp == 'weap' ||
+				  actual_grp == 'eqip' || actual_grp == 'bipd');
 
 	if (is_net_obj && actual_grp == 'vehi')
 	{
@@ -2713,6 +2739,10 @@ static void forge_client_materialize_streamed_hash(
 					eff_held,
 					0);
 			}
+			else if (def_idx != NONE)
+			{
+				forge_create_engine_object_for_instance(idx, def_idx, eff_held);
+			}
 		}
 		else
 		{
@@ -2779,7 +2809,8 @@ static int forge_stream_offer_is_valid(
 
 	grp = offer->root_group;
 	if (grp != 'scen' && grp != 'vehi' && grp != 'weap' && grp != 'eqip' &&
-		grp != 'mach' && grp != 'lifi' && grp != 'ctrl' && grp != 'bipd')
+		grp != 'mach' && grp != 'lifi' && grp != 'ctrl' && grp != 'bipd' &&
+		grp != 'actv')
 	{
 		return 0;
 	}

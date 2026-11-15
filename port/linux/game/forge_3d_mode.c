@@ -3883,17 +3883,39 @@ void forge_init_map_scenario_entities(void)
 
 			if (item_def_idx != NONE)
 			{
-				struct object_placement_data pdata;
-				long oidx;
-				object_placement_data_new(&pdata, item_def_idx, NONE);
-				pdata.position = eq->position;
-				pdata.position.z += 0.08f;
-				euler_to_forward_up(eq->facing, 0.0f, 0.0f, &pdata.forward, &pdata.up);
-				oidx = object_new(&pdata);
-				if (oidx != NONE)
+				struct object_iterator it;
+				struct object_datum *iobj;
+				int already_exists = 0;
+
+				object_iterator_new(&it, _object_mask_item, 0);
+				while ((iobj = object_iterator_next(&it)) != NULL)
 				{
-					object_set_automatic_deactivation(oidx, FALSE);
-					object_activate(oidx);
+					if (iobj->definition_index == item_def_idx)
+					{
+						float dx = iobj->object.position.x - eq->position.x;
+						float dy = iobj->object.position.y - eq->position.y;
+						float dz = iobj->object.position.z - eq->position.z;
+						if (dx * dx + dy * dy + dz * dz < 1.0f)
+						{
+							already_exists = 1;
+							break;
+						}
+					}
+				}
+				if (!already_exists)
+				{
+					struct object_placement_data pdata;
+					long oidx;
+					object_placement_data_new(&pdata, item_def_idx, NONE);
+					pdata.position = eq->position;
+					pdata.position.z += 0.08f;
+					euler_to_forward_up(eq->facing, 0.0f, 0.0f, &pdata.forward, &pdata.up);
+					oidx = object_new(&pdata);
+					if (oidx != NONE)
+					{
+						object_set_automatic_deactivation(oidx, FALSE);
+						object_activate(oidx);
+					}
 				}
 			}
 		}
@@ -5700,11 +5722,19 @@ static void forge_enforce_runtime_object_properties(void)
 			if (def_idx != NONE && obj->definition_index != def_idx)
 			{
 				char const *oname = (obj->definition_index != NONE) ? tag_get_name(obj->definition_index) : NULL;
-				int is_baked_mp_vehi = (inst->group_tag == 'vehi' && obj->object.type == _object_type_vehicle) ||
+				int type_matches =
+					(inst->group_tag == 'vehi' && obj->object.type == _object_type_vehicle) ||
+					(inst->group_tag == 'weap' && obj->object.type == _object_type_weapon) ||
+					(inst->group_tag == 'eqip' && obj->object.type == _object_type_equipment) ||
+					((inst->group_tag == 'bipd' || inst->group_tag == 'actv') && obj->object.type == _object_type_biped) ||
+					(inst->group_tag == 'scen' && obj->object.type == _object_type_scenery) ||
+					(inst->group_tag == 'mach' && obj->object.type == _object_type_machine) ||
+					(inst->group_tag == 'ctrl' && obj->object.type == _object_type_control) ||
+					(inst->group_tag == 'lifi' && obj->object.type == _object_type_light_fixture) ||
 					(oname && _strnicmp(oname, "forge\\vehicles\\placed_unit_", 27) == 0);
-				if (!is_baked_mp_vehi)
+				if (!type_matches)
 				{
-					/* Never allow a placed instance to hijack a stock scenario object occupying the same datum slot */
+					/* Never allow a placed instance to hijack an incompatible stock scenario object occupying the same datum slot */
 					obj = NULL;
 					inst->object_index = NONE;
 				}
@@ -6130,11 +6160,19 @@ static void forge_reconcile_live_instances(void)
 			if (def_idx != NONE && obj->definition_index != def_idx)
 			{
 				char const *oname = (obj->definition_index != NONE) ? tag_get_name(obj->definition_index) : NULL;
-				int is_baked_mp_vehi = (inst->group_tag == 'vehi' && obj->object.type == _object_type_vehicle) ||
+				int type_matches =
+					(inst->group_tag == 'vehi' && obj->object.type == _object_type_vehicle) ||
+					(inst->group_tag == 'weap' && obj->object.type == _object_type_weapon) ||
+					(inst->group_tag == 'eqip' && obj->object.type == _object_type_equipment) ||
+					((inst->group_tag == 'bipd' || inst->group_tag == 'actv') && obj->object.type == _object_type_biped) ||
+					(inst->group_tag == 'scen' && obj->object.type == _object_type_scenery) ||
+					(inst->group_tag == 'mach' && obj->object.type == _object_type_machine) ||
+					(inst->group_tag == 'ctrl' && obj->object.type == _object_type_control) ||
+					(inst->group_tag == 'lifi' && obj->object.type == _object_type_light_fixture) ||
 					(oname && _strnicmp(oname, "forge\\vehicles\\placed_unit_", 27) == 0);
-				if (!is_baked_mp_vehi)
+				if (!type_matches)
 				{
-					/* Never allow a placed instance to hijack a stock scenario object occupying the same datum slot */
+					/* Never allow a placed instance to hijack an incompatible stock scenario object occupying the same datum slot */
 					obj = NULL;
 					inst->object_index = NONE;
 				}
@@ -6229,9 +6267,17 @@ static void forge_reconcile_live_instances(void)
 			if (obj && def_idx != NONE && obj->definition_index != def_idx)
 			{
 				char const *oname = (obj->definition_index != NONE) ? tag_get_name(obj->definition_index) : NULL;
-				int is_baked_mp_vehi = (inst->group_tag == 'vehi' && obj->object.type == _object_type_vehicle) ||
+				int type_matches =
+					(inst->group_tag == 'vehi' && obj->object.type == _object_type_vehicle) ||
+					(inst->group_tag == 'weap' && obj->object.type == _object_type_weapon) ||
+					(inst->group_tag == 'eqip' && obj->object.type == _object_type_equipment) ||
+					((inst->group_tag == 'bipd' || inst->group_tag == 'actv') && obj->object.type == _object_type_biped) ||
+					(inst->group_tag == 'scen' && obj->object.type == _object_type_scenery) ||
+					(inst->group_tag == 'mach' && obj->object.type == _object_type_machine) ||
+					(inst->group_tag == 'ctrl' && obj->object.type == _object_type_control) ||
+					(inst->group_tag == 'lifi' && obj->object.type == _object_type_light_fixture) ||
 					(oname && _strnicmp(oname, "forge\\vehicles\\placed_unit_", 27) == 0);
-				if (!is_baked_mp_vehi)
+				if (!type_matches)
 				{
 					/* Slot was overwritten or reverted to a different object by game_state_revert() */
 					obj = NULL;

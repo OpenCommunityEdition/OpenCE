@@ -3470,10 +3470,10 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 				}
 				else
 				{
-					int32_t antr_node_cnt = *(int32_t const *)(abuf + 0x54u);
+					int32_t antr_node_cnt = *(int32_t const *)(abuf + 0x68u);
 					int32_t antr_anim_cnt = *(int32_t const *)(abuf + 0x74u);
 					if (antr_anim_cnt <= 0 ||
-						(antr_node_cnt > 0 && model_node_cnt > 0 && antr_node_cnt != model_node_cnt))
+						(grp == 'scen' && antr_node_cnt > 0 && model_node_cnt > 0 && antr_node_cnt != model_node_cnt))
 					{
 						*(int32_t *)(obuf + 0x44u) = NONE;
 					}
@@ -3695,9 +3695,15 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 		cl->runtime_handles[abs_idx] = NONE;
 		return;
 	}
+	if (grp == 'matg' || grp == 'hudg' || grp == 'hud#' ||
+		grp == 'font' || grp == 'DeLa' || grp == 'hmt ')
+	{
+		cl->runtime_handles[abs_idx] = tag_loaded((long)grp, tname);
+		return;
+	}
 
 	/* Reuse any dependency tag that was already dynamically injected during this session,
-	 * or reuse shared base-map dependencies (including sounds) on stock Xbox maps. */
+	 * or reuse shared base-map dependencies (including sounds) on the active map. */
 	if (cl->order_count > 0 && !cl->is_red_beam_variant && !cl->include_all_dependencies)
 	{
 		char donor_name[256];
@@ -3714,8 +3720,7 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 		{
 			long base_cnt = (long)forge_get_base_map_tag_count();
 			if ((base_cnt > 0 && (ex & 0xFFFF) >= base_cnt) ||
-				(!custom_edition_cache_tags_loaded() && !mcc_cache_tags_loaded() &&
-				 grp != 'bitm' && grp != 'mode' && grp != 'antr' && grp != 'coll' &&
+				(grp != 'bitm' && grp != 'mode' && grp != 'mod2' && grp != 'antr' && grp != 'coll' &&
 				 grp != 'shdr' && grp != 'senv' && grp != 'soso' && grp != 'sotr' &&
 				 grp != 'schi' && grp != 'scex' && grp != 'swat' && grp != 'sgla' &&
 				 grp != 'smet' && grp != 'spla'))
@@ -4853,6 +4858,27 @@ static long load_native_xbox_tag_from_source(
 		}
 	}
 
+	for (i = 0; i < cl.order_count; i++)
+	{
+		int32_t abs_idx = cl.order[i];
+		long hdl = cl.runtime_handles[abs_idx];
+		uint32_t io = (uint32_t)abs_idx * 32u;
+		uint32_t grp = *(uint32_t const *)(cl.tag_buf + io + 0x00);
+		uint32_t name_addr = *(uint32_t const *)(cl.tag_buf + io + 0x10);
+		char const *tname = (name_addr >= cl.tag_base && (name_addr - cl.tag_base) < cl.tag_sz)
+			? (char const *)(cl.tag_buf + (name_addr - cl.tag_base))
+			: req_path;
+		if (hdl == NONE || !cl.cloned_roots[abs_idx])
+			continue;
+		if (grp == 'vehi')
+			patch_vehicle_tag_for_player_driving(hdl, tname);
+		if (grp == 'vehi' || grp == 'weap' || grp == 'eqip' || grp == 'bipd' ||
+			grp == 'scen' || grp == 'mach' || grp == 'lifi' || grp == 'ctrl')
+		{
+			patch_forge_device_and_light_tag_runtime(hdl, grp, tname);
+		}
+	}
+
 	root_handle = cl.runtime_handles[root_abs_idx];
 	if (root_handle != NONE)
 	{
@@ -4865,6 +4891,7 @@ static long load_native_xbox_tag_from_source(
 		upsert_dynamic_tag_entry(req_group, req_path, root_handle, rad);
 		if (out_actual_group)
 			*out_actual_group = (uint32_t)tag_get_group_tag(root_handle);
+		forge_normalize_mcc_hud_tags();
 	}
 
 	free(cl.visited);
@@ -5668,6 +5695,13 @@ static long install_faber_bundle_from_source(
 		{
 			patch_light_definition_buffer(root_buf);
 		}
+		if (grp == 'vehi')
+			patch_vehicle_tag_for_player_driving(datums[ti], tag_get_name(datums[ti]));
+		if (grp == 'vehi' || grp == 'weap' || grp == 'eqip' || grp == 'bipd' ||
+			grp == 'scen' || grp == 'mach' || grp == 'lifi' || grp == 'ctrl')
+		{
+			patch_forge_device_and_light_tag_runtime(datums[ti], grp, tag_get_name(datums[ti]));
+		}
 	}
 
 	root_handle = datums[0];
@@ -5681,6 +5715,7 @@ static long install_faber_bundle_from_source(
 		upsert_dynamic_tag_entry(req_group, req_path, root_handle, rad);
 		if (out_actual_group)
 			*out_actual_group = (uint32_t)tag_get_group_tag(root_handle);
+		forge_normalize_mcc_hud_tags();
 	}
 
 	free(datums);
@@ -5750,11 +5785,9 @@ static long load_faber_vault_tag_bundle_runtime(
 						if (b_tag_off >= 2048u && b_tag_off + 0x28u <= bundle_size &&
 							*(uint32_t const *)(uncomp_buf + b_tag_off + 0x24u) == 0x74616773u)
 						{
-							/* Pre-v2.10.6 unconverted MCC bundle in tag_vault: auto-upgrade in-place from mcc_maps/ */
+							/* Pre-v2.10.6 unconverted MCC bundle in tag_vault: auto-upgrade in-place from mcc_maps/ if available */
 							port_tag_profiles_bundle_close(b_handle);
 							b_handle = NONE;
-							free(uncomp_buf);
-							uncomp_buf = NULL;
 							if (try_extract_tag_from_mcc_maps_to_vault(req_group, req_path))
 							{
 								long up_p = port_tag_profiles_count() > 0 ? 0 : -1;
@@ -5763,16 +5796,26 @@ static long load_faber_vault_tag_bundle_runtime(
 									up_t = port_tag_profiles_tag_find(up_p, (unsigned long)'mod2', req_path);
 								if (up_p >= 0 && up_t >= 0)
 								{
-									b_handle = port_tag_profiles_bundle_open(up_p, up_t, &bundle_size);
-									if (b_handle != NONE && bundle_size >= 2048u && bundle_size <= 64u * 1024u * 1024u)
+									unsigned long up_sz = 0;
+									long up_hdl = port_tag_profiles_bundle_open(up_p, up_t, &up_sz);
+									if (up_hdl != NONE && up_sz >= 2048u && up_sz <= 64u * 1024u * 1024u)
 									{
-										uncomp_buf = (uint8_t *)malloc(bundle_size);
-										if (!uncomp_buf || !port_tag_profiles_bundle_read_at(b_handle, 0, uncomp_buf, bundle_size))
+										uint8_t *up_buf = (uint8_t *)malloc(up_sz);
+										if (up_buf && port_tag_profiles_bundle_read_at(up_hdl, 0, up_buf, up_sz))
 										{
 											free(uncomp_buf);
-											uncomp_buf = NULL;
+											uncomp_buf = up_buf;
+											bundle_size = up_sz;
+											b_handle = up_hdl;
+											up_hdl = NONE;
+										}
+										else
+										{
+											free(up_buf);
 										}
 									}
+									if (up_hdl != NONE)
+										port_tag_profiles_bundle_close(up_hdl);
 								}
 							}
 						}
@@ -8636,6 +8679,10 @@ static void render_world_objective_and_spawn_markers(void)
 {
 	int i, hill_id;
 
+	/* Objective markers, spawn markers, teleporter markers, and stream proxy markers are only visible in 3D Monitor Mode */
+	if (!g_forge_session_enabled || g_forge.mode != _forge_mode_3d_monitor)
+		return;
+
 	ensure_objective_marker_meshes_loaded();
 
 	for (i = 0; i < g_forge.live_instance_count; i++)
@@ -10746,6 +10793,102 @@ static int try_extract_tag_from_mcc_maps_to_vault(uint32_t req_group, char const
 				}
 			} while (FindNextFileA(h, &fd));
 			CloseHandle(h);
+		}
+	}
+
+	if (was_open && prev_map_path[0])
+		forge_ui_open_map_for_tag_browser(prev_map_path);
+
+	return extracted;
+}
+
+static int try_extract_tag_from_single_xbox_map_file(
+	char const *map_path,
+	uint32_t req_group,
+	char const *req_path,
+	char const *clean_name)
+{
+	int32_t i;
+	int ok = 0;
+
+	if (!map_path || !map_path[0] || !is_xbox_version5_map_file(map_path))
+		return 0;
+	if (!forge_ui_open_map_for_tag_browser(map_path))
+		return 0;
+
+	for (i = 0; i < s_map_browser.xbox_tag_count; i++)
+	{
+		uint32_t grp = browser_tag_group_at(i);
+		if ((grp == req_group || (req_group == 'mode' && grp == 'mod2') || (req_group == 'mod2' && grp == 'mode')) &&
+			_stricmp(browser_tag_name_at(i), req_path) == 0)
+		{
+			ok = extract_xbox_map_tag_to_vault(i, grp, req_path, clean_name);
+			break;
+		}
+	}
+	forge_ui_close_map_tag_browser();
+	return ok;
+}
+
+static int try_extract_tag_from_xbox_maps_to_vault(uint32_t req_group, char const *req_path)
+{
+	static char const *const s_xbox_dirs[] = {
+		"maps",
+		"assets/maps",
+		"../assets/maps"
+	};
+	char prev_map_path[512];
+	int was_open = s_map_browser.is_open;
+	char clean_name[64];
+	char const *leaf;
+	char const *p;
+	char candidate_stems[8][64];
+	int stem_count, s, d;
+	int extracted = 0;
+
+	if (!req_path || !req_path[0])
+		return 0;
+
+	prev_map_path[0] = '\0';
+	if (was_open && s_map_browser.map_path[0])
+		snprintf(prev_map_path, sizeof(prev_map_path), "%s", s_map_browser.map_path);
+
+	leaf = req_path;
+	for (p = req_path; *p; p++)
+	{
+		if (*p == '\\' || *p == '/')
+			leaf = p + 1;
+	}
+	snprintf(clean_name, sizeof(clean_name), "%s", leaf[0] ? leaf : "custom_tag");
+
+	/* 1. Check candidate map stems from credits.md first */
+	stem_count = find_donor_map_stems_from_credits(req_group, req_path, candidate_stems, 8);
+	for (s = 0; s < stem_count && !extracted; s++)
+	{
+		for (d = 0; d < (int)(sizeof(s_xbox_dirs) / sizeof(s_xbox_dirs[0])) && !extracted; d++)
+		{
+			char full_path[512];
+			snprintf(full_path, sizeof(full_path), "%s/%s.map", s_xbox_dirs[d], candidate_stems[s]);
+			if (try_extract_tag_from_single_xbox_map_file(full_path, req_group, req_path, clean_name))
+				extracted = 1;
+		}
+	}
+
+	/* 2. Check campaign and common Xbox maps */
+	if (!extracted)
+	{
+		static char const *const s_xbox_stems[] = {
+			"b30", "a10", "a30", "a50", "b40", "c10", "c20", "c40", "d20", "d40", "bloodgulch", "sidewinder"
+		};
+		for (s = 0; s < (int)(sizeof(s_xbox_stems) / sizeof(s_xbox_stems[0])) && !extracted; s++)
+		{
+			for (d = 0; d < (int)(sizeof(s_xbox_dirs) / sizeof(s_xbox_dirs[0])) && !extracted; d++)
+			{
+				char full_path[512];
+				snprintf(full_path, sizeof(full_path), "%s/%s.map", s_xbox_dirs[d], s_xbox_stems[s]);
+				if (try_extract_tag_from_single_xbox_map_file(full_path, req_group, req_path, clean_name))
+					extracted = 1;
+			}
 		}
 	}
 
@@ -13379,7 +13522,8 @@ static int forge_stream_tag_path_is_safe(char const *tag_path)
 static int forge_stream_group_is_allowed_root(uint32_t grp)
 {
 	return (grp == 'scen' || grp == 'vehi' || grp == 'weap' || grp == 'eqip' ||
-			grp == 'mach' || grp == 'lifi' || grp == 'ctrl' || grp == 'bipd') ? 1 : 0;
+			grp == 'mach' || grp == 'lifi' || grp == 'ctrl' || grp == 'bipd' ||
+			grp == 'actv') ? 1 : 0;
 }
 
 int forge_export_custom_tag_bundle(
@@ -13557,17 +13701,51 @@ int forge_export_custom_tag_bundle(
 		}
 		if (!cand_path[0])
 			forge_find_credits_tag_by_hash(hash, &cand_grp, cand_path, sizeof(cand_path));
+		if (!cand_path[0])
+		{
+			for (i = 0; i < s_dyn_tags.count; i++)
+			{
+				uint32_t tg = s_dyn_tags.entries[i].group_tag;
+				char const *tn = s_dyn_tags.entries[i].tag_path;
+				if (!tn[0] || !forge_stream_group_is_allowed_root(tg))
+					continue;
+				if (forge_compute_catalog_hash(tg, tn) == hash)
+				{
+					cand_grp = tg;
+					snprintf(cand_path, sizeof(cand_path), "%s", tn);
+					break;
+				}
+			}
+		}
+		if (!cand_path[0])
+		{
+			struct tag_iterator it;
+			long hdl;
+			tag_iterator_new(&it, 0);
+			while ((hdl = tag_iterator_next(&it)) != NONE)
+			{
+				uint32_t tg = (uint32_t)tag_get_group_tag(hdl);
+				char const *tn = tag_get_name(hdl);
+				if (!tn || !tn[0] || !forge_stream_group_is_allowed_root(tg))
+					continue;
+				if (forge_compute_catalog_hash(tg, tn) == hash)
+				{
+					cand_grp = tg;
+					snprintf(cand_path, sizeof(cand_path), "%s", tn);
+					break;
+				}
+			}
+		}
 
 		if (cand_path[0] && forge_stream_group_is_allowed_root(cand_grp))
 		{
 			int extracted_now = forge_cache_active_map_tag(cand_grp, cand_path);
-			if (!extracted_now)
-				extracted_now = try_extract_tag_from_mcc_maps_to_vault(cand_grp, cand_path);
-			else
+			long p_chk = (port_tag_profiles_count() > 0) ? 0 : -1;
+			if (!extracted_now || p_chk < 0 || port_tag_profiles_tag_find(p_chk, (unsigned long)cand_grp, cand_path) < 0)
 			{
-				long p_chk = (port_tag_profiles_count() > 0) ? 0 : -1;
-				if (p_chk < 0 || port_tag_profiles_tag_find(p_chk, (unsigned long)cand_grp, cand_path) < 0)
-					extracted_now = try_extract_tag_from_mcc_maps_to_vault(cand_grp, cand_path);
+				extracted_now = try_extract_tag_from_mcc_maps_to_vault(cand_grp, cand_path);
+				if (!extracted_now)
+					extracted_now = try_extract_tag_from_xbox_maps_to_vault(cand_grp, cand_path);
 			}
 			if (extracted_now)
 			{
@@ -13888,7 +14066,7 @@ long forge_install_ephemeral_tag_bundle(
 	if (root_group == 'weap') cat_id = _forge_cat_weapons;
 	else if (root_group == 'eqip') cat_id = _forge_cat_equipment;
 	else if (root_group == 'vehi') cat_id = _forge_cat_vehicles;
-	else if (root_group == 'bipd') cat_id = _forge_cat_bipeds;
+	else if (root_group == 'bipd' || root_group == 'actv') cat_id = _forge_cat_bipeds;
 	else if (is_forge_door_tag(root_group, root_tag_path)) cat_id = _forge_cat_barriers_devices;
 	else if (is_forge_light_beacon_emitter_tag(root_group, root_tag_path)) cat_id = _forge_cat_lights;
 	else cat_id = _forge_cat_scenery;
