@@ -312,6 +312,7 @@ symbols in this file:
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
+#include "sergeant_johnson.h" /* port: port/linux/game/sergeant_johnson.c */
 
 #include <stddef.h>
 
@@ -2266,6 +2267,9 @@ void encounter_create(
 			case _unique_leader_type_none:
 				break;
 			}
+			/* port: Sergeant Johnson only where a10's and a50's story has him
+			(sergeant_johnson.c) */
+			initial_variant = sergeant_johnson_leader_variant(encounter_definition->name, initial_variant);
 
 			for (i = 0; i < count; ++i)
 			{

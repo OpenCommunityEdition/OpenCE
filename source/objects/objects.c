@@ -12,6 +12,7 @@ OBJECTS.C
 #include "coop_pickups.h" /* port: the host's extra campaign pickups */
 #include "coop_vehicles.h" /* port: the host's extra campaign vehicles */
 #include "scenario_placement.h" /* port: port/linux/game/scenario_placement.c */
+#include "sergeant_johnson.h" /* port: port/linux/game/sergeant_johnson.c */
 
 #include "damage.h"
 #include "light_definitions.h"
@@ -1121,6 +1122,8 @@ void objects_initialize_for_new_map(
 	/* port: the last map's waist and mesh forgotten
 	(port/linux/game/first_person_legs.c) */
 	first_person_legs_reset();
+	/* port: and its Sergeant Johnson (sergeant_johnson.c) */
+	sergeant_johnson_reset();
 	
 	data_make_valid(object_header_data);
 	/* port: (zeroed for a new map only: a revert or a load brings them back with the bipeds' snapshots) */
@@ -4144,6 +4147,9 @@ long object_new_from_scenario(
 					&placement_data.up,
 					&scenario_object->rotation);
 				placement_data.variant_number = scenario_object->variant_number;
+				/* port: a50's Sergeant Johnson (sergeant_johnson.c) */
+				placement_data.variant_number = sergeant_johnson_scenario_variant(
+					scenario_object, definition_index, placement_data.variant_number);
 				
 				result = object_new(&placement_data);
 				if (result!=NONE)

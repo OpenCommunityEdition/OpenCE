@@ -699,6 +699,7 @@ symbols in this file:
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 #include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
+#include "sergeant_johnson.h" /* port: port/linux/game/sergeant_johnson.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -2824,6 +2825,8 @@ void unit_died(
 
 	if (!feigned)
 	{
+		/* port: a50's Sergeant Johnson died (sergeant_johnson.c) */
+		sergeant_johnson_unit_died(unit_index);
 		object_set_garbage(unit_index, TRUE);
 		if (unit->unit.player_index != NONE)
 		{
