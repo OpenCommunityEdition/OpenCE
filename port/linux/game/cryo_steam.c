@@ -5,16 +5,13 @@ a10 opens in its cryo bay, and the Master Chief's tube vents steam twice:
 
 - The opening cinematic (x10) ends there (cryo): the tube's four vents
   (x10_cryo_steam_1a, 1b, 2a and 2b) are made 90 ticks into the shot of
-  the tube (tube_1a to tube_1b), so their steam rose from nothing as the
-  shot showed it, from one side of the tube at first, and was never full
-  before the scene faded out. They are made with the tube instead (its
-  object_create_anew, at the shot of the technician's keyboard, several
-  seconds before), so that all four vent in full from the shot's first
-  frame. They were destroyed once the scene had faded out to white (15
-  ticks), and a destroyed object's steam lives out its last particles
-  (some 40 ticks: they are orphaned, attachments_delete), so it drifted
-  through the first second of the scene that follows, the Chief's waking.
-  They are destroyed as the fade out begins instead, and the white is held
+  the tube (tube_1a to tube_1b), as the technician says the pins blow in
+  five, and their steam rises from there, as on the Xbox. They were
+  destroyed once the scene had faded out to white (15 ticks), and a
+  destroyed object's steam lives out its last particles (some 40 ticks:
+  they are orphaned, attachments_delete), so it drifted through the first
+  second of the scene that follows, the Chief's waking. They are destroyed
+  as the fade out begins instead, and the white is held
   CRYO_STEAM_WHITE_TICKS ticks, not 15, so that their steam is gone before
   the next scene is seen.
 - Off Normal, and in co-op, a short scene stands for the cryo technicians'
@@ -30,9 +27,9 @@ steam, made as the Chief wakes and destroyed as its fade lifts.
 
 As a10's scripts are made ready (hs_scenario_postprocess), after the climb's
 foley is moved (cryo_exit_foley.c), each begin is changed only when it is
-as the map has it: in cryo, the vents' object_create_anew_containing after
-the tube's object_create_anew, a fade_out after them followed by a (sleep
-15), and the vents' object_destroy_containing after it; in fast_setup, the
+as the map has it: in cryo, the vents' object_create_anew_containing, a
+fade_out after it followed by a (sleep 15), and the vents'
+object_destroy_containing after that; in fast_setup, the
 two vents' object_creates of the first tube and the second tube's in an if
 of (game_is_cooperative) each, all four. So a map whose scripts differ, or
 one already changed (the postprocess runs again on a revert), is left as it
@@ -61,7 +58,6 @@ nothing the machines send or agree on changes.
 #define A10_SCENARIO_NAME "levels\\a10\\a10"
 #define CRYO_SCRIPT_NAME "cryo"
 #define FAST_SETUP_SCRIPT_NAME "fast_setup"
-#define CRYO_TUBE_NAME "x10_tube"
 #define CRYO_VENTS_NAME "x10_cryo_steam"
 /* the most expressions of the cinematic's begin looked through (cryo has 60) */
 #define CRYO_STEAM_MAXIMUM_EXPRESSIONS 256
@@ -287,7 +283,7 @@ static short cryo_steam_cooperative_create(
 
 /* ---------- public code */
 
-boolean cryo_steam_vents_with_tube(
+boolean cryo_steam_vents_end_before_fade(
 	struct data_array *syntax,
 	char const *strings,
 	long string_bytes,
@@ -297,7 +293,6 @@ boolean cryo_steam_vents_with_tube(
 	/* the begin's expressions, in order, and the place of each one looked for */
 	long expressions[CRYO_STEAM_MAXIMUM_EXPRESSIONS];
 	short expression_count = 0;
-	short tube = NONE;
 	short vents = NONE;
 	short fade = NONE;
 	short vents_end = NONE;
@@ -322,11 +317,6 @@ boolean cryo_steam_vents_with_tube(
 		}
 		expression_index = expression_count;
 		expressions[expression_count++] = index;
-		made = script_call_argument(syntax, strings, string_bytes, expression, "object_create_anew");
-		if (made && !strcmp(made, CRYO_TUBE_NAME) && tube == NONE)
-		{
-			tube = expression_index;
-		}
 		made = script_call_argument(syntax, strings, string_bytes, expression, "object_create_anew_containing");
 		if (made && !strcmp(made, CRYO_VENTS_NAME) && vents == NONE)
 		{
@@ -342,11 +332,11 @@ boolean cryo_steam_vents_with_tube(
 			vents_end = expression_index;
 		}
 	}
-	/* the tube, the vents after it, then a fade out, the white held, and
-	the vents' end after them; not already moved (the vents' end before the
-	fade, and the white held longer) */
-	if (tube == NONE || vents == NONE || fade == NONE || vents_end == NONE ||
-		!(tube < vents && vents < fade && fade + 1 < vents_end))
+	/* the vents, then a fade out, the white held, and the vents' end after
+	them; not already moved (the vents' end before the fade, and the white
+	held longer) */
+	if (vents == NONE || fade == NONE || vents_end == NONE ||
+		!(vents < fade && fade + 1 < vents_end))
 	{
 		return FALSE;
 	}
@@ -356,20 +346,13 @@ boolean cryo_steam_vents_with_tube(
 		return FALSE;
 	}
 
-	/* the vents' end taken out of its place and put right before the fade,
-	then the vents out of theirs and put right after the tube: the later
-	first, as the node before the fade may be the vents' (each move is by
-	the links of the expressions before the one moved and before its new
-	place) */
+	/* the vents' end taken out of its place and put right before the fade
+	(by the links of the expressions before it and before the fade: the
+	vents' made before the fade, the fade is never the begin's first) */
 	script_node_get(syntax, expressions[vents_end - 1])->next_node_index =
 		script_node_get(syntax, expressions[vents_end])->next_node_index;
 	script_node_get(syntax, expressions[vents_end])->next_node_index = expressions[fade];
 	script_node_get(syntax, expressions[fade - 1])->next_node_index = expressions[vents_end];
-	script_node_get(syntax, expressions[vents - 1])->next_node_index =
-		script_node_get(syntax, expressions[vents])->next_node_index;
-	script_node_get(syntax, expressions[vents])->next_node_index =
-		script_node_get(syntax, expressions[tube])->next_node_index;
-	script_node_get(syntax, expressions[tube])->next_node_index = expressions[vents];
 	white->short_value = CRYO_STEAM_WHITE_TICKS;
 
 	return TRUE;
@@ -474,7 +457,7 @@ void cryo_steam_scripts_loaded(
 
 		if (!csstrcmp(script->name, CRYO_SCRIPT_NAME))
 		{
-			cryo_steam_vents_with_tube(
+			cryo_steam_vents_end_before_fade(
 				syntax,
 				(char const *)scenario->hs_string_constants.address,
 				scenario->hs_string_constants.size,

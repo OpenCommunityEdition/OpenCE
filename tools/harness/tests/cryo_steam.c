@@ -1,14 +1,14 @@
 /*
 CRYO_STEAM.C (test)
 
-The real cryo_steam_vents_with_tube and cryo_steam_wake_without_steam
-(cryo_steam.c): a10's opening cinematic made its cryo tube's four vents 90
-ticks into the tube's shot, and destroyed them after its fade out to white,
-so that their steam rose from nothing in the shot and drifted into the next
-scene; and the short cryo scene that stands for the tutorial (fast_setup)
-made the tube's steam as the tube opened, and left one vent of it on for
-the rest of the level in a game of one player. The vents are made with the
-tube and destroyed as the fade begins, the white held 45 ticks, not 15;
+The real cryo_steam_vents_end_before_fade and cryo_steam_wake_without_steam
+(cryo_steam.c): a10's opening cinematic destroyed its cryo tube's four
+vents after its fade out to white, so that their steam drifted into the
+next scene; and the short cryo scene that stands for the tutorial
+(fast_setup) made the tube's steam as the tube opened, and left one vent of
+it on for the rest of the level in a game of one player. The vents are
+still made 90 ticks into the tube's shot, as on the Xbox, and destroyed as
+the fade begins, the white held 45 ticks, not 15;
 fast_setup's four object_creates of its steam are taken out. The nodes are
 laid out as a10's are, in a data array of script nodes: a call (permanent)
 names its function with its first child (a primitive of the function name
@@ -131,25 +131,28 @@ static long begin_new(long first, ...)
 }
 
 /* a10's cryo, from the tube to the cleanup after the fade, with the vents
-made after the tube (or before it, when not tube_first) and the white held
-the ticks given */
-static long cryo_new(boolean tube_first, short white)
+made 90 ticks into the tube's shot (or after the fade, when vents_late)
+and the white held the ticks given */
+static long cryo_new(boolean vents_late, short white)
 {
 	long tube = named_new("object_create_anew", "x10_tube");
 	long vents = call_new(_hs_type_void, "object_create_anew_containing", name_new("x10_cryo_steam"), NONE);
+	long sound = named_new("sound_impulse_start", "sound\\dialog\\x10\\ass04");
+	long assistant = named_new("object_destroy", "assistant");
 
 	return begin_new(
-		tube_first ? tube : vents,
+		tube,
 		named_new("object_create_anew", "x10_chief"),
 		named_new("camera_set", "booth_hi_1"),
 		named_new("camera_set", "tube_1a"),
 		sleep_new(constant_new(90)),
-		tube_first ? vents : tube,
-		named_new("sound_impulse_start", "sound\\dialog\\x10\\ass04"),
-		sleep_new(call_new(_hs_type_short_integer, "camera_time", NONE)),
-		call_new(_hs_type_void, "fade_out", constant_new(1), NONE),
-		sleep_new(constant_new(white)),
-		named_new("object_destroy", "assistant"),
+		vents_late ? sound : vents,
+		vents_late ? sleep_new(call_new(_hs_type_short_integer, "camera_time", NONE)) : sound,
+		vents_late ? call_new(_hs_type_void, "fade_out", constant_new(1), NONE) :
+			sleep_new(call_new(_hs_type_short_integer, "camera_time", NONE)),
+		vents_late ? sleep_new(constant_new(white)) : call_new(_hs_type_void, "fade_out", constant_new(1), NONE),
+		vents_late ? vents : sleep_new(constant_new(white)),
+		assistant,
 		named_new("object_destroy", "x10_tube"),
 		call_new(_hs_type_void, "object_destroy_containing", name_new("x10_cryo_steam"), NONE),
 		named_new("camera_control", "false"),
@@ -259,7 +262,7 @@ static boolean nodes_unchanged(void)
 
 static boolean vents(long root)
 {
-	return cryo_steam_vents_with_tube(syntax, strings, string_bytes, root);
+	return cryo_steam_vents_end_before_fade(syntax, strings, string_bytes, root);
 }
 
 static boolean wake(long root)
@@ -273,17 +276,18 @@ int main(int argc, char **argv)
 
 	syntax = game_state_data_new("script node", 2048, sizeof(struct hs_syntax_node));
 
-	/* the vents made with the tube, destroyed as the fade begins, and the
-	white held 45 ticks; nothing else moves, and no node is made */
+	/* the vents still made 90 ticks into the tube's shot, destroyed as the
+	fade begins, and the white held 45 ticks; nothing else moves, and no
+	node is made */
 	CASE("vents")
 	{
-		long cryo = cryo_new(TRUE, 15);
+		long cryo = cryo_new(FALSE, 15);
 		long count = syntax->count;
 
 		CHECK(vents(cryo), "not changed");
 		CHECK(!strcmp(begin_order(cryo),
-			"object_create_anew:x10_tube object_create_anew_containing:x10_cryo_steam object_create_anew:x10_chief "
-			"camera_set:booth_hi_1 camera_set:tube_1a sleep:90 sound_impulse_start:sound\\dialog\\x10\\ass04 "
+			"object_create_anew:x10_tube object_create_anew:x10_chief camera_set:booth_hi_1 camera_set:tube_1a "
+			"sleep:90 object_create_anew_containing:x10_cryo_steam sound_impulse_start:sound\\dialog\\x10\\ass04 "
 			"sleep:(camera_time) object_destroy_containing:x10_cryo_steam fade_out:1 sleep:45 "
 			"object_destroy:assistant object_destroy:x10_tube camera_control:false"), "the scene %s", begin_order(cryo));
 		CHECK(syntax->count == count, "%ld nodes made", syntax->count - count);
@@ -293,7 +297,7 @@ int main(int argc, char **argv)
 	changes nothing */
 	CASE("vents once")
 	{
-		long cryo = cryo_new(TRUE, 15);
+		long cryo = cryo_new(FALSE, 15);
 
 		CHECK(vents(cryo), "not changed");
 		nodes_keep();
@@ -301,20 +305,20 @@ int main(int argc, char **argv)
 		CHECK(nodes_unchanged(), "changed again");
 		return 0;
 	}
-	/* the vents made before the tube, a white of another length, no begin:
+	/* the vents made after the fade, a white of another length, no begin:
 	left as they are */
 	CASE("other scenes")
 	{
-		long vents_first = cryo_new(FALSE, 15);
-		long other_white = cryo_new(TRUE, 30);
+		long vents_late = cryo_new(TRUE, 15);
+		long other_white = cryo_new(FALSE, 30);
 		long call = named_new("object_create_anew", "x10_tube");
 
 		nodes_keep();
-		CHECK(!vents(vents_first), "the vents before the tube changed");
+		CHECK(!vents(vents_late), "the vents made after the fade changed");
 		CHECK(!vents(other_white), "another white changed");
 		CHECK(!vents(call), "no begin changed");
 		CHECK(!vents(NONE), "no root changed");
-		CHECK(!cryo_steam_vents_with_tube(syntax, NULL, string_bytes, other_white), "no strings changed");
+		CHECK(!cryo_steam_vents_end_before_fade(syntax, NULL, string_bytes, other_white), "no strings changed");
 		CHECK(nodes_unchanged(), "changed");
 		return 0;
 	}

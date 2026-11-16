@@ -1,8 +1,8 @@
-"""The real cryo_steam_vents_with_tube and cryo_steam_wake_without_steam (cryo_steam.c): a10's opening cinematic made
-its cryo tube's four vents 90 ticks into the tube's shot and destroyed them after its fade to white, so that their steam
-rose from nothing in the shot and drifted into the next scene; and the short cryo scene that stands for the tutorial
-(fast_setup) made the tube's steam as the tube opened, one vent left on for the rest of the level. The vents are made
-with the tube and destroyed as the fade begins, the white held 45 ticks; fast_setup's steam is not made. Scenes laid out
+"""The real cryo_steam_vents_end_before_fade and cryo_steam_wake_without_steam (cryo_steam.c): a10's opening cinematic
+destroyed its cryo tube's four vents after its fade to white, so that their steam drifted into the next scene, the
+Chief's waking; and the short cryo scene that stands for the tutorial (fast_setup) made the tube's steam as the tube
+opened, one vent left on for the rest of the level. The vents are still made 90 ticks into the tube's shot, as on the
+Xbox, and destroyed as the fade begins, the white held 45 ticks; fast_setup's steam is not made. Scenes laid out
 otherwise, or already changed, are left as they are."""
 
 import re
@@ -18,13 +18,12 @@ CASES = ["vents", "vents once", "other scenes", "wake", "wake once", "other wake
 
 FUNCTIONS = ["script_node_get", "script_string_get", "script_call_name_node", "script_node_calls",
              "script_call_argument", "script_sleep_ticks", "script_begin_name_node", "cryo_steam_name_index",
-             "cryo_steam_cooperative_create", "cryo_steam_vents_with_tube", "cryo_steam_wake_without_steam"]
+             "cryo_steam_cooperative_create", "cryo_steam_vents_end_before_fade", "cryo_steam_wake_without_steam"]
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
-    # the vents left where they were
-    "vents-kept": (("\tscript_node_get(syntax, expressions[tube])->next_node_index = expressions[vents];\n", ""),
-                   "vents"),
+    # a scene whose vents are made after the fade changed too
+    "after-fade": (("!(vents < fade && fade + 1 < vents_end)", "!(fade + 1 < vents_end)"), "other scenes"),
     # the white held as it was
     "white-kept": (("\twhite->short_value = CRYO_STEAM_WHITE_TICKS;\n", ""), "vents"),
     # the vents' end left after the fade
@@ -67,7 +66,7 @@ def test_scripts_change_them():
     assert '#define CRYO_SCRIPT_NAME "cryo"' in source
     assert '#define FAST_SETUP_SCRIPT_NAME "fast_setup"' in source
     assert "csstrcmp(scenario_name, A10_SCENARIO_NAME)" in loaded
-    assert loaded.index("CRYO_SCRIPT_NAME") < loaded.index("cryo_steam_vents_with_tube(")
+    assert loaded.index("CRYO_SCRIPT_NAME") < loaded.index("cryo_steam_vents_end_before_fade(")
     assert loaded.index("FAST_SETUP_SCRIPT_NAME") < loaded.index("cryo_steam_wake_without_steam(")
 
 
