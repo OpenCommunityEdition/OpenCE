@@ -7,7 +7,7 @@
 	<widget name="main_menu/profile_manager/multiplayer_saving_profile" width="640" height="480" flags="pass_unhandled_to_focused_child no_history" auto_close="3000" auto_close_fade="1000">
 		<on event="b" run="NULL"/>
 		<on event="back" run="NULL"/>
-		<on event="deleted" run="NULL" open="main_menu/multiplayer_type_select/multiplayer_type_select_screen"/>
+		<on event="deleted" run="NULL" open="main_menu/multiplayer_type_select/gamemode/gamemode_select_screen"/>
 		<child widget="error/warning_creating_player_profile_screen"/>
 	</widget>
 	<widget name="main_menu/profile_manager/player_profile_extended_desc" width="640" height="480">

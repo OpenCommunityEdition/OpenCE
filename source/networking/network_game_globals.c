@@ -107,6 +107,7 @@ symbols in this file:
 #include "main/main.h"
 #include "memory/data_packet_groups.h"
 #include "network_client_manager.h"
+#include "network_connection.h"
 #include "network_messages.h"
 #include "network_game_manager.h"
 #include "network_game_globals.h"
@@ -291,6 +292,20 @@ boolean network_distributed_client_send_reliably(
 	csmemcpy(buffer, message, size);
 	return network_game_client_write(network_game_client_get_connection(global_network_game_client),
 		(message_header *)buffer, size, NULL, 1);
+}
+
+/* port: bytes queued in the client's reliable outgoing queue (for client-to-host tag streaming flow control) */
+long network_distributed_client_reliable_backlog(
+	void)
+{
+	struct network_connection *connection;
+
+	if (!global_network_game_client)
+		return NONE;
+	connection = network_game_client_get_connection(global_network_game_client);
+	if (!connection)
+		return NONE;
+	return network_connection_reliable_backlog(connection);
 }
 
 /* a client of the distributed netcode, which decides nothing the host does */

@@ -31,6 +31,10 @@
 #include <stdint.h>
 #include <errno.h>
 
+#undef malloc
+#undef free
+#undef realloc
+
 void *mcc_memory_reserve(uint32_t address, uint32_t size);
 void mcc_memory_release(void *allocation, uint32_t size);
 int mcc_tags_prepare(struct mcc_runtime *runtime);
@@ -280,6 +284,11 @@ void *mcc_runtime_allocate(struct mcc_runtime *runtime, uint32_t bytes)
 }
 
 boolean mcc_cache_tags_loaded(void) { return mcc_loaded; }
+
+char const *mcc_cache_loaded_level_name(void)
+{
+    return (mcc_loaded && mcc_loaded_cache.level_name[0]) ? mcc_loaded_cache.level_name : NULL;
+}
 
 short mcc_cache_scenario_type(void)
 {

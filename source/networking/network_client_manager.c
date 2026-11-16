@@ -397,6 +397,7 @@ void network_game_client_reset_settings_staging(void); /* port: discard partial 
 #include "text/unicode.h"
 #include "map_share.h" /* port: port/linux/game/map_share.c */
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
+#include "forge_net_override.h" /* port: port/linux/game/forge_net_override.h */
 
 /* ---------- constants */
 
@@ -3113,7 +3114,9 @@ static boolean network_game_client_idle_pregame(
 					network_event("the game put off is over: waiting for the host's next start");
 				}
 				else if (!custom_edition_level_name(client->game.map.name) ||
-					custom_edition_cache_playable(client->game.map.name))
+					custom_edition_cache_playable(client->game.map.name) ||
+					custom_edition_cache_multiplayer(client->game.map.name) ||
+					custom_edition_cache_campaign(client->game.map.name))
 				{
 					network_event("the map is downloaded: joining the game the host started");
 					if (!network_game_client_game_has_started(client))
@@ -3174,19 +3177,8 @@ static boolean network_game_client_idle_ingame(
 		}
 		else if (connection_stale && !client->connection_silent && started)
 		{
-			short local_player_index;
-
-			for (local_player_index = local_player_get_next(NONE);
-				local_player_index != NONE;
-				local_player_index = local_player_get_next(local_player_index))
-			{
-				display_error(
-					_error_network_trouble_is_brewing,
-					local_player_index,
-					FALSE,
-					FALSE);
-			}
-
+			/* port: suppress the intrusive "Waiting for System Link..." modal popup during
+			   brief tag-loading or map-sync stalls when joining a server. */
 			network_event("network client connection has been silent for a dangerously long amount of time");
 		}
 
@@ -3194,7 +3186,7 @@ static boolean network_game_client_idle_ingame(
 	}
 
 	/* port: progressing MCC conversion has an absolute limit too, even when
-	 * the host keeps writing while its synchronous map conversion runs. */
+	   the host keeps writing while its synchronous map conversion runs. */
 	if (success && mcc_load_network_client_expired())
 	{
 		network_event("MCC loading exceeded its bounded conversion window");
@@ -3302,7 +3294,8 @@ version is this machine's (HALO_PORT_NETWORK_VERSION), and it plays the
 distributed netcode (a host of this version built before the lockstep
 netcode was removed may play that). If not the player is told why (when
 tell), and nothing is joined. */
-boolean network_game_client_advertised_game_compatible(
+/* port: wrapped by network_game_client_advertised_game_compatible in forge_hooks.c */
+boolean orig_network_game_client_advertised_game_compatible(
 	struct network_game_client *client,
 	struct network_advertised_game const *game,
 	boolean tell)
@@ -3420,7 +3413,8 @@ boolean network_game_client_port_advertised_game_summary(
 
 /* port: the advertised game's kind (an OpenCE gametype's mode, and Hardcore:
 port/linux/game/game_modes.h), for the server browser's name of it */
-byte network_game_client_advertised_game_kind(
+/* port: wrapped by network_game_client_advertised_game_kind in forge_hooks.c */
+byte orig_network_game_client_advertised_game_kind(
 	struct network_game_client *client,
 	struct network_advertised_game const *game)
 {
