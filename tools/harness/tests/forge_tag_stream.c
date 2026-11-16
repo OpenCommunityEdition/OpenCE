@@ -1146,6 +1146,46 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+	/* 12. Reused object datum slot on player respawn never overwrites player's biped definition_index */
+	CASE("reused-datum-slot-on-respawn")
+	{
+		struct forge_distributed_object_change ch[2];
+		long weapon_def = (long)0xE1230099UL;
+		long cyborg_def = (long)0xE0100010UL;
+
+		reset_world();
+		/* Slot 7 previously held a tracked Forge weapon/item */
+		g_forge.live_instance_count = 1;
+		g_forge.live_instances[0].active = 1;
+		g_net_obj_def_index[7] = weapon_def;
+		g_net_obj_live_index[7] = 0;
+		g_net_obj_is_held[7] = 1;
+
+		/* Host reuses datum slot 7 to spawn a respawned player's biped (owner_player_index = 1) */
+		memset(ch, 0, sizeof(ch));
+		ch[0].change = 0; /* _object_change_create */
+		ch[0].owner_player_index = 1;
+		ch[0].object_index = ((long)0x80050000UL) | 7;
+		ch[0].definition_index = cyborg_def;
+
+		forge_network_pre_handle_object_changes(ch, 1);
+		CHECK(ch[0].definition_index == cyborg_def,
+			"respawned player's biped definition_index preserved (not overwritten with weapon_def)");
+		CHECK(g_net_obj_def_index[7] == NONE && g_net_obj_live_index[7] == -1,
+			"stale Forge tracking cleared on reused player unit datum slot");
+
+		/* Also verify _object_change_delete clears g_net_obj_def_index */
+		g_net_obj_def_index[9] = weapon_def;
+		g_net_obj_live_index[9] = 0;
+		ch[0].change = 1; /* _object_change_delete */
+		ch[0].owner_player_index = (byte)NONE;
+		ch[0].object_index = ((long)0x80050000UL) | 9;
+		forge_network_pre_handle_object_changes(ch, 1);
+		CHECK(g_net_obj_def_index[9] == NONE && g_net_obj_live_index[9] == -1,
+			"_object_change_delete clears g_net_obj_def_index and g_net_obj_live_index");
+		return 0;
+	}
+
 	fprintf(stderr, "unknown case: %s\n", case_name);
 	return 2;
 }

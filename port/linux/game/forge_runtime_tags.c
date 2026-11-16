@@ -3449,8 +3449,11 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 			*(float *)(obuf + 0x104u) = 4.0f;
 		if (grp == 'weap')
 		{
-			char *wlabel = (char *)(obuf + 0x308u);
+			char *wlabel = (char *)(obuf + 0x30Cu);
 			unsigned w_j;
+			/* Repair weapon.flags (+0x308) if an earlier build wrote "ar" (0x7261) at +0x308 instead of +0x30C */
+			if ((*(uint32_t const *)(obuf + 0x308u) & 0xFFFFu) == 0x7261u)
+				*(uint32_t *)(obuf + 0x308u) = 0u;
 			/* Normalize MCC weapon HUD interface enum values (17..18 -> 15..16) */
 			for (w_j = 0; w_j < 4u; w_j++)
 			{
@@ -3458,13 +3461,8 @@ static void patch_forge_device_and_light_tag_runtime(long tag_idx, uint32_t grp,
 				if (val == 17u || val == 18u)
 					*(uint16_t *)(obuf + 0x330u + w_j * 2u) = (uint16_t)(val - 2u);
 			}
-			/* Ensure weapon.label matches a valid cyborg animation class on stock Xbox maps
-			   so unit_can_use_weapon allows Spartans to pick up, switch to, and fire the weapon! */
-			if (strcmp(wlabel, "ar") != 0 && strcmp(wlabel, "pr") != 0 &&
-				strcmp(wlabel, "pp") != 0 && strcmp(wlabel, "hp") != 0 &&
-				strcmp(wlabel, "sr") != 0 && strcmp(wlabel, "rl") != 0 &&
-				strcmp(wlabel, "sg") != 0 && strcmp(wlabel, "ob") != 0 &&
-				strcmp(wlabel, "flag") != 0)
+			/* Ensure an empty weapon.label (+0x30C) gets a valid default cyborg animation class */
+			if (wlabel[0] == '\0')
 			{
 				strcpy(wlabel, "ar");
 			}
@@ -3739,7 +3737,7 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 		return;
 	}
 	if (grp == 'matg' || grp == 'hudg' || grp == 'hud#' ||
-		grp == 'font' || grp == 'DeLa' || grp == 'hmt ')
+		grp == 'font' || grp == 'DeLa' || grp == 'hmt ' || grp == 'foot')
 	{
 		cl->runtime_handles[abs_idx] = tag_loaded((long)grp, tname);
 		return;
@@ -3747,21 +3745,18 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 
 	/* Reuse any dependency tag that was already dynamically injected during this session,
 	   or reuse shared base-map dependencies (including sounds) on the active map.
-	   For self-contained custom/MCC bundles (is_custom_bundle), only reuse genuine base-map
-	   non-visual dependencies so two custom bundles never cross-link colliding sub-tag paths. */
-	if (cl->order_count > 0 && !cl->is_red_beam_variant && !cl->include_all_dependencies)
+	   For self-contained custom/MCC bundles (is_custom_bundle), never replace bundle sub-tags
+	   (animations, HUD interfaces, projectiles, damage effects, etc.) with stock base-map tags. */
+	if (cl->order_count > 0 && !cl->is_red_beam_variant && !cl->include_all_dependencies && !cl->is_custom_bundle)
 	{
 		char donor_name[256];
 		long ex;
-		if (!cl->is_custom_bundle)
+		snprintf(donor_name, sizeof(donor_name), "%s__donor", tname);
+		ex = tag_loaded((long)grp, donor_name);
+		if (ex != NONE)
 		{
-			snprintf(donor_name, sizeof(donor_name), "%s__donor", tname);
-			ex = tag_loaded((long)grp, donor_name);
-			if (ex != NONE)
-			{
-				cl->runtime_handles[abs_idx] = ex;
-				return;
-			}
+			cl->runtime_handles[abs_idx] = ex;
+			return;
 		}
 		ex = tag_loaded((long)grp, tname);
 		if (ex != NONE)
@@ -3772,15 +3767,7 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 				 grp != 'shdr' && grp != 'senv' && grp != 'soso' && grp != 'sotr' &&
 				 grp != 'schi' && grp != 'scex' && grp != 'swat' && grp != 'sgla' &&
 				 grp != 'smet' && grp != 'spla');
-			if (cl->is_custom_bundle)
-			{
-				if (base_cnt > 0 && (ex & 0xFFFF) < base_cnt && is_non_visual_dep)
-				{
-					cl->runtime_handles[abs_idx] = ex;
-					return;
-				}
-			}
-			else if ((base_cnt > 0 && (ex & 0xFFFF) >= base_cnt) || is_non_visual_dep)
+			if ((base_cnt > 0 && (ex & 0xFFFF) >= base_cnt) || is_non_visual_dep)
 			{
 				cl->runtime_handles[abs_idx] = ex;
 				return;
@@ -4568,7 +4555,56 @@ static long load_native_xbox_tag_from_source(
 						runtime_tint_dxt1_blue_to_red(pix_mem, read_bytes);
 				}
 				bmp->base_address = pix_mem;
-				halo_custom_edition_texels_channels(bmp->base_address, 0 /* _custom_edition_channels_xbox */);
+				{
+					unsigned char chan_order = 0; /* _custom_edition_channels_xbox */
+					if (cl.tag_base == 0x50000000u)
+					{
+						int32_t s_k;
+						for (s_k = 0; s_k < cl.order_count; s_k++)
+						{
+							int32_t s_abs = cl.order[s_k];
+							uint32_t s_io = cl.inst_off + (uint32_t)s_abs * 32u;
+							uint32_t s_grp = *(uint32_t const *)(tag_buf + s_io + 0x00);
+							uint8_t const *s_buf = cl.cloned_roots[s_abs];
+							if (!s_buf)
+								continue;
+							if (s_grp == 'soso')
+							{
+								uint16_t s_flags = *(uint16_t const *)(s_buf + 0x28u);
+								int32_t multi_ref = *(int32_t const *)(s_buf + 0xC8u + 12u);
+								if (!(s_flags & 0x40u) && multi_ref == (int32_t)cl.runtime_handles[abs_idx])
+									chan_order = 1; /* _custom_edition_channels_ce_multipurpose */
+							}
+							else if (s_grp == 'wphi')
+							{
+								int32_t m_cnt = *(int32_t const *)(s_buf + 0x6Cu);
+								uint8_t const *m_arr = *(uint8_t const *const *)(s_buf + 0x70u);
+								int32_t m_i;
+								for (m_i = 0; m_i < m_cnt && m_cnt <= 64 && m_arr; m_i++)
+								{
+									uint8_t const *mt = m_arr + (size_t)m_i * 0xB4u;
+									if (*(int32_t const *)(mt + 0x54u) == (int32_t)cl.runtime_handles[abs_idx] &&
+										!(mt[0x84u] & 0x20u))
+									{
+										chan_order = 2; /* _custom_edition_channels_hud_meter */
+										break;
+									}
+								}
+							}
+							else if (s_grp == 'unhi')
+							{
+								if ((*(int32_t const *)(s_buf + 0xF4u + 0x30u) == (int32_t)cl.runtime_handles[abs_idx] &&
+									 !(s_buf[0xF4u + 0x60u] & 0x20u)) ||
+									(*(int32_t const *)(s_buf + 0x1E4u + 0x30u) == (int32_t)cl.runtime_handles[abs_idx] &&
+									 !(s_buf[0x1E4u + 0x60u] & 0x20u)))
+								{
+									chan_order = 2; /* _custom_edition_channels_hud_meter */
+								}
+							}
+						}
+					}
+					halo_custom_edition_texels_channels(bmp->base_address, chan_order);
+				}
 
 				forge_register_d3d_bitmap_texture(bmp, tex);
 			}
@@ -4860,8 +4896,8 @@ static long load_native_xbox_tag_from_source(
 						}
 						else
 						{
-							int16_t frame_cnt = *(int16_t const *)(anim + 0x24u);
-							int16_t frame_sz = *(int16_t const *)(anim + 0x26u);
+							int16_t frame_cnt = *(int16_t const *)(anim + 0x22u);
+							int16_t frame_sz = *(int16_t const *)(anim + 0x24u);
 							int32_t fdata_sz = *(int32_t const *)(anim + 0x94u);
 							uint8_t *fdata_ptr = *(uint8_t **)(anim + 0x9Cu);
 							int f_i;
@@ -4915,6 +4951,105 @@ static long load_native_xbox_tag_from_source(
 				*(float *)(rf + 0x64u) = 1.0f;
 				*(float *)(rf + 0x68u) = 0.12f;
 				*(float *)(rf + 0x6Cu) = 0.08f;
+			}
+		}
+		else if (cl.tag_base == 0x50000000u && (grp == 'wphi' || grp == 'unhi' || grp == 'grhi'))
+		{
+			/* Normalize raw MCC v13 960p HUD placements & bitmap half-HUD scales when loaded on non-MCC maps */
+			long total_inst = 0;
+			struct forge_cache_file_tag_instance *inst_arr =
+				(struct forge_cache_file_tag_instance *)cache_files_tag_instances(&total_inst);
+			if (grp == 'wphi')
+			{
+				int32_t cnt, k, j;
+				uint8_t *arr;
+				/* statics (+0x60) & meters (+0x6C) */
+				for (k = 0; k < 2; k++)
+				{
+					cnt = *(int32_t const *)(root_buf + 0x60u + (uint32_t)k * 12u);
+					arr = *(uint8_t *const *)(root_buf + 0x64u + (uint32_t)k * 12u);
+					for (j = 0; j < cnt && cnt <= 64 && arr; j++)
+					{
+						uint8_t *el = arr + (size_t)j * 0xB4u + 0x24u;
+						int32_t bm_ref = *(int32_t const *)(el + 0x30u);
+						int half = 0;
+						uint16_t mflags = *(uint16_t const *)(el + 0x0Cu);
+						float factor;
+						if (bm_ref != NONE && inst_arr && (bm_ref & 0xFFFF) < total_inst &&
+							inst_arr[bm_ref & 0xFFFF].group_tag == 'bitm' &&
+							inst_arr[bm_ref & 0xFFFF].base_address)
+						{
+							uint16_t bflags = *(uint16_t const *)((uint8_t const *)inst_arr[bm_ref & 0xFFFF].base_address + 0x06u);
+							half = (bflags & (0x10u | 0x80u)) != 0;
+						}
+						if (!(mflags & 4u))
+						{
+							*(int16_t *)(el + 0x00u) /= 2;
+							*(int16_t *)(el + 0x02u) /= 2;
+						}
+						*(uint16_t *)(el + 0x0Cu) = (uint16_t)(mflags & ~4u);
+						factor = half ? 0.25f : 0.5f;
+						if (*(float const *)(el + 0x04u) == 0.0f) *(float *)(el + 0x04u) = 1.0f;
+						if (*(float const *)(el + 0x08u) == 0.0f) *(float *)(el + 0x08u) = 1.0f;
+						*(float *)(el + 0x04u) *= factor;
+						*(float *)(el + 0x08u) *= factor;
+						if (k == 1)
+						{
+							*(float *)(el + 0x54u) = 0.0f; /* meter->opacity */
+							*(float *)(el + 0x58u) = 0.0f; /* meter->fade */
+						}
+					}
+					/* crosshairs (+0x84, item stride 0x6C) & overlays (+0x90, item stride 0x88) */
+					cnt = *(int32_t const *)(root_buf + 0x84u + (uint32_t)k * 12u);
+					arr = *(uint8_t *const *)(root_buf + 0x88u + (uint32_t)k * 12u);
+					for (j = 0; j < cnt && cnt <= 64 && arr; j++)
+					{
+						uint8_t *def = arr + (size_t)j * 0x68u + 0x24u;
+						int32_t bm_ref = *(int32_t const *)(def + 0x0Cu);
+						int32_t icnt = *(int32_t const *)(def + 0x10u);
+						uint8_t *iarr = *(uint8_t *const *)(def + 0x14u);
+						uint32_t istride = k ? 0x88u : 0x6Cu;
+						int half = 0;
+						int32_t m_i;
+						if (bm_ref != NONE && inst_arr && (bm_ref & 0xFFFF) < total_inst &&
+							inst_arr[bm_ref & 0xFFFF].group_tag == 'bitm' &&
+							inst_arr[bm_ref & 0xFFFF].base_address)
+						{
+							uint16_t bflags = *(uint16_t const *)((uint8_t const *)inst_arr[bm_ref & 0xFFFF].base_address + 0x06u);
+							half = (bflags & (0x10u | 0x80u)) != 0;
+						}
+						for (m_i = 0; m_i < icnt && icnt <= 64 && iarr; m_i++)
+						{
+							uint8_t *pl = iarr + (size_t)m_i * istride;
+							uint16_t mflags = *(uint16_t const *)(pl + 0x0Cu);
+							float factor = half ? 0.25f : 0.5f;
+							if (!(mflags & 4u))
+							{
+								*(int16_t *)(pl + 0x00u) /= 2;
+								*(int16_t *)(pl + 0x02u) /= 2;
+							}
+							*(uint16_t *)(pl + 0x0Cu) = (uint16_t)(mflags & ~4u);
+							if (*(float const *)(pl + 0x04u) == 0.0f) *(float *)(pl + 0x04u) = 1.0f;
+							if (*(float const *)(pl + 0x08u) == 0.0f) *(float *)(pl + 0x08u) = 1.0f;
+							*(float *)(pl + 0x04u) *= factor;
+							*(float *)(pl + 0x08u) *= factor;
+						}
+					}
+				}
+				/* numbers (+0x78, stride 0xA0) */
+				cnt = *(int32_t const *)(root_buf + 0x78u);
+				arr = *(uint8_t *const *)(root_buf + 0x7Cu);
+				for (j = 0; j < cnt && cnt <= 64 && arr; j++)
+				{
+					uint8_t *pl = arr + (size_t)j * 0xA0u + 0x24u;
+					uint16_t mflags = *(uint16_t const *)(pl + 0x0Cu);
+					if (!(mflags & 4u))
+					{
+						*(int16_t *)(pl + 0x00u) /= 2;
+						*(int16_t *)(pl + 0x02u) /= 2;
+					}
+					*(uint16_t *)(pl + 0x0Cu) = (uint16_t)(mflags & ~4u);
+				}
 			}
 		}
 	}
@@ -5528,11 +5663,9 @@ static long install_faber_bundle_from_source(
 		if (grp == 'scnr' || grp == 'sbsp' || grp == 'matg' || grp == 'udlg')
 			continue;
 
-		if (ti > 0 && (custom_edition_cache_tags_loaded() || mcc_cache_tags_loaded()) &&
-			grp != 'bitm' && grp != 'mod2' && grp != 'mode' && grp != 'snd!' && grp != 'lsnd' &&
-			grp != 'shdr' && grp != 'senv' && grp != 'soso' && grp != 'sotr' &&
-			grp != 'schi' && grp != 'scex' && grp != 'swat' && grp != 'sgla' &&
-			grp != 'smet' && grp != 'spla')
+		if (ti > 0 &&
+			(grp == 'hudg' || grp == 'hud#' || grp == 'font' ||
+			 grp == 'DeLa' || grp == 'hmt ' || grp == 'foot'))
 		{
 			long ex = tag_loaded((long)actual_grp, tname);
 			if (ex != NONE)
@@ -5619,22 +5752,51 @@ static long install_faber_bundle_from_source(
 			*(void **)(root_buf + 0x44u) = NULL;
 
 			{
-				int used_mp = 0, used_rgba = 0;
+				int used_mp = 0, used_rgba = 0, used_hud_meter = 0;
 				for (k = 0; k < loaded.tag_count; k++)
 				{
 					byte const *s_ent = loaded.tags + k * TAG_BUNDLE_TAG_BYTES;
 					uint32_t s_grp = *(uint32_t const *)(s_ent + TAG_BUNDLE_TAG_GROUP_OFFSET);
 					uint8_t const *s_buf = loaded.data + *(uint32_t const *)(s_ent + TAG_BUNDLE_TAG_ROOT_OFFSET);
-					if (s_grp != 'soso')
-						continue;
-					if (*(int32_t const *)(s_buf + 0xC8u) == (int32_t)datums[ti])
-						used_mp = 1;
-					if (*(int32_t const *)(s_buf + 0xB0u) == (int32_t)datums[ti] ||
-						*(int32_t const *)(s_buf + 0xE8u) == (int32_t)datums[ti] ||
-						*(int32_t const *)(s_buf + 0x170u) == (int32_t)datums[ti])
-						used_rgba = 1;
+					if (s_grp == 'soso')
+					{
+						if (*(int32_t const *)(s_buf + 0xC8u) == (int32_t)datums[ti])
+							used_mp = 1;
+						if (*(int32_t const *)(s_buf + 0xB0u) == (int32_t)datums[ti] ||
+							*(int32_t const *)(s_buf + 0xE8u) == (int32_t)datums[ti] ||
+							*(int32_t const *)(s_buf + 0x170u) == (int32_t)datums[ti])
+							used_rgba = 1;
+					}
+					else if (s_grp == 'wphi')
+					{
+						int32_t m_cnt = *(int32_t const *)(s_buf + 0x6Cu);
+						uint8_t const *m_arr = *(uint8_t const *const *)(s_buf + 0x70u);
+						int32_t m_i;
+						for (m_i = 0; m_i < m_cnt && m_cnt <= 64 && m_arr; m_i++)
+						{
+							uint8_t const *mt = m_arr + (size_t)m_i * 0xB4u;
+							if (*(int32_t const *)(mt + 0x54u) == (int32_t)datums[ti] &&
+								!(mt[0x84u] & 0x20u))
+							{
+								used_hud_meter = 1;
+								break;
+							}
+						}
+					}
+					else if (s_grp == 'unhi')
+					{
+						if ((*(int32_t const *)(s_buf + 0xF4u + 0x30u) == (int32_t)datums[ti] &&
+							 !(s_buf[0xF4u + 0x60u] & 0x20u)) ||
+							(*(int32_t const *)(s_buf + 0x1E4u + 0x30u) == (int32_t)datums[ti] &&
+							 !(s_buf[0x1E4u + 0x60u] & 0x20u)))
+						{
+							used_hud_meter = 1;
+						}
+					}
 				}
-				if (used_mp && !used_rgba)
+				if (used_hud_meter)
+					chan_order = 2; /* _custom_edition_channels_hud_meter */
+				else if (used_mp && !used_rgba)
 					chan_order = 1;
 			}
 
@@ -10350,6 +10512,29 @@ static int extract_xbox_map_tag_to_vault(
 							break;
 						}
 					}
+					else if (s_grp == 'wphi' && s_data >= cl.tag_base && (s_data - cl.tag_base) + 0x78u <= cl.tag_sz)
+					{
+						uint32_t w_off = s_data - cl.tag_base;
+						int32_t m_cnt = *(int32_t const *)(masked_tag_buf + w_off + 0x6Cu);
+						uint32_t m_addr = *(uint32_t const *)(masked_tag_buf + w_off + 0x70u);
+						int32_t m_i;
+						if (m_cnt > 0 && m_cnt <= 64 && m_addr >= cl.tag_base &&
+							(m_addr - cl.tag_base) + (uint32_t)m_cnt * 0xB4u <= cl.tag_sz)
+						{
+							for (m_i = 0; m_i < m_cnt; m_i++)
+							{
+								uint8_t const *mt = masked_tag_buf + (m_addr - cl.tag_base) + (size_t)m_i * 0xB4u;
+								int32_t m_ref = *(int32_t const *)(mt + 0x54u);
+								if (m_ref != -1 && (m_ref & 0xFFFF) == abs_idx && !(mt[0x84u] & 0x20u))
+								{
+									chan_mode = 4u;
+									break;
+								}
+							}
+							if (chan_mode == 4u)
+								break;
+						}
+					}
 				}
 			}
 
@@ -13198,7 +13383,7 @@ void forge_normalize_mcc_hud_tags(void)
 				already_normalized = 1;
 				break;
 			}
-			if (char_w >= 20 || scr_w >= 16)
+			if (char_w >= 20 && scr_w >= 16)
 			{
 				int b;
 				int32_t bm_tag = *(int32_t const *)(base + 0x0C);

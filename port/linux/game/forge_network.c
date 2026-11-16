@@ -2166,12 +2166,16 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 						{
 							g_net_obj_live_index[k] = -1;
 							g_net_obj_is_held[k] = 0;
+							g_net_obj_def_index[k] = NONE;
+							g_net_obj_has_deferred_create[k] = 0;
 						}
 					}
 					if (host_obj_abs >= 0 && host_obj_abs < FORGE_MAX_TRACKED_NET_OBJECTS)
 					{
 						g_net_obj_live_index[host_obj_abs] = -1;
 						g_net_obj_is_held[host_obj_abs] = 0;
+						g_net_obj_def_index[host_obj_abs] = NONE;
+						g_net_obj_has_deferred_create[host_obj_abs] = 0;
 					}
 					if (target_idx < FORGE_MAX_LIVE_INSTANCES)
 						g_pending_slot_props[target_idx].valid = 0;
@@ -2270,12 +2274,16 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 						{
 							g_net_obj_live_index[k] = -1;
 							g_net_obj_is_held[k] = 0;
+							g_net_obj_def_index[k] = NONE;
+							g_net_obj_has_deferred_create[k] = 0;
 						}
 					}
 					if (obj_abs >= 0 && obj_abs < FORGE_MAX_TRACKED_NET_OBJECTS)
 					{
 						g_net_obj_live_index[obj_abs] = -1;
 						g_net_obj_is_held[obj_abs] = 0;
+						g_net_obj_def_index[obj_abs] = NONE;
+						g_net_obj_has_deferred_create[obj_abs] = 0;
 					}
 					if (target_idx < FORGE_MAX_LIVE_INSTANCES)
 					{
@@ -2309,6 +2317,32 @@ void forge_network_pre_handle_object_changes(void const *entries, short count)
 			int obj_abs = (int)DATUM_INDEX_TO_ABSOLUTE_INDEX(changes[i].object_index);
 			if (obj_abs >= 0 && obj_abs < FORGE_MAX_TRACKED_NET_OBJECTS)
 			{
+				if (changes[i].owner_player_index != (byte)NONE)
+				{
+					/* A player-owned unit/biped is never a Forge-spawned prop/weapon:
+					   clear any stale tracking on this reused datum slot so we never
+					   overwrite the respawned player's biped definition_index. */
+					g_net_obj_has_deferred_create[obj_abs] = 0;
+					g_net_obj_def_index[obj_abs] = NONE;
+					g_net_obj_live_index[obj_abs] = -1;
+					g_net_obj_is_held[obj_abs] = 0;
+					continue;
+				}
+				if (g_net_obj_def_index[obj_abs] != NONE)
+				{
+					int32_t live_idx = g_net_obj_live_index[obj_abs];
+					int valid_forge_slot =
+						(live_idx >= 0 && live_idx < g_forge.live_instance_count &&
+						 g_forge.live_instances[live_idx].active) ||
+						(base_tag_count > 0 && changes[i].definition_index != NONE &&
+						 (uint32_t)DATUM_INDEX_TO_ABSOLUTE_INDEX(changes[i].definition_index) >= base_tag_count);
+					if (!valid_forge_slot)
+					{
+						g_net_obj_def_index[obj_abs] = NONE;
+						g_net_obj_live_index[obj_abs] = -1;
+						g_net_obj_is_held[obj_abs] = 0;
+					}
+				}
 				g_net_obj_deferred_create[obj_abs] = changes[i];
 				g_net_obj_has_deferred_create[obj_abs] = 1;
 				if (g_net_obj_def_index[obj_abs] != NONE)
@@ -2334,6 +2368,9 @@ void forge_network_pre_handle_object_changes(void const *entries, short count)
 			if (obj_abs >= 0 && obj_abs < FORGE_MAX_TRACKED_NET_OBJECTS)
 			{
 				g_net_obj_has_deferred_create[obj_abs] = 0;
+				g_net_obj_def_index[obj_abs] = NONE;
+				g_net_obj_live_index[obj_abs] = -1;
+				g_net_obj_is_held[obj_abs] = 0;
 			}
 		}
 	}

@@ -1640,7 +1640,7 @@ static void hud_draw_bitmap_internal(
 
 	/* port: shared CE HUD sheets need meter channels only for this draw
 	(port/linux/src/xbox_textures.c), leaving their static artwork intact. */
-	halo_custom_edition_hud_meter(meter_parameters && custom_edition_cache_tags_loaded());
+	halo_custom_edition_hud_meter(meter_parameters != NULL);
 	rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
 	halo_custom_edition_hud_meter(FALSE); /* port: end the CE meter draw scope */
 
@@ -1992,10 +1992,11 @@ void hud_draw_meter(
 		meter_parameters.background_color =
 			((UNSIGNED_CHAR_MAX - (meter->empty_color>>24))<<24) | (meter->empty_color&0xFFFFFF);
 		/* port: fade and opacity clamped to [0, 1], as the tools keep them; a
-		Custom Edition map's meter can be outside that, which asserted */
+		Custom Edition or MCC map's meter can be outside that (or NaN), which asserted
+		or evaluated PIN(1.0f-NaN, 0.0f, 1.0f) to 0.0f (black) */
 		meter_parameters.tint_color = real_alpha_intensity_to_pixel32(
-			PIN(meter->fade, 0.0f, 1.0f),
-			PIN(1.0f-meter->opacity, 0.0f, 1.0f));
+			(meter->fade >= 0.0f && meter->fade <= 1.0f) ? meter->fade : 0.0f,
+			(meter->opacity >= 0.0f && meter->opacity <= 1.0f) ? (1.0f - meter->opacity) : 1.0f);
 		/* port: PC meter shading does not multiply the emitted color by
 		the Xbox opacity tint. Keep this compatibility limited to the CE
 		maps identified as depending on Gearbox meters. */

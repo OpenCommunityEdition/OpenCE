@@ -23,6 +23,7 @@ CASES = [
     "three-strikes-cutoff-and-reset",
     "opt-out-and-stall-timeout",
     "backlog-pacing-and-timeout-retry",
+    "reused-datum-slot-on-respawn",
 ]
 
 RUNTIME_FUNCTIONS = (
@@ -52,6 +53,7 @@ NETWORK_FUNCTIONS = (
     "forge_tag_stream_tick",
     "forge_network_get_tag_stream_progress",
     "forge_network_get_tag_download_status",
+    "forge_network_pre_handle_object_changes",
 )
 
 NEGATIVE_CONTROLS = {
@@ -133,6 +135,11 @@ NEGATIVE_CONTROLS = {
         "forge_client_abort_rx",
         "backlog-pacing-and-timeout-retry",
     ),
+    "reused-slot-overwrites-player-biped": (
+        ("if (changes[i].owner_player_index != (byte)NONE)", "if (0)"),
+        "forge_network_pre_handle_object_changes",
+        "reused-datum-slot-on-respawn",
+    ),
 }
 
 
@@ -172,6 +179,7 @@ def generated(fault=None, faulty_function=None):
     ):
         config += structure(net_src, name) + "\n"
     config += "static struct forge_pending_slot_props g_pending_slot_props[FORGE_MAX_LIVE_INSTANCES];\n"
+    config += "static uint8_t g_suppressed_change_slots[256];\n"
     config += enum_with(net_src, "_forge_tag_rx_idle") + "\n"
     config += net_src[
         net_src.index("static struct forge_host_cached_tag_bundle g_host_tag_cache"):

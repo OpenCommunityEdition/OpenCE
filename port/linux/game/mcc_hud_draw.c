@@ -210,7 +210,6 @@ struct hud_absolute_placement_definition const *mcc_hud_child_placement(
     struct hud_absolute_placement_definition *storage)
 {
     unsigned short child;
-    if (!mcc_cache_tags_loaded()) return parent;
     memcpy(&child,(unsigned char const *)element+6,sizeof(child));
     if (!child || child>9) return parent;
     *storage=*parent;
@@ -237,9 +236,11 @@ real mcc_hud_bitmap_scale(long bitmap_group_index)
  * cinematic masks and the renderer's viewport fallback retain their units. */
 void mcc_hud_mask_begin(struct bitmap_data const *bitmap)
 {
-    mcc_hud_mask=mcc_cache_tags_loaded() && bitmap && bitmap->tag_index!=NONE ? bitmap : NULL;
+    struct bitmap_group const *group;
+    group=bitmap && bitmap->tag_index!=NONE ? bitmap_group_get(bitmap->tag_index) : NULL;
+    mcc_hud_mask=group && (mcc_cache_tags_loaded() || (group->flags&(0x10|0x80))) ? bitmap : NULL;
     mcc_hud_mask_scale=mcc_hud_mask ?
-        mcc_hud_bitmap_scale(bitmap->tag_index)/mcc_hud_canvas_scale() : 1.0f;
+        (group->flags&(0x10|0x80) ? 0.5f : 1.0f) : 1.0f;
 }
 
 void mcc_hud_mask_end(void)
@@ -251,7 +252,7 @@ void mcc_hud_mask_end(void)
 void mcc_hud_mask_transform(struct bitmap_data const *bitmap,
     real_vector2d *size,real_vector2d *texture_scale)
 {
-    if (!mcc_cache_tags_loaded() || !bitmap || bitmap!=mcc_hud_mask) return;
+    if (!bitmap || bitmap!=mcc_hud_mask) return;
     size->i*=mcc_hud_mask_scale;
     size->j*=mcc_hud_mask_scale;
     /* Both linear pixel coordinates and normalized texture coordinates
@@ -336,7 +337,7 @@ boolean mcc_hud_icon_draw(long bitmap_group_index, struct bitmap_data const *bit
  * MCC tags and handle them here instead of changing the native enum. */
 static boolean mcc_hud_edge(short anchor)
 {
-    return mcc_cache_tags_loaded() && anchor>=5 && anchor<=8;
+    return anchor>=5 && anchor<=8;
 }
 
 static short mcc_hud_frame_inset(short gap,long maximum)
@@ -351,7 +352,7 @@ boolean mcc_hud_anchor_point(short anchor, struct hud_placement_definition const
     real x,y;
     rectangle2d frame;
     long horizontal_inset;
-    if (!mcc_cache_tags_loaded() || anchor<0 || anchor>8 || anchor==4) return FALSE;
+    if (anchor<0 || anchor>8 || anchor==4 || (!mcc_cache_tags_loaded() && anchor<5)) return FALSE;
     if (anchor<4 && (mcc_native_view || (mcc_weapon_frame!=NONE ? mcc_weapon_frame :
         placement->pad==MCC_HUD_NATIVE_FRAME))) return FALSE;
     horizontal_inset=halo_screen_width()/20;

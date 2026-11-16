@@ -1695,7 +1695,8 @@ static void first_person_weapon_switch_weapons(
 								weapon_definition->weapon.interface_definition.first_person_animations.index,
 								first_person_weapon->weapon_node_remapping_table);
 
-						if (first_person_weapon->weapon_node_remapping_table_valid &&
+						/* port: allow cross-map custom/MCC weapons whose hands bone names differ from the host map's fp hands */
+						if (first_person_weapon->weapon_node_remapping_table_valid ||
 							first_person_weapon->hands_node_remapping_table_valid)
 						{
 							first_person_weapon->weapon_index= weapon_index;
@@ -2149,6 +2150,7 @@ static boolean model_build_remapping_table_for_animation_graph(
 	struct model *model= model_definition_get(model_index);
 	struct animation_graph *animation_graph= animation_graph_definition_get(animation_graph_index);
 	boolean valid= TRUE;
+	short matched_count= 0;
 	short model_node_index;
 
 	/* port: no more model nodes than the table holds, and only graph nodes
@@ -2179,11 +2181,20 @@ static boolean model_build_remapping_table_for_animation_graph(
 		if (animation_graph_node_index!=NONE)
 		{
 			node_remapping_table[model_node_index]= animation_graph_node_index;
+			matched_count++;
 		}
 		else
 		{
+			/* port: default unmatched cross-map fp model/hands nodes to root node 0 so
+			   first-person weapons still animate when a custom weapon's fp rig has extra/renamed bones */
+			node_remapping_table[model_node_index]= 0;
 			valid= FALSE;
 		}
+	}
+
+	if (!valid && matched_count>0 && animation_graph->nodes.count>0)
+	{
+		valid= TRUE;
 	}
 
 	return valid;
