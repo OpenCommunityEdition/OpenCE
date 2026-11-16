@@ -60,6 +60,7 @@ OBJECTS.C
 #include "structures/structure_bsp_definitions.h"
 #include "units/units.h"
 #include "units/bipeds.h" /* port: vehicle riding */
+#include "animation_blend_space.h" /* port: port/linux/game/animation_blend_space.c */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
 /* port: port/linux/game/first_person_legs.c's */
@@ -1532,6 +1533,9 @@ void object_start_interpolation(
 		object_header_block_get(object_index, &object->object.original_node_orientations),
 		object_header_block_get(object_index, &object->object.node_orientations),
 		sizeof(real_orientation)*node_count);
+	/* port: the space (the object's or the world's) of the pose kept
+	(animation_blend_space.c) */
+	animation_blend_space_started(object_index);
 	if (frame_count>=
 		object->object.animation.interpolation_frame_count-
 		object->object.animation.interpolation_frame_index
@@ -2801,7 +2805,11 @@ void object_compute_node_matrices(
 			object_type_preprocess_node_orientations(object_index, node_orientations);
 		}
 
-		if (object->object.animation.interpolation_frame_count>0)
+		/* port: not from a pose in the other space (the object's, or the
+		world's for a world-relative animation): blended from one into the
+		other, the body flew across the scene (animation_blend_space.c) */
+		if (object->object.animation.interpolation_frame_count>0 &&
+			!animation_blend_space_crossed(object_index, world_relative))
 		{
 			match_assert("c:\\halo\\SOURCE\\objects\\objects.c", 2777, !TEST_FLAG(_object_mask_cannot_interpolate, object->object.type));
 
@@ -2815,6 +2823,9 @@ void object_compute_node_matrices(
 				object->object.animation.interpolation_frame_index,
 				object->object.animation.interpolation_frame_count);
 		}
+		/* port: the space of the pose computed, which a blend started next
+		keeps (animation_blend_space.c) */
+		animation_blend_space_computed(object_index, world_relative);
 
 		if (!world_relative)
 		{

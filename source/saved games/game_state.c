@@ -131,6 +131,8 @@ symbols in this file:
 #include "hs_console_state.h" /* port: port/linux/game/hs_console_state.inl */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_invalidate(void);
+/* port: port/linux/game/animation_blend_space.c's */
+void animation_blend_space_forget(void);
 
 /* port: riding taken from the settings after every load (bipeds.c) */
 void bipeds_riding_latch(void);
@@ -209,6 +211,8 @@ static game_state_before_load_proc before_load_procs[] =
 	/* port: (and the inputs their functions were computed from are not
 	theirs: objects.c's object_function_inputs) */
 	object_function_inputs_forget,
+	/* port: (nor the spaces their blends started from: animation_blend_space.c) */
+	animation_blend_space_forget,
 };
 
 static game_state_after_load_proc after_load_procs[] =
@@ -319,6 +323,8 @@ void game_state_initialize_for_new_map(
 	/* port: (and the inputs their functions were computed from are not
 	theirs: objects.c's object_function_inputs) */
 	object_function_inputs_forget();
+	/* port: (nor the spaces their blends started from: animation_blend_space.c) */
+	animation_blend_space_forget();
 	game_state_note_event("map start");
 	game_state_data_arrays_new_map();
 
