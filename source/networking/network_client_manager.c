@@ -3430,8 +3430,9 @@ byte network_game_client_advertised_game_kind(
 		network_game_client_advertised_versions[game_index].kind : 0;
 }
 
-boolean network_game_client_join_first_available_game(
-	void)
+/* port: an identifier picks the host */
+static boolean network_game_client_join_available_game(
+	byte const *identifier)
 {
 	struct network_game_client *client = global_network_game_client_get();
 	long game_index;
@@ -3446,7 +3447,8 @@ boolean network_game_client_join_first_available_game(
 		struct network_advertised_game *game = &client->available_games[game_index];
 
 		if (network_game_client_advertised_game_is_valid(game) &&
-			game->platform == network_game_get_local_platform() && game->open)
+			game->platform == network_game_get_local_platform() && game->open &&
+			(!identifier || !csmemcmp(game->xnaddr.data + 2, identifier, 6)))
 		{
 			struct transport_address address = { { { 0 } } };
 			struct network_join_parameters join_parameters;
@@ -3469,6 +3471,18 @@ boolean network_game_client_join_first_available_game(
 		}
 	}
 	return FALSE;
+}
+
+boolean network_game_client_join_first_available_game(
+	void)
+{
+	return network_game_client_join_available_game(NULL);
+}
+
+boolean network_game_client_port_join_host(
+	byte const *identifier)
+{
+	return network_game_client_join_available_game(identifier);
 }
 
 /* ... and puts this machine's players on a team (a team game needs both

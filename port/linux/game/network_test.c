@@ -22,6 +22,11 @@ Automated system link sessions for testing the netcode without the menus
   lists after five seconds (internet play's public games: a host's with
   debug.network_test_public), co-op ones last, as picking it there does,
   and then as "join". It logs what it lists.
+- "match:<playlist>[,<playlist>...]:<size>" (slayer, ctf, king, oddball,
+  race; 1v1, 2v2, 3v3, 4v4, ffa6) searches as MATCHMAKING's SEARCH does,
+  and the search's decisions host or join (matchmaking.c), the host's teams
+  kept. It logs the roster as it changes, in the lobby and in the game, at
+  the start, and each player's team five seconds into the game.
 - "log" hosts and joins nothing: the game that runs (map_name, in init.txt,
   plays one without the menus) is logged, as below.
 - "probe" (halo --probe [<invite>]: a list site's look at a server) searches
@@ -65,6 +70,7 @@ Called from the main loop every frame (main.c).
 #include "networking/network_game_globals.h"
 #include "networking/network_client_manager.h"
 #include "networking/network_server_manager.h"
+#include "networking/network_game_manager.h"
 #include "game/game.h"
 #include "game/game_engine.h"
 #include "game/players.h"
@@ -129,7 +135,9 @@ enum
 	_network_test_browse,
 	_network_test_log,
 	_network_test_probe,
+	_network_test_match,
 };
+
 
 static struct
 {
@@ -185,6 +193,11 @@ static struct
 	short next_cue;
 	long cue_players;
 	long cues_start;
+	struct p2p_mm_choice match;
+	boolean match_searching;
+	short match_roster_count;
+	boolean match_start_logged;
+	boolean match_teams_logged;
 } network_test;
 
 /* the variant at the index of the list (copied to name), FALSE past its end */
@@ -210,6 +223,41 @@ static boolean network_test_variant(
 		snprintf(name, size, "%.*s", (int)length, variant);
 	}
 	return TRUE;
+}
+
+static boolean network_test_read_match(
+	char const *text,
+	struct p2p_mm_choice *choice)
+{
+	char const *size = strchr(text, ':');
+	short index;
+
+	if (!size)
+		return FALSE;
+	choice->playlists = 0;
+	choice->size = NONE;
+	for (index = 0; index < NUMBER_OF_P2P_MM_SIZES; index++)
+	{
+		if (!strcmp(size + 1, p2p_mm_size_names[index]))
+			choice->size = index;
+	}
+	while (text < size)
+	{
+		size_t length = strcspn(text, ",:");
+
+		for (index = 0; index < NUMBER_OF_P2P_MM_PLAYLISTS &&
+			(strlen(p2p_mm_playlist_names[index]) != length || strncmp(text, p2p_mm_playlist_names[index], length));
+			index++)
+		{
+		}
+		if (index == NUMBER_OF_P2P_MM_PLAYLISTS)
+			return FALSE;
+		choice->playlists |= 1u << index;
+		text += length;
+		if (*text == ',' && ++text == size)
+			return FALSE;
+	}
+	return choice->playlists && choice->size != NONE;
 }
 
 static void network_test_read_settings(
@@ -248,6 +296,13 @@ static void network_test_read_settings(
 	else if (!strcmp(setting, "probe"))
 	{
 		network_test.mode = _network_test_probe;
+	}
+	else if (!strncmp(setting, "match:", 6))
+	{
+		if (network_test_read_match(setting + 6, &network_test.match))
+			network_test.mode = _network_test_match;
+		else
+			platform_log("network test: \"%s\" is not \"match:<playlist>[,<playlist>...]:<size>\": no test", setting);
 	}
 	network_test.public_game = config_boolean("debug.network_test_public") != 0;
 	network_test.start_delay = (real)config_real("debug.network_test_start");
@@ -707,22 +762,34 @@ static void network_test_vehicle(
 	}
 }
 
-/* debug.network_test_name: the name the machine's first player takes (its
-profile's, which it joins with), in ASCII */
+/* stored in the profile: a join reads the name from it again */
 static void network_test_set_name(
 	void)
 {
 	char const *name = config_string("debug.network_test_name");
 	struct player_profile profile;
+	wchar_t wide_name[MAXIMUM_PLAYER_PROFILE_NAME_LENGTH];
+	long profile_index;
 	short index;
 
 	if (!name || !name[0])
 		return;
-	player_ui_get_active_player_profile(0, &profile);
 	for (index = 0; name[index] && index < MAXIMUM_PLAYER_PROFILE_NAME_LENGTH - 1; index++)
-		profile.player_name[index] = (wchar_t)(unsigned char)name[index];
-	profile.player_name[index] = 0;
-	player_ui_set_active_player_profile(0, player_ui_get_active_player_profile_index(0), &profile);
+		wide_name[index] = (wchar_t)(unsigned char)name[index];
+	wide_name[index] = 0;
+	profile_index = player_ui_get_active_player_profile_index(0);
+	if (profile_index == NONE || !player_profile_get(profile_index, &profile))
+	{
+		profile_index = player_profile_new(0, wide_name);
+		if (profile_index == NONE || !player_profile_get(profile_index, &profile))
+		{
+			platform_log("network test: no profile could be made for %s", name);
+			return;
+		}
+	}
+	csmemcpy(profile.player_name, wide_name, sizeof(wide_name));
+	player_profile_save(profile_index, &profile);
+	player_ui_set_active_player_profile(0, profile_index, &profile);
 	platform_log("network test: this machine's player is named %s", name);
 }
 
@@ -1141,6 +1208,89 @@ static void network_test_probe_answer(
 	}
 }
 
+static void network_test_player_name(
+	wchar_t const *player_name,
+	char *name)
+{
+	short character;
+
+	for (character = 0; character < 12 && player_name[character]; character++)
+		name[character] = player_name[character] >= 32 && player_name[character] < 127 ? (char)player_name[character] : '?';
+	name[character] = 0;
+}
+
+static void network_test_log_roster(
+	struct network_game const *game,
+	char const *when)
+{
+	short index;
+	short teams[2] = { 0, 0 };
+
+	for (index = 0; index < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; index++)
+	{
+		struct network_player const *player = &game->players[index];
+		char name[13];
+
+		if (!network_player_is_valid(player))
+			continue;
+		network_test_player_name(player->name, name);
+		if (player->team_index == 0 || player->team_index == 1)
+			teams[player->team_index]++;
+		platform_log("network test: %s roster: %s machine %d team %d", when, name, player->machine_index,
+			player->team_index);
+	}
+	platform_log("network test: %s roster: %d players, team 0: %d, team 1: %d (most %d)", when, game->player_count,
+		teams[0], teams[1], game->maximum_players);
+}
+
+static void network_test_match_update(
+	boolean main_menu_loaded)
+{
+	struct network_game_client *client = global_network_game_client_get();
+	struct network_game *game = client ? network_game_client_get_game(client) : NULL;
+
+	if (main_menu_loaded)
+	{
+		network_test.match_start_logged = network_test.match_teams_logged = FALSE;
+		if (!game)
+			network_test.match_roster_count = NONE;
+		else if (game->player_count != network_test.match_roster_count)
+		{
+			network_test.match_roster_count = game->player_count;
+			network_test_log_roster(game, "lobby");
+		}
+		return;
+	}
+	if (!game_in_progress())
+		return;
+	if (!network_test.match_start_logged && game)
+	{
+		network_test.match_start_logged = TRUE;
+		network_test.match_roster_count = game->player_count;
+		network_test_log_roster(game, "start");
+	}
+	else if (game && game->player_count != network_test.match_roster_count)
+	{
+		network_test.match_roster_count = game->player_count;
+		network_test_log_roster(game, "game");
+	}
+	if (!network_test.match_teams_logged && game_time_get() > 5 * TICKS_PER_SECOND)
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+
+		network_test.match_teams_logged = TRUE;
+		data_iterator_new(&iterator, player_data);
+		while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		{
+			char name[13];
+
+			network_test_player_name(player->name, name);
+			platform_log("network test: in game: %s team %ld", name, (long)player->team_index);
+		}
+	}
+}
+
 void network_test_update(
 	boolean main_menu_loaded,
 	real seconds)
@@ -1491,6 +1641,9 @@ void network_test_update(
 		}
 	}
 
+	if (network_test.mode == _network_test_match && network_test.match_searching)
+		network_test_match_update(main_menu_loaded);
+
 	if (!main_menu_loaded)
 		return;
 	/* the intro movie skipped first, as a button press does: the movie
@@ -1510,6 +1663,15 @@ void network_test_update(
 
 	switch (network_test.mode)
 	{
+	case _network_test_match:
+		if (!network_test.match_searching)
+		{
+			network_test.match_searching = TRUE;
+			network_test.match_roster_count = NONE;
+			network_test_set_name();
+			p2p_mm_search(&network_test.match);
+		}
+		break;
 	case _network_test_browse:
 	{
 		struct p2p_listing listed[8], games[8];

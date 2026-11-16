@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/multiplayer_type_select/multiplayer_type_matchmaking_item" type="text" left="51" width="232" height="32" bitmap="bitmaps/list_item_bkd" string_list="main_menu/multiplayer_type_select/multiplayer_options" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="5">
+		<on event="a" run="mp type set mode" open="main_menu/multiplayer_type_select/matchmaking/matchmaking_screen"/>
+		<on event="start" run="mp type set mode" open="main_menu/multiplayer_type_select/matchmaking/matchmaking_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/matchmaking_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" run="port matchmaking back"/>
+		<on event="back" run="port matchmaking back"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/header_matchmaking"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/options_menu"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/header_matchmaking" controller="1" left="35" top="11" width="363" height="59" bitmap="main_menu/multiplayer_type_select/matchmaking/header_matchmaking">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/help" type="text" controller="1" left="373" top="357" width="232" height="40" string_list="main_menu/multiplayer_type_select/matchmaking/help_strings" font="ui\small_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/multiplayer_type_select/matchmaking/help">
+		<data input="port matchmaking update"/>
+		<on event="created" run="port matchmaking init"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/op_size" x="35" y="104"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/op_playlist_0" x="35" y="136"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/op_playlist_1" x="35" y="159"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/op_playlist_2" x="35" y="182"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/op_playlist_3" x="35" y="205"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/op_playlist_4" x="35" y="228"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/op_size" width="296" height="18" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/size_label"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/size_spinner" x="190" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/size_label" type="text" controller="1" width="190" height="18" string_list="main_menu/multiplayer_type_select/matchmaking/labels" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/op_playlist_0" width="296" height="18" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_0_label"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_spinner" x="190" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/playlist_0_label" type="text" controller="1" width="190" height="18" string_list="main_menu/multiplayer_type_select/matchmaking/labels" string_index="1" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/op_playlist_1" width="296" height="18" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_1_label"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_spinner" x="190" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/playlist_1_label" type="text" controller="1" width="190" height="18" string_list="main_menu/multiplayer_type_select/matchmaking/labels" string_index="2" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/op_playlist_2" width="296" height="18" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_2_label"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_spinner" x="190" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/playlist_2_label" type="text" controller="1" width="190" height="18" string_list="main_menu/multiplayer_type_select/matchmaking/labels" string_index="3" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/op_playlist_3" width="296" height="18" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_3_label"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_spinner" x="190" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/playlist_3_label" type="text" controller="1" width="190" height="18" string_list="main_menu/multiplayer_type_select/matchmaking/labels" string_index="4" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/op_playlist_4" width="296" height="18" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_4_label"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/playlist_spinner" x="190" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/playlist_4_label" type="text" controller="1" width="190" height="18" string_list="main_menu/multiplayer_type_select/matchmaking/labels" string_index="5" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/size_spinner" type="spinner" width="84" height="16" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="1V1|2V2|3V3|4V4|FFA 6" font="ui\small_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="2 -6 14 0" footer_bounds="2 87 14 93">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/playlist_spinner" type="spinner" width="84" height="16" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO|YES" font="ui\small_ui" color="#FF2896FF" align="center" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="2 -6 14 0" footer_bounds="2 87 14 93">
+		<on event="left_mouse" run="mouse spinner 1wide click"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/button_defaults" x="35" y="1"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/button_search" x="341" y="1"/>
+		<child widget="common_button_cancel" x="477" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port matchmaking defaults"/>
+		<on event="start" run="port matchmaking defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/button_search" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="SEARCH" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port matchmaking search" open="main_menu/multiplayer_type_select/matchmaking/search_screen"/>
+		<on event="start" run="port matchmaking search" open="main_menu/multiplayer_type_select/matchmaking/search_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<strings name="main_menu/multiplayer_type_select/matchmaking/labels">
+		<string text="GAME SIZE:"/>
+		<string text="SLAYER:"/>
+		<string text="CTF:"/>
+		<string text="KING OF THE HILL:"/>
+		<string text="ODDBALL:"/>
+		<string text="RACE:"/>
+	</strings>
+	<strings name="main_menu/multiplayer_type_select/matchmaking/help_strings">
+		<string text="Players a side. 1V1 is two teams\nof one. Required."/>
+		<string text="Players a side. 2V2 is two teams\nof two. Required."/>
+		<string text="Players a side. 3V3 is two teams\nof three. Required."/>
+		<string text="Players a side. 4V4 is two teams\nof four. Required."/>
+		<string text="Six players, every one for\nthemselves. Required."/>
+		<string text="CTF has no free for all. Set another\nplaylist to YES for this size."/>
+		<string text="Slayer games: the most kills wins."/>
+		<string text="Capture the Flag games."/>
+		<string text="King of the Hill games."/>
+		<string text="Oddball games."/>
+		<string text="Race games."/>
+		<string text="Search for a game of a playlist at\nYES, at this game size."/>
+		<string text="CHOOSE A PLAYLIST: SET ONE\nTO YES."/>
+		<string text="ONE PLAYER A MACHINE FOR\nMATCHMAKING."/>
+		<string text=""/>
+	</strings>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" run="port matchmaking search back"/>
+		<on event="back" run="port matchmaking search back"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/header_matchmaking"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_notice"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_title"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_help"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_count"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot_you" x="340" y="112"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="133"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="154"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="175"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="196"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="217"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="238"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot" x="340" y="259"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_card_text" x="35" y="370"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_list"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_notice" type="text" controller="1" left="35" top="74" width="570" height="16" font="ui\small_ui" color="#FFE6C66E">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_title" type="text" controller="1" left="35" top="92" width="230" height="20" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_help" type="text" controller="1" left="35" top="114" width="285" height="40" font="ui\small_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_count" type="text" controller="1" left="340" top="92" width="265" height="18" font="ui\small_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_slot_you" width="265" height="18" bitmap="main_menu/multiplayer_type_select/matchmaking/search_slot">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/current_profile_name" x="24"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_slot" width="265" height="18" bitmap="main_menu/multiplayer_type_select/matchmaking/search_slot">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_slot_name" x="24"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/current_profile_name" type="text" controller="1" width="241" height="18" font="ui\small_ui" color="#FFFFFFFF" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_slot_name" type="text" controller="1" width="241" height="18" font="ui\small_ui" color="#FFFFFFFF" text_y="1">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_card_text" type="text" controller="1" width="265" height="24" font="ui\small_ui" color="#FFFFFFFF" text_x="10" text_y="4">
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<data input="port matchmaking search update"/>
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/multiplayer_type_select/matchmaking/search_button_cancel" x="477" y="1"/>
+	</widget>
+	<widget name="main_menu/multiplayer_type_select/matchmaking/search_button_cancel" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" text="CANCEL" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port matchmaking search back"/>
+		<on event="start" run="port matchmaking search back"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

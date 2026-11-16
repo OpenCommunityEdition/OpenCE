@@ -954,6 +954,10 @@ def replaced(folder: str) -> bool:
 # ---------- multiplayer (PLAN.md section 11)
 
 MT = "main_menu/multiplayer_type_select"
+# 29 units apart, not CE's 33: at 33 a tenth row would put EDIT GAMETYPES's bar on the description panel's bottom curve
+MULTIPLAYER_ROWS = ["join", "matchmaking", "join_internet", "join_lan", "join_direct", "create", "create_internet",
+                    "create_lan", "coop"]
+MULTIPLAYER_ROW_Y = {row: 78 + 29 * index for index, row in enumerate(MULTIPLAYER_ROWS)}
 
 # strings added to the PC version's lists: (at, strings) of each list. Slayer's
 # kills to win goes up to 500, for big games (the Xbox editor's are
@@ -1072,8 +1076,9 @@ def LOADOUT_HELPS(slot: str) -> list:
 
 STRING_OVERRIDES.update({
     f"{MT}/multiplayer_options": ["JOIN GAME", "CREATE GAME", "INTERNET", "LAN", "DIRECT LINK", "EDIT GAMETYPES",
-                                  "SERVER BROWSER", "CO-OP CAMPAIGN"],
+                                  "SERVER BROWSER", "CO-OP CAMPAIGN", "MATCHMAKING"],
     f"{MT}/multiplayer_option_descriptions": [
+        "Join a match without choosing\\na game: pick playlists and a\\nsize, alone or with friends.",
         "Browse the games on the\\nInternet.",
         "Join a multiplayer game on\\nyour LAN.",
         "Join a game by its invite link,\\nor one a Discord invite\\nreached.",
@@ -1129,8 +1134,8 @@ STRING_OVERRIDES.update({
 # port's own, the rest of their lists the PC version's
 OVERRIDE_ORIGINALS = {
     f"{PE}/profile_edit_descriptions": [0, None, None, None, None, None, None, 7, None],
-    f"{MT}/multiplayer_options": [0, 1, 2, 3, None, 5, None, None],
-    f"{MT}/multiplayer_option_descriptions": [0, 1, None, None, 4, None, 5],
+    f"{MT}/multiplayer_options": [0, 1, 2, 3, None, 5, None, None, None],
+    f"{MT}/multiplayer_option_descriptions": [None, 0, 1, None, None, 4, None, 5],
     "main_menu/gametype_select/var_gametype_banks": [0, None, 2],
     "main_menu/settings_select/multiplayer_setup/item_options_edit/item_options_labels": [0, 1, 2, 3, 4] + [None] * 4,
     # (the first's note that infinite grenades work only with 4 players or
@@ -1185,9 +1190,11 @@ WIDGET_PATCHES = {
         f'<on event="start" run="mp type set mode" open="{MT}/join_game/join_game_screen"/>',
         '<on event="left_mouse" run="mouse emit accept event"/>',
     ]},
-    # (Co-op, after Create Game's: _coop)
     f"{MT}/multiplayer_type_select_list": {"insert_before": {
-        f"{MT}/multiplayer_type_gametypes_item": [f'<child widget="{MT}/multiplayer_type_coop_item" y="309"/>'],
+        f"{MT}/multiplayer_type_join_internet_item": [
+            f'<child widget="{MT}/multiplayer_type_matchmaking_item" y="{MULTIPLAYER_ROW_Y["matchmaking"]}"/>'],
+        f"{MT}/multiplayer_type_gametypes_item": [
+            f'<child widget="{MT}/multiplayer_type_coop_item" y="{MULTIPLAYER_ROW_Y["coop"]}"/>'],
     }},
     # (the Map screen's and New Game's lists: SINGLEPLAYER or MULTIPLAYER
     # maps, the first row's chooser's (_map_kind); B on the Map screen goes
@@ -2173,6 +2180,169 @@ def _join4(base: str) -> list:
     return lines
 
 
+# in p2p.h's P2P_MM_* order; MATCHMAKING_HELP in menu_functions.c's _matchmaking_help_* order
+MATCHMAKING_SIZES = ["1V1", "2V2", "3V3", "4V4", "FFA 6"]
+MATCHMAKING_PLAYLISTS = ["SLAYER", "CTF", "KING OF THE HILL", "ODDBALL", "RACE"]
+MATCHMAKING_HELP = [
+    *(f"Players a side. {size} is two teams\\nof {count}. Required."
+      for size, count in zip(MATCHMAKING_SIZES, ["one", "two", "three", "four"])),
+    "Six players, every one for\\nthemselves. Required.",
+    "CTF has no free for all. Set another\\nplaylist to YES for this size.",
+    "Slayer games: the most kills wins.", "Capture the Flag games.", "King of the Hill games.", "Oddball games.",
+    "Race games.",
+    "Search for a game of a playlist at\\nYES, at this game size.",
+    "CHOOSE A PLAYLIST: SET ONE\\nTO YES.", "ONE PLAYER A MACHINE FOR\\nMATCHMAKING.",
+    "",
+]
+TITLES[f"{MT}/matchmaking/header_matchmaking"] = "MATCHMAKING"
+
+
+def _matchmaking() -> list:
+    base = f"{MT}/matchmaking"
+    screen = f"{base}/matchmaking_screen"
+    lines = _widget(f"{MT}/multiplayer_type_matchmaking_item",
+                    [("type", "text"), ("left", 51), ("width", 232), ("height", 32), ("bitmap", "bitmaps/list_item_bkd"),
+                     ("string_list", f"{MT}/multiplayer_options"), ("string_index", 8), ("font", "ui\\large_ui"),
+                     ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
+                    [f'<on event="a" run="mp type set mode" open="{screen}"/>',
+                     f'<on event="start" run="mp type set mode" open="{screen}"/>',
+                     '<on event="left_mouse" run="mouse emit accept event"/>'])
+    lines += _widget(screen, [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game"),
+                              ("bitmap", "bitmaps/gradient")],
+                     ['<on event="b" run="port matchmaking back"/>', '<on event="back" run="port matchmaking back"/>',
+                      f'<child widget="{base}/header_matchmaking"/>',
+                      f'<child widget="{base}/options_menu"/>'])
+    lines += _header(f"{base}/header_matchmaking", f"{base}/header_matchmaking")
+    lines += _widget(f"{base}/help", [("type", "text"), ("controller", 1), ("left", 373), ("top", 357), ("width", 232),
+                                      ("height", 40), ("string_list", f"{base}/help_strings"), ("font", "ui\\small_ui"),
+                                      ("color", "#FFFFFFFF")], [])
+    rows = [("size", 104)] + [(f"playlist_{index}", 136 + 23 * index) for index in range(len(MATCHMAKING_PLAYLISTS))]
+    lines += _widget(f"{base}/options_menu",
+                     [("type", "column_list"), ("width", 640), ("height", 480),
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                      ("description", f"{base}/help")],
+                     ['<data input="port matchmaking update"/>', '<on event="created" run="port matchmaking init"/>',
+                      *(f'<child widget="{base}/op_{key}" x="35" y="{y}"/>' for key, y in rows),
+                      f'<child widget="{base}/button_bar" y="414"/>'])
+    for index, (key, _) in enumerate(rows):
+        spinner = "size_spinner" if key == "size" else "playlist_spinner"
+        lines += _widget(f"{base}/op_{key}", [("width", 296), ("height", 18),
+                                              ("flags", "pass_unhandled_to_focused_child"),
+                                              ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<child widget="{base}/{key}_label"/>', f'<child widget="{base}/{spinner}" x="190" y="1"/>'])
+        lines += _widget(f"{base}/{key}_label", [("type", "text"), ("controller", 1), ("width", 190), ("height", 18),
+                                                 ("string_list", f"{base}/labels"), ("string_index", index or None),
+                                                 ("font", "ui\\small_ui"), ("color", "#FF2896FF"), ("text_x", 13),
+                                                 ("text_y", 1)], [])
+    for spinner, choices in [("size_spinner", MATCHMAKING_SIZES), ("playlist_spinner", ["NO", "YES"])]:
+        lines += _widget(f"{base}/{spinner}",
+                         [("type", "spinner"), ("width", 84), ("height", 16),
+                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                          ("strings", "|".join(choices)), ("font", "ui\\small_ui"), ("color", "#FF2896FF"),
+                          ("align", "center"), ("header_bitmap", "bitmaps/arrow_sm_left"),
+                          ("footer_bitmap", "bitmaps/arrow_sm_right"), ("header_bounds", "2 -6 14 0"),
+                          ("footer_bounds", "2 87 14 93")],
+                         ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    lines += _widget(f"{base}/button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
+                                            ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     [f'<child widget="{base}/button_defaults" x="35" y="1"/>',
+                      f'<child widget="{base}/button_search" x="341" y="1"/>',
+                      '<child widget="common_button_cancel" x="477" y="1"/>'])
+    lines += _button(f"{base}/button_defaults", 3, ['<on event="a" run="port matchmaking defaults"/>',
+                                                    '<on event="start" run="port matchmaking defaults"/>'])
+    lines += _widget(f"{base}/button_search", [("type", "text"), ("width", 128), ("height", 24),
+                                               ("bitmap", "bitmaps/text_button_background"), ("text", "SEARCH"),
+                                               ("font", "ui\\small_ui"), ("color", "#FFFFFFFF"), ("align", "center"),
+                                               ("text_y", 2)],
+                     [f'<on event="a" run="port matchmaking search" open="{base}/search_screen"/>',
+                      f'<on event="start" run="port matchmaking search" open="{base}/search_screen"/>',
+                      '<on event="left_mouse" run="mouse emit accept event"/>'])
+    lines += _strings(f"{base}/labels", ["GAME SIZE:", *(f"{name}:" for name in MATCHMAKING_PLAYLISTS)])
+    lines += _strings(f"{base}/help_strings", MATCHMAKING_HELP)
+    return lines + _matchmaking_search(base)
+
+
+MATCHMAKING_GOLD = "#e6c66e"
+
+
+# SEARCH_SLOT_SPINNER_FRAMES must equal menu_functions.c's
+SEARCH_SLOT_SIZE = (265, 18)
+SEARCH_SLOT_SPINNER_FRAMES = 8
+
+
+def search_slot_frames() -> list:
+    """frames: you, matched, then looking with its spinner (menu_functions.c's _search_slot_*)"""
+    width, height = SEARCH_SLOT_SIZE
+
+    def slot(mark):
+        return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+                f'viewBox="0 0 {width} {height}">\n{mark}</svg>\n', width, height)
+
+    frames = [slot(f'  <rect x="6" y="4" width="10" height="10" fill="{MATCHMAKING_GOLD}"/>\n'),
+              slot('  <rect x="6" y="4" width="10" height="10" fill="#2896ff"/>\n')]
+    for turn in range(SEARCH_SLOT_SPINNER_FRAMES):
+        spinner = ('  <circle cx="11" cy="9" r="4.5" fill="none" stroke="#2896ff" stroke-opacity="0.3" '
+                   'stroke-width="1.6"/>\n'
+                   f'  <path d="M11,4.5 A4.5,4.5 0 0 1 15.5,9" fill="none" stroke="#2896ff" stroke-width="1.6" '
+                   f'transform="rotate({turn * 360 // SEARCH_SLOT_SPINNER_FRAMES} 11 9)"/>\n')
+        frames.append(slot(spinner))
+    return frames
+
+
+def _search_slots(base: str) -> tuple:
+    children = [f'<child widget="{base}/search_slot_you" x="340" y="112"/>',
+                *(f'<child widget="{base}/search_slot" x="340" y="{112 + 21 * index}"/>' for index in range(1, 8))]
+    # menu_functions.c's profile_name_show fills current_profile_name
+    lines = _widget(f"{base}/search_slot_you", [("width", SEARCH_SLOT_SIZE[0]), ("height", SEARCH_SLOT_SIZE[1]),
+                                                ("bitmap", f"{base}/search_slot")],
+                    [f'<child widget="{base}/current_profile_name" x="24"/>'])
+    lines += _widget(f"{base}/search_slot", [("width", SEARCH_SLOT_SIZE[0]), ("height", SEARCH_SLOT_SIZE[1]),
+                                             ("bitmap", f"{base}/search_slot")],
+                     [f'<child widget="{base}/search_slot_name" x="24"/>'])
+    for key in ("current_profile_name", "search_slot_name"):
+        lines += _widget(f"{base}/{key}", [("type", "text"), ("controller", 1), ("width", SEARCH_SLOT_SIZE[0] - 24),
+                                           ("height", SEARCH_SLOT_SIZE[1]), ("font", "ui\\small_ui"),
+                                           ("color", "#FFFFFFFF"), ("text_y", 1)], [])
+    return children, lines
+
+
+def _matchmaking_search(base: str) -> list:
+    screen = f"{base}/search_screen"
+    slots, slot_widgets = _search_slots(base)
+    texts = [("notice", 35, 74, 570, 16, "ui\\small_ui", f"#FF{MATCHMAKING_GOLD[1:].upper()}", None),
+             ("title", 35, 92, 230, 20, "ui\\large_ui", "#FF2896FF", None),
+             ("help", 35, 114, 285, 40, "ui\\small_ui", "#FFFFFFFF", None),
+             ("count", 340, 92, 265, 18, "ui\\small_ui", "#FFFFFFFF", None)]
+    lines = _widget(screen, [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child pause_game"),
+                             ("bitmap", "bitmaps/gradient")],
+                    ['<on event="b" run="port matchmaking search back"/>',
+                     '<on event="back" run="port matchmaking search back"/>',
+                     f'<child widget="{base}/header_matchmaking"/>',
+                     *(f'<child widget="{base}/search_{key}"/>' for key, *_ in texts),
+                     *slots,
+                     f'<child widget="{base}/search_card_text" x="35" y="370"/>',
+                     f'<child widget="{base}/search_list"/>'])
+    for key, left, top, width, height, font, color, align in texts:
+        lines += _widget(f"{base}/search_{key}", [("type", "text"), ("controller", 1), ("left", left), ("top", top),
+                                                  ("width", width), ("height", height), ("font", font),
+                                                  ("color", color), ("align", align)], [])
+    lines += slot_widgets
+    lines += _widget(f"{base}/search_card_text", [("type", "text"), ("controller", 1), ("width", 265), ("height", 24),
+                                                  ("font", "ui\\small_ui"),
+                                                  ("color", "#FFFFFFFF"), ("text_x", 10), ("text_y", 4)], [])
+    lines += _widget(f"{base}/search_list", [("type", "column_list"), ("width", 640), ("height", 480),
+                                             ("flags", "pass_unhandled_to_focused_child up_down_tabs_children")],
+                     ['<data input="port matchmaking search update"/>',
+                      f'<child widget="{base}/search_button_bar" y="414"/>'])
+    lines += _widget(f"{base}/search_button_bar", [("type", "column_list"), ("width", 640), ("height", 28),
+                                                   ("flags", "pass_unhandled_to_focused_child left_right_tabs_items")],
+                     [f'<child widget="{base}/search_button_cancel" x="477" y="1"/>'])
+    run = "port matchmaking search back"
+    lines += _text_button(f"{base}/search_button_cancel", "CANCEL",
+                          [f'<on event="a" run="{run}"/>', f'<on event="start" run="{run}"/>'])
+    return lines
+
+
 def _coop() -> list:
     """Co-op, the campaign for two players on this machine in split screen
     (the Xbox's Cooperative Play): Multiplayer's CO-OP CAMPAIGN, then player
@@ -2402,6 +2572,7 @@ def multiplayer_files() -> dict:
         f"{MT}/server_settings".replace("/", ".") + ".xml": head + _server_settings() + ["</menus>", ""],
         f"{MT}/lobby".replace("/", ".") + ".xml": head + _lobby() + ["</menus>", ""],
         f"{MT}/coop".replace("/", ".") + ".xml": head + _coop() + ["</menus>", ""],
+        f"{MT}/matchmaking".replace("/", ".") + ".xml": head + _matchmaking() + ["</menus>", ""],
         "main_menu/new_select".replace("/", ".") + ".port.xml": head + _map_kind() + ["</menus>", ""],
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         PLAYER_EDIT.replace("/", ".") + ".port.xml": head + _player_options_extras() + ["</menus>", ""],
