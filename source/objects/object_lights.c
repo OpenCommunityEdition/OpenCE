@@ -1237,6 +1237,27 @@ void lights_preprocess_scene(
 								_point_light_attached_to_first_person_weapon_bit,
 								TRUE);
 						}
+						/* port: any other light on an object's marker (a
+						marine's flashlight, on the rifle he holds), from the
+						marker on the pose the frame draws, as a beam above:
+						its own place is the tick's, which stepped at 30 a
+						second while the object moved every frame */
+						else
+						{
+							struct object_marker markers[1];
+
+							if (object_get_marker_by_name(
+								light->object_index,
+								object_get_attachment_marker_name(light->object_index,
+									light->attachment_marker_index),
+								markers,
+								1) > 0)
+							{
+								light_parameters.position = markers[0].matrix.position;
+								light_parameters.forward = markers[0].matrix.forward;
+								light_parameters.up = markers[0].matrix.up;
+							}
+						}
 					}
 
 					light->rasterizer_light_index = rasterizer_light_submit(
