@@ -58,6 +58,8 @@ extern int compress2(unsigned char *dest, unsigned long *destLen, const unsigned
 
 #include "forge_engine.h"
 
+boolean tag_index_is_group(long tag_index, tag group_tag);
+
 #undef fopen
 #undef fclose
 #undef fread
@@ -6348,7 +6350,6 @@ int forge_ui_save_copy_as(char const *new_map_name)
 	int was_already_saved = g_forge.has_saved_map_once;
 	int map_exists = 0;
 	int is_legacy_flg1_map = 0;
-	int use_sidecar_only = 1;
 	int ok;
 
 	if (!new_map_name || !new_map_name[0])
@@ -6391,8 +6392,6 @@ int forge_ui_save_copy_as(char const *new_map_name)
 		snprintf(suffixed, sizeof(suffixed), "%s_forge", clean_name);
 		snprintf(clean_name, sizeof(clean_name), "%s", suffixed);
 	}
-	(void)use_sidecar_only;
-
 	ok = forge_write_sidecar_state_file(clean_name);
 
 	if (ok)

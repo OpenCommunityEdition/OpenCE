@@ -4005,8 +4005,6 @@ long game_engine_remap_object_definition(long definition_index)
 	return orig_game_engine_remap_object_definition(definition_index);
 }
 
-static void forge_ensure_pause_menu_save_button(void);
-
 static int forge_variant_is_forge_mode(struct game_variant const *v)
 {
 	if (!v)

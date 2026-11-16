@@ -29,6 +29,8 @@ Multiplayer Forge synchronization and bidirectional custom tag streaming
 
 #include "forge_engine.h"
 
+boolean tag_index_is_group(long tag_index, tag group_tag);
+
 #undef malloc
 #undef calloc
 #undef free

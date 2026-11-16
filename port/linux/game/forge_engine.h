@@ -19,7 +19,7 @@ extern "C" {
 
 #include "halo_port_limits.h"
 
-#define FORGE_VERSION_STRING "2.11.0"
+#define FORGE_VERSION_STRING "2.11.1"
 #define FORGE_NETWORK_VERSION 0x4633
 #define FORGE_GAME_KIND 0x46
 #ifndef HALO_PORT_NETWORK_VERSION_STOCK
@@ -432,8 +432,8 @@ int32_t forge_3d_adopt_default_object_at_slot(
 void forge_init_map_scenario_entities(void);
 void forge_3d_reset_session_tracking(void);
 void forge_sync_instance_extended_props_to_edit_state(int32_t live_idx);
-void forge_sync_live_markers_to_scenario(uint32_t group_tag);
 void forge_undo_clear(void);
+int forge_find_credits_tag_by_hash(uint32_t target_hash, uint32_t *out_group, char *out_path, size_t path_sz);
 
 /* ---------- Prototypes: forge_network.c */
 

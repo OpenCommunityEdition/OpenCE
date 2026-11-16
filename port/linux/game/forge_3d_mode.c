@@ -2434,14 +2434,6 @@ void sync_live_netgame_flags_to_scenario(void)
 	}
 }
 
-void forge_sync_live_markers_to_scenario(uint32_t group_tag)
-{
-	if (group_tag == 'spwn')
-		sync_live_player_spawns_to_scenario();
-	else if (group_tag == 'tele' || group_tag == 'flag')
-		sync_live_netgame_flags_to_scenario();
-}
-
 void forge_sync_instance_extended_props_to_edit_state(int32_t live_idx)
 {
 	struct forge_live_instance *inst;
