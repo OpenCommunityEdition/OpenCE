@@ -107,5 +107,8 @@ int hud_hires_override_point_threshold(long asset);
 long hud_hires_upscale_at(unsigned long address, long width, long height);
 unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
 	unsigned long height, long kind, unsigned long *levels);
+/* a texture hud_hires_upscale_texture gave no longer used by its texture
+(kept for the same pixels again: hud_hires.c) */
+void hud_hires_upscale_release(unsigned int texture);
 
 #endif
