@@ -335,7 +335,26 @@ int hud_hires_override_point_threshold(long asset)
 
 /* Catmull-Rom interpolation of the map's original texels. No font, sprite
  * rectangle, registration point or animation frame is substituted. Keeping
- * the input centres at (x + .5) also keeps the original HUD alignment. */
+ * the input centres at (x + .5) also keeps the original HUD alignment.
+ *
+ * The message icons' sheets and the crosshair warnings' (kind 1: the
+ * weapons' outlines the pickup prompt shows, the buttons and sticks, their
+ * words) are line art a texel or two wide, which interpolation alone leaves
+ * soft at a screen of 1080 lines and more (the HUD's 480 lines drawn 2.25
+ * times or larger). They are drawn UPSCALE_LINE_ART_FACTOR times their
+ * size, their coverage then sharpened by an unsharp mask
+ * (upscale_sharpen_alpha): its edges steepened to about a pixel of the
+ * texture at the screen's scale, its flat parts (the sticks' tinted
+ * insides) as they were. */
+#define UPSCALE_FACTOR 4
+#define UPSCALE_LINE_ART_FACTOR 8
+/* the unsharp mask's blur, in the upscaled texture's texels (half a texel
+of the map's), and how much of the difference from it is added */
+#define UPSCALE_SHARPEN_SIGMA 4.0f
+#define UPSCALE_SHARPEN_AMOUNT 1.5f
+/* exp(-1 / (2 UPSCALE_SHARPEN_SIGMA^2)): a tap's weight is this to the
+power of its distance squared */
+#define UPSCALE_SHARPEN_STEP 0.96923323f
 static void upscale_weights(float t, float *weights)
 {
 	float square = t * t, cube = square * t;
@@ -347,26 +366,27 @@ static void upscale_weights(float t, float *weights)
 }
 
 static unsigned char *upscale_pixels(const unsigned char *bgra, unsigned long width, unsigned long height,
-	unsigned long maximum)
+	unsigned long maximum, unsigned long factor)
 {
 	unsigned char *out;
 	unsigned long x, y, channel;
+	float step = 1.0f / (float)factor;
 
 	if (!bgra || !width || !height || width > maximum || height > maximum)
 		return NULL;
-	out = malloc(width * height * 16 * 4);
+	out = malloc(width * height * factor * factor * 4);
 	if (!out)
 		return NULL;
-	for (y = 0; y < height * 4; y++)
+	for (y = 0; y < height * factor; y++)
 	{
-		float sy = (y + 0.5f) * 0.25f - 0.5f, wy[4];
+		float sy = (y + 0.5f) * step - 0.5f, wy[4];
 		long iy = (long)sy;
 
 		if (sy < iy) iy--;
 		upscale_weights(sy - iy, wy);
-		for (x = 0; x < width * 4; x++)
+		for (x = 0; x < width * factor; x++)
 		{
-			float sx = (x + 0.5f) * 0.25f - 0.5f, wx[4];
+			float sx = (x + 0.5f) * step - 0.5f, wx[4];
 			long ix = (long)sx;
 
 			if (sx < ix) ix--;
@@ -392,7 +412,7 @@ static unsigned char *upscale_pixels(const unsigned char *bgra, unsigned long wi
 						value += bgra[(py * width + px) * 4 + source_channel] * wy[row] * wx[column];
 					}
 				}
-				out[(y * width * 4 + x) * 4 + channel] =
+				out[(y * width * factor + x) * 4 + channel] =
 					(unsigned char)(value < 0 ? 0 : value > 255 ? 255 : value + 0.5f);
 			}
 		}
@@ -400,9 +420,92 @@ static unsigned char *upscale_pixels(const unsigned char *bgra, unsigned long wi
 	return out;
 }
 
+/* one pass of a Gaussian blur of the coverage (alpha, in from, out to),
+along rows (horizontal) or columns, its edges taken as continuing */
+static void upscale_blur_pass(const float *from, float *to, unsigned long width, unsigned long height,
+	const float *kernel, long radius, int horizontal)
+{
+	unsigned long x, y;
+
+	for (y = 0; y < height; y++)
+	{
+		for (x = 0; x < width; x++)
+		{
+			float sum = 0.0f;
+			long tap;
+
+			for (tap = -radius; tap <= radius; tap++)
+			{
+				long sx = horizontal ? (long)x + tap : (long)x;
+				long sy = horizontal ? (long)y : (long)y + tap;
+
+				if (sx < 0) sx = 0;
+				if (sx >= (long)width) sx = (long)width - 1;
+				if (sy < 0) sy = 0;
+				if (sy >= (long)height) sy = (long)height - 1;
+				sum += from[sy * width + sx] * kernel[tap + radius];
+			}
+			to[y * width + x] = sum;
+		}
+	}
+}
+
+/* the upscaled RGBA texels' coverage (alpha) sharpened: each texel's
+difference from its neighbourhood's (a Gaussian blur) added again,
+UPSCALE_SHARPEN_AMOUNT of it, so that an edge is steeper and a flat part
+is as it was. Left as it is if memory runs out */
+static void upscale_sharpen_alpha(unsigned char *pixels, unsigned long width, unsigned long height)
+{
+	float kernel[64];
+	long radius = (long)(3.0f * UPSCALE_SHARPEN_SIGMA + 0.5f), tap;
+	float total = 0.0f;
+	float *alpha, *across, *blurred;
+	unsigned long index, count = width * height;
+
+	if (radius * 2 + 1 > (long)(sizeof(kernel) / sizeof(kernel[0])))
+		return;
+	alpha = malloc(count * sizeof(float));
+	across = malloc(count * sizeof(float));
+	blurred = malloc(count * sizeof(float));
+	if (!alpha || !across || !blurred)
+	{
+		free(alpha);
+		free(across);
+		free(blurred);
+		return;
+	}
+	/* (each tap's weight exp(-tap^2 / (2 sigma^2)), as a power of
+	UPSCALE_SHARPEN_STEP, without the system's maths) */
+	for (tap = 0; tap <= radius; tap++)
+	{
+		float weight = 1.0f;
+		long power;
+
+		for (power = 0; power < tap * tap; power++)
+			weight *= UPSCALE_SHARPEN_STEP;
+		kernel[radius + tap] = kernel[radius - tap] = weight;
+		total += tap ? 2.0f * weight : weight;
+	}
+	for (tap = 0; tap <= radius * 2; tap++)
+		kernel[tap] /= total;
+	for (index = 0; index < count; index++)
+		alpha[index] = pixels[index * 4 + 3];
+	upscale_blur_pass(alpha, across, width, height, kernel, radius, 1);
+	upscale_blur_pass(across, blurred, width, height, kernel, radius, 0);
+	for (index = 0; index < count; index++)
+	{
+		float value = alpha[index] + UPSCALE_SHARPEN_AMOUNT * (alpha[index] - blurred[index]);
+
+		pixels[index * 4 + 3] = (unsigned char)(value < 0.0f ? 0 : value > 255.0f ? 255 : value + 0.5f);
+	}
+	free(alpha);
+	free(across);
+	free(blurred);
+}
+
 unsigned char *hud_hires_upscale_pixels(const unsigned char *bgra, unsigned long width, unsigned long height)
 {
-	return upscale_pixels(bgra, width, height, 256);
+	return upscale_pixels(bgra, width, height, 256, UPSCALE_FACTOR);
 }
 
 static unsigned char *png_decode(const unsigned char *data, unsigned long size,
@@ -458,23 +561,26 @@ unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long 
 {
 	unsigned char *pixels;
 	unsigned long largest;
+	unsigned long factor = kind == 1 ? UPSCALE_LINE_ART_FACTOR : UPSCALE_FACTOR;
 	GLuint texture;
 
 	if (!xgpu_gl_ready())
 		return 0;
-	pixels = kind == 4 ? upscale_pixels(bgra, width, height, 512) : hud_hires_upscale_pixels(bgra, width, height);
+	pixels = upscale_pixels(bgra, width, height, kind == 4 ? 512 : 256, factor);
 	if (!pixels)
 		return 0;
 	upscale_outline(pixels, bgra, width, height, kind);
+	if (kind == 1)
+		upscale_sharpen_alpha(pixels, width * factor, height * factor);
 	*levels = 1;
-	for (largest = (width > height ? width : height) * 4; largest > 1; largest >>= 1)
+	for (largest = (width > height ? width : height) * factor; largest > 1; largest >>= 1)
 		(*levels)++;
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, (GLint)*levels - 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width * 4, (GLsizei)height * 4,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)(width * factor), (GLsizei)(height * factor),
 		0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	xgpu_gl_state_invalidate();
