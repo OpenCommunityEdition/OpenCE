@@ -115,7 +115,8 @@ symbols in this file:
 #include "units/bipeds.h"
 /* port: object_bounds_cache.c's */
 boolean object_bounds_cache_out_of_reach(long object_index, real_point3d const *point, real radius);
-boolean object_bounds_cache_missed_by_vector(long object_index, real_point3d const *point, real_vector3d const *vector);
+boolean object_bounds_cache_missed_by_vector(long object_index, unsigned long flags, real_point3d const *point, real_vector3d const *vector);
+long const *object_bounds_cache_cluster_objects(short cluster_index, unsigned long flags, long *count);
 
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
@@ -663,15 +664,26 @@ boolean collision_test_vector(
 				{
 					long reference_index;
 					long object_index;
+					/* port: a vector that tests for no bipeds goes through
+					the cluster's other objects, in the list's order, from
+					a list of them (object_bounds_cache.c) */
+					long cached_count = 0;
+					long cached_next = 0;
+					long const *cached = object_bounds_cache_cluster_objects((short)cluster_index, flags, &cached_count);
 
-					for (object_index = cluster_get_first_collideable_object(&reference_index, cluster_index);
+					for (object_index = cached ?
+							(cached_count > 0 ? cached[0] : NONE) :
+							cluster_get_first_collideable_object(&reference_index, cluster_index);
 						object_index != NONE;
-						object_index = cluster_get_next_collideable_object(&reference_index))
+						object_index = cached ?
+							(++cached_next < cached_count ? cached[cached_next] : NONE) :
+							cluster_get_next_collideable_object(&reference_index))
 					{
-						/* port: (the ones the vector misses passed over on a
-						packed copy of their bounding spheres, before they
-						are marked, which reads them: object_bounds_cache.c) */
-						if (!object_bounds_cache_missed_by_vector(object_index, point, vector) &&
+						/* port: (the ones the vector misses, or of a type it
+						does not test for, passed over on a packed copy of
+						their bounding spheres and types, before they are
+						marked, which reads them: object_bounds_cache.c) */
+						if (!object_bounds_cache_missed_by_vector(object_index, flags, point, vector) &&
 							object_mark_function(object_index) &&
 							object_test_vector(
 								object_index,

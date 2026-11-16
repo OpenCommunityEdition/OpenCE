@@ -94,6 +94,9 @@ static long *cluster_partition_get_first_reference(
 	short cluster_index);
 static void cluster_partition_port_forget(
 	struct cluster_partition *partition);
+static void cluster_partition_port_cluster_changed(
+	struct cluster_partition *partition,
+	short cluster_index);
 static long cluster_partition_port_add(
 	struct data_array *array,
 	long *first_reference_index,
@@ -229,6 +232,9 @@ void cluster_partition_new(
 		__FILE__, __LINE__);
 	partition->port_cluster_data_references = debug_malloc(HALO_PORT_MAXIMUM_CLUSTER_REFERENCES * sizeof(long), FALSE,
 		__FILE__, __LINE__);
+	/* port: each cluster's list's changes (cluster_partition_port_cluster_changes) */
+	partition->port_cluster_modification_counts = debug_malloc(
+		MAXIMUM_CLUSTERS_PER_STRUCTURE * sizeof(*partition->port_cluster_modification_counts), TRUE, __FILE__, __LINE__);
 	cluster_partition_port_forget(partition);
 	if (cluster_partitions_port_count < MAXIMUM_PORT_CLUSTER_PARTITIONS)
 		cluster_partitions_port[cluster_partitions_port_count++] = partition;
@@ -437,6 +443,7 @@ void cluster_partition_reconnect(
 			partition->port_previous_references);
 
 		partition->port_modification_count++;
+		cluster_partition_port_cluster_changed(partition, cluster_index);
 		if (cluster_reference_index != NONE && partition->port_cluster_data_references)
 		{
 			partition->port_cluster_data_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(cluster_reference_index)] =
@@ -464,6 +471,7 @@ void cluster_partition_disconnect(
 			partition->port_cluster_data_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(cluster_reference_index)] : NONE;
 
 		datum_delete(partition->cluster_reference_data, cluster_reference_index);
+		cluster_partition_port_cluster_changed(partition, cluster_index);
 
 		/* port: reference_list_remove's, starting where the reference was
 		put */
@@ -504,10 +512,30 @@ every reference in the same place. The places are not in the game state, so
 they are forgotten when it is loaded (cluster_partitions_port_forget) or a
 new map makes the lists anew. */
 
+static void cluster_partition_port_cluster_changed(
+	struct cluster_partition *partition,
+	short cluster_index)
+{
+	if (partition->port_cluster_modification_counts && cluster_index >= 0 && cluster_index < MAXIMUM_CLUSTERS_PER_STRUCTURE)
+		partition->port_cluster_modification_counts[cluster_index]++;
+}
+
+unsigned long cluster_partition_port_cluster_changes(
+	struct cluster_partition const *partition,
+	short cluster_index)
+{
+	return partition->port_cluster_modification_counts && cluster_index >= 0 && cluster_index < MAXIMUM_CLUSTERS_PER_STRUCTURE ?
+		partition->port_cluster_modification_counts[cluster_index] : 0;
+}
+
 static void cluster_partition_port_forget(
 	struct cluster_partition *partition)
 {
+	short cluster_index;
+
 	partition->port_modification_count++;
+	for (cluster_index = 0; cluster_index < MAXIMUM_CLUSTERS_PER_STRUCTURE; cluster_index++)
+		cluster_partition_port_cluster_changed(partition, cluster_index);
 	if (partition->port_previous_references)
 		csmemset(partition->port_previous_references, 0xFF, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES * sizeof(long));
 	if (partition->port_cluster_data_references)
