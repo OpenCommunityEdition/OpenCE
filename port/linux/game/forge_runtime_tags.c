@@ -6393,46 +6393,7 @@ int forge_ui_save_copy_as(char const *new_map_name)
 	}
 	(void)use_sidecar_only;
 
-	{
-		char const *cur = forge_get_active_map_name();
-		char const *slash = cur ? strrchr(cur, '\\') : NULL;
-		char const *slash2 = cur ? strrchr(cur, '/') : NULL;
-		char const *active_leaf;
-		if (slash2 && (!slash || slash2 > slash))
-			slash = slash2;
-		active_leaf = slash ? (slash + 1) : (cur && cur[0] ? cur : "");
-		ok = forge_write_sidecar_state_file(clean_name);
-		if (ok && active_leaf[0] && _stricmp(active_leaf, clean_name) != 0)
-		{
-			/* Remove any leftover default-named sidecar save (e.g. custom_maps/<active_leaf>.txt)
-			   so saving with a custom name never leaves two saves or pollutes the stock base map. */
-			char d_map[160], d_txt[160], host_map[512], host_txt[512];
-			FILE *f_check;
-			snprintf(d_map, sizeof(d_map), "d:\\custom_maps\\%s.map", active_leaf);
-			host_map[0] = '\0';
-			platform_translate_path(d_map, host_map, sizeof(host_map));
-			f_check = host_map[0] ? fopen(host_map, "rb") : NULL;
-			if (!f_check)
-			{
-				snprintf(host_map, sizeof(host_map), "custom_maps/%s.map", active_leaf);
-				f_check = fopen(host_map, "rb");
-			}
-			if (f_check)
-			{
-				fclose(f_check);
-			}
-			else
-			{
-				snprintf(d_txt, sizeof(d_txt), "d:\\custom_maps\\%s.txt", active_leaf);
-				host_txt[0] = '\0';
-				platform_translate_path(d_txt, host_txt, sizeof(host_txt));
-				if (host_txt[0])
-					remove(host_txt);
-				snprintf(host_txt, sizeof(host_txt), "custom_maps/%s.txt", active_leaf);
-				remove(host_txt);
-			}
-		}
-	}
+	ok = forge_write_sidecar_state_file(clean_name);
 
 	if (ok)
 	{
@@ -6483,6 +6444,21 @@ void forge_trigger_save_map_action(void)
 	}
 
 	/* Otherwise, open the initial save prompt so the user can name their custom map */
+	if (!g_forge.save_map_name[0])
+	{
+		char const *cur = forge_get_active_map_name();
+		char const *slash = cur ? strrchr(cur, '\\') : NULL;
+		char const *slash2 = cur ? strrchr(cur, '/') : NULL;
+		if (slash2 && (!slash || slash2 > slash))
+			slash = slash2;
+		snprintf(g_forge.save_map_name, sizeof(g_forge.save_map_name), "%s_forge", slash ? (slash + 1) : (cur && cur[0] ? cur : "custom"));
+		g_forge.save_map_name_len = (int)strlen(g_forge.save_map_name);
+	}
+	g_forge.active_modal = _forge_modal_save_copy_as;
+}
+
+void forge_trigger_save_as_new_map_action(void)
+{
 	if (!g_forge.save_map_name[0])
 	{
 		char const *cur = forge_get_active_map_name();

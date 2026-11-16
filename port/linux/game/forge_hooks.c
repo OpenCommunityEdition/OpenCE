@@ -9,6 +9,7 @@ editor and sidecar map loader to the game loop.
 #define HALO_RELEASE
 #endif
 #include "cseries.h"
+#include "bitmaps/bitmap_group.h"
 #include "game/game.h"
 #include "game/players.h"
 #include "camera/director.h"
@@ -101,6 +102,8 @@ static short s_forge_only_ce_count = 0;
 static short s_non_forge_ce_indices[4096];
 static short s_non_forge_ce_count = 0;
 static long s_save_forge_btn_tag = NONE;
+static long s_save_as_new_forge_btn_tag = NONE;
+extern void event_manager_post_button(short controller, short button);
 
 /* Original engine symbols wrapped by Forge hooks */
 extern void orig_network_chat_update(void);
@@ -258,6 +261,8 @@ static struct
 	int count;
 	int first;
 	int chosen;
+	int preserve_on_return;
+	int action_choice; /* 0 = OPEN MAP, 1 = DELETE MAP, 2 = BACK */
 	char map_leaves[FORGE_MAX_EDIT_MAPS][64];
 	char base_maps[FORGE_MAX_EDIT_MAPS][128]; /* Non-empty for MCC Forge saves stored as custom_maps/<leaf>.txt */
 } s_forge_menu;
@@ -869,6 +874,167 @@ static void scan_forge_edit_maps(int wanted_tab)
 	}
 }
 
+static void populate_forge_edit_map_right_desc(
+	struct forge_widget_instance *desc,
+	int map_idx,
+	char const *prompt_line)
+{
+	struct forge_widget_instance *sp_name;
+	struct forge_widget_instance *sp_pic;
+	struct forge_widget_instance *sp_data;
+	struct forge_widget_instance *mp_name;
+	struct forge_widget_instance *mp_pic;
+	struct forge_widget_instance *mp_data;
+	long d_idx;
+
+	if (!desc)
+		return;
+
+	sp_name = fw_named(desc, "replay_level_right_name", 0);
+	sp_pic = fw_named(desc, "replay_level_right_pic", 0);
+	sp_data = fw_named(desc, "replay_level_right_data", 0);
+	mp_name = fw_named(desc, "mp_map_right_name", 0);
+	mp_pic = fw_named(desc, "mp_map_right_pic", 0);
+	mp_data = fw_named(desc, "mp_map_right_data", 0);
+
+	if (sp_name) sp_name->visible = FALSE;
+	if (sp_pic) sp_pic->visible = FALSE;
+	if (sp_data) sp_data->visible = FALSE;
+	for (d_idx = 0; d_idx < 3; d_idx++)
+	{
+		struct forge_widget_instance *di = fw_named(desc, "difficulty_indicator", d_idx);
+		if (di) di->visible = FALSE;
+	}
+
+	if (s_forge_menu.count > 0 && map_idx >= 0 && map_idx < s_forge_menu.count)
+	{
+		char const *leaf = s_forge_menu.map_leaves[map_idx];
+		char level_name[128];
+		char forge_meta[192];
+		char info[255];
+		short disp_idx;
+
+		snprintf(level_name, sizeof(level_name), "custom_maps\\%s", leaf);
+		disp_idx = custom_edition_maps_display_index(level_name);
+		if (custom_edition_map_format_forge_summary("custom_maps\\", leaf, forge_meta, sizeof(forge_meta)) ||
+			custom_edition_map_format_forge_summary("OpenCE Forge\\maps\\", leaf, forge_meta, sizeof(forge_meta)))
+		{
+			snprintf(info, sizeof(info), "%s\r\n%s\r\n\r\n%s",
+				s_forge_menu.tab == 0 ? "User Created Map" : "Downloaded Map",
+				forge_meta,
+				prompt_line ? prompt_line : "Press OK to select.");
+		}
+		else
+		{
+			snprintf(info, sizeof(info), "%s\r\nBase Map: %.24s\r\n\r\n%s",
+				s_forge_menu.tab == 0 ? "User Created Map" : "Downloaded Map",
+				leaf,
+				prompt_line ? prompt_line : "Press OK to select.");
+		}
+
+		if (disp_idx != NONE)
+		{
+			wchar_t *desc_w = custom_edition_maps_description(disp_idx);
+			if (desc_w)
+			{
+				int k;
+				for (k = 0; info[k] && k < 254; k++)
+					desc_w[k] = (wchar_t)(unsigned char)info[k];
+				desc_w[k] = 0;
+			}
+			if (mp_name)
+			{
+				mp_name->visible = TRUE;
+				mp_name->parameters.text_box.string_list_index = disp_idx;
+			}
+			if (mp_pic)
+			{
+				mp_pic->visible = TRUE;
+				mp_pic->animation.current_frame_index = disp_idx;
+			}
+			if (mp_data)
+			{
+				mp_data->visible = TRUE;
+				mp_data->parameters.text_box.string_list_index = disp_idx;
+			}
+		}
+		else
+		{
+			if (mp_name)
+			{
+				mp_name->visible = TRUE;
+				fw_text_set_ascii(mp_name, s_forge_menu.map_leaves[map_idx]);
+			}
+			if (mp_pic) mp_pic->visible = FALSE;
+			if (mp_data)
+			{
+				mp_data->visible = TRUE;
+				fw_text_set_ascii(mp_data, info);
+			}
+		}
+	}
+	else
+	{
+		if (mp_name) mp_name->visible = FALSE;
+		if (mp_pic) mp_pic->visible = FALSE;
+		if (mp_data) mp_data->visible = FALSE;
+	}
+}
+
+static void forge_delete_saved_edit_map(int map_idx)
+{
+	char const *leaf;
+	char rel_path[256];
+	char d_path[256];
+	char host_path[512];
+	int is_flg1 = 0;
+
+	if (map_idx < 0 || map_idx >= s_forge_menu.count)
+		return;
+	leaf = s_forge_menu.map_leaves[map_idx];
+	if (!leaf || !leaf[0])
+		return;
+
+	snprintf(rel_path, sizeof(rel_path), "custom_maps/%s.map", leaf);
+	is_flg1 = is_forge_created_map_file(rel_path, leaf, NULL);
+
+	/* Delete .txt sidecar in custom_maps/ and OpenCE Forge/maps/ */
+	snprintf(rel_path, sizeof(rel_path), "custom_maps/%s.txt", leaf);
+	forge_host_remove(rel_path);
+	remove(rel_path);
+	snprintf(d_path, sizeof(d_path), "d:\\custom_maps\\%s.txt", leaf);
+	host_path[0] = 0;
+	platform_translate_path(d_path, host_path, sizeof(host_path));
+	if (host_path[0])
+		remove(host_path);
+
+	snprintf(rel_path, sizeof(rel_path), "OpenCE Forge/maps/%s.txt", leaf);
+	forge_host_remove(rel_path);
+	remove(rel_path);
+
+	/* If a legacy Forge-created .map/.bmp copy exists in custom_maps/, remove it too */
+	if (is_flg1)
+	{
+		snprintf(rel_path, sizeof(rel_path), "custom_maps/%s.map", leaf);
+		forge_host_remove(rel_path);
+		remove(rel_path);
+		snprintf(d_path, sizeof(d_path), "d:\\custom_maps\\%s.map", leaf);
+		host_path[0] = 0;
+		platform_translate_path(d_path, host_path, sizeof(host_path));
+		if (host_path[0])
+			remove(host_path);
+
+		snprintf(rel_path, sizeof(rel_path), "custom_maps/%s.bmp", leaf);
+		forge_host_remove(rel_path);
+		remove(rel_path);
+		snprintf(d_path, sizeof(d_path), "d:\\custom_maps\\%s.bmp", leaf);
+		host_path[0] = 0;
+		platform_translate_path(d_path, host_path, sizeof(host_path));
+		if (host_path[0])
+			remove(host_path);
+	}
+}
+
 static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 {
 	struct forge_widget_instance *spinner = fw_named(list, "edit_maps_kind_spinner", 0);
@@ -884,6 +1050,11 @@ static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 	{
 		scan_forge_edit_maps(kind);
 	}
+
+	if (s_forge_menu.chosen >= s_forge_menu.count)
+		s_forge_menu.chosen = (s_forge_menu.count > 0) ? (s_forge_menu.count - 1) : 0;
+	if (s_forge_menu.chosen < 0)
+		s_forge_menu.chosen = 0;
 
 	for (child = list->child; child; child = child->next, row_idx++)
 	{
@@ -925,7 +1096,8 @@ static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 			}
 		}
 		if (fw_named(child, "list_item_arrows", 0))
-			fw_named(child, "list_item_arrows", 0)->visible = (child == list->focused_child);
+			fw_named(child, "list_item_arrows", 0)->visible =
+				(child == list->focused_child || (s_forge_menu.count > 0 && item_slot == s_forge_menu.chosen));
 		if (fw_named(child, "scroll_up_button", 0))
 			fw_named(child, "scroll_up_button", 0)->visible = FALSE;
 		if (fw_named(child, "scroll_down_button", 0))
@@ -935,98 +1107,73 @@ static void update_forge_edit_maps_widget(struct forge_widget_instance *list)
 	if (focused_entry >= 0 && focused_entry < s_forge_menu.count)
 		s_forge_menu.chosen = focused_entry;
 
-	if (desc)
+	populate_forge_edit_map_right_desc(desc, s_forge_menu.chosen, "Press OK to select.");
+}
+
+static void update_forge_edit_map_action_widget(struct forge_widget_instance *list)
+{
+	static char const *const s_action_labels[3] = {
+		"OPEN MAP",
+		"DELETE MAP",
+		"BACK"
+	};
+	struct forge_widget_instance *screen = list;
+	struct forge_widget_instance *hdr;
+	struct forge_widget_instance *desc = list ? list->parameters.list.extended_description : NULL;
+	struct forge_widget_instance *child;
+	int row_idx = 0;
+
+	while (screen && screen->parent)
+		screen = screen->parent;
+	hdr = fw_named(screen, "forge_edit_map_action_header", 0);
+	if (hdr)
 	{
-		struct forge_widget_instance *sp_name = fw_named(desc, "replay_level_right_name", 0);
-		struct forge_widget_instance *sp_pic = fw_named(desc, "replay_level_right_pic", 0);
-		struct forge_widget_instance *sp_data = fw_named(desc, "replay_level_right_data", 0);
-		struct forge_widget_instance *mp_name = fw_named(desc, "mp_map_right_name", 0);
-		struct forge_widget_instance *mp_pic = fw_named(desc, "mp_map_right_pic", 0);
-		struct forge_widget_instance *mp_data = fw_named(desc, "mp_map_right_data", 0);
-		long d_idx;
-
-		/* Always hide the single-player right-hand widgets ('Truth and Reconciliation' default) and difficulty icons */
-		if (sp_name) sp_name->visible = FALSE;
-		if (sp_pic) sp_pic->visible = FALSE;
-		if (sp_data) sp_data->visible = FALSE;
-		for (d_idx = 0; d_idx < 3; d_idx++)
-		{
-			struct forge_widget_instance *di = fw_named(desc, "difficulty_indicator", d_idx);
-			if (di) di->visible = FALSE;
-		}
-
 		if (s_forge_menu.count > 0 && s_forge_menu.chosen >= 0 && s_forge_menu.chosen < s_forge_menu.count)
 		{
-			char const *leaf = s_forge_menu.map_leaves[s_forge_menu.chosen];
-			char level_name[128];
-			char forge_meta[192];
-			char info[255];
-			short disp_idx;
-
-			snprintf(level_name, sizeof(level_name), "custom_maps\\%s", leaf);
-			disp_idx = custom_edition_maps_display_index(level_name);
-			if (custom_edition_map_format_forge_summary("custom_maps\\", leaf, forge_meta, sizeof(forge_meta)) ||
-				custom_edition_map_format_forge_summary("OpenCE Forge\\maps\\", leaf, forge_meta, sizeof(forge_meta)))
+			if (s_forge_menu.base_maps[s_forge_menu.chosen][0] != '\0' &&
+				(_strnicmp(s_forge_menu.base_maps[s_forge_menu.chosen], "mcc_maps\\", 9) == 0 ||
+				 _strnicmp(s_forge_menu.base_maps[s_forge_menu.chosen], "mcc_maps/", 9) == 0))
 			{
-				snprintf(info, sizeof(info), "%s\r\n%s\r\n\r\nPress OK to edit.",
-					s_forge_menu.tab == 0 ? "User Created Map" : "Downloaded Map",
-					forge_meta);
+				char mcc_label[128];
+				snprintf(mcc_label, sizeof(mcc_label), "[MCC] %s", s_forge_menu.map_leaves[s_forge_menu.chosen]);
+				fw_text_set_ascii(hdr, mcc_label);
 			}
 			else
 			{
-				snprintf(info, sizeof(info), "%s\r\nBase Map: %.24s\r\n\r\nPress OK to edit\r\nin Forge.",
-					s_forge_menu.tab == 0 ? "User Created Map" : "Downloaded Map",
-					leaf);
-			}
-
-			if (disp_idx != NONE)
-			{
-				wchar_t *desc_w = custom_edition_maps_description(disp_idx);
-				if (desc_w)
-				{
-					int k;
-					for (k = 0; info[k] && k < 254; k++)
-						desc_w[k] = (wchar_t)(unsigned char)info[k];
-					desc_w[k] = 0;
-				}
-				if (mp_name)
-				{
-					mp_name->visible = TRUE;
-					mp_name->parameters.text_box.string_list_index = disp_idx;
-				}
-				if (mp_pic)
-				{
-					mp_pic->visible = TRUE;
-					mp_pic->animation.current_frame_index = disp_idx;
-				}
-				if (mp_data)
-				{
-					mp_data->visible = TRUE;
-					mp_data->parameters.text_box.string_list_index = disp_idx;
-				}
-			}
-			else
-			{
-				if (mp_name)
-				{
-					mp_name->visible = TRUE;
-					fw_text_set_ascii(mp_name, s_forge_menu.map_leaves[s_forge_menu.chosen]);
-				}
-				if (mp_pic) mp_pic->visible = FALSE;
-				if (mp_data)
-				{
-					mp_data->visible = TRUE;
-					fw_text_set_ascii(mp_data, info);
-				}
+				fw_text_set_ascii(hdr, s_forge_menu.map_leaves[s_forge_menu.chosen]);
 			}
 		}
 		else
 		{
-			if (mp_name) mp_name->visible = FALSE;
-			if (mp_pic) mp_pic->visible = FALSE;
-			if (mp_data) mp_data->visible = FALSE;
+			fw_text_set_ascii(hdr, "FORGE MAP");
 		}
 	}
+
+	for (child = list ? list->child : NULL; child && row_idx < 3; child = child->next, row_idx++)
+	{
+		if (!child->name || strncmp(child->name, "list_item_", 10) != 0)
+			break;
+		child->visible = TRUE;
+		fw_text_set_ascii(fw_named(child, "list_item_text", 0), s_action_labels[row_idx]);
+		if (child == list->focused_child)
+			s_forge_menu.action_choice = row_idx;
+		if (fw_named(child, "list_item_arrows", 0))
+			fw_named(child, "list_item_arrows", 0)->visible =
+				(child == list->focused_child || s_forge_menu.action_choice == row_idx);
+		if (fw_named(child, "scroll_up_button", 0))
+			fw_named(child, "scroll_up_button", 0)->visible = FALSE;
+		if (fw_named(child, "scroll_down_button", 0))
+			fw_named(child, "scroll_down_button", 0)->visible = FALSE;
+	}
+
+	populate_forge_edit_map_right_desc(
+		desc,
+		s_forge_menu.chosen,
+		s_forge_menu.action_choice == 1
+			? "Permanently delete this\r\nForge map from disk."
+			: (s_forge_menu.action_choice == 2
+				? "Return to Edit Maps list."
+				: "Open this map in the\r\n3D Forge editor."));
 }
 
 /* ---------- Forge Tag Options Browsers (ADD TAGS / INSTALLED TAGS / NAME TAG / DELETE / RESET) */
@@ -2298,19 +2445,70 @@ boolean pc_menu_event_function_invoke(
 	if (fn_name && strcmp(fn_name, "load game menu init") == 0 &&
 		strcmp(w_name, "forge_edit_maps_list") == 0)
 	{
+		struct forge_widget_instance *sp = fw_named(widget, "edit_maps_kind_spinner", 0);
+		int saved_tab = s_forge_menu.preserve_on_return ? s_forge_menu.tab : 0;
+		int saved_first = s_forge_menu.preserve_on_return ? s_forge_menu.first : 0;
+		int saved_chosen = s_forge_menu.preserve_on_return ? s_forge_menu.chosen : 0;
+		s_forge_menu.preserve_on_return = 0;
 		g_forge_session_enabled = 1;
 		dispose_global_network_game_client();
 		dispose_global_network_game_server();
 		network_game_accept_remote_connections(FALSE);
 		forge_menu_custom_edition_maps_look_again();
-		scan_forge_edit_maps(0);
+		scan_forge_edit_maps(saved_tab);
+		if (sp)
+			sp->parameters.list.selected_index = (short)saved_tab;
+		if (saved_chosen >= s_forge_menu.count)
+			saved_chosen = (s_forge_menu.count > 0) ? (s_forge_menu.count - 1) : 0;
+		if (saved_chosen < 0)
+			saved_chosen = 0;
+		if (saved_first > saved_chosen)
+			saved_first = saved_chosen;
+		s_forge_menu.first = saved_first;
+		s_forge_menu.chosen = saved_chosen;
+		fw_focus_row(widget, (s_forge_menu.count > 0) ? (1 + s_forge_menu.chosen - s_forge_menu.first) : 0);
+		return TRUE;
+	}
+	if (fn_name && strcmp(fn_name, "load game menu init") == 0 &&
+		strcmp(w_name, "forge_edit_map_action_list") == 0)
+	{
+		g_forge_session_enabled = 1;
+		s_forge_menu.action_choice = 0;
+		if (widget && widget->child)
+		{
+			widget->focused_child = widget->child;
+			widget->parameters.list.selected_index = 0;
+		}
 		return TRUE;
 	}
 	if (fn_name && strcmp(fn_name, "load game menu activated") == 0 &&
 		(strcmp(w_name, "forge_edit_maps_list") == 0 ||
 		 (widget && widget->parent && widget->parent->name && strcmp(widget->parent->name, "forge_edit_maps_list") == 0)))
 	{
+		struct forge_widget_instance *lw = (strcmp(w_name, "forge_edit_maps_list") == 0) ? widget : widget->parent;
+		update_forge_edit_maps_widget(lw);
 		if (s_forge_menu.count > 0 && s_forge_menu.chosen >= 0 && s_forge_menu.chosen < s_forge_menu.count)
+		{
+			s_forge_menu.preserve_on_return = 1;
+			s_forge_menu.action_choice = 0;
+			ui_play_audio_feedback_sound(2);
+			ui_widget_port_open(
+				widget_ptr,
+				"pc\\main_menu\\forge_select\\forge_edit_map_action_screen",
+				widget_deleted);
+			return TRUE;
+		}
+		ui_play_audio_feedback_sound(4);
+		return FALSE;
+	}
+	if (fn_name && strcmp(fn_name, "load game menu activated") == 0 &&
+		(strcmp(w_name, "forge_edit_map_action_list") == 0 ||
+		 (widget && widget->parent && widget->parent->name && strcmp(widget->parent->name, "forge_edit_map_action_list") == 0)))
+	{
+		struct forge_widget_instance *lw = (strcmp(w_name, "forge_edit_map_action_list") == 0) ? widget : widget->parent;
+		update_forge_edit_map_action_widget(lw);
+		if (s_forge_menu.action_choice == 0 &&
+			s_forge_menu.count > 0 && s_forge_menu.chosen >= 0 && s_forge_menu.chosen < s_forge_menu.count)
 		{
 			char level_path[128];
 			g_forge_session_enabled = 1;
@@ -2338,6 +2536,24 @@ boolean pc_menu_event_function_invoke(
 			main_menu_switch_to_single_player();
 			player_ui_remember_player1_profile(TRUE);
 			ui_play_audio_feedback_sound(2);
+			return TRUE;
+		}
+		if (s_forge_menu.action_choice == 1 &&
+			s_forge_menu.count > 0 && s_forge_menu.chosen >= 0 && s_forge_menu.chosen < s_forge_menu.count)
+		{
+			forge_delete_saved_edit_map(s_forge_menu.chosen);
+			forge_menu_custom_edition_maps_look_again();
+			scan_forge_edit_maps(s_forge_menu.tab);
+			s_forge_menu.preserve_on_return = 1;
+			ui_play_audio_feedback_sound(2);
+			event_manager_post_button(0, 1);
+			return TRUE;
+		}
+		if (s_forge_menu.action_choice == 2)
+		{
+			s_forge_menu.preserve_on_return = 1;
+			ui_play_audio_feedback_sound(3);
+			event_manager_post_button(0, 1);
 			return TRUE;
 		}
 		ui_play_audio_feedback_sound(4);
@@ -2570,7 +2786,7 @@ boolean pc_menu_event_function_invoke(
 		return res;
 	}
 
-	/* In-Game Escape Pause Menu -> "SAVE MAP.." button handler
+	/* In-Game Escape Pause Menu -> "SAVE MAP" and "SAVE AS NEW.." button handlers
 	   Note: ui_widget_event_handler_function_invoke subtracts PC_MENU_FUNCTION_BASE (0x100 = 256) before calling pc_menu_event_function_invoke */
 	if (function_index == 0x7777 ||
 		function_index == (0x7777 - 256) ||
@@ -2583,6 +2799,19 @@ boolean pc_menu_event_function_invoke(
 			*widget_deleted = TRUE;
 		ui_play_audio_feedback_sound(2);
 		forge_trigger_save_map_action();
+		return TRUE;
+	}
+	if (function_index == 0x7778 ||
+		function_index == (0x7778 - 256) ||
+		function_index == (0x7778 - 102) ||
+		(widget && widget->definition_tag_index == s_save_as_new_forge_btn_tag && s_save_as_new_forge_btn_tag != NONE) ||
+		(w_name && strcmp(w_name, "save_as_new_forge_button") == 0))
+	{
+		ui_widgets_close_all();
+		if (widget_deleted)
+			*widget_deleted = TRUE;
+		ui_play_audio_feedback_sound(2);
+		forge_trigger_save_as_new_map_action();
 		return TRUE;
 	}
 
@@ -3061,6 +3290,12 @@ void pc_menu_game_data_function_invoke(
 		return;
 	}
 	if (fn_name && strcmp(fn_name, "load game list update") == 0 &&
+		strcmp(w_name, "forge_edit_map_action_list") == 0)
+	{
+		update_forge_edit_map_action_widget(widget);
+		return;
+	}
+	if (fn_name && strcmp(fn_name, "load game list update") == 0 &&
 		strcmp(w_name, "forge_add_tags_map_list") == 0)
 	{
 		update_forge_add_tags_map_widget(widget);
@@ -3327,22 +3562,17 @@ void network_chat_update(void)
 		return;
 	}
 
-	/* Synchronize g_forge_session_enabled on network clients with the host's active game variant */
+	/* Synchronize g_forge_session_enabled on network clients with the host's active game variant,
+	   and ensure the Escape pause menu has SAVE MAP and SAVE AS NEW.. in every Forge session */
 	if (game_connection() == _game_connection_network_client)
-	{
 		forge_sync_session_enabled_from_network();
-		if (g_forge_session_enabled)
-			forge_ensure_pause_menu_save_button();
-	}
+	if (g_forge_session_enabled)
+		forge_ensure_pause_menu_save_button();
 
-	/* Reset per-map monitor state only when switching between different active maps */
 	if (cur_map && cur_map[0] && _stricmp(cur_map, g_last_forge_map_name) != 0)
 	{
-		int had_previous_map = (g_last_forge_map_name[0] != 0);
 		snprintf(g_last_forge_map_name, sizeof(g_last_forge_map_name), "%s", cur_map);
 		g_forge.active_modal = _forge_modal_none;
-		if (had_previous_map)
-			forge_reset_transient_session_state(1);
 	}
 
 	if (g_last_forge_frame_ms != 0)
@@ -3832,6 +4062,7 @@ void menu_tags_unloaded(void)
 	tag_preview_clear();
 	forge_runtime_on_map_unload();
 	s_save_forge_btn_tag = NONE;
+	s_save_as_new_forge_btn_tag = NONE;
 	g_last_forge_map_name[0] = 0;
 	g_forge.live_instance_count = 0;
 	forge_reset_transient_session_state(0);
@@ -3851,7 +4082,7 @@ void menu_tags_unloaded(void)
 
 static void forge_ensure_pause_menu_save_button(void)
 {
-	if (!g_forge_session_enabled || forge_is_main_menu_active() || mcc_cache_tags_loaded() || s_save_forge_btn_tag != NONE)
+	if (!g_forge_session_enabled || mcc_cache_tags_loaded() || s_save_forge_btn_tag != NONE)
 		return;
 	{
 		long settings_btn_tag = tag_loaded('DeLa', "pc\\pause\\settings_button");
@@ -3861,46 +4092,44 @@ static void forge_ensure_pause_menu_save_button(void)
 
 		if (settings_btn_tag != NONE && instances && existing_count > 0 && existing_count < 65000)
 		{
-			static uint8_t s_pause_btn_def[0x3EC];
-			static struct tag_block s_pause_ustr_def;
-			static struct tag_data s_pause_ustr_entry;
-			static wchar_t s_pause_wtext[32];
-			static uint8_t s_pause_h_dst[16 * 0x48];
+			static uint8_t s_pause_btn_def[2][0x3EC];
+			static struct tag_block s_pause_ustr_def[2];
+			static struct tag_data s_pause_ustr_entry[2];
+			static wchar_t s_pause_wtext[2][32];
+			static uint8_t s_pause_h_dst[2][16 * 0x48];
 			static uint8_t s_pause_children[8][17 * 0x50];
 			int child_slot_used = 0;
 			uint8_t const *settings_def = (uint8_t const *)tag_get('DeLa', settings_btn_tag);
 			struct forge_pause_tag_instance *grown;
-			uint8_t *btn_def = s_pause_btn_def;
-			struct tag_block *ustr_def = &s_pause_ustr_def;
-			struct tag_data *ustr_entry = &s_pause_ustr_entry;
-			wchar_t *wtext = s_pause_wtext;
 
 			if (s_pause_alloc_instances)
 			{
 				free(s_pause_alloc_instances);
 				s_pause_alloc_instances = NULL;
 			}
-			grown = (struct forge_pause_tag_instance *)malloc((size_t)(existing_count + 2) * sizeof(*grown));
+			grown = (struct forge_pause_tag_instance *)malloc((size_t)(existing_count + 4) * sizeof(*grown));
 
 			if (grown && settings_def)
 			{
-				static char const *const label = "SAVE MAP..";
+				static char const *const labels[2] = { "SAVE MAP", "SAVE AS NEW.." };
+				static char const *const ustr_names[2] = {
+					"pc\\pause\\save_forge_button text",
+					"pc\\pause\\save_as_new_forge_button text"
+				};
+				static char const *const btn_names[2] = {
+					"pc\\pause\\save_forge_button",
+					"pc\\pause\\save_as_new_forge_button"
+				};
+				static char const *const short_names[2] = {
+					"save_forge_button",
+					"save_as_new_forge_button"
+				};
+				static int16_t const fn_codes[2] = { 0x7777, 0x7778 };
 				long max_salt = 0xE174;
-				long i, ustr_tag, btn_tag;
+				long i, btn_tags[2];
+				int b;
 				int32_t h_count;
 				uint8_t const *h_src;
-
-				memset(ustr_def, 0, sizeof(*ustr_def));
-				memset(ustr_entry, 0, sizeof(*ustr_entry));
-				memset(wtext, 0, sizeof(s_pause_wtext));
-				for (i = 0; label[i]; i++)
-					wtext[i] = (wchar_t)(unsigned char)label[i];
-				wtext[i] = 0;
-
-				ustr_entry->size = (long)((i + 1) * sizeof(wchar_t));
-				ustr_entry->address = wtext;
-				ustr_def->count = 1;
-				ustr_def->address = ustr_entry;
 
 				memcpy(grown, instances, (size_t)existing_count * sizeof(*grown));
 				for (i = 0; i < existing_count; i++)
@@ -3913,62 +4142,83 @@ static void forge_ensure_pause_menu_save_button(void)
 					}
 				}
 
-				ustr_tag = ((max_salt + 1) << 16) | (existing_count & 0xFFFF);
-				btn_tag = ((max_salt + 2) << 16) | ((existing_count + 1) & 0xFFFF);
-				s_save_forge_btn_tag = btn_tag;
-
-				memset(&grown[existing_count], 0, sizeof(grown[0]));
-				grown[existing_count].group_tag = 'ustr';
-				grown[existing_count].parent_group_tags[0] = NONE;
-				grown[existing_count].parent_group_tags[1] = NONE;
-				grown[existing_count].tag_index = ustr_tag;
-				grown[existing_count].name = "pc\\pause\\save_forge_button text";
-				grown[existing_count].base_address = ustr_def;
-
-				memcpy(btn_def, settings_def, 0x3EC);
-				snprintf((char *)(btn_def + 0x04), 32, "save_forge_button");
-				/* Set text_label_string_list at offset 0xEC to our ustr_tag */
-				*(int32_t *)(btn_def + 0xEC + 0x00) = 'ustr';
-				*(char const **)(btn_def + 0xEC + 0x04) = "pc\\pause\\save_forge_button text";
-				*(int32_t *)(btn_def + 0xEC + 0x08) = 0;
-				*(int32_t *)(btn_def + 0xEC + 0x0C) = ustr_tag;
-
-				/* Clone event_handlers at offset 0x54 -> run function 0x7777 & close all pause widgets */
 				h_count = *(int32_t const *)(settings_def + 0x54);
 				h_src = *(uint8_t const *const *)(settings_def + 0x58);
-				if (h_count > 0 && h_count <= 16 && h_src)
+
+				for (b = 0; b < 2; b++)
 				{
-					uint8_t *h_dst = s_pause_h_dst;
-					int h;
-					memcpy(h_dst, h_src, (size_t)h_count * 0x48u);
-					for (h = 0; h < h_count; h++)
+					long ustr_slot = existing_count + b * 2;
+					long btn_slot = existing_count + b * 2 + 1;
+					long ustr_tag = ((max_salt + 1 + b * 2) << 16) | (ustr_slot & 0xFFFF);
+					long btn_tag = ((max_salt + 2 + b * 2) << 16) | (btn_slot & 0xFFFF);
+					uint8_t *btn_def = s_pause_btn_def[b];
+					struct tag_block *ustr_def = &s_pause_ustr_def[b];
+					struct tag_data *ustr_entry = &s_pause_ustr_entry[b];
+					wchar_t *wtext = s_pause_wtext[b];
+
+					btn_tags[b] = btn_tag;
+					memset(ustr_def, 0, sizeof(*ustr_def));
+					memset(ustr_entry, 0, sizeof(*ustr_entry));
+					memset(wtext, 0, sizeof(s_pause_wtext[b]));
+					for (i = 0; labels[b][i]; i++)
+						wtext[i] = (wchar_t)(unsigned char)labels[b][i];
+					wtext[i] = 0;
+
+					ustr_entry->size = (long)((i + 1) * sizeof(wchar_t));
+					ustr_entry->address = wtext;
+					ustr_def->count = 1;
+					ustr_def->address = ustr_entry;
+
+					memset(&grown[ustr_slot], 0, sizeof(grown[0]));
+					grown[ustr_slot].group_tag = 'ustr';
+					grown[ustr_slot].parent_group_tags[0] = NONE;
+					grown[ustr_slot].parent_group_tags[1] = NONE;
+					grown[ustr_slot].tag_index = ustr_tag;
+					grown[ustr_slot].name = (char *)ustr_names[b];
+					grown[ustr_slot].base_address = ustr_def;
+
+					memcpy(btn_def, settings_def, 0x3EC);
+					snprintf((char *)(btn_def + 0x04), 32, "%s", short_names[b]);
+					*(int32_t *)(btn_def + 0xEC + 0x00) = 'ustr';
+					*(char const **)(btn_def + 0xEC + 0x04) = ustr_names[b];
+					*(int32_t *)(btn_def + 0xEC + 0x08) = 0;
+					*(int32_t *)(btn_def + 0xEC + 0x0C) = ustr_tag;
+
+					if (h_count > 0 && h_count <= 16 && h_src)
 					{
-						uint8_t *hp = h_dst + (size_t)h * 0x48u;
-						/* _event_handler_run_function_bit (bit 7) | _event_handler_close_all_widgets_bit (bit 2) */
-						*(int32_t *)(hp + 0x00) = (1 << 7) | (1 << 2);
-						*(int16_t *)(hp + 0x06) = 0x7777;
-						*(int32_t *)(hp + 0x08) = 'DeLa';
-						*(void **)(hp + 0x0C) = NULL;
-						*(int32_t *)(hp + 0x10) = 0;
-						*(int32_t *)(hp + 0x14) = NONE;
+						uint8_t *h_dst = s_pause_h_dst[b];
+						int h;
+						memcpy(h_dst, h_src, (size_t)h_count * 0x48u);
+						for (h = 0; h < h_count; h++)
+						{
+							uint8_t *hp = h_dst + (size_t)h * 0x48u;
+							*(int32_t *)(hp + 0x00) = (1 << 7) | (1 << 2);
+							*(int16_t *)(hp + 0x06) = fn_codes[b];
+							*(int32_t *)(hp + 0x08) = 'DeLa';
+							*(void **)(hp + 0x0C) = NULL;
+							*(int32_t *)(hp + 0x10) = 0;
+							*(int32_t *)(hp + 0x14) = NONE;
+						}
+						*(uint8_t **)(btn_def + 0x58) = h_dst;
 					}
-					*(uint8_t **)(btn_def + 0x58) = h_dst;
+
+					memset(&grown[btn_slot], 0, sizeof(grown[0]));
+					grown[btn_slot].group_tag = 'DeLa';
+					grown[btn_slot].parent_group_tags[0] = NONE;
+					grown[btn_slot].parent_group_tags[1] = NONE;
+					grown[btn_slot].tag_index = btn_tag;
+					grown[btn_slot].name = (char *)btn_names[b];
+					grown[btn_slot].base_address = btn_def;
 				}
 
-				memset(&grown[existing_count + 1], 0, sizeof(grown[0]));
-				grown[existing_count + 1].group_tag = 'DeLa';
-				grown[existing_count + 1].parent_group_tags[0] = NONE;
-				grown[existing_count + 1].parent_group_tags[1] = NONE;
-				grown[existing_count + 1].tag_index = btn_tag;
-				grown[existing_count + 1].name = "pc\\pause\\save_forge_button";
-				grown[existing_count + 1].base_address = btn_def;
-
+				s_save_forge_btn_tag = btn_tags[0];
+				s_save_as_new_forge_btn_tag = btn_tags[1];
 				s_pause_saved_instances = instances;
 				s_pause_saved_count = existing_count;
 				s_pause_alloc_instances = grown;
-				cache_files_set_tag_instances(grown, existing_count + 2);
+				cache_files_set_tag_instances(grown, existing_count + 4);
 
-				/* Insert save_forge_button into the pause menu's column list right before settings_button */
+				/* Insert SAVE MAP and SAVE AS NEW.. into the pause menu's column list right before settings_button */
 				for (i = 0; i < existing_count; i++)
 				{
 					uint8_t *w_def;
@@ -3982,7 +4232,7 @@ static void forge_ensure_pause_menu_save_button(void)
 						continue;
 					c_count = *(int32_t const *)(w_def + 0x3E0);
 					c_arr = *(uint8_t *const *)(w_def + 0x3E4);
-					if (c_count <= 0 || c_count > 16 || !c_arr)
+					if (c_count <= 0 || c_count > 14 || !c_arr)
 						continue;
 					for (c = 0; c < c_count; c++)
 					{
@@ -3999,42 +4249,46 @@ static void forge_ensure_pause_menu_save_button(void)
 					if (found_at >= 0 && child_slot_used < 8)
 					{
 						uint8_t *new_children = s_pause_children[child_slot_used++];
+						int32_t new_count = c_count + 2;
 						int16_t old_y0 = *(int16_t const *)(c_arr + 0 * 0x50u + 0x36);
-						int16_t spacing = (c_count + 1 <= 4) ? 29 : 25;
-						int16_t base_y = (old_y0 >= 60) ? (int16_t)(old_y0 - 20) : 0;
+						int16_t spacing = (old_y0 >= 60) ? 24 : ((new_count <= 5) ? 26 : 23);
+						int16_t base_y = (old_y0 >= 60) ? (int16_t)((old_y0 > 38) ? (old_y0 - 28) : 10) : 0;
 						long list_tag_idx = grown[i].tag_index;
 						long s_idx;
 
 						if (found_at > 0)
 							memcpy(new_children, c_arr, (size_t)found_at * 0x50u);
-						memcpy(new_children + (size_t)found_at * 0x50u, c_arr + (size_t)found_at * 0x50u, 0x50u);
-						*(int32_t *)(new_children + (size_t)found_at * 0x50u + 0x00) = 'DeLa';
-						*(char const **)(new_children + (size_t)found_at * 0x50u + 0x04) = "pc\\pause\\save_forge_button";
-						*(int32_t *)(new_children + (size_t)found_at * 0x50u + 0x08) = 0;
-						*(int32_t *)(new_children + (size_t)found_at * 0x50u + 0x0C) = btn_tag;
+						for (b = 0; b < 2; b++)
+						{
+							uint8_t *dst_b = new_children + (size_t)(found_at + b) * 0x50u;
+							memcpy(dst_b, c_arr + (size_t)found_at * 0x50u, 0x50u);
+							*(int32_t *)(dst_b + 0x00) = 'DeLa';
+							*(char const **)(dst_b + 0x04) = btn_names[b];
+							*(int32_t *)(dst_b + 0x08) = 0;
+							*(int32_t *)(dst_b + 0x0C) = btn_tags[b];
+						}
 
 						for (c = found_at; c < c_count; c++)
 						{
-							uint8_t *dst_c = new_children + (size_t)(c + 1) * 0x50u;
+							uint8_t *dst_c = new_children + (size_t)(c + 2) * 0x50u;
 							memcpy(dst_c, c_arr + (size_t)c * 0x50u, 0x50u);
 						}
-						for (c = 0; c < c_count + 1; c++)
+						for (c = 0; c < new_count; c++)
 						{
 							uint8_t *dst_c = new_children + (size_t)c * 0x50u;
 							*(int16_t *)(dst_c + 0x36) = (int16_t)(base_y + c * spacing);
 						}
-						*(int32_t *)(w_def + 0x3E0) = c_count + 1;
+						*(int32_t *)(w_def + 0x3E0) = new_count;
 						*(uint8_t **)(w_def + 0x3E4) = new_children;
-						*(int16_t *)(w_def + 0x28) = (int16_t)(*(int16_t const *)(w_def + 0x28) + spacing); /* bounds.y1 */
+						*(int16_t *)(w_def + 0x28) = (int16_t)(base_y + new_count * spacing + 28);
 
-						/* Shift the pause list widget itself upward inside its parent screen widget so all options sit centered inside the box */
+						/* Upgrade the pause box to the taller 229px frame and align the list and footer inside it */
 						if (old_y0 < 60)
 						{
-							int16_t lift = (old_y0 > 10) ? 14 : 22;
 							for (s_idx = 0; s_idx < existing_count; s_idx++)
 							{
 								uint8_t *sw_def;
-								int32_t sc_count, sc;
+								int32_t sc_count, sc, list_sc = -1, box_sc = -1, key_sc = -1;
 								uint8_t *sc_arr;
 								if (grown[s_idx].group_tag != 'DeLa' || !grown[s_idx].base_address)
 									continue;
@@ -4047,9 +4301,72 @@ static void forge_ensure_pause_menu_save_button(void)
 								{
 									if (*(int32_t const *)(sc_arr + (size_t)sc * 0x50u + 0x0C) == list_tag_idx)
 									{
-										*(int16_t *)(sc_arr + (size_t)sc * 0x50u + 0x36) =
-											(int16_t)(*(int16_t const *)(sc_arr + (size_t)sc * 0x50u + 0x36) - lift);
+										list_sc = sc;
+										break;
 									}
+								}
+								if (list_sc < 0)
+									continue;
+
+								for (sc = 0; sc < sc_count; sc++)
+								{
+									int32_t ct = *(int32_t const *)(sc_arr + (size_t)sc * 0x50u + 0x0C);
+									long ca = ct & 0xFFFF;
+									if (sc == list_sc || ct == NONE || ca < 0 || ca >= existing_count ||
+										grown[ca].group_tag != 'DeLa' || !grown[ca].base_address)
+										continue;
+									{
+										uint8_t *cw_def = (uint8_t *)grown[ca].base_address;
+										int32_t p_cnt = *(int32_t const *)(cw_def + 0x3E0);
+										uint8_t *p_arr = *(uint8_t *const *)(cw_def + 0x3E4);
+										if (p_cnt == 3 && p_arr)
+											box_sc = sc;
+										else if (*(int16_t const *)(sc_arr + (size_t)sc * 0x50u + 0x36) >
+												 *(int16_t const *)(sc_arr + (size_t)list_sc * 0x50u + 0x36))
+											key_sc = sc;
+									}
+								}
+
+								if (box_sc >= 0)
+								{
+									int32_t bt = *(int32_t const *)(sc_arr + (size_t)box_sc * 0x50u + 0x0C);
+									uint8_t *box_def = (uint8_t *)grown[bt & 0xFFFF].base_address;
+									uint8_t *p_arr = *(uint8_t *const *)(box_def + 0x3E4);
+									int p_i;
+									int16_t scr_h = *(int16_t const *)(sw_def + 0x28) - *(int16_t const *)(sw_def + 0x24);
+									int16_t box_y = (scr_h >= 400) ? 125 : 4;
+
+									*(int16_t *)(box_def + 0x28) = 229;
+									for (p_i = 0; p_i < 3; p_i++)
+									{
+										int32_t pt = *(int32_t const *)(p_arr + (size_t)p_i * 0x50u + 0x0C);
+										long pa = pt & 0xFFFF;
+										if (pt != NONE && pa >= 0 && pa < existing_count && grown[pa].base_address)
+										{
+											uint8_t *p_def = (uint8_t *)grown[pa].base_address;
+											int32_t bm_tag = *(int32_t const *)(p_def + 0x44);
+											*(int16_t *)(p_def + 0x28) = 229;
+											if (bm_tag != NONE && (bm_tag & 0xFFFF) < existing_count &&
+												grown[bm_tag & 0xFFFF].group_tag == 'bitm' &&
+												grown[bm_tag & 0xFFFF].base_address)
+											{
+												struct bitmap_group *bg = (struct bitmap_group *)grown[bm_tag & 0xFFFF].base_address;
+												struct bitmap_group_sequence *seq = (struct bitmap_group_sequence *)bg->sequences.address;
+												if (seq && bg->bitmaps.count >= 2 && seq->first_bitmap_index == 0)
+													seq->first_bitmap_index = 1;
+											}
+										}
+									}
+									*(int16_t *)(sc_arr + (size_t)box_sc * 0x50u + 0x36) = box_y;
+									*(int16_t *)(sc_arr + (size_t)list_sc * 0x50u + 0x36) =
+										(int16_t)(box_y + ((new_count <= 5) ? 35 : 31));
+									if (key_sc >= 0)
+										*(int16_t *)(sc_arr + (size_t)key_sc * 0x50u + 0x36) = (int16_t)(box_y + 204);
+								}
+								else
+								{
+									*(int16_t *)(sc_arr + (size_t)list_sc * 0x50u + 0x36) =
+										(int16_t)(*(int16_t const *)(sc_arr + (size_t)list_sc * 0x50u + 0x36) - 24);
 								}
 							}
 						}
@@ -4066,7 +4383,10 @@ static void forge_ensure_pause_menu_save_button(void)
 
 void menu_tags_loaded(char const *map_name)
 {
-	mcc_pause_set_forge_save_callbacks(forge_mcc_pause_save_enabled, forge_trigger_save_map_action);
+	mcc_pause_set_forge_save_callbacks(
+		forge_mcc_pause_save_enabled,
+		forge_trigger_save_map_action,
+		forge_trigger_save_as_new_map_action);
 
 	/* Clean up any leftover LAN/Internet browser client or server when loading a solo map so LEAVE GAME returns to the main menu */
 	if (map_name && _stricmp(map_name, "ui") != 0 && _stricmp(map_name, "levels\\ui\\ui") != 0 &&
@@ -4083,6 +4403,7 @@ void menu_tags_loaded(char const *map_name)
 	orig_menu_tags_loaded(map_name);
 
 	s_save_forge_btn_tag = NONE;
+	s_save_as_new_forge_btn_tag = NONE;
 	g_last_forge_map_name[0] = 0;
 	g_forge.live_instance_count = 0;
 

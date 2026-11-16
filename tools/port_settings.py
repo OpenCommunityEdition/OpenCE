@@ -3253,7 +3253,7 @@ def _forge_screens() -> list:
                       f'<child widget="{fbase}/edit_maps_kind_row" x="82" y="73"/>',
                       *[f'<child widget="main_menu/new_select/list_item_{idx}" x="20" y="{103 + 30 * (idx - 1)}"/>'
                         for idx in range(1, 11)],
-                      '<child widget="main_menu/solo_level_select/solo_level_select_button_bar" y="414"/>'])
+                      f'<child widget="{fbase}/forge_browser_button_bar" y="414"/>'])
     lines += _widget(f"{fbase}/forge_edit_maps_screen",
                      [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child"),
                       ("bitmap", "bitmaps/gradient")],
@@ -3261,6 +3261,33 @@ def _forge_screens() -> list:
                       '<on event="back" back="true"/>',
                       '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
                       f'<child widget="{fbase}/forge_edit_maps_list"/>',
+                      f'<child widget="{MT}/header_forge"/>'])
+
+    # 3b. Forge Edit Map Selected Action Screen (OPEN MAP / DELETE MAP / BACK in the same UI style)
+    lines += _widget(f"{fbase}/forge_edit_map_action_header",
+                     [("type", "text"), ("controller", 1), ("width", 256), ("height", 28),
+                      ("bitmap", "bitmaps/option_bkds_sm"), ("font", "ui\\large_ui"),
+                      ("color", "#FF2896FF"), ("align", "center"), ("text_y", 3)], [])
+    lines += _widget(f"{fbase}/forge_edit_map_action_list",
+                     [("type", "column_list"), ("width", 640), ("height", 480),
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children"),
+                      ("description", "main_menu/solo_level_select/solo_level_extended_desc")],
+                     ['<data input="load game list update"/>',
+                      '<on event="created" run="load game menu init"/>',
+                      '<on event="custom_activation" run="load game menu activated"/>',
+                      '<on event="b" back="true"/>',
+                      '<on event="back" back="true"/>',
+                      *[f'<child widget="main_menu/new_select/list_item_{idx}" x="20" y="{103 + 30 * (idx - 1)}"/>'
+                        for idx in range(1, 4)],
+                      f'<child widget="{fbase}/forge_browser_button_bar" y="414"/>'])
+    lines += _widget(f"{fbase}/forge_edit_map_action_screen",
+                     [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child"),
+                      ("bitmap", "bitmaps/gradient")],
+                     ['<on event="b" back="true"/>',
+                      '<on event="back" back="true"/>',
+                      '<child widget="main_menu/new_select/sel_list_desc_bkd"/>',
+                      f'<child widget="{fbase}/forge_edit_map_action_header" x="82" y="73"/>',
+                      f'<child widget="{fbase}/forge_edit_map_action_list"/>',
                       f'<child widget="{MT}/header_forge"/>'])
     return lines
 

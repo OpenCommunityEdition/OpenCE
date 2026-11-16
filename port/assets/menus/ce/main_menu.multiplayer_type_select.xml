@@ -481,13 +481,34 @@
 		<child widget="main_menu/new_select/list_item_8" x="20" y="313"/>
 		<child widget="main_menu/new_select/list_item_9" x="20" y="343"/>
 		<child widget="main_menu/new_select/list_item_10" x="20" y="373"/>
-		<child widget="main_menu/solo_level_select/solo_level_select_button_bar" y="414"/>
+		<child widget="main_menu/forge_select/forge_browser_button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/forge_select/forge_edit_maps_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
 		<on event="b" back="true"/>
 		<on event="back" back="true"/>
 		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
 		<child widget="main_menu/forge_select/forge_edit_maps_list"/>
+		<child widget="main_menu/multiplayer_type_select/header_forge"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_edit_map_action_header" type="text" controller="1" width="256" height="28" bitmap="bitmaps/option_bkds_sm" font="ui\large_ui" color="#FF2896FF" align="center" text_y="3">
+	</widget>
+	<widget name="main_menu/forge_select/forge_edit_map_action_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/solo_level_select/solo_level_extended_desc">
+		<data input="load game list update"/>
+		<on event="created" run="load game menu init"/>
+		<on event="custom_activation" run="load game menu activated"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/list_item_1" x="20" y="103"/>
+		<child widget="main_menu/new_select/list_item_2" x="20" y="133"/>
+		<child widget="main_menu/new_select/list_item_3" x="20" y="163"/>
+		<child widget="main_menu/forge_select/forge_browser_button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/forge_select/forge_edit_map_action_screen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/new_select/sel_list_desc_bkd"/>
+		<child widget="main_menu/forge_select/forge_edit_map_action_header" x="82" y="73"/>
+		<child widget="main_menu/forge_select/forge_edit_map_action_list"/>
 		<child widget="main_menu/multiplayer_type_select/header_forge"/>
 	</widget>
 </menus>

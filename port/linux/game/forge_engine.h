@@ -19,7 +19,7 @@ extern "C" {
 
 #include "halo_port_limits.h"
 
-#define FORGE_VERSION_STRING "2.10.16"
+#define FORGE_VERSION_STRING "2.11.0"
 #define FORGE_NETWORK_VERSION 0x4633
 #define FORGE_GAME_KIND 0x46
 #ifndef HALO_PORT_NETWORK_VERSION_STOCK
@@ -357,6 +357,7 @@ struct tag_injector_mesh;
 int forge_ui_build_tag_preview_mesh(int is_installed_mode, int category_tab, int list_index, struct tag_injector_mesh *mesh);
 int forge_ui_save_copy_as(char const *new_map_name);
 void forge_trigger_save_map_action(void);
+void forge_trigger_save_as_new_map_action(void);
 void forge_set_pending_sidecar_leaf(char const *leaf);
 int forge_has_pending_or_active_sidecar(void);
 void forge_load_saved_map_state_if_present(char const *map_name);

@@ -3399,6 +3399,7 @@ static void update_save_modal_input(void)
 	static int prev_gp_b = 0;
 	static int prev_gp_left = 0;
 	static int prev_gp_right = 0;
+	static char s_save_modal_prev_name[64] = "";
 	int vk;
 
 	director_inhibit_input(0);
@@ -3412,6 +3413,7 @@ static void update_save_modal_input(void)
 		prev_gp_b = forge_gp_button_down(FORGE_GP_B);
 		prev_gp_left = forge_gp_button_down(FORGE_GP_DPAD_LEFT) || forge_gp_button_down(FORGE_GP_DPAD_UP) || (s_gp_lx < -0.55f);
 		prev_gp_right = forge_gp_button_down(FORGE_GP_DPAD_RIGHT) || forge_gp_button_down(FORGE_GP_DPAD_DOWN) || (s_gp_lx > 0.55f);
+		snprintf(s_save_modal_prev_name, sizeof(s_save_modal_prev_name), "%s", g_forge.save_map_name);
 		s_save_confirm_overwrite = 0;
 		s_save_confirm_choice = 0;
 		s_save_confirm_in_maps = 0;
@@ -3521,6 +3523,11 @@ static void update_save_modal_input(void)
 		int gp_b_down = forge_gp_button_down(FORGE_GP_B);
 		if ((esc_down && !prev_key[VK_ESCAPE]) || (gp_b_down && !prev_gp_b))
 		{
+			if (g_forge.has_saved_map_once && s_save_modal_prev_name[0])
+			{
+				snprintf(g_forge.save_map_name, sizeof(g_forge.save_map_name), "%s", s_save_modal_prev_name);
+				g_forge.save_map_name_len = (int)strlen(g_forge.save_map_name);
+			}
 			g_forge.active_modal = _forge_modal_none;
 			prev_key[VK_ESCAPE] = esc_down;
 			prev_gp_b = gp_b_down;
