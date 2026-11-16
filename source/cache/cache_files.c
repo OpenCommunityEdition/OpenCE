@@ -615,6 +615,12 @@ void scenario_tags_unload(
 
 		hud_hires_tags_unloaded();
 	}
+	/* port: the Longswords' exhaust flare forgotten (port/linux/game/longsword_exhaust.c) */
+	{
+		extern void longsword_exhaust_tags_unloaded(void);
+
+		longsword_exhaust_tags_unloaded();
+	}
 	sound_cache_close();
 	texture_cache_close();
 	/* port: the mods' tags go, after the sound and texture caches that held
@@ -1422,6 +1428,13 @@ long scenario_tags_load(
 				extern void powerup_render_bounds_tags_loaded(void);
 
 				powerup_render_bounds_tags_loaded();
+			}
+			/* port: the Longswords' exhaust glow seen from behind them only
+			(port/linux/game/longsword_exhaust.c) */
+			{
+				extern void longsword_exhaust_tags_loaded(void);
+
+				longsword_exhaust_tags_loaded();
 			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{

@@ -184,6 +184,7 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
 #include "cache/cache_files.h" /* port: (tag_iterator: light_port_glow_definition_get) */
+#include "longsword_exhaust.h" /* port: port/linux/game/longsword_exhaust.c */
 void shield_glow_update(void); /* port: port/linux/game/shield_glow.c */
 
 /* port: port/linux/src (halo.log) */
@@ -1317,9 +1318,15 @@ void lights_preprocess_scene(
 						marker_index++)
 					{
 						lens_flare_parameters.position = markers[marker_index].matrix.position;
-						lens_flare_parameters.compressed_direction =
-							compress_real_vector3d_to_int32_clamp(
-								&markers[marker_index].matrix.forward);
+						{
+							real_vector3d direction = markers[marker_index].matrix.forward;
+
+							/* port: the Longswords' exhaust shines back along the ship's
+							path, not where its marker points (longsword_exhaust.c) */
+							longsword_exhaust_flare_direction(definition->lens_flare.index, light->object_index, &direction);
+							lens_flare_parameters.compressed_direction =
+								compress_real_vector3d_to_int32_clamp(&direction);
+						}
 						lens_flare_parameters.compressed_up =
 							compress_real_vector3d_to_int32_clamp(
 								&markers[marker_index].matrix.up);

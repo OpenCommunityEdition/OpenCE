@@ -762,6 +762,11 @@ void rasterizer_memory_pool_dispose(void);
 
 void rasterizer_lights_reset_for_new_map(
 	void);
+/* port: (longsword_exhaust.c) */
+boolean rasterizer_lens_flare_face_light_direction(
+	long definition_index,
+	real falloff_angle,
+	real cutoff_angle);
 void rasterizer_lights_begin(
 	void);
 void rasterizer_lights_end(

@@ -650,6 +650,47 @@ void rasterizer_lights_reset_for_new_map(
 	return;
 }
 
+/* port: a lens flare that has no fade by angle made to shine only toward
+where its light points: full within falloff_angle of it, none past
+cutoff_angle, as a flare whose reflections are scaled by the light's
+direction to the camera is (longsword_exhaust.c). A flare that has a fade
+by angle, or a reflection scaled by anything, is left as it is: whether it
+was changed. */
+boolean rasterizer_lens_flare_face_light_direction(
+	long definition_index,
+	real falloff_angle,
+	real cutoff_angle)
+{
+	struct lens_flare_definition *definition;
+	short reflection_index;
+
+	if (definition_index == NONE || !(falloff_angle >= 0.0f && falloff_angle < cutoff_angle && cutoff_angle <= _pi))
+		return FALSE;
+	definition = lens_flare_definition_get(definition_index);
+	if (definition->falloff_angle != 0.0f || definition->cutoff_angle != 0.0f || definition->reflections.count <= 0)
+		return FALSE;
+	for (reflection_index = 0; reflection_index < definition->reflections.count; reflection_index++)
+	{
+		if (TAG_BLOCK_GET_ELEMENT(&definition->reflections, reflection_index, struct lens_flare_reflection)->
+			brightness_scale_function != _lens_flare_reflection_scale_function_none)
+		{
+			return FALSE;
+		}
+	}
+
+	definition->falloff_angle = falloff_angle;
+	definition->cutoff_angle = cutoff_angle;
+	definition->runtime_cosine_falloff_angle = (real)cos(falloff_angle);
+	definition->runtime_cosine_cutoff_angle = (real)cos(cutoff_angle);
+	for (reflection_index = 0; reflection_index < definition->reflections.count; reflection_index++)
+	{
+		TAG_BLOCK_GET_ELEMENT(&definition->reflections, reflection_index, struct lens_flare_reflection)->
+			brightness_scale_function = _lens_flare_reflection_scale_function_light_to_camera;
+	}
+
+	return TRUE;
+}
+
 void rasterizer_lens_flare_submit(
 	struct rasterizer_lens_flare_submit_parameters const *parameters)
 {
