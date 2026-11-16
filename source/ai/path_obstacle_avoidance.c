@@ -976,6 +976,17 @@ boolean path_avoid_obstacles(
 				(real_point2d const *)start_point, start_surface_index,
 				(real_point2d const *)goal_point, goal_surface_index, finishing, TRUE);
 		}
+		/* port: for an actor that obeys (a command list), once more without the
+		bipeds ahead that move its way: slower than the optional ones, they shut
+		the way and ended its go-tos, and the list (obey_obstacles.c) */
+		if (!path_found &&
+			obey_obstacles_clear_way(obstacles, state->input.ignore_source_object_index, start_point, &movement_direction))
+		{
+			obstacles_recompute(obstacles, radius);
+			path_found= path_find(obstacle_path, state->input.ignore_broken_surfaces, obstacles, radius,
+				(real_point2d const *)start_point, start_surface_index,
+				(real_point2d const *)goal_point, goal_surface_index, finishing, FALSE);
+		}
 
 		if (path_found)
 		{
