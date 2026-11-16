@@ -1873,6 +1873,13 @@ static boolean biped_jump(
 	return jumped;
 }
 
+/* port: how many dead bodies' limbs settle onto the ground in one tick; the
+rest keep their pose and settle in the next ticks, each as many steps as
+before. A blast that kills dozens of a 32x co-op game's enemies at once
+otherwise settled them all in the same few ticks, which took hundreds of
+milliseconds. */
+#define BIPED_PORT_LIMP_BODY_STEPS_PER_TICK 24
+
 static void biped_update_dead(
 	long biped_index,
 	struct unit_animation_update_data *animation)
@@ -1884,6 +1891,21 @@ static void biped_update_dead(
 		biped->biped.limp_body_current_relaxation_iterations <
 			biped->biped.limp_body_max_relaxation_iterations)
 	{
+		static long limp_body_steps_time = NONE;
+		static long limp_body_steps;
+		long time = game_time_get();
+
+		if (time != limp_body_steps_time)
+		{
+			limp_body_steps_time = time;
+			limp_body_steps = 0;
+		}
+		if (limp_body_steps >= BIPED_PORT_LIMP_BODY_STEPS_PER_TICK)
+		{
+			animation->crouching = FALSE;
+			return;
+		}
+		limp_body_steps++;
 		if (!debug_biped_limp_body_disable)
 			biped_limp_noodle_relax_nodes_onto_environment(biped_index);
 		biped_verify_object_vectors(biped_index, "post-limp-noodle");
