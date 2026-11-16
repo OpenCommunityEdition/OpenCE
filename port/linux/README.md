@@ -207,7 +207,9 @@ under 2 ms, in that game and the next. Loading one from the file took up to
 has a list beside the file (`<driver>-<map>.list`) of the programs it drew
 with, and they are loaded as the map loads, ahead of its first frame (the
 Maw's 41 in 16 ms); a program not on the list yet is loaded when first drawn
-with, and added. Shaders of the same GLSL made for
+with, and added. A map with no list yet, in its first game, loads the
+programs that two or more other maps' lists have (most of a map's are);
+those it does not draw with are deleted as the next map loads. Shaders of the same GLSL made for
 different draws share one program, loaded once. The files grow to 64 MB at
 most (a large map's programs take some 2 MB). Delete the folder to clear
 them.
