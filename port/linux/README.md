@@ -202,8 +202,15 @@ with the GPU programs the game has linked on it (`display.shader_cache`).
 The first time a material or an effect comes into view the driver links its
 program, which can stop the game for a frame of 30 to 90 ms (more on
 integrated graphics); after that the program is loaded from this file in
-under 2 ms, in that game and the next. The files grow to 64 MB at most (a
-large map's programs take some 2 MB). Delete the folder to clear them.
+under 2 ms, in that game and the next. Loading one from the file took up to
+20 ms, a stalled frame each time a level showed something new, so each map
+has a list beside the file (`<driver>-<map>.list`) of the programs it drew
+with, and they are loaded as the map loads, ahead of its first frame (the
+Maw's 41 in 16 ms); a program not on the list yet is loaded when first drawn
+with, and added. Shaders of the same GLSL made for
+different draws share one program, loaded once. The files grow to 64 MB at
+most (a large map's programs take some 2 MB). Delete the folder to clear
+them.
 
 These files are in the data root:
 
@@ -531,7 +538,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.scoreboard_background_color` | `"16, 16, 16, 150"` | `HALO_SCOREBOARD_BACKGROUND_COLOR` | The colour of the scoreboard's panel: `"red, green, blue, alpha"`, each from `0` to `255`. Alpha `0` is see-through, `255` is solid. |
 | `display.anisotropic_filtering` | `0` | `HALO_ANISOTROPIC_FILTERING` | Textures seen at a grazing angle (floors, walls, terrain) are sampled along the angle from finer mip levels, so they stay sharp; the Xbox game asks for none. `0` or `1`: as on the Xbox. `2`, `4`, `8` or `16`: at most that many samples (at most the GPU's); `4` keeps most of `16`'s sharpness at less cost on slower GPUs. TEXTURE FILTERING in Video Setup > Graphics. It applies to the textures of the map that have mip levels and are filtered linearly (base, detail, bump and environment maps; lightmaps have no mip levels), not to what the game renders, such as the water's ripples. On Android and the web, only where the GPU has `GL_EXT_texture_filter_anisotropic`. |
 | `display.latency_meter` | `false` | `HALO_LATENCY_METER` | `true`: in a network game, your round trip to the host in milliseconds at the top right of the screen, "Ping 45 ms" with four bars: green below 80 ms, yellow below 150, red from 150. The host shows "Max ping", its slowest player's. A player's machine that has heard nothing from the host for two seconds shows "Connection problem". The round trip includes each machine's wait for its next tick, so a LAN reads 15 to 35 ms. Not shown in the menus, after the game, in a co-op cutscene or when the host plays alone. The scoreboard's pings take the same colours, and show the round trips this machine times itself (the host: each player's; a player: their own), so they agree with the meter. Nothing more is sent. Only in config.toml, not in the menus. |
-| `display.shader_cache` | `true` | `HALO_SHADER_CACHE` | Windows and Linux: keep the GPU programs that the game links in `shader_cache/` in the save root, and load each from there the next time instead of linking it again, which stops the game for a frame on some drivers. `false`: link each program every time. Refer to "Files and folders". |
+| `display.shader_cache` | `true` | `HALO_SHADER_CACHE` | Windows and Linux: keep the GPU programs that the game links in `shader_cache/` in the save root, and load each from there the next time instead of compiling its shaders and linking it again, which stops the game for a frame (up to 180 ms as a level's things first come into view). `false`: link each program every time. Refer to "Files and folders". |
 | `display.mcc_texture_prepare_mb` | `0` | `HALO_MCC_TEXTURE_PREPARE_MB` | Windows and Linux, MCC only: prepare large non-paletted textures during loading within this estimated GPU-storage budget in MiB, capped at 512. Zero disables it. Quality, palette behavior, and Xbox/CE texture caches are unchanged. Prepared textures remain owned by the MCC texture bridge until map unload. |
 | `display.stats_log` | `false` | `HALO_STATS_LOG` | `true`: a line a second in the log with the frame rate, the mode, the map, the renderer and the size of the 3D view (`STATS fps=120.2 mode=Slayer map=bloodgulch gpu="Adreno (TM) 735" res=1068x480`), so a graphics bug's report or two builds compared say which of them was running and at what frame rate. Nothing is drawn and nothing is sent. |
 | `display.per_pixel_lighting` | `false` | `HALO_PER_PIXEL_LIGHTING` | `false`: the models (characters, weapons, vehicles, scenery) are lit at each vertex and the light is blended between them, as on the Xbox. The light across a curved surface then shows facets, and a point light that passes close lights only the vertices it reaches. `true`: the models are lit at each pixel by the same lights (the ambient light, two distant lights and two point lights), which changes their look. |
@@ -1982,6 +1989,7 @@ Other changes:
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
 | `units/units.c` | When a unit readies a weapon, a current weapon it does not carry is cleared, not put away (`unit_ready_desired_weapon`). On a co-op client, the current weapon can be one the host's updates already took away, and putting it away would detach it from a parent it does not have. |
 | `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`), adds the tags of the menus to the menus' map (`game/menu_tags.c`), and plays the mods' tags (`game/mods.c`). |
+| `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`), adds the tags of the menus to the menus' map (`game/menu_tags.c`), plays the mods' tags (`game/mods.c`), and loads the GPU programs the map drew with last time from the shader cache (`src/d3d8_gl.c`). |
 | `cache/xbox_sound_cache.c`, `cache/xbox_texture_cache.c` | The samples of a mod's sound are copied from memory, and the pixels of a mod's bitmap read from its file and laid out for the hardware, at once (`game/mod_sounds.c`, `game/mod_bitmaps.c`); a mod's linear bitmap need not have rows of whole steps of the pitch. |
 | `hs/hs.c` | The console's `mods_reload`, `mods_enable` and `mods_list`, which a client may run too. |
 | `ai/action_vehicle.c` | On Custom Edition maps, AI can take a seat in any unit a script sends it to, bipeds included, as on Halo PC (`ai_scripting_go_to_vehicle_internal` accepts any unit). On Xbox maps, only vehicle seats. |

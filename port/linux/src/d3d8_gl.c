@@ -594,6 +594,14 @@ struct program_entry
 	struct program_entry *next;
 	GLuint vertex_shader;
 	GLuint fragment_shader;
+	/* port: the entry of the same two GLSL sources, made first under other
+	shaders' names, whose program this pair's draws use (program_get); NULL
+	for an entry of its own */
+	struct program_entry *same;
+	/* an entry of its own's: its shaders' GLSL hashes, and the next in its
+	program_hash_buckets list */
+	unsigned long long vertex_hash, fragment_hash;
+	struct program_entry *next_by_hash;
 	GLuint program;
 	GLint constants;
 	GLint viewport_scale;
@@ -678,11 +686,78 @@ static void shader_hash_set(GLuint shader, const char *source)
 	shader_hashes[shader] = source_hash(source);
 }
 
-#ifndef HALO_GLES
 static unsigned long long shader_hash(GLuint shader)
 {
 	return shader < shader_hashes_size ? shader_hashes[shader] : 0;
 }
+
+/* The game's shaders, compiled when a program that uses them is first linked
+(shader_compiled), not when they are first wanted: a program the cache above
+has is loaded from its binary, and its shaders are never compiled. Compiling
+them was most of the cost left of a program's first use once it was cached,
+up to 180 ms a frame as a level's things first came into view. A shader is
+named by its place here (from 1), by which program_get finds its GLSL hash
+and its compiled GL shader. */
+struct deferred_shader
+{
+	GLenum type;
+	const char *what;
+	char *source;
+	GLuint shader;
+};
+
+static struct deferred_shader *deferred_shaders;
+static GLuint deferred_shader_count;
+static GLuint deferred_shader_size;
+
+/* a shader of this GLSL, to be compiled once a program needs it; 0 if there
+is no room for it */
+static GLuint shader_deferred(GLenum type, const char *source, const char *what)
+{
+	struct deferred_shader *shader;
+	size_t length = strlen(source) + 1;
+
+	if (deferred_shader_count == deferred_shader_size)
+	{
+		GLuint size = deferred_shader_size ? 2 * deferred_shader_size : 256;
+		struct deferred_shader *grown = realloc(deferred_shaders, size * sizeof(*grown));
+
+		if (!grown)
+			return 0;
+		deferred_shaders = grown;
+		deferred_shader_size = size;
+	}
+	shader = &deferred_shaders[deferred_shader_count];
+	shader->type = type;
+	shader->what = what;
+	shader->shader = 0;
+	if (!(shader->source = malloc(length)))
+		return 0;
+	memcpy(shader->source, source, length);
+	deferred_shader_count++;
+	shader_hash_set(deferred_shader_count, source);
+	return deferred_shader_count;
+}
+
+/* the deferred shader's GL shader, compiled the first time (0 if it cannot
+be) */
+static GLuint shader_compiled(GLuint name)
+{
+	struct deferred_shader *shader;
+
+	if (!name || name > deferred_shader_count)
+		return 0;
+	shader = &deferred_shaders[name - 1];
+	if (shader->source)
+	{
+		shader->shader = xgpu_compile_shader(shader->type, shader->source, shader->what);
+		free(shader->source);
+		shader->source = NULL;
+	}
+	return shader->shader;
+}
+
+#ifndef HALO_GLES
 
 /* the cache file: entries one after another, each a header (magic, the two
 shaders' GLSL hashes, the binary's format and length, and its data's hash)
@@ -716,6 +791,11 @@ struct program_cache_entry
 	unsigned long long data_hash;
 	/* where its binary starts in the file */
 	unsigned long offset;
+	/* port: program_cache_map_loaded's: its program loaded with the map's,
+	until the game first draws with it (program_cache_load), and the map
+	whose list has it (program_cache.map) */
+	GLuint map_program;
+	unsigned long map;
 };
 
 static struct
@@ -728,6 +808,13 @@ static struct
 	/* this run's: programs loaded from the cache, linked, written to it,
 	and binaries the driver refused */
 	unsigned long loaded, linked, written, refused;
+	/* port: the save root's directory of the cache, the file's name
+	without .bin (program_cache_map_loaded's lists are named after it), the
+	map loaded's list, open to add to, and its number (counting maps
+	loaded, from 1) */
+	char directory[512], driver_name[32];
+	FILE *map_file;
+	unsigned long map;
 } program_cache;
 
 static unsigned long long data_hash(const void *data, unsigned long size)
@@ -823,6 +910,8 @@ static void program_cache_initialize(void)
 		driver = (driver ^ source_hash(strings[index] ? strings[index] : "")) * 1099511628211ULL;
 	snprintf(path, sizeof(path), "%s/shader_cache", platform_save_root());
 	posix_make_directory(path);
+	snprintf(program_cache.directory, sizeof(program_cache.directory), "%s", path);
+	snprintf(program_cache.driver_name, sizeof(program_cache.driver_name), "%016llx", driver);
 	snprintf(path, sizeof(path), "%s/shader_cache/%016llx.bin", platform_save_root(), driver);
 	program_cache.file = fopen(path, "r+b");
 	if (program_cache.file)
@@ -846,20 +935,16 @@ static void program_cache_initialize(void)
 	platform_log("shader cache: %s, %lu KB", path, program_cache.end / 1024);
 }
 
-/* the cached binary of the program of these shaders, loaded into a new
-program; 0 if there is none or the driver refuses it (then forgotten: the
-program is linked again, and its new binary written after) */
-static GLuint program_cache_load(unsigned long long vertex_hash, unsigned long long fragment_hash)
+/* the entry's binary loaded into a new program; 0 if the driver refuses it
+(then forgotten: the program is linked again, and its new binary written
+after) */
+static GLuint program_cache_read(struct program_cache_entry *entry)
 {
-	struct program_cache_entry *entry;
 	void *binary;
 	GLuint program = 0;
 	GLint status = 0;
 
-	if (!program_cache.enabled || !vertex_hash || !fragment_hash)
-		return 0;
-	entry = program_cache_find(vertex_hash, fragment_hash);
-	if (!entry || !entry->length || !(binary = malloc(entry->length)))
+	if (!entry->length || !(binary = malloc(entry->length)))
 		return 0;
 	if (fseek(program_cache.file, (long)entry->offset, SEEK_SET) == 0 &&
 		fread(binary, entry->length, 1, program_cache.file) == 1 &&
@@ -879,10 +964,130 @@ static GLuint program_cache_load(unsigned long long vertex_hash, unsigned long l
 	{
 		program_cache.refused++;
 		entry->length = 0;
-		return 0;
 	}
-	program_cache.loaded++;
 	return program;
+}
+
+/* port: the entry on the list of the map loaded, once */
+static void program_cache_map_list(struct program_cache_entry *entry)
+{
+	unsigned long long hashes[2];
+
+	if (!entry || !program_cache.map_file || entry->map == program_cache.map)
+		return;
+	entry->map = program_cache.map;
+	hashes[0] = entry->vertex_hash;
+	hashes[1] = entry->fragment_hash;
+	if (fwrite(hashes, sizeof(hashes), 1, program_cache.map_file) == 1)
+		fflush(program_cache.map_file);
+}
+
+/* the cached program of these shaders: loaded with the map's
+(program_cache_map_loaded), or now; 0 if there is none or the driver
+refuses it */
+static GLuint program_cache_load(unsigned long long vertex_hash, unsigned long long fragment_hash)
+{
+	struct program_cache_entry *entry;
+	GLuint program;
+
+	if (!program_cache.enabled || !vertex_hash || !fragment_hash)
+		return 0;
+	entry = program_cache_find(vertex_hash, fragment_hash);
+	if (!entry)
+		return 0;
+	program = entry->map_program;
+	entry->map_program = 0;
+	if (!program)
+		program = program_cache_read(entry);
+	if (!program)
+		return 0;
+	program_cache.loaded++;
+	program_cache_map_list(entry);
+	return program;
+}
+
+/* port: The programs a map drew with, loaded as it loads, ahead of its
+first frame (the driver turning a binary back into a program took up to 20
+ms, and a level showed new things, and so new programs, all through a game,
+each first draw holding its frame up). Each map has a list of them in the
+cache's directory, beside the cache, kept as programs are first drawn with
+(program_cache_load, program_cache_store), its first game drawing them as
+before. A program loaded is the game's at its first draw with it; one the
+map's next game does not draw with is deleted as another map loads. The
+same binaries, giving the same programs. */
+void program_cache_map_loaded(const char *map_name)
+{
+	char path[600], name[64];
+	unsigned long long (*pairs)[2] = NULL;
+	long count = 0, kept = 0, loaded = 0, index, bucket;
+	FILE *file;
+	Uint64 start = SDL_GetPerformanceCounter();
+	struct program_cache_entry *entry;
+
+	if (!program_cache.enabled || !map_name)
+		return;
+	if (program_cache.map_file)
+		fclose(program_cache.map_file);
+	program_cache.map_file = NULL;
+	program_cache.map++;
+	for (index = 0; map_name[index] && index < (long)sizeof(name) - 1; index++)
+	{
+		char c = map_name[index];
+
+		name[index] = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+			c == '_' || c == '-' ? c : '_';
+	}
+	name[index] = 0;
+	snprintf(path, sizeof(path), "%s/%s-%s.list", program_cache.directory, program_cache.driver_name, name);
+
+	/* the list read whole: kept are the pairs the cache has a program for */
+	file = fopen(path, "rb");
+	if (file)
+	{
+		fseek(file, 0, SEEK_END);
+		count = ftell(file) / (long)sizeof(*pairs);
+		fseek(file, 0, SEEK_SET);
+		if (count > 0 && (pairs = malloc(count * sizeof(*pairs))) != NULL)
+			count = (long)fread(pairs, sizeof(*pairs), (size_t)count, file);
+		else
+			count = 0;
+		fclose(file);
+	}
+	for (index = 0; index < count; index++)
+	{
+		entry = program_cache_find(pairs[index][0], pairs[index][1]);
+		if (!entry || !entry->length || entry->map == program_cache.map)
+			continue;
+		entry->map = program_cache.map;
+		pairs[kept][0] = pairs[index][0];
+		pairs[kept][1] = pairs[index][1];
+		kept++;
+		if (!entry->map_program && (entry->map_program = program_cache_read(entry)) != 0)
+			loaded++;
+	}
+	/* (the last map's not on this one's list) */
+	for (bucket = 0; bucket < PROGRAM_CACHE_BUCKETS; bucket++)
+	{
+		for (entry = program_cache.buckets[bucket]; entry; entry = entry->next)
+		{
+			if (entry->map_program && entry->map != program_cache.map)
+			{
+				glDeleteProgram(entry->map_program);
+				entry->map_program = 0;
+			}
+		}
+	}
+
+	/* written again with only those kept, and open to add to */
+	program_cache.map_file = fopen(path, "wb");
+	if (program_cache.map_file && kept)
+	{
+		fwrite(pairs, sizeof(*pairs), (size_t)kept, program_cache.map_file);
+		fflush(program_cache.map_file);
+	}
+	free(pairs);
+	platform_log("shader cache: %ld of %s's programs loaded in %.0f ms", loaded, name,
+		(double)(SDL_GetPerformanceCounter() - start) * 1000.0 / (double)SDL_GetPerformanceFrequency());
 }
 
 /* a linked program's binary, written after the file's last whole entry */
@@ -934,16 +1139,24 @@ static void program_cache_store(GLuint program, unsigned long long vertex_hash, 
 			entry->length = header.length;
 			entry->data_hash = header.data_hash;
 			entry->offset = program_cache.end + sizeof(header);
+			program_cache_map_list(entry);
 		}
 		program_cache.end += sizeof(header) + header.length;
 		program_cache.written++;
 	}
 	free(binary);
 }
+#else
+void program_cache_map_loaded(const char *map_name)
+{
+	(void)map_name;
+}
 #endif
 
 static struct fragment_entry *fragment_buckets[FRAGMENT_BUCKETS];
 static struct program_entry *program_buckets[PROGRAM_BUCKETS];
+/* port: the entries of their own by their shaders' GLSL hashes (program_get) */
+static struct program_entry *program_hash_buckets[PROGRAM_BUCKETS];
 
 /* ---------- render targets */
 
@@ -3790,7 +4003,7 @@ static struct vertex_shader_object *fixed_function_program(void)
 
 		program.signature = VERTEX_SHADER_SIGNATURE;
 		program.instructions = no_instructions;
-		program.shader[1] = xgpu_compile_shader(GL_VERTEX_SHADER, source, "fixed-function vertex");
+		program.shader[1] = shader_deferred(GL_VERTEX_SHADER, source, "fixed-function vertex");
 		/* (vertex_shader_get: neither variant compiled from instructions) */
 		program.shaders_tried = 1 | 2;
 		free(source);
@@ -3862,8 +4075,7 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 			immediate ? 0 : device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
 
 		program->shaders_tried |= tried;
-		*shader = xgpu_compile_shader(GL_VERTEX_SHADER, source, "vertex");
-		shader_hash_set(*shader, source);
+		*shader = shader_deferred(GL_VERTEX_SHADER, source, "vertex");
 		if (debug_settings.dump_shaders)
 		{
 			char path[512];
@@ -3915,8 +4127,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry->hash = hash;
 	entry->key = *key;
 	source = nv2a_pixel_shader_to_glsl(key);
-	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
-	shader_hash_set(entry->shader, source);
+	entry->shader = shader_deferred(GL_FRAGMENT_SHADER, source, "pixel");
 	if (debug_settings.dump_shaders)
 	{
 		char path[512];
@@ -3939,20 +4150,27 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_shader)
 {
 	static struct program_entry *last;
+	static GLuint last_vertex_shader, last_fragment_shader;
 	unsigned long hash = (vertex_shader * 2654435761UL) ^ fragment_shader;
 	struct program_entry **bucket = &program_buckets[hash % PROGRAM_BUCKETS];
 	struct program_entry *entry;
 	int stage;
+	unsigned long long vertex_hash, fragment_hash;
+	struct program_entry **hash_bucket;
 
-	if (last && last->vertex_shader == vertex_shader && last->fragment_shader == fragment_shader)
+	if (last && last_vertex_shader == vertex_shader && last_fragment_shader == fragment_shader)
 		return last;
 	for (entry = *bucket; entry; entry = entry->next)
 	{
 		if (entry->vertex_shader == vertex_shader && entry->fragment_shader == fragment_shader)
 		{
+			if (entry->same)
+				entry = entry->same;
 			if (!entry->program)
 				return NULL;
 			last = entry;
+			last_vertex_shader = vertex_shader;
+			last_fragment_shader = fragment_shader;
 			return entry;
 		}
 	}
@@ -3965,16 +4183,46 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	if (!vertex_shader || !fragment_shader)
 		return NULL;
 
+	/* port: the same two GLSL sources under other names (a shader of the
+	same GLSL is made for each of the game's keys that give it, by name:
+	shader_deferred) use the program made for them first, and its entry,
+	whose uniforms' places and values are that program's: a program the
+	game draws with under fourteen pairs of names was loaded or linked
+	fourteen times, each a stall the first time its pair was drawn */
+	vertex_hash = shader_hash(vertex_shader);
+	fragment_hash = shader_hash(fragment_shader);
+	hash_bucket = &program_hash_buckets[(unsigned long)((vertex_hash * 0x9e3779b97f4a7c15ULL ^ fragment_hash) >> 32) % PROGRAM_BUCKETS];
+	if (vertex_hash && fragment_hash)
+	{
+		struct program_entry *other;
+
+		for (other = *hash_bucket; other; other = other->next_by_hash)
+		{
+			if (other->vertex_hash == vertex_hash && other->fragment_hash == fragment_hash && other->program)
+			{
+				entry->same = other;
+				last = other;
+				last_vertex_shader = vertex_shader;
+				last_fragment_shader = fragment_shader;
+				return other;
+			}
+		}
+	}
+
 #ifndef HALO_GLES
 	entry->program = program_cache_load(shader_hash(vertex_shader), shader_hash(fragment_shader));
 	if (!entry->program)
 	{
 		/* (linked as xgpu_link_program does, keeping its binary) */
 		GLint status = 0;
+		GLuint compiled_vertex = shader_compiled(vertex_shader);
+		GLuint compiled_fragment = shader_compiled(fragment_shader);
 
+		if (!compiled_vertex || !compiled_fragment)
+			return NULL;
 		entry->program = glCreateProgram();
-		glAttachShader(entry->program, vertex_shader);
-		glAttachShader(entry->program, fragment_shader);
+		glAttachShader(entry->program, compiled_vertex);
+		glAttachShader(entry->program, compiled_fragment);
 		if (program_cache.enabled)
 			glProgramParameteri(entry->program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 		glLinkProgram(entry->program);
@@ -3993,7 +4241,9 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 		program_cache_store(entry->program, shader_hash(vertex_shader), shader_hash(fragment_shader));
 	}
 #else
-	entry->program = xgpu_link_program(vertex_shader, fragment_shader, "shader");
+	if (!shader_compiled(vertex_shader) || !shader_compiled(fragment_shader))
+		return NULL;
+	entry->program = xgpu_link_program(shader_compiled(vertex_shader), shader_compiled(fragment_shader), "shader");
 	if (!entry->program)
 		return NULL;
 #endif
@@ -4053,7 +4303,16 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 		snprintf(name, sizeof(name), "tex%d", stage);
 		glUniform1i(glGetUniformLocation(entry->program, name), stage);
 	}
+	if (vertex_hash && fragment_hash)
+	{
+		entry->vertex_hash = vertex_hash;
+		entry->fragment_hash = fragment_hash;
+		entry->next_by_hash = *hash_bucket;
+		*hash_bucket = entry;
+	}
 	last = entry;
+	last_vertex_shader = vertex_shader;
+	last_fragment_shader = fragment_shader;
 	return entry;
 }
 

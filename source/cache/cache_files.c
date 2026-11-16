@@ -1316,6 +1316,13 @@ long scenario_tags_load(
 
 				hud_hires_tags_loaded(cache_file_globals.tag_header->scenario_tag_index);
 			}
+			/* port: the GPU programs the map drew with, loaded ahead
+			(port/linux/src/d3d8_gl.c), as for Xbox maps below */
+			{
+				extern void program_cache_map_loaded(const char *map_name);
+
+				program_cache_map_loaded(cache_file_globals.header.name);
+			}
 			/* (and the mods' tags, as below) */
 			{
 				extern void mods_tags_loaded(char const *map_name);
@@ -1434,6 +1441,13 @@ long scenario_tags_load(
 				extern void hud_hires_tags_loaded(long scenario_index);
 
 				hud_hires_tags_loaded(cache_file_globals.tag_header->scenario_tag_index);
+			}
+			/* port: the GPU programs the map drew with, loaded ahead of its
+			first frame (port/linux/src/d3d8_gl.c) */
+			{
+				extern void program_cache_map_loaded(const char *map_name);
+
+				program_cache_map_loaded(cache_file_globals.header.name);
 			}
 			/* port: the mods' sounds, bitmaps, text and models played over
 			the map's, last, over the menus' tags too, and with the high-res
