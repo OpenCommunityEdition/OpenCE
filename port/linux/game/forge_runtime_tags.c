@@ -3699,6 +3699,7 @@ struct xbox_runtime_closure
 	uint8_t **cloned_roots;
 	int is_red_beam_variant;
 	int include_all_dependencies;
+	int is_custom_bundle;
 };
 
 static void xbox_collect_schema_dependencies(
@@ -3743,27 +3744,41 @@ static void xbox_visit_tag_index(struct xbox_runtime_closure *cl, int32_t abs_id
 	}
 
 	/* Reuse any dependency tag that was already dynamically injected during this session,
-	   or reuse shared base-map dependencies (including sounds) on the active map. */
+	   or reuse shared base-map dependencies (including sounds) on the active map.
+	   For self-contained custom/MCC bundles (is_custom_bundle), only reuse genuine base-map
+	   non-visual dependencies so two custom bundles never cross-link colliding sub-tag paths. */
 	if (cl->order_count > 0 && !cl->is_red_beam_variant && !cl->include_all_dependencies)
 	{
 		char donor_name[256];
 		long ex;
-		snprintf(donor_name, sizeof(donor_name), "%s__donor", tname);
-		ex = tag_loaded((long)grp, donor_name);
-		if (ex != NONE)
+		if (!cl->is_custom_bundle)
 		{
-			cl->runtime_handles[abs_idx] = ex;
-			return;
+			snprintf(donor_name, sizeof(donor_name), "%s__donor", tname);
+			ex = tag_loaded((long)grp, donor_name);
+			if (ex != NONE)
+			{
+				cl->runtime_handles[abs_idx] = ex;
+				return;
+			}
 		}
 		ex = tag_loaded((long)grp, tname);
 		if (ex != NONE)
 		{
 			long base_cnt = (long)forge_get_base_map_tag_count();
-			if ((base_cnt > 0 && (ex & 0xFFFF) >= base_cnt) ||
+			int is_non_visual_dep =
 				(grp != 'bitm' && grp != 'mode' && grp != 'mod2' && grp != 'antr' && grp != 'coll' &&
 				 grp != 'shdr' && grp != 'senv' && grp != 'soso' && grp != 'sotr' &&
 				 grp != 'schi' && grp != 'scex' && grp != 'swat' && grp != 'sgla' &&
-				 grp != 'smet' && grp != 'spla'))
+				 grp != 'smet' && grp != 'spla');
+			if (cl->is_custom_bundle)
+			{
+				if (base_cnt > 0 && (ex & 0xFFFF) < base_cnt && is_non_visual_dep)
+				{
+					cl->runtime_handles[abs_idx] = ex;
+					return;
+				}
+			}
+			else if ((base_cnt > 0 && (ex & 0xFFFF) >= base_cnt) || is_non_visual_dep)
 			{
 				cl->runtime_handles[abs_idx] = ex;
 				return;
@@ -4362,6 +4377,7 @@ static long load_native_xbox_tag_from_source(
 	cl.order = (int32_t *)calloc((size_t)tag_count, sizeof(int32_t));
 	cl.runtime_handles = (long *)malloc((size_t)tag_count * sizeof(long));
 	cl.cloned_roots = (uint8_t **)calloc((size_t)tag_count, sizeof(uint8_t *));
+	cl.is_custom_bundle = (mem_image != NULL) ? 1 : 0;
 	if (!cl.visited || !cl.order || !cl.runtime_handles || !cl.cloned_roots)
 	{
 		free(cl.visited);
@@ -4439,7 +4455,10 @@ static long load_native_xbox_tag_from_source(
 		}
 		else if (abs_idx != root_abs_idx && tag_loaded((long)reg_grp, tname) != NONE)
 		{
-			snprintf(reg_name, sizeof(reg_name), "%s__donor", tname);
+			if (cl.is_custom_bundle)
+				snprintf(reg_name, sizeof(reg_name), "%s__donor_%d", tname, s_dyn_tags.count);
+			else
+				snprintf(reg_name, sizeof(reg_name), "%s__donor", tname);
 		}
 		else
 		{
@@ -7575,16 +7594,20 @@ static int forge_write_sidecar_state_file(char const *leaf)
 			snprintf(base_map_str, sizeof(base_map_str), "%s", forge_get_active_map_name());
 		}
 
-		/* Ensure any network-replicated live instances on a Joiner (edit_entry_index < 0) are synced into edit_state before saving,
-		   and deduplicate any identical placed_objects entries. */
+		/* Ensure any network-replicated or client-streamed live instances (including on a Joiner)
+		   each have a distinct, up-to-date entry in edit_state before saving, and deduplicate
+		   only exact overlapping placed_objects entries. */
 		{
 			int32_t li_idx;
 			int p_i, p_j;
+			uint8_t used_po[FORGE_MAX_PLACED_OBJECTS];
+			memset(used_po, 0, sizeof(used_po));
 			for (li_idx = 0; li_idx < g_forge.live_instance_count; ++li_idx)
 			{
 				struct forge_live_instance *inst = &g_forge.live_instances[li_idx];
 				if (!inst->active || inst->is_default_scenario_object ||
-					!inst->tag_path[0] || inst->x < -90000.0f)
+					!inst->tag_path[0] || strncmp(inst->tag_path, "streaming\\", 10) == 0 ||
+					inst->x < -90000.0f)
 				{
 					continue;
 				}
@@ -7608,11 +7631,23 @@ static int forge_write_sidecar_state_file(char const *leaf)
 				}
 				else if (inst->group_tag != 'spwn' && inst->group_tag != 'tele' && inst->group_tag != 'flag')
 				{
-					if (inst->edit_entry_index < 0 && g_forge.edit_state.placed_object_count < FORGE_MAX_PLACED_OBJECTS)
+					int32_t po_idx = inst->edit_entry_index;
+					if (po_idx < 0 || po_idx >= g_forge.edit_state.placed_object_count || used_po[po_idx])
 					{
-						struct forge_placed_object_entry *po = &g_forge.edit_state.placed_objects[g_forge.edit_state.placed_object_count];
-						inst->edit_entry_index = g_forge.edit_state.placed_object_count++;
-						memset(po, 0, sizeof(*po));
+						if (g_forge.edit_state.placed_object_count < FORGE_MAX_PLACED_OBJECTS)
+						{
+							po_idx = g_forge.edit_state.placed_object_count++;
+							inst->edit_entry_index = po_idx;
+						}
+						else
+						{
+							po_idx = -1;
+						}
+					}
+					if (po_idx >= 0 && po_idx < FORGE_MAX_PLACED_OBJECTS)
+					{
+						struct forge_placed_object_entry *po = &g_forge.edit_state.placed_objects[po_idx];
+						used_po[po_idx] = 1u;
 						po->active = 1;
 						po->source_cache_id = inst->source_cache_id;
 						po->group_tag = inst->group_tag;
@@ -7624,17 +7659,6 @@ static int forge_write_sidecar_state_file(char const *leaf)
 						po->light_intensity_preset = inst->light_intensity_preset;
 						po->light_radius_preset = inst->light_radius_preset;
 						snprintf(po->tag_path, sizeof(po->tag_path), "%s", inst->tag_path);
-						po->x = inst->x;
-						po->y = inst->y;
-						po->z = inst->z;
-						po->yaw = inst->yaw;
-						po->pitch = inst->pitch;
-						po->roll = inst->roll;
-						po->team_index = inst->team_designator;
-					}
-					else if (inst->edit_entry_index >= 0 && inst->edit_entry_index < g_forge.edit_state.placed_object_count)
-					{
-						struct forge_placed_object_entry *po = &g_forge.edit_state.placed_objects[inst->edit_entry_index];
 						po->x = inst->x;
 						po->y = inst->y;
 						po->z = inst->z;
@@ -7659,8 +7683,11 @@ static int forge_write_sidecar_state_file(char const *leaf)
 					dx = a->x - b->x;
 					dy = a->y - b->y;
 					dz = a->z - b->z;
-					if (dx * dx + dy * dy + dz * dz < 0.0025f)
+					if (dx * dx + dy * dy + dz * dz < 0.0001f &&
+						!used_po[p_j])
+					{
 						b->active = 0;
+					}
 				}
 			}
 		}

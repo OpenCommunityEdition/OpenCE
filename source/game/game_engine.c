@@ -9146,6 +9146,9 @@ static void game_engine_update_item_spawn(
 				{
 					continue;
 				}
+				/* port: do not stack duplicate netgame_equipment items on top of existing or Forge-managed items */
+				if (forge_should_skip_netgame_equipment_spawn(definition_index, &equipment->position))
+					continue;
 				object_placement_data_new(
 					&placement_data,
 					definition_index,

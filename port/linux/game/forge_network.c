@@ -1072,13 +1072,25 @@ void forge_network_send_transform_ext(
 	}
 
 	/* If this client instance has not yet been linked to a Host slot (e.g. while the Host
-	   is downloading a custom/MCC tag from this client), send live_idx = -1 and obj_abs = -1
-	   so the Host updates g_host_pending_client_spawns instead of moving an existing Host slot. */
+	   is downloading a custom/MCC tag from this client), send a negative ordinal live_idx
+	   (-1 - unlinked_ord) and obj_abs = -1 so the Host updates the matching entry in
+	   g_host_pending_client_spawns without colliding when multiple custom tags are queued. */
 	if (game_connection() == _game_connection_network_client &&
 		live_idx >= 0 && live_idx < g_forge.live_instance_count &&
 		(g_forge.live_instances[live_idx].pad_inst & 0x80u) != 0)
 	{
-		live_idx = -1;
+		int32_t u_i;
+		int unlinked_ord = 0;
+		for (u_i = 0; u_i < live_idx; u_i++)
+		{
+			if (g_forge.live_instances[u_i].active &&
+				!g_forge.live_instances[u_i].is_default_scenario_object &&
+				(g_forge.live_instances[u_i].pad_inst & 0x80u) != 0)
+			{
+				unlinked_ord++;
+			}
+		}
+		live_idx = -1 - unlinked_ord;
 		obj_abs = -1;
 	}
 
@@ -1449,21 +1461,8 @@ static void forge_client_handle_host_spawn(
 		}
 	}
 
-	/* 1. If the Client is currently holding a locally-created unlinked instance (pad_inst & 0x80) of this tag, match it first */
-	if (g_forge.grabbed_live_index >= 0 && g_forge.grabbed_live_index < g_forge.live_instance_count)
-	{
-		struct forge_live_instance const *cand = &g_forge.live_instances[g_forge.grabbed_live_index];
-		if (cand->active && !cand->is_default_scenario_object &&
-			(cand->pad_inst & 0x80u) != 0 &&
-			cand->group_tag == ce->group_tag && _stricmp(cand->tag_path, ce->tag_path) == 0)
-		{
-			match_idx = g_forge.grabbed_live_index;
-			matched_client_unlinked = 1;
-		}
-	}
-
-	/* 2. Check if host_live_idx points to a locally-created unlinked instance of this tag */
-	if (match_idx < 0 && host_live_idx >= 0 && host_live_idx < g_forge.live_instance_count)
+	/* 1. Check if host_live_idx already points to a locally-created unlinked instance of this tag */
+	if (host_live_idx >= 0 && host_live_idx < g_forge.live_instance_count)
 	{
 		struct forge_live_instance const *cand = &g_forge.live_instances[host_live_idx];
 		if (cand->active && !cand->is_default_scenario_object &&
@@ -1475,20 +1474,30 @@ static void forge_client_handle_host_spawn(
 		}
 	}
 
-	/* 3. Scan for any locally-created unlinked Client instance (pad_inst & 0x80) of this tag */
+	/* 2. Scan locally-created unlinked Client instances (pad_inst & 0x80) of this tag in FIFO order,
+	   preferring the one closest to the confirmed spawn coordinates so multiple queued spawns never collide. */
 	if (match_idx < 0)
 	{
-		for (i = g_forge.live_instance_count - 1; i >= 0; i--)
+		float best_dist_sq = 1.0e30f;
+		for (i = 0; i < g_forge.live_instance_count; i++)
 		{
 			struct forge_live_instance const *cand = &g_forge.live_instances[i];
+			float dx, dy, dz, d2;
 			if (!cand->active || cand->is_default_scenario_object ||
 				(cand->pad_inst & 0x80u) == 0)
 				continue;
 			if (cand->group_tag == ce->group_tag && _stricmp(cand->tag_path, ce->tag_path) == 0)
 			{
-				match_idx = i;
-				matched_client_unlinked = 1;
-				break;
+				dx = cand->x - x;
+				dy = cand->y - y;
+				dz = cand->z - z;
+				d2 = dx * dx + dy * dy + dz * dz;
+				if (match_idx < 0 || d2 + 0.01f < best_dist_sq)
+				{
+					best_dist_sq = d2;
+					match_idx = i;
+					matched_client_unlinked = 1;
+				}
 			}
 		}
 	}
@@ -2048,7 +2057,7 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 			int live_idx = -1, obj_abs = -1, yaw_cr = 0, pitch_cr = 0, roll_cr = 0, is_held = 0;
 			float x = 0.0f, y = 0.0f, z = 0.0f;
 			int n = sscanf(text + 4, "%d:%d:%f:%f:%f:%d:%d:%d:%d", &live_idx, &obj_abs, &x, &y, &z, &yaw_cr, &pitch_cr, &roll_cr, &is_held);
-			if (n >= 8 && live_idx >= -1 && live_idx < FORGE_MAX_LIVE_INSTANCES &&
+			if (n >= 8 && live_idx >= -FORGE_TAG_STREAM_MAX_SESSION_TAGS && live_idx < FORGE_MAX_LIVE_INSTANCES &&
 				obj_abs >= -1 && obj_abs < FORGE_MAX_TRACKED_NET_OBJECTS &&
 				forge_net_coords_valid(x, y, z, yaw_cr, pitch_cr, roll_cr))
 			{
@@ -2089,22 +2098,37 @@ int forge_network_intercept_chat_packet(long machine_index, char const *text, in
 				}
 				else if (machine_index >= 0 && machine_index < FORGE_MAX_CLIENT_MACHINES)
 				{
-					/* Update latest coordinates on any pending client custom-tag spawn from this machine */
+					/* Update latest coordinates on the matching pending client custom-tag spawn from this machine */
+					int want_ord = (live_idx < 0) ? (-1 - live_idx) : -1;
+					int seen_ord = 0;
+					int matched_ps = -1;
+					int last_ps = -1;
 					int ps_i;
-					for (ps_i = FORGE_TAG_STREAM_MAX_SESSION_TAGS - 1; ps_i >= 0; ps_i--)
+					for (ps_i = 0; ps_i < FORGE_TAG_STREAM_MAX_SESSION_TAGS; ps_i++)
 					{
 						if (g_host_pending_client_spawns[ps_i].active &&
 							g_host_pending_client_spawns[ps_i].machine_index == (int32_t)machine_index)
 						{
-							g_host_pending_client_spawns[ps_i].x = x;
-							g_host_pending_client_spawns[ps_i].y = y;
-							g_host_pending_client_spawns[ps_i].z = z;
-							g_host_pending_client_spawns[ps_i].yaw_cr = yaw_cr;
-							g_host_pending_client_spawns[ps_i].pitch_cr = pitch_cr;
-							g_host_pending_client_spawns[ps_i].roll_cr = roll_cr;
-							g_host_pending_client_spawns[ps_i].is_held = (uint8_t)((n >= 9 && is_held) ? 1 : 0);
-							break;
+							last_ps = ps_i;
+							if (seen_ord == want_ord)
+							{
+								matched_ps = ps_i;
+								break;
+							}
+							seen_ord++;
 						}
+					}
+					if (matched_ps < 0)
+						matched_ps = last_ps;
+					if (matched_ps >= 0)
+					{
+						g_host_pending_client_spawns[matched_ps].x = x;
+						g_host_pending_client_spawns[matched_ps].y = y;
+						g_host_pending_client_spawns[matched_ps].z = z;
+						g_host_pending_client_spawns[matched_ps].yaw_cr = yaw_cr;
+						g_host_pending_client_spawns[matched_ps].pitch_cr = pitch_cr;
+						g_host_pending_client_spawns[matched_ps].roll_cr = roll_cr;
+						g_host_pending_client_spawns[matched_ps].is_held = (uint8_t)((n >= 9 && is_held) ? 1 : 0);
 					}
 				}
 			}
@@ -2549,6 +2573,39 @@ static int32_t forge_client_upsert_stream_proxy_instance(
 		return -1;
 
 	inst = &g_forge.live_instances[slot];
+	if (inst->active && !inst->is_default_scenario_object && (inst->pad_inst & 0x80u) != 0)
+	{
+		/* Relocate an unlinked client-placed instance so an incoming Host stream proxy never overwrites it */
+		int32_t reloc = -1;
+		if (g_forge.live_instance_count < FORGE_MAX_LIVE_INSTANCES)
+		{
+			reloc = g_forge.live_instance_count++;
+		}
+		else
+		{
+			int32_t s;
+			for (s = 0; s < g_forge.live_instance_count; s++)
+			{
+				if (!g_forge.live_instances[s].active)
+				{
+					reloc = s;
+					break;
+				}
+			}
+		}
+		if (reloc >= 0 && reloc != slot)
+		{
+			g_forge.live_instances[reloc] = *inst;
+			if (g_forge.grabbed_live_index == slot)
+				g_forge.grabbed_live_index = reloc;
+			if (g_forge.hovered_live_index == slot)
+				g_forge.hovered_live_index = reloc;
+			memset(inst, 0, sizeof(*inst));
+			inst->object_index = NONE;
+			inst->actor_index = NONE;
+			inst->edit_entry_index = -1;
+		}
+	}
 	if (!(inst->active && (inst->pad_inst & 0x40u) != 0 && g_pending_inst_stream[slot].hash == hash))
 	{
 		if (inst->active && inst->object_index != NONE)

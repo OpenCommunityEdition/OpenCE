@@ -94,6 +94,7 @@ static struct {
     long count, first, strings;
     unsigned short salt;
     boolean failed;
+    boolean forge_save;
     struct mcc_pause_assets assets;
     struct mcc_pause_tag tags[MCC_PAUSE_MAX_TAGS];
     long roots[MODE_COUNT][MCC_PAUSE_LAYOUT_COUNT];
@@ -486,6 +487,7 @@ boolean mcc_pause_build(long first_index, short first_salt, struct mcc_pause_ass
     for (layout = 0; layout < MCC_PAUSE_LAYOUT_COUNT; ++layout)
         if (assets->font[layout] == NONE || assets->small_font[layout] == NONE) return FALSE;
     mcc_pause.first = first_index; mcc_pause.salt = (unsigned short)first_salt; mcc_pause.assets = *assets;
+    mcc_pause.forge_save = s_forge_save_enabled_fn && s_forge_save_enabled_fn() ? TRUE : FALSE;
     mcc_pause.arena = malloc(MCC_PAUSE_ARENA_BYTES);
     if (!mcc_pause.arena) return FALSE;
     memset(mcc_pause.confirm, 0xFF, sizeof(mcc_pause.confirm));
@@ -517,6 +519,11 @@ struct mcc_pause_tag const *mcc_pause_tag_at(long ordinal)
     return ordinal >= 0 && ordinal < mcc_pause.count ? &mcc_pause.tags[ordinal] : NULL;
 }
 boolean mcc_pause_owns(long handle) { return mcc_pause_definition(handle) != NULL; }
+boolean mcc_pause_needs_rebuild(void)
+{
+    boolean want = s_forge_save_enabled_fn && s_forge_save_enabled_fn() ? TRUE : FALSE;
+    return mcc_pause.arena && !mcc_pause.failed && mcc_pause.forge_save != want;
+}
 boolean mcc_pause_text_wrap_needed(long handle)
 {
     struct mcc_pause_widget const *widget = mcc_pause_definition(handle);

@@ -2739,6 +2739,41 @@ int32_t forge_3d_spawn_object_at_slot(
 			g_forge.live_instance_count = forced_live_idx + 1;
 		}
 		else if (g_forge.live_instances[forced_live_idx].active &&
+			!g_forge.live_instances[forced_live_idx].is_default_scenario_object &&
+			(g_forge.live_instances[forced_live_idx].pad_inst & 0x80u) != 0)
+		{
+			/* Relocate an unlinked client-placed instance occupying forced_live_idx so an incoming Host spawn never clobbers it */
+			int32_t reloc = -1;
+			if (g_forge.live_instance_count < FORGE_MAX_LIVE_INSTANCES)
+			{
+				reloc = g_forge.live_instance_count++;
+			}
+			else
+			{
+				int32_t s;
+				for (s = 0; s < g_forge.live_instance_count; s++)
+				{
+					if (!g_forge.live_instances[s].active)
+					{
+						reloc = s;
+						break;
+					}
+				}
+			}
+			if (reloc >= 0 && reloc != forced_live_idx)
+			{
+				g_forge.live_instances[reloc] = g_forge.live_instances[forced_live_idx];
+				if (g_forge.grabbed_live_index == forced_live_idx)
+					g_forge.grabbed_live_index = reloc;
+				if (g_forge.hovered_live_index == forced_live_idx)
+					g_forge.hovered_live_index = reloc;
+				memset(&g_forge.live_instances[forced_live_idx], 0, sizeof(struct forge_live_instance));
+				g_forge.live_instances[forced_live_idx].object_index = NONE;
+				g_forge.live_instances[forced_live_idx].actor_index = NONE;
+				g_forge.live_instances[forced_live_idx].edit_entry_index = -1;
+			}
+		}
+		else if (g_forge.live_instances[forced_live_idx].active &&
 			g_forge.live_instances[forced_live_idx].object_index != NONE)
 		{
 			if (forge_valid_object_get(g_forge.live_instances[forced_live_idx].object_index))
@@ -5786,6 +5821,106 @@ static void forge_enforce_runtime_object_properties(void)
 	}
 }
 
+int forge_should_skip_netgame_equipment_spawn(long definition_index, real_point3d const *position)
+{
+	struct object_iterator iter;
+	struct object_datum *dobj;
+	long cur_tick;
+	int i;
+
+	if (!position)
+		return 0;
+
+	cur_tick = game_time_get();
+
+	/* 1. Check if a saved Forge default_edit deleted, moved, or took over respawn timing for this equipment slot */
+	for (i = 0; i < (int)g_forge.edit_state.default_edit_count; i++)
+	{
+		struct forge_default_object_edit const *de = &g_forge.edit_state.default_edits[i];
+		float dx, dy, dz;
+		if (!de->active)
+			continue;
+		if (de->group_tag != 'weap' && de->group_tag != 'eqip')
+			continue;
+		dx = de->orig_x - position->x;
+		dy = de->orig_y - position->y;
+		dz = de->orig_z - position->z;
+		if (dx * dx + dy * dy < 2.25f && dz * dz < 4.0f)
+		{
+			if (de->deleted)
+				return 1;
+			if (cur_tick > 0)
+			{
+				float mdx = de->new_x - de->orig_x;
+				float mdy = de->new_y - de->orig_y;
+				float mdz = de->new_z - de->orig_z;
+				if (mdx * mdx + mdy * mdy + mdz * mdz > 0.01f || de->respawn_timer_sec > 0)
+					return 1;
+			}
+		}
+	}
+
+	/* 2. Check if a live_instance for this default scenario slot is deleted, moved, or still has its item on the ground */
+	for (i = 0; i < g_forge.live_instance_count; i++)
+	{
+		struct forge_live_instance const *inst = &g_forge.live_instances[i];
+		float dx, dy, dz;
+		if (!inst->is_default_scenario_object)
+			continue;
+		if (inst->group_tag != 'weap' && inst->group_tag != 'eqip')
+			continue;
+		dx = inst->orig_x - position->x;
+		dy = inst->orig_y - position->y;
+		dz = inst->orig_z - position->z;
+		if (dx * dx + dy * dy < 2.25f && dz * dz < 4.0f)
+		{
+			if (!inst->active)
+				return 1;
+			if (cur_tick > 0)
+			{
+				float mdx = inst->x - inst->orig_x;
+				float mdy = inst->y - inst->orig_y;
+				float mdz = inst->z - inst->orig_z;
+				if (mdx * mdx + mdy * mdy + mdz * mdz > 0.01f || inst->respawn_timer_sec > 0)
+					return 1;
+				if (inst->object_index != NONE)
+				{
+					struct object_datum *obj = forge_valid_object_get(inst->object_index);
+					if (obj && obj->object.parent_object_index == NONE &&
+						!TEST_FLAG(((struct item_datum *)obj)->item.flags, _item_attached_to_unit_bit))
+					{
+						return 1;
+					}
+				}
+			}
+		}
+	}
+
+	/* 3. On periodic respawns (cur_tick > 0), never stack a duplicate item on top of an unheld item already at this spawn point */
+	if (cur_tick > 0)
+	{
+		object_iterator_new(&iter, _object_mask_item, 0);
+		while ((dobj = object_iterator_next(&iter)) != NULL)
+		{
+			struct item_datum *it = (struct item_datum *)dobj;
+			float dx, dy, dz;
+			if (dobj->object.parent_object_index != NONE ||
+				TEST_FLAG(it->item.flags, _item_attached_to_unit_bit))
+				continue;
+			dx = dobj->object.position.x - position->x;
+			dy = dobj->object.position.y - position->y;
+			dz = dobj->object.position.z - position->z;
+			if (dx * dx + dy * dy < 0.64f && dz * dz < 2.25f)
+				return 1;
+			if (definition_index != NONE && dobj->definition_index == definition_index &&
+				dx * dx + dy * dy < 2.25f && dz * dz < 4.0f)
+				return 1;
+		}
+	}
+
+	return 0;
+}
+
 static void forge_reconcile_live_instances(void)
 {
 	struct scenario *scen = global_scenario_try_and_get();
@@ -5963,10 +6098,16 @@ static void forge_reconcile_live_instances(void)
 					}
 				}
 			}
-			else if (inst->active && !is_held_item && inst->respawn_timer_sec > 0 &&
-				(inst->group_tag == 'weap' || inst->group_tag == 'eqip' || inst->group_tag == 'vehi'))
+			else if (inst->active && !is_held_item &&
+				(inst->group_tag == 'weap' || inst->group_tag == 'eqip' || inst->group_tag == 'vehi') &&
+				(inst->respawn_timer_sec > 0 ||
+				 ((inst->group_tag == 'weap' || inst->group_tag == 'eqip') &&
+				  ((inst->x - inst->orig_x) * (inst->x - inst->orig_x) +
+				   (inst->y - inst->orig_y) * (inst->y - inst->orig_y) +
+				   (inst->z - inst->orig_z) * (inst->z - inst->orig_z) > 0.01f))))
 			{
-				/* Default scenario weapon/equipment/vehicle with explicit Forge respawn timer */
+				long eff_respawn_sec = (inst->respawn_timer_sec > 0) ? (long)inst->respawn_timer_sec : 30L;
+				/* Default scenario weapon/equipment/vehicle with explicit Forge respawn timer or moved position */
 				obj = forge_valid_object_get(inst->object_index);
 				if (inst->group_tag == 'weap' || inst->group_tag == 'eqip')
 				{
@@ -5982,7 +6123,7 @@ static void forge_reconcile_live_instances(void)
 						{
 							inst->death_tick = cur_tick;
 						}
-						else if (cur_tick - inst->death_tick >= (long)inst->respawn_timer_sec * 30L)
+						else if (cur_tick - inst->death_tick >= eff_respawn_sec * 30L)
 						{
 							actual_grp = inst->group_tag;
 							def_idx = forge_resolve_engine_tag(inst->group_tag, inst->tag_path, &actual_grp);
@@ -9831,30 +9972,84 @@ void forge_3d_draw_hud(
 			}
 			if (has_dl && dl_status[0])
 			{
-				short dl_bottom_y = (short)(bar_top_y - (has_toast ? 34 : 4));
-				short bar_w = 260;
-				short bar_h = 8;
-				short bar_x0 = (short)((window_x0 + window_x1 - bar_w) / 2);
-				short bar_y0 = (short)(dl_bottom_y - 34);
-				short fill_w;
-				uint32_t accent = stream_is_upload ? 0xFFFFB038u : 0xFF50B8FFu;
+				short safe_w = (short)(window_x1 - window_x0);
+				short dl_bottom_y = (short)(bar_top_y - (has_toast ? 34 : 6));
+				short w_txt = measure_ce_menu_str_pixels(0, font_index, dl_status);
+				short box_w = (short)(w_txt + 48);
+				short box_h = 48;
+				short bx0, bx1, by0, by1;
+				short track_w, track_x0, track_x1, track_y0, track_y1;
+				short inner_x0, inner_y0, inner_w, inner_h, fill_w;
+				uint32_t accent = stream_is_upload ? 0xFFFFB038u : 0xFF38B0FFu;
+
+				if (box_w < 280)
+					box_w = 280;
+				if (box_w > safe_w - 24)
+					box_w = (short)(safe_w - 24);
+				bx0 = (short)(window_x0 + (safe_w - box_w) / 2);
+				bx1 = (short)(bx0 + box_w);
+				by1 = dl_bottom_y;
+				by0 = (short)(by1 - box_h);
+
 				if (stream_pct < 0)
 					stream_pct = 0;
 				if (stream_pct > 100)
 					stream_pct = 100;
-				fill_w = (short)((bar_w * stream_pct) / 100);
-				draw_sized_bottom_pill_bar(
-					font_index, window_x0, window_x1, dl_bottom_y,
-					dl_status, NULL, 1, _forge_ui_area_toast_bar, accent, NULL);
+
+				set_forge_hud_ui_scale(FORGE_IN_MATCH_HUD_SCALE, (float)(window_x0 + window_x1) * 0.5f, (float)by1);
+
+				/* Outer rounded Halo CE UI box matching the rest of the Forge HUD */
+				draw_ce_pause_box(bx0, by0, box_w, box_h, 0);
+
+				/* Centered status text in the upper half of the rounded box */
+				draw_ce_menu_str_box(
+					0, font_index,
+					(short)(bx0 + 14), (short)(by0 + 6),
+					(short)(bx1 - 14), (short)(by0 + 24),
+					2 /* center */, dl_status, 0xFFFFFFFFu);
+
+				/* Rounded progress bar track centered neatly inside the lower half of the box */
+				track_w = (short)(box_w - 40);
+				track_x0 = (short)(bx0 + (box_w - track_w) / 2);
+				track_x1 = (short)(track_x0 + track_w);
+				track_y0 = (short)(by0 + 27);
+				track_y1 = (short)(track_y0 + 12);
+				if (!draw_ce_rounded_row_bar(0, track_x0, track_y0, track_x1, track_y1))
 				{
-					rectangle2d bg_rect = { (short)(bar_y0 - 2), (short)(bar_x0 - 2), (short)(bar_y0 + bar_h + 2), (short)(bar_x0 + bar_w + 2) };
-					draw_quad(&bg_rect, 0xD80A121Eu);
-					draw_box_border((short)(bar_x0 - 2), (short)(bar_y0 - 2), (short)(bar_x0 + bar_w + 2), (short)(bar_y0 + bar_h + 2), 1, accent);
+					rectangle2d trk_bg = { track_y0, (short)(track_x0 + 1), track_y1, (short)(track_x1 - 1) };
+					rectangle2d trk_cap_l = { (short)(track_y0 + 1), track_x0, (short)(track_y1 - 1), (short)(track_x0 + 1) };
+					rectangle2d trk_cap_r = { (short)(track_y0 + 1), (short)(track_x1 - 1), (short)(track_y1 - 1), track_x1 };
+					draw_quad(&trk_bg, 0xB806101Eu);
+					draw_quad(&trk_cap_l, 0xB806101Eu);
+					draw_quad(&trk_cap_r, 0xB806101Eu);
 				}
+
+				/* Rounded progress fill centered inside the track */
+				inner_x0 = (short)(track_x0 + 3);
+				inner_y0 = (short)(track_y0 + 2);
+				inner_w = (short)(track_w - 6);
+				inner_h = 8;
+				fill_w = (short)((inner_w * stream_pct) / 100);
 				if (fill_w > 0)
 				{
-					rectangle2d fill_rect = { bar_y0, bar_x0, (short)(bar_y0 + bar_h), (short)(bar_x0 + fill_w) };
-					draw_quad(&fill_rect, accent);
+					short fx0 = inner_x0;
+					short fx1 = (short)(inner_x0 + fill_w);
+					short fy0 = inner_y0;
+					short fy1 = (short)(inner_y0 + inner_h);
+					if (fill_w >= 4)
+					{
+						rectangle2d f_mid = { fy0, (short)(fx0 + 1), fy1, (short)(fx1 - 1) };
+						rectangle2d f_cap_l = { (short)(fy0 + 1), fx0, (short)(fy1 - 1), (short)(fx0 + 1) };
+						rectangle2d f_cap_r = { (short)(fy0 + 1), (short)(fx1 - 1), (short)(fy1 - 1), fx1 };
+						draw_quad(&f_mid, accent);
+						draw_quad(&f_cap_l, accent);
+						draw_quad(&f_cap_r, accent);
+					}
+					else
+					{
+						rectangle2d f_all = { (short)(fy0 + 1), fx0, (short)(fy1 - 1), fx1 };
+						draw_quad(&f_all, accent);
+					}
 				}
 			}
 		}

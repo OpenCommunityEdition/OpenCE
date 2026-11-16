@@ -53,6 +53,8 @@ editor and sidecar map loader to the game loop.
 #include "objects/objects.h"
 #include "units/units.h"
 #include "networking/network_client_manager.h"
+#include "networking/network_game_globals.h"
+#include "networking/network_game_manager.h"
 #include "../src/p2p.h"
 #include "game_modes.h"
 
@@ -3302,6 +3304,9 @@ int forge_is_main_menu_active(void)
 	return 0;
 }
 
+static void forge_ensure_pause_menu_save_button(void);
+static void forge_sync_session_enabled_from_network(void);
+
 void network_chat_update(void)
 {
 	unsigned long now = system_milliseconds();
@@ -3325,19 +3330,9 @@ void network_chat_update(void)
 	/* Synchronize g_forge_session_enabled on network clients with the host's active game variant */
 	if (game_connection() == _game_connection_network_client)
 	{
-		struct game_variant const *v = game_engine_get_variant();
-		if (v)
-		{
-			int is_forge_var = (_wcsicmp(v->human_readable_game_description, L"Forge") == 0 ||
-								v->universal_variant.score_to_win == 0x3FFFFFFF ||
-								(v->universal_variant.flags & (1u << 7)) != 0) ? 1 : 0;
-			g_forge_session_enabled = is_forge_var;
-			if (!is_forge_var)
-			{
-				g_forge.mode = _forge_mode_play;
-				g_forge.active_modal = _forge_modal_none;
-			}
-		}
+		forge_sync_session_enabled_from_network();
+		if (g_forge_session_enabled)
+			forge_ensure_pause_menu_save_button();
 	}
 
 	/* Reset per-map monitor state only when switching between different active maps */
@@ -3780,10 +3775,41 @@ long game_engine_remap_object_definition(long definition_index)
 	return orig_game_engine_remap_object_definition(definition_index);
 }
 
+static void forge_ensure_pause_menu_save_button(void);
+
+static int forge_variant_is_forge_mode(struct game_variant const *v)
+{
+	if (!v)
+		return 0;
+	return (_wcsicmp(v->human_readable_game_description, L"Forge") == 0 ||
+			v->universal_variant.score_to_win == 0x3FFFFFFF ||
+			(v->universal_variant.flags & (1u << 7)) != 0) ? 1 : 0;
+}
+
+static void forge_sync_session_enabled_from_network(void)
+{
+	if (game_connection() == _game_connection_network_client ||
+		(global_network_game_client_get() != NULL && global_network_game_server_get() == NULL))
+	{
+		struct network_game const *ng = network_game_get_game();
+		struct game_variant const *v = ng ? &ng->variant : game_engine_get_variant();
+		int is_forge_var = forge_variant_is_forge_mode(v);
+		if (!is_forge_var && v != game_engine_get_variant())
+			is_forge_var = forge_variant_is_forge_mode(game_engine_get_variant());
+		g_forge_session_enabled = is_forge_var;
+		if (!is_forge_var)
+		{
+			g_forge.mode = _forge_mode_play;
+			g_forge.active_modal = _forge_modal_none;
+		}
+	}
+}
+
 /* ---------- Point 2 & 6: In-Game Escape Pause Menu "SAVE FORGE MAP" Patch & Map Unload Cleanup */
 
 static boolean forge_mcc_pause_save_enabled(void)
 {
+	forge_sync_session_enabled_from_network();
 	return g_forge_session_enabled ? TRUE : FALSE;
 }
 
@@ -3823,57 +3849,10 @@ void menu_tags_unloaded(void)
 	orig_menu_tags_unloaded();
 }
 
-void menu_tags_loaded(char const *map_name)
+static void forge_ensure_pause_menu_save_button(void)
 {
-	mcc_pause_set_forge_save_callbacks(forge_mcc_pause_save_enabled, forge_trigger_save_map_action);
-
-	/* Clean up any leftover LAN/Internet browser client or server when loading a solo map so LEAVE GAME returns to the main menu */
-	if (map_name && _stricmp(map_name, "ui") != 0 && _stricmp(map_name, "levels\\ui\\ui") != 0 &&
-		(game_connection() == _game_connection_local || !network_game_is_active()))
-	{
-		dispose_global_network_game_client();
-		dispose_global_network_game_server();
-		network_game_accept_remote_connections(FALSE);
-	}
-
-	orig_menu_tags_loaded(map_name);
-
-	s_save_forge_btn_tag = NONE;
-	g_last_forge_map_name[0] = 0;
-	g_forge.live_instance_count = 0;
-
-	if (map_name && (_stricmp(map_name, "ui") == 0 || _stricmp(map_name, "levels\\ui\\ui") == 0))
-	{
-		forge_reset_transient_session_state(0);
-		forge_set_pending_sidecar_leaf(NULL);
-		g_forge_session_enabled = 0;
-		g_forge.mode = _forge_mode_play;
-		g_forge.active_modal = _forge_modal_none;
-		forge_menu_custom_edition_maps_look_again();
-	}
-	else
-	{
-		struct game_variant const *v = game_engine_get_variant();
-		if (game_connection() == _game_connection_network_client && v)
-		{
-			int is_forge_var = (_wcsicmp(v->human_readable_game_description, L"Forge") == 0 ||
-								v->universal_variant.score_to_win == 0x3FFFFFFF ||
-								(v->universal_variant.flags & (1u << 7)) != 0) ? 1 : 0;
-			g_forge_session_enabled = is_forge_var;
-			if (!is_forge_var)
-			{
-				g_forge.mode = _forge_mode_play;
-				g_forge.active_modal = _forge_modal_none;
-			}
-		}
-		forge_reset_transient_session_state(1);
-		snprintf(g_last_forge_map_name, sizeof(g_last_forge_map_name), "%s", forge_get_active_map_name());
-	}
-
-	forge_normalize_mcc_hud_tags();
-
-	/* Patch "SAVE FORGE MAP" button into the in-game Escape Pause Menu when in a Forge session */
-	if (g_forge_session_enabled && map_name && strcmp(map_name, "ui") != 0 && !mcc_cache_tags_loaded())
+	if (!g_forge_session_enabled || forge_is_main_menu_active() || mcc_cache_tags_loaded() || s_save_forge_btn_tag != NONE)
+		return;
 	{
 		long settings_btn_tag = tag_loaded('DeLa', "pc\\pause\\settings_button");
 		long existing_count = 0;
@@ -4048,7 +4027,7 @@ void menu_tags_loaded(char const *map_name)
 						*(uint8_t **)(w_def + 0x3E4) = new_children;
 						*(int16_t *)(w_def + 0x28) = (int16_t)(*(int16_t const *)(w_def + 0x28) + spacing); /* bounds.y1 */
 
-						/* Shift the pause list widget itself upward inside its parent screen widget so all 4 options sit centered inside the box */
+						/* Shift the pause list widget itself upward inside its parent screen widget so all options sit centered inside the box */
 						if (old_y0 < 60)
 						{
 							int16_t lift = (old_y0 > 10) ? 14 : 22;
@@ -4083,6 +4062,51 @@ void menu_tags_loaded(char const *map_name)
 			}
 		}
 	}
+}
+
+void menu_tags_loaded(char const *map_name)
+{
+	mcc_pause_set_forge_save_callbacks(forge_mcc_pause_save_enabled, forge_trigger_save_map_action);
+
+	/* Clean up any leftover LAN/Internet browser client or server when loading a solo map so LEAVE GAME returns to the main menu */
+	if (map_name && _stricmp(map_name, "ui") != 0 && _stricmp(map_name, "levels\\ui\\ui") != 0 &&
+		(game_connection() == _game_connection_local || !network_game_is_active()))
+	{
+		dispose_global_network_game_client();
+		dispose_global_network_game_server();
+		network_game_accept_remote_connections(FALSE);
+	}
+
+	if (map_name && _stricmp(map_name, "ui") != 0 && _stricmp(map_name, "levels\\ui\\ui") != 0)
+		forge_sync_session_enabled_from_network();
+
+	orig_menu_tags_loaded(map_name);
+
+	s_save_forge_btn_tag = NONE;
+	g_last_forge_map_name[0] = 0;
+	g_forge.live_instance_count = 0;
+
+	if (map_name && (_stricmp(map_name, "ui") == 0 || _stricmp(map_name, "levels\\ui\\ui") == 0))
+	{
+		forge_reset_transient_session_state(0);
+		forge_set_pending_sidecar_leaf(NULL);
+		g_forge_session_enabled = 0;
+		g_forge.mode = _forge_mode_play;
+		g_forge.active_modal = _forge_modal_none;
+		forge_menu_custom_edition_maps_look_again();
+	}
+	else
+	{
+		forge_sync_session_enabled_from_network();
+		forge_reset_transient_session_state(1);
+		snprintf(g_last_forge_map_name, sizeof(g_last_forge_map_name), "%s", forge_get_active_map_name());
+	}
+
+	forge_normalize_mcc_hud_tags();
+
+	/* Patch "SAVE FORGE MAP" button into the in-game Escape Pause Menu when in a Forge session */
+	if (g_forge_session_enabled && map_name && strcmp(map_name, "ui") != 0 && !mcc_cache_tags_loaded())
+		forge_ensure_pause_menu_save_button();
 
 	/* Ensure local tag cache is extracted and loaded when in a Forge session */
 	if (g_forge_session_enabled)

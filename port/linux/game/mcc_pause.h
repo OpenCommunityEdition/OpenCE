@@ -59,5 +59,6 @@ void mcc_pause_dispose(void);
 void mcc_pause_friendly_fire(boolean enabled);
 void mcc_pause_set_forge_save_callbacks(boolean (*enabled_fn)(void), void (*trigger_fn)(void));
 void mcc_pause_trigger_forge_save(void);
+boolean mcc_pause_needs_rebuild(void);
 
 #endif

@@ -144,6 +144,7 @@ int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel)
 port/linux/game/forge_3d_mode.c, port/linux/game/custom_edition_cache.c) */
 extern int g_forge_session_enabled;
 int forge_is_unit_in_monitor_mode(long unit_index);
+int forge_should_skip_netgame_equipment_spawn(long definition_index, union real_point3d const *position);
 void custom_edition_map_paths_forget(void);
 
 #endif
