@@ -459,9 +459,10 @@ static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
  * sheets again, the same pixels each time, and each time the upscale (tens
  * of milliseconds for a 256-pixel sheet) held a frame up, about once a
  * minute through a game. The same pixels, width, height and kind give the
- * same texture, so it is used again (the pixels compared whole). Up to UPSCALE_CACHE_SIZE are kept;
- * those no texture uses go, the longest unused first, as more are made, and
- * all of them when a map is unloaded. */
+ * same texture, so it is used again (the pixels compared whole), in this map
+ * or a later one: the stock sheets are the same in every map. Up to
+ * UPSCALE_CACHE_SIZE are kept; of those no texture uses, the
+ * UPSCALE_CACHE_UNUSED last used stay (all go when the cache is full). */
 #define UPSCALE_CACHE_SIZE 32
 #define UPSCALE_CACHE_UNUSED 8
 
@@ -875,12 +876,6 @@ void hud_hires_map_unloaded(void)
 {
 #ifdef HUD_HIRES_DECODE_AHEAD
 	long asset;
-#endif
-
-	/* (the upscaled sheets no texture uses) */
-	if (xgpu_gl_ready())
-		upscale_cache_trim(0);
-#ifdef HUD_HIRES_DECODE_AHEAD
 
 	pthread_mutex_lock(&decode_lock);
 	decode_stopping = 1;
