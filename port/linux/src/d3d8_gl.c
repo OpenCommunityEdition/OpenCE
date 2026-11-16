@@ -602,6 +602,9 @@ struct program_entry
 	program_hash_buckets list */
 	unsigned long long vertex_hash, fragment_hash;
 	struct program_entry *next_by_hash;
+	/* port: the last map it was drawn with, counting maps loaded
+	(program_map_drawn) */
+	unsigned long map_drawn;
 	GLuint program;
 	GLint constants;
 	GLint viewport_scale;
@@ -796,6 +799,12 @@ struct program_cache_entry
 	whose list has it (program_cache.map) */
 	GLuint map_program;
 	unsigned long map;
+	/* port: its program the game's already (program_cache_load,
+	program_cache_store): then not loaded again ahead of a map */
+	BOOL live;
+	/* port: program_cache_preload_shared's count of the other maps' lists
+	that have it, for the map numbered shared_map, and the last list counted */
+	unsigned long shared_map, shared_list, shared_count;
 };
 
 static struct
@@ -982,6 +991,19 @@ static void program_cache_map_list(struct program_cache_entry *entry)
 		fflush(program_cache.map_file);
 }
 
+/* port: a program the game draws with, on the list of the map loaded the
+first time that map draws with it, made now or for an earlier map: a
+program alive from the last map was never loaded again, so it was missing
+from the list of each map after the first of a run */
+static void program_map_drawn(struct program_entry *entry)
+{
+	if (entry->map_drawn == program_cache.map)
+		return;
+	entry->map_drawn = program_cache.map;
+	if (program_cache.enabled && entry->vertex_hash && entry->fragment_hash)
+		program_cache_map_list(program_cache_find(entry->vertex_hash, entry->fragment_hash));
+}
+
 /* the cached program of these shaders: loaded with the map's
 (program_cache_map_loaded), or now; 0 if there is none or the driver
 refuses it */
@@ -1002,8 +1024,73 @@ static GLuint program_cache_load(unsigned long long vertex_hash, unsigned long l
 	if (!program)
 		return 0;
 	program_cache.loaded++;
+	entry->live = TRUE;
 	program_cache_map_list(entry);
 	return program;
+}
+
+/* port: the cached programs that the lists of two or more maps other than
+this one and the menus have, loaded (program_cache_map_loaded); the number
+loaded */
+static long program_cache_preload_shared(const char *name)
+{
+	static unsigned long list_serial;
+	char pattern[64], own[128], path[640];
+	char **files;
+	int count = 0, index;
+	long loaded = 0, bucket;
+	struct program_cache_entry *entry;
+
+	snprintf(pattern, sizeof(pattern), "%s-*.list", program_cache.driver_name);
+	snprintf(own, sizeof(own), "%s-%s.list", program_cache.driver_name, name);
+	files = SDL_GlobDirectory(program_cache.directory, pattern, 0, &count);
+	if (!files)
+		return 0;
+	for (index = 0; index < count; index++)
+	{
+		unsigned long long pair[2];
+		size_t length = strlen(files[index]);
+		FILE *file;
+
+		if (!strcmp(files[index], own) || (length >= 8 && !strcmp(files[index] + length - 8, "-ui.list")))
+			continue;
+		snprintf(path, sizeof(path), "%s/%s", program_cache.directory, files[index]);
+		if (!(file = fopen(path, "rb")))
+			continue;
+		list_serial++;
+		while (fread(pair, sizeof(pair), 1, file) == 1)
+		{
+			entry = program_cache_find(pair[0], pair[1]);
+			if (!entry || !entry->length)
+				continue;
+			if (entry->shared_map != program_cache.map)
+			{
+				entry->shared_map = program_cache.map;
+				entry->shared_count = 0;
+				entry->shared_list = 0;
+			}
+			/* (once a list) */
+			if (entry->shared_list != list_serial)
+			{
+				entry->shared_list = list_serial;
+				entry->shared_count++;
+			}
+		}
+		fclose(file);
+	}
+	SDL_free(files);
+	for (bucket = 0; bucket < PROGRAM_CACHE_BUCKETS; bucket++)
+	{
+		for (entry = program_cache.buckets[bucket]; entry; entry = entry->next)
+		{
+			if (entry->shared_map == program_cache.map && entry->shared_count >= 2 && entry->length &&
+				!entry->live && !entry->map_program && (entry->map_program = program_cache_read(entry)) != 0)
+			{
+				loaded++;
+			}
+		}
+	}
+	return loaded;
 }
 
 /* port: The programs a map drew with, loaded as it loads, ahead of its
@@ -1019,8 +1106,9 @@ void program_cache_map_loaded(const char *map_name)
 {
 	char path[600], name[64];
 	unsigned long long (*pairs)[2] = NULL;
-	long count = 0, kept = 0, loaded = 0, index, bucket;
+	long count = 0, kept = 0, loaded = 0, shared = 0, index, bucket;
 	FILE *file;
+	BOOL listed;
 	Uint64 start = SDL_GetPerformanceCounter();
 	struct program_cache_entry *entry;
 
@@ -1042,6 +1130,7 @@ void program_cache_map_loaded(const char *map_name)
 
 	/* the list read whole: kept are the pairs the cache has a program for */
 	file = fopen(path, "rb");
+	listed = file != NULL;
 	if (file)
 	{
 		fseek(file, 0, SEEK_END);
@@ -1062,7 +1151,7 @@ void program_cache_map_loaded(const char *map_name)
 		pairs[kept][0] = pairs[index][0];
 		pairs[kept][1] = pairs[index][1];
 		kept++;
-		if (!entry->map_program && (entry->map_program = program_cache_read(entry)) != 0)
+		if (!entry->live && !entry->map_program && (entry->map_program = program_cache_read(entry)) != 0)
 			loaded++;
 	}
 	/* (the last map's not on this one's list) */
@@ -1078,6 +1167,13 @@ void program_cache_map_loaded(const char *map_name)
 		}
 	}
 
+	/* a map with no list yet, in its first game: the programs that two or
+	more other maps' lists have (most of a map's are), loaded too; those it
+	does not draw with are deleted as the next map loads, as above, and its
+	list has only those it draws with */
+	if (!listed && strcmp(name, "ui"))
+		shared = program_cache_preload_shared(name);
+
 	/* written again with only those kept, and open to add to */
 	program_cache.map_file = fopen(path, "wb");
 	if (program_cache.map_file && kept)
@@ -1086,7 +1182,7 @@ void program_cache_map_loaded(const char *map_name)
 		fflush(program_cache.map_file);
 	}
 	free(pairs);
-	platform_log("shader cache: %ld of %s's programs loaded in %.0f ms", loaded, name,
+	platform_log("shader cache: %ld of %s's programs loaded, and %ld that other maps share, in %.0f ms", loaded, name, shared,
 		(double)(SDL_GetPerformanceCounter() - start) * 1000.0 / (double)SDL_GetPerformanceFrequency());
 }
 
@@ -1139,6 +1235,7 @@ static void program_cache_store(GLuint program, unsigned long long vertex_hash, 
 			entry->length = header.length;
 			entry->data_hash = header.data_hash;
 			entry->offset = program_cache.end + sizeof(header);
+			entry->live = TRUE;
 			program_cache_map_list(entry);
 		}
 		program_cache.end += sizeof(header) + header.length;
@@ -1150,6 +1247,11 @@ static void program_cache_store(GLuint program, unsigned long long vertex_hash, 
 void program_cache_map_loaded(const char *map_name)
 {
 	(void)map_name;
+}
+
+static void program_map_drawn(struct program_entry *entry)
+{
+	(void)entry;
 }
 #endif
 
@@ -4159,7 +4261,10 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 	struct program_entry **hash_bucket;
 
 	if (last && last_vertex_shader == vertex_shader && last_fragment_shader == fragment_shader)
+	{
+		program_map_drawn(last);
 		return last;
+	}
 	for (entry = *bucket; entry; entry = entry->next)
 	{
 		if (entry->vertex_shader == vertex_shader && entry->fragment_shader == fragment_shader)
@@ -4171,6 +4276,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 			last = entry;
 			last_vertex_shader = vertex_shader;
 			last_fragment_shader = fragment_shader;
+			program_map_drawn(entry);
 			return entry;
 		}
 	}
@@ -4202,6 +4308,7 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 			{
 				entry->same = other;
 				last = other;
+				program_map_drawn(other);
 				last_vertex_shader = vertex_shader;
 				last_fragment_shader = fragment_shader;
 				return other;
