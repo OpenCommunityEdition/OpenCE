@@ -19,7 +19,7 @@ extern "C" {
 
 #include "halo_port_limits.h"
 
-#define FORGE_VERSION_STRING "2.11.1"
+#define FORGE_VERSION_STRING "2.12.0"
 #define FORGE_NETWORK_VERSION 0x4633
 #define FORGE_GAME_KIND 0x46
 #ifndef HALO_PORT_NETWORK_VERSION_STOCK
@@ -500,6 +500,7 @@ unsigned char forge_tag_stream_handles_message(void const *message, unsigned sho
 void forge_tag_stream_handle_message(long machine_index, void const *message, unsigned short size, unsigned char from_stream);
 int forge_network_get_tag_download_status(char *out_text, size_t out_sz);
 int forge_network_get_tag_stream_progress(char *out_text, size_t out_sz, int *out_pct, int *out_is_upload);
+int forge_network_is_initial_tag_sync_active(char *out_title, size_t title_sz, char *out_detail, size_t detail_sz, int *out_pct);
 void forge_network_register_host_object(int32_t live_idx, long object_index, long definition_index, uint32_t group_tag, char const *tag_path);
 
 #undef GetAsyncKeyState

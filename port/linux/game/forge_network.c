@@ -126,10 +126,10 @@ static int g_host_machine_mon_synced[FORGE_MAX_CLIENT_MACHINES];
 #define FORGE_TAG_STREAM_MAX_COMP_BYTES       (16u * 1024u * 1024u)
 #define FORGE_TAG_STREAM_MAX_UNCOMP_BYTES     (64u * 1024u * 1024u)
 #define FORGE_TAG_STREAM_MAX_CHUNKS           ((FORGE_TAG_STREAM_MAX_COMP_BYTES + FORGE_TAG_STREAM_CHUNK_BYTES - 1u) / FORGE_TAG_STREAM_CHUNK_BYTES)
-#define FORGE_TAG_STREAM_CHUNKS_PER_TICK      6
-#define FORGE_TAG_STREAM_BYTES_PER_SEC        (128u * 1024u)
+#define FORGE_TAG_STREAM_CHUNKS_PER_TICK      12
+#define FORGE_TAG_STREAM_BYTES_PER_SEC        (1024u * 1024u)
 #define FORGE_TAG_STREAM_MAX_BURST_BYTES      (16u * 1024u)
-#define FORGE_TAG_STREAM_MAX_BACKLOG          (16L * 1024L)
+#define FORGE_TAG_STREAM_MAX_BACKLOG          (64L * 1024L)
 #define FORGE_TAG_STREAM_STALL_TIMEOUT_MS     15000u
 #define FORGE_TAG_STREAM_MAX_ATTEMPTS         3
 #define FORGE_TAG_STREAM_MAX_SESSION_TAGS     32
@@ -277,6 +277,10 @@ static struct
 	int settled_count;
 	int downloaded_count;
 	int strikes;
+	int initial_sync_loading;
+	int initial_sync_total;
+	unsigned long initial_sync_idle_since_ms;
+	unsigned long join_ms;
 } g_client_tag_rx;
 
 static struct forge_client_pending_instance g_pending_inst_stream[FORGE_MAX_LIVE_INSTANCES];
@@ -623,6 +627,7 @@ void forge_network_reset_session(void)
 	}
 	memset(g_pending_slot_props, 0, sizeof(g_pending_slot_props));
 	forge_tag_stream_reset_state();
+	g_client_tag_rx.join_ms = g_client_join_ms;
 }
 
 static int forge_object_is_network_shared(long obj_idx)
@@ -2515,6 +2520,14 @@ static void forge_enqueue_tag_download_from(uint32_t hash, int32_t source_machin
 		g_client_tag_rx.queue_attempts[g_client_tag_rx.queue_count] = 0;
 		g_client_tag_rx.queue_source_machine[g_client_tag_rx.queue_count] = source_machine_index;
 		g_client_tag_rx.queue_count++;
+		if (source_machine_index < 0 && game_connection() == _game_connection_network_client &&
+			(g_client_tag_rx.initial_sync_loading || g_client_tag_rx.join_ms == 0 ||
+			 (system_milliseconds() - g_client_tag_rx.join_ms) < 8000ul))
+		{
+			g_client_tag_rx.initial_sync_loading = 1;
+			g_client_tag_rx.initial_sync_total++;
+			g_client_tag_rx.initial_sync_idle_since_ms = 0;
+		}
 	}
 }
 
@@ -3703,6 +3716,89 @@ static void forge_tag_stream_tick(unsigned long now)
 			}
 		}
 	}
+
+	if (g_client_tag_rx.initial_sync_loading)
+	{
+		if (g_client_tag_rx.state != _forge_tag_rx_idle || g_client_tag_rx.queue_count > 0)
+		{
+			g_client_tag_rx.initial_sync_idle_since_ms = 0;
+		}
+		else
+		{
+			if (g_client_tag_rx.initial_sync_idle_since_ms == 0)
+				g_client_tag_rx.initial_sync_idle_since_ms = now;
+			else if ((now - g_client_tag_rx.initial_sync_idle_since_ms) >= 350ul)
+				g_client_tag_rx.initial_sync_loading = 0;
+		}
+	}
+}
+
+int forge_network_is_initial_tag_sync_active(
+	char *out_title,
+	size_t title_sz,
+	char *out_detail,
+	size_t detail_sz,
+	int *out_pct)
+{
+	int remaining, total, cur_idx, tag_pct = 5, overall_pct = 100;
+
+	if (out_title && title_sz > 0)
+		out_title[0] = '\0';
+	if (out_detail && detail_sz > 0)
+		out_detail[0] = '\0';
+	if (out_pct)
+		*out_pct = 0;
+
+	if (game_connection() != _game_connection_network_client || !g_client_tag_rx.initial_sync_loading)
+		return 0;
+
+	remaining = g_client_tag_rx.queue_count + (g_client_tag_rx.state != _forge_tag_rx_idle ? 1 : 0);
+	total = (g_client_tag_rx.initial_sync_total >= remaining && g_client_tag_rx.initial_sync_total > 0)
+		? g_client_tag_rx.initial_sync_total
+		: (remaining > 0 ? remaining : 1);
+
+	if (remaining <= 0)
+	{
+		if (out_title && title_sz > 0)
+			snprintf(out_title, title_sz, "LOADING CUSTOM MAP TAGS (%d OF %d)", total, total);
+		if (out_detail && detail_sz > 0)
+			snprintf(out_detail, detail_sz, "Custom map tags ready (100%%)");
+		if (out_pct)
+			*out_pct = 100;
+		return 1;
+	}
+
+	cur_idx = total - remaining + 1;
+	if (cur_idx < 1)
+		cur_idx = 1;
+	if (cur_idx > total)
+		cur_idx = total;
+
+	if (g_client_tag_rx.state == _forge_tag_rx_receiving && g_client_tag_rx.chunk_count > 0)
+	{
+		char const *label = g_client_tag_rx.display_name[0] ? g_client_tag_rx.display_name : g_client_tag_rx.tag_path;
+		tag_pct = (int)(((uint32_t)g_client_tag_rx.chunks_received * 100u) / (uint32_t)g_client_tag_rx.chunk_count);
+		if (out_detail && detail_sz > 0)
+			snprintf(out_detail, detail_sz, "Streaming %s... (%d%%)", label, tag_pct);
+	}
+	else
+	{
+		tag_pct = 5;
+		if (out_detail && detail_sz > 0)
+			snprintf(out_detail, detail_sz, "Requesting custom map tag (%d remaining)...", remaining);
+	}
+
+	overall_pct = ((cur_idx - 1) * 100 + tag_pct) / total;
+	if (overall_pct < 2)
+		overall_pct = 2;
+	if (overall_pct > 100)
+		overall_pct = 100;
+
+	if (out_title && title_sz > 0)
+		snprintf(out_title, title_sz, "LOADING CUSTOM MAP TAGS (%d OF %d)", cur_idx, total);
+	if (out_pct)
+		*out_pct = overall_pct;
+	return 1;
 }
 
 int forge_network_get_tag_stream_progress(char *out_text, size_t out_sz, int *out_pct, int *out_is_upload)

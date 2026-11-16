@@ -6809,6 +6809,15 @@ void forge_3d_update(float dt)
 	}
 
 	/* Only run Forge editor controls when inside a Forge session; in Standard Mode, still reconcile saved map edits & MP sync */
+	if (forge_network_is_initial_tag_sync_active(NULL, 0, NULL, 0, NULL))
+	{
+		director_inhibit_input(0);
+		director_inhibit_facing(0);
+		forge_network_sync_tick();
+		forge_reconcile_live_instances();
+		forge_enforce_runtime_object_properties();
+		return;
+	}
 	if (!g_forge_session_enabled)
 	{
 		if (g_forge.has_saved_map_once ||
@@ -9502,8 +9511,8 @@ void forge_3d_draw_hud(
 
 	(void)line_height;
 
-	/* Never draw any Forge overlay on the main menu (levels\ui\ui) or when not in a Forge session */
-	if (!g_forge_session_enabled || local_player_index != 0 || w <= 0 || h <= 0)
+	/* Never draw any Forge overlay on the main menu (levels\ui\ui) */
+	if (local_player_index != 0 || w <= 0 || h <= 0)
 		return;
 	if (forge_is_main_menu_active())
 		return;
@@ -9512,6 +9521,93 @@ void forge_3d_draw_hud(
 
 	/* Ensure customizable UI theme & PNG backgrounds from OpenCE Forge/ui/ are loaded */
 	forge_ui_theme_ensure_loaded();
+
+	/* Full-screen Halo CE Loading Overlay while a Joiner is downloading the map's initial custom tags */
+	{
+		char sync_title[128];
+		char sync_detail[128];
+		int sync_pct = 0;
+		if (forge_network_is_initial_tag_sync_active(
+			sync_title, sizeof(sync_title),
+			sync_detail, sizeof(sync_detail),
+			&sync_pct))
+		{
+			rectangle2d full_bg = { window_y0, window_x0, window_y1, window_x1 };
+			short box_w = 420;
+			short box_h = 104;
+			short bx0, bx1, by0, by1;
+			short track_w, track_x0, track_x1, track_y0, track_y1;
+			short inner_x0, inner_y0, inner_w, inner_h, fill_w;
+
+			if (box_w > w - 32)
+				box_w = (short)(w - 32);
+			bx0 = (short)(window_x0 + (w - box_w) / 2);
+			bx1 = (short)(bx0 + box_w);
+			by0 = (short)(window_y0 + (h - box_h) / 2);
+			by1 = (short)(by0 + box_h);
+
+			draw_quad(&full_bg, 0xF2040B16u);
+			set_forge_hud_ui_scale(1.0f, 0.0f, 0.0f);
+			draw_ce_pause_box(bx0, by0, box_w, box_h, 0);
+
+			draw_ce_menu_str_box(
+				0, font_index,
+				(short)(bx0 + 16), (short)(by0 + 16),
+				(short)(bx1 - 16), (short)(by0 + 36),
+				2 /* center */, sync_title, 0xFF2896FFu);
+			draw_ce_menu_str_box(
+				0, font_index,
+				(short)(bx0 + 16), (short)(by0 + 40),
+				(short)(bx1 - 16), (short)(by0 + 60),
+				2 /* center */, sync_detail, 0xFFFFFFFFu);
+
+			track_w = (short)(box_w - 56);
+			track_x0 = (short)(bx0 + (box_w - track_w) / 2);
+			track_x1 = (short)(track_x0 + track_w);
+			track_y0 = (short)(by0 + 68);
+			track_y1 = (short)(track_y0 + 14);
+			if (!draw_ce_rounded_row_bar(0, track_x0, track_y0, track_x1, track_y1))
+			{
+				rectangle2d trk_bg = { track_y0, (short)(track_x0 + 1), track_y1, (short)(track_x1 - 1) };
+				rectangle2d trk_cap_l = { (short)(track_y0 + 1), track_x0, (short)(track_y1 - 1), (short)(track_x0 + 1) };
+				rectangle2d trk_cap_r = { (short)(track_y0 + 1), (short)(track_x1 - 1), (short)(track_y1 - 1), track_x1 };
+				draw_quad(&trk_bg, 0xB806101Eu);
+				draw_quad(&trk_cap_l, 0xB806101Eu);
+				draw_quad(&trk_cap_r, 0xB806101Eu);
+			}
+
+			inner_x0 = (short)(track_x0 + 3);
+			inner_y0 = (short)(track_y0 + 3);
+			inner_w = (short)(track_w - 6);
+			inner_h = 8;
+			fill_w = (short)((inner_w * sync_pct) / 100);
+			if (fill_w > 0)
+			{
+				short fx0 = inner_x0;
+				short fx1 = (short)(inner_x0 + fill_w);
+				short fy0 = inner_y0;
+				short fy1 = (short)(inner_y0 + inner_h);
+				if (fill_w >= 4)
+				{
+					rectangle2d f_mid = { fy0, (short)(fx0 + 1), fy1, (short)(fx1 - 1) };
+					rectangle2d f_cap_l = { (short)(fy0 + 1), fx0, (short)(fy1 - 1), (short)(fx0 + 1) };
+					rectangle2d f_cap_r = { (short)(fy0 + 1), (short)(fx1 - 1), (short)(fy1 - 1), fx1 };
+					draw_quad(&f_mid, 0xFF38B0FFu);
+					draw_quad(&f_cap_l, 0xFF38B0FFu);
+					draw_quad(&f_cap_r, 0xFF38B0FFu);
+				}
+				else
+				{
+					rectangle2d f_all = { (short)(fy0 + 1), fx0, (short)(fy1 - 1), fx1 };
+					draw_quad(&f_all, 0xFF38B0FFu);
+				}
+			}
+			return;
+		}
+	}
+
+	if (!g_forge_session_enabled)
+		return;
 
 	/* Draw 3D-projected Player Spawns & Teleporter / Objective floating labels */
 	draw_teleporter_and_objective_markers(window_x0, window_y0, window_x1, window_y1, font_index);
