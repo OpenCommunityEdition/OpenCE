@@ -112,6 +112,8 @@ boolean object_type_new(long object_index);
 void object_type_place(long object_index, struct scenario_object_datum *scenario_object);
 
 void object_type_handle_deleted_object(long object_index, long deleted_object_index);
+/* port: whether an object of the type has a part that handles deleted objects */
+boolean object_type_port_handles_deleted_objects(short object_type);
 void object_type_handle_region_destroyed(long object_index, short region_index, unsigned long damage_flags);
 boolean object_type_handle_parent_destroyed(long object_index);
 
