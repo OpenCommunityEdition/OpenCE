@@ -95,6 +95,9 @@ static void memory_pool_verify(
 static struct memory_pool_block *memory_pool_block_get(
 	struct memory_pool *pool,
 	void **reference);
+static void memory_pool_port_verify_block(
+	struct memory_pool *pool,
+	struct memory_pool_block *block);
 
 /* ---------- globals */
 
@@ -158,7 +161,9 @@ boolean memory_pool_block_allocate(
 	actual_size = size+sizeof(*block);
 	if (actual_size&3)
 		actual_size = (actual_size|3)+1;
-	memory_pool_verify(pool);
+	/* port: the block the new one follows, not the whole pool (memory_pool_block_get) */
+	if (pool->last_block)
+		memory_pool_port_verify_block(pool, pool->last_block);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 124, size>=0);
 
 	block = pool->last_block
@@ -369,7 +374,6 @@ static struct memory_pool_block *memory_pool_block_get(
 	struct memory_pool_block *other_block;
 
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 372, reference && (*reference));
-	memory_pool_verify(pool);
 	block = (struct memory_pool_block *)((byte *)*reference-sizeof(*block));
 	match_vassert(
 		"c:\\halo\\SOURCE\\memory\\memory_pool.c",
@@ -377,9 +381,28 @@ static struct memory_pool_block *memory_pool_block_get(
 		block->reference==reference,
 		csprintf(temporary, "expected reference %08x but got %08x", block->reference, reference));
 
-	for (other_block = pool->first_block; other_block && block != other_block; other_block = other_block->next_block)
-	{
-	}
-	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 388, other_block);
+	/* port: the block and its neighbours are checked, not the whole pool:
+	walking every block (twice: memory_pool_verify, then looking for this
+	one) made each object freed or resized cost two walks of all the
+	objects' blocks, and a host deleting a hundred objects at once stalled
+	a joined client's frame for 50-100 ms. A block whose neighbours link to
+	it is in the pool's list. The whole pool is still verified when it is
+	compacted or deleted. */
+	(void)other_block;
+	memory_pool_port_verify_block(pool, block);
 	return block;
+}
+
+static void memory_pool_port_verify_block(
+	struct memory_pool *pool,
+	struct memory_pool_block *block)
+{
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 340, pool->signature==POOL_SIGNATURE);
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 355, block->header_signature==BLOCK_HEADER_SIGNATURE);
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 356, block->trailer_signature==BLOCK_TRAILER_SIGNATURE);
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 358, (byte *)block>=(byte *)pool->base_address);
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 359, (byte *)block+block->size<=(byte *)pool->base_address+pool->size);
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 352, block->previous_block ? block->previous_block->next_block==block : pool->first_block==block);
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 353, block->next_block ? block->next_block->previous_block==block : pool->last_block==block);
+	return;
 }
