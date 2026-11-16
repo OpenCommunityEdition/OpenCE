@@ -1999,6 +1999,7 @@ Other changes:
 | `game/players.c`, `networking/network_server_manager.c` | Bots (`game/bots.c`, `bots.count`): the lobby of a local Slayer game takes the bot players, each the one player of a machine of its own that no real machine is, and every tick their actions come from `game/bots.c` instead of their empty queues. Nothing changes in a system link or internet game. |
 | `input/input_xbox.c`, `physics/collision_usage.c` | The clock is read only for a button held, and for collision tests only when their times are shown: a read of the clock is slow in a browser. |
 | `main/main.c`, `interface/hud.c`, `interface/hud_unit.c`, `interface/hud_draw.c`, `game/game_engine.c` | The text chat of network games (`game/network_chat.c`): its keys are read each frame, and the debug keys are not while a line is typed; each view's HUD draws its lines, above the motion sensor, whose place the HUD notes (the left of the last picture drawn); the scoreboard's menu has Mute voice and chat, and the host's Mute for everyone. |
+| `units/bipeds.c` | At most 24 dead bodies' limbs settle (`biped_limp_noodle.c`) each tick; the others keep their pose until a later tick. Hundreds of bodies after a fight in 32x co-op made ticks of up to 400 ms. |
 
 The x86 inline assembly of the game is replaced by C. Thus the compiler
 can optimize that code for each processor:
