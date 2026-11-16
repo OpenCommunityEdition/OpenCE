@@ -221,8 +221,9 @@ static const struct config_setting config_settings[] =
 		"and glow trails. False keeps the central 4:3 framing." },
 	{ "display.shadow_resolution", _config_integer, "128", "HALO_SHADOW_RESOLUTION", _environment_value,
 		_platform_all,
-		"The size the objects' shadows are drawn at, in pixels each way: 128 as\n"
-		"on the Xbox, or 256, 512 or 1024 for smoother edges, as soft." },
+		"The most the objects' shadows are drawn at, in pixels each way: 128 as\n"
+		"on the Xbox, or 256, 512 or 1024 for smoother edges, as soft. Each\n"
+		"shadow is drawn at the size its object's size on the screen needs." },
 	{ "display.menus", _config_string, "\"pc\"", "HALO_MENUS", _environment_value, _platform_all,
 		"The menus: \"pc\" for the PC version's main menu (port/assets/menus,\n"
 		"and a menus folder here for your own), \"xbox\" for the Xbox's." },
