@@ -11,6 +11,11 @@ stood as the others ran on. For an actor that obeys, the bipeds ahead
 that move its way are taken from the obstacles and the path is made once
 more; a standing biped, one behind or one coming at it, an object that is
 no biped, and an actor that does not obey are left as they were.
+And the real obey_obstacles_follow: in a cinematic, before a path of an
+actor that obeys is made, the bipeds ahead that move along its way, within
+45 degrees, are taken (d40's ending: flood_2 behind flood_1); one crossing
+its way, one behind, outside a cinematic or for an actor that does not
+obey, is kept.
 test_obey_obstacles.py takes the code from the sources (under_test.inc).
 */
 
@@ -38,6 +43,12 @@ struct actor_datum
 static struct object_datum test_objects[8];
 static unsigned long test_object_types[8];
 static struct actor_datum test_actors[2];
+static boolean test_cinematic = TRUE;
+
+static boolean cinematic_in_progress(void)
+{
+	return test_cinematic;
+}
 
 static void *object_try_and_get_and_verify_type(long object_index, unsigned long valid_type_flags)
 {
@@ -96,6 +107,38 @@ static void scene(struct obstacles *obstacles, short action)
 	disc_add(obstacles, 3, 0, -114.624f, -66.385f);
 	disc_add(obstacles, 2, 0, -114.180f, -64.311f);
 	disc_add(obstacles, 4, 0, -113.934f, -62.345f);
+}
+
+/* d40's ending (x70, launch_1, tick 370): flood_2 (object 0) on its way to
+its march's goal, flood_1 (object 1) ahead on nearly its line, flood_4
+(object 2) beside and just behind it, and a biped (object 3) crossing its
+way ahead, at 69 degrees to it */
+static real_point3d const column_start = { -113.78f, -29.09f, 0.f };
+
+static void column(struct obstacles *obstacles, real_vector3d *way, short action, boolean cinematic)
+{
+	real_vector3d crossing;
+	real length;
+
+	way->i = -96.66f - column_start.x;
+	way->j = -35.33f - column_start.y;
+	way->k = 0.f;
+	length = (real)sqrt(way->i * way->i + way->j * way->j);
+	way->i /= length;
+	way->j /= length;
+	crossing.i = 0.04f * ((real)cos(1.2) * way->i - (real)sin(1.2) * way->j);
+	crossing.j = 0.04f * ((real)sin(1.2) * way->i + (real)cos(1.2) * way->j);
+	test_cinematic = cinematic;
+	memset(obstacles, 0, sizeof(*obstacles));
+	object_set(0, _object_mask_unit | _object_mask_biped, 0.f, 0.f, 0.f);
+	test_objects[0].unit.actor_index = 0;
+	test_actors[0].state.action = action;
+	object_set(1, _object_mask_unit | _object_mask_biped, 0.017f, -0.011f, 0.f);
+	object_set(2, _object_mask_unit | _object_mask_biped, 0.017f, -0.010f, 0.f);
+	object_set(3, _object_mask_unit | _object_mask_biped, crossing.i, crossing.j, 0.f);
+	disc_add(obstacles, 1, 0, -113.14f, -29.14f);
+	disc_add(obstacles, 2, 0, -114.17f, -30.11f);
+	disc_add(obstacles, 3, 0, -112.90f, -29.60f);
 }
 
 int main(int argc, char **argv)
@@ -176,6 +219,43 @@ int main(int argc, char **argv)
 		CHECK(!obey_obstacles_clear_way(&obstacles, 0, &start, &way), "taken with the squad standing");
 		CHECK(obstacles.disc_count == 4 && obstacles.disc_optional_count == 1, "%d discs, %d optional",
 			obstacles.disc_count, obstacles.disc_optional_count);
+		return 0;
+	}
+
+	/* in a cinematic: flood_1 ahead taken, the one behind and the one
+	crossing kept, in order */
+	CASE("column in a cinematic")
+	{
+		struct obstacles obstacles;
+		real_vector3d way;
+
+		column(&obstacles, &way, _actor_action_obey, TRUE);
+		CHECK(obey_obstacles_follow(&obstacles, 0, &column_start, &way), "nothing taken");
+		CHECK(obstacles.disc_count == 2, "%d discs kept", obstacles.disc_count);
+		CHECK(obstacles.discs[0].object_index == 2 && obstacles.discs[1].object_index == 3,
+			"kept %ld and %ld", obstacles.discs[0].object_index, obstacles.discs[1].object_index);
+		return 0;
+	}
+	/* outside a cinematic: as the original */
+	CASE("not in a cinematic")
+	{
+		struct obstacles obstacles;
+		real_vector3d way;
+
+		column(&obstacles, &way, _actor_action_obey, FALSE);
+		CHECK(!obey_obstacles_follow(&obstacles, 0, &column_start, &way), "taken outside a cinematic");
+		CHECK(obstacles.disc_count == 3, "%d discs kept", obstacles.disc_count);
+		return 0;
+	}
+	/* an actor that does not obey, in a cinematic: as the original */
+	CASE("follow does not obey")
+	{
+		struct obstacles obstacles;
+		real_vector3d way;
+
+		column(&obstacles, &way, _actor_action_guard, TRUE);
+		CHECK(!obey_obstacles_follow(&obstacles, 0, &column_start, &way), "taken for an actor that guards");
+		CHECK(obstacles.disc_count == 3, "%d discs kept", obstacles.disc_count);
 		return 0;
 	}
 

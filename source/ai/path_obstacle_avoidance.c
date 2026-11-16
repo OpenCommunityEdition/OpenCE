@@ -959,6 +959,11 @@ boolean path_avoid_obstacles(
 				obstacles_add_disc(obstacles, state->input.attractor_object_index, FLAG(_disc_optional_bit),
 					&state->input.attractor_point, state->input.attractor_radius);
 			}
+			/* port: in a cinematic, an actor that obeys walks on behind the
+			bipeds ahead that move along its way, not round them anew at each
+			path (obey_obstacles.c) */
+			obey_obstacles_follow(obstacles, state->input.ignore_source_object_index, start_point,
+				&movement_direction);
 			obstacles_recompute(obstacles, radius);
 			if (state->debug && !state->debug->use_stored_obstacles)
 			{

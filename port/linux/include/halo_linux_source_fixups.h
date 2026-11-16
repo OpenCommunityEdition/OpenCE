@@ -43,6 +43,11 @@ them, whether any was (port/linux/game/obey_obstacles.c) */
 struct obstacles;
 int obey_obstacles_clear_way(struct obstacles *obstacles, long source_object_index,
 	union real_point3d const *start_point, union real_vector3d const *movement_direction);
+/* in a cinematic, for an actor that obeys, before its path is made: the
+bipeds ahead that move along its way taken from its obstacles, whether any
+was (port/linux/game/obey_obstacles.c) */
+int obey_obstacles_follow(struct obstacles *obstacles, long source_object_index,
+	union real_point3d const *start_point, union real_vector3d const *movement_direction);
 
 /* whether the map being loaded, by the name it was loaded by, is a
 downloaded one, whose scripts may call and set less: one map sharing
