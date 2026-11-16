@@ -129,6 +129,9 @@ struct lruv_cache_hole
 static void lruv_cache_verify(
 	struct lruv_cache *cache,
 	boolean verify_blocks);
+static void lruv_cache_port_verify_block(
+	struct lruv_cache *cache,
+	long block_index);
 
 static long lruv_cache_bytes_to_pages(
 	struct lruv_cache *cache,
@@ -236,7 +239,9 @@ void lruv_block_delete(
 	struct lruv_cache_block *previous_block;
 
 	block = datum_get(cache->blocks, block_index);
-	lruv_cache_verify(cache, TRUE);
+	/* port: the block and its neighbours checked, not every block
+	(lruv_cache_port_verify_block) */
+	lruv_cache_port_verify_block(cache, block_index);
 
 	if (cache->delete_block_proc)
 		cache->delete_block_proc(block_index);
@@ -269,8 +274,19 @@ void lruv_block_delete(
 		cache->last_block_index = block->previous_block_index;
 	}
 
-	datum_delete(cache->blocks, block_index);
-	lruv_cache_verify(cache, TRUE);
+	{
+		long previous_block_index = block->previous_block_index;
+		long next_block_index = block->next_block_index;
+
+		datum_delete(cache->blocks, block_index);
+		/* port: the blocks now linked to each other checked
+		(lruv_cache_port_verify_block) */
+		lruv_cache_verify(cache, FALSE);
+		if (previous_block_index != NONE)
+			lruv_cache_port_verify_block(cache, previous_block_index);
+		if (next_block_index != NONE)
+			lruv_cache_port_verify_block(cache, next_block_index);
+	}
 
 	return;
 }
@@ -735,7 +751,10 @@ long lruv_block_new(
 			new_block->first_page_index = best_hole.first_page_index;
 			new_block->page_count = desired_page_count;
 			new_block->last_used_tick = cache->tick;
-			lruv_cache_verify(cache, TRUE);
+			/* port: the new block and its neighbours checked
+			(lruv_cache_port_verify_block) */
+			lruv_cache_verify(cache, FALSE);
+			lruv_cache_port_verify_block(cache, new_block_index);
 		}
 	}
 
@@ -829,6 +848,71 @@ static void lruv_cache_verify(
 
 			block_index = block->next_block_index;
 		}
+	}
+
+	return;
+}
+
+/* port: lruv_cache_verify's checks of one block's links with its neighbours.
+Making and deleting a block checked every block of the cache before and
+after: the decals' cache has 2048, and in a big fight each new decal (each
+deleting the oldest) walked them several times. */
+static void lruv_cache_port_verify_block(
+	struct lruv_cache *cache,
+	long block_index)
+{
+	struct lruv_cache_block *block;
+	struct lruv_cache_block *next_block;
+	struct lruv_cache_block *previous_block;
+
+	lruv_cache_verify(cache, FALSE);
+	block = datum_get(cache->blocks, block_index);
+	if (block->previous_block_index == NONE)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			770,
+			cache->first_block_index==block_index);
+	}
+	else
+	{
+		previous_block = datum_get(cache->blocks, block->previous_block_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			776,
+			previous_block->next_block_index==block_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			777,
+			previous_block->first_page_index<block->first_page_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			778,
+			previous_block->first_page_index+previous_block->page_count<=block->first_page_index);
+	}
+
+	if (block->next_block_index == NONE)
+	{
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			784,
+			cache->last_block_index==block_index);
+	}
+	else
+	{
+		next_block = datum_get(cache->blocks, block->next_block_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			790,
+			next_block->previous_block_index==block_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			791,
+			next_block->first_page_index>block->first_page_index);
+		match_assert(
+			"c:\\halo\\SOURCE\\memory\\lruv_cache.c",
+			792,
+			block->first_page_index+block->page_count<=next_block->first_page_index);
 	}
 
 	return;
