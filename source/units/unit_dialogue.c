@@ -713,6 +713,18 @@ void unit_notify_impulse_sound(
 	ai_communication_packet_new(&speech_item.ai);
 	unit_speak(unit_index, play_type, &speech_item);
 
+	/* port: a dead unit takes no line but its death's (unit_speak), so a
+	script's line played on one (c10's flashback plays Johnson's and
+	Bisenti's on them once dead) is not its current speech: the line plays
+	from its body, and its current speech is left as it was, not marked
+	played as this line; the original halted a debug build on the assertion
+	below */
+	if (unit->unit.speech.current.sound_definition_index != sound_definition_index &&
+		TEST_FLAG(unit->object.damage_flags, _object_dead_bit))
+	{
+		return;
+	}
+
 	match_assert(
 		"c:\\halo\\SOURCE\\units\\unit_dialogue.c",
 		406,

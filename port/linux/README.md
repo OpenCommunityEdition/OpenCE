@@ -1957,6 +1957,7 @@ code or data.
 | `rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.c` | `&(T *)x` is now `(T **)&x`. |
 | `hs/hs.c` | Local prototypes that did not agree with `ai_script.h` are removed. |
 | `units/vehicles.c` | The local prototype of `unit_update_animation` uses the type of `units.h`. |
+| `units/unit_dialogue.c` | A script's line played from a dead unit (`sound_impulse_start` on it) is not taken for its current speech, which a dead unit keeps as its death's: the line plays from its body. The original went on to assert that the line was its current speech, which halted a debug build near the end of c10's flashback, whose script plays lines of Johnson and Bisenti once they are dead. |
 
 `math/real_math.h` had a copy of `plane2d_from_points` that did not agree
 with the function in `effects/decals.c`. clang used the copy, and parts of
