@@ -22,7 +22,7 @@ GAMETYPES = sorted((ROOT / "deploy/gametypes").glob("*.toml"))
 # gametypes starts from; checked against server_gametypes.c's list below)
 OPENCE_ENGINES = {
     "swat": "slayer", "infection": "slayer", "gun_game": "slayer", "hardcore": "slayer",
-    "hardcore_ctf": "ctf", "hardcore_oddball": "oddball", "hardcore_king": "king",
+    "hardcore_ctf": "ctf", "hardcore_oddball": "oddball", "hardcore_king": "king", "forge": "slayer",
 }
 
 

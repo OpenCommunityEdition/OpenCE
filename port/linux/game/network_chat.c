@@ -1626,7 +1626,7 @@ boolean network_chat_host_name_muted(
 	return index && chat_mute_find(chat_mutes, NUMBEROF(chat_mutes), ascii, system_milliseconds()) != NULL;
 }
 
-void network_chat_handle_up(
+void orig_network_chat_handle_up(
 	long machine_index,
 	void const *entries,
 	boolean from_stream)
@@ -1716,7 +1716,7 @@ word network_chat_line_entry_size(
 
 /* ---------- a client */
 
-void network_chat_handle_down(
+void orig_network_chat_handle_down(
 	void const *entries,
 	boolean from_stream)
 {
@@ -2058,6 +2058,8 @@ static unsigned long chat_keyboard_buttons(unsigned long buttons)
 	return buttons & ~chat_keyboard.opening_buttons;
 }
 
+/* port: wrapped by network_chat_update in forge_hooks.c */
+#define network_chat_update orig_network_chat_update
 void network_chat_update(
 	void)
 {
@@ -2241,13 +2243,14 @@ void network_chat_update(
 		chat_scroll = (short)(chat_scroll + halo_chat_wheel_steps());
 	chat_scroll = (short)PIN(chat_scroll, 0, MAX(chat_line_count - 1, 0));
 }
+#undef network_chat_update
 
 short network_chat_controller(void)
 {
 	return chat_input.active && chat_keyboard.open ? chat_input.controller : NONE;
 }
 
-boolean network_chat_typing(
+boolean orig_network_chat_typing(
 	void)
 {
 	return chat_input.active;
@@ -2709,7 +2712,7 @@ static void chat_keyboard_draw(
 	}
 }
 
-void network_chat_draw(
+void orig_network_chat_draw(
 	short local_player_index)
 {
 	long font_index = hud_get_font_index();

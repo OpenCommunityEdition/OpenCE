@@ -962,7 +962,8 @@ static void model_data_error(
 	return;
 }
 
-void render_model(
+/* port: wrapped by render_model in forge_hooks.c */
+void orig_render_model(
 	long model_index,
 	real level_of_detail_pixels,
 	real_matrix4x3 const *node_matrices,

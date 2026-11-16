@@ -250,6 +250,7 @@ symbols in this file:
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
+#include "forge_net_override.h" /* port: port/linux/game/forge_net_override.h */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
@@ -949,6 +950,27 @@ boolean network_distributed_server_send_to_machine_reliably(
 	return network_game_server_write(connection, buffer, size, NULL, 1);
 }
 
+/* port: the bytes the reliable stream to a machine in the game has not sent
+yet; NONE for no such machine (OpenCE Forge's custom tag streaming paces
+itself by it: port/linux/game/forge_network.c) */
+long network_distributed_server_machine_reliable_backlog(
+	long machine_index)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	struct network_game_server_client_machine *machine;
+	struct network_connection *connection;
+
+	if (!server)
+		return NONE;
+	machine = network_game_server_client_machine_in_game(server, machine_index);
+	if (!machine)
+		return NONE;
+	connection = network_game_server_get_client_connection(machine);
+	if (!connection || !network_connection_active(connection))
+		return NONE;
+	return network_connection_reliable_backlog(connection);
+}
+
 /* to every machine, reliably (the netcode's objects appearing and going
 must not be lost) */
 boolean network_distributed_server_send_to_all_reliably(
@@ -1496,6 +1518,7 @@ boolean network_game_server_handle_client_message(
 				{
 					long machine_index;
 
+					network_game_server_client_machine_heard(server, machine);
 					network_game_server_get_client_machine(server, machine, &machine_index);
 					/* (port: from its stream, which only it can send on) */
 					network_distributed_handle_stream_message(machine_index, message, message_buffer_size);

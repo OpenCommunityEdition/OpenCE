@@ -55,12 +55,13 @@ typedef char mcc_pause_event_size[sizeof(struct mcc_pause_event) == 0x48 ? 1 : -
 typedef char mcc_pause_child_size[sizeof(struct mcc_pause_child) == 0x50 ? 1 : -1];
 typedef char mcc_pause_child_offset[offsetof(struct mcc_pause_widget, children) == 0x3E0 ? 1 : -1];
 
-enum { MCC_PAUSE_MAX_TAGS = 512, MCC_PAUSE_ARENA_BYTES = 2 * 1024 * 1024 };
+enum { MCC_PAUSE_MAX_TAGS = 1024, MCC_PAUSE_ARENA_BYTES = 2 * 1024 * 1024 };
 enum { SOLO, COOP_HOST, COOP_CLIENT, MP_LOCAL, MP_HOST, MP_CLIENT, MODE_COUNT };
 enum { LABEL_RESUME, LABEL_REVERT, LABEL_SAVE_QUIT, LABEL_LEAVE, LABEL_SETTINGS,
     LABEL_END, LABEL_OBJECTIVES, LABEL_CONFIRM_REVERT, LABEL_CONFIRM_RESTART,
     LABEL_CONFIRM_SAVE_QUIT, LABEL_ATTENTION, LABEL_RESTART_LEVEL, LABEL_FOOTER,
-    LABEL_SELECT, LABEL_ACCEPT, LABEL_SAVING, LABEL_FRIENDLY_ON, LABEL_FRIENDLY_OFF, LABEL_COUNT };
+    LABEL_SELECT, LABEL_ACCEPT, LABEL_SAVING, LABEL_FRIENDLY_ON, LABEL_FRIENDLY_OFF,
+    LABEL_SAVE_MAP, LABEL_SAVE_AS_NEW_MAP, LABEL_COUNT };
 
 enum { CONFIRM_REVERT, CONFIRM_RESTART, CONFIRM_SAVE_QUIT, CONFIRM_COUNT };
 static char const *const mcc_pause_labels[LABEL_COUNT] = {
@@ -70,8 +71,31 @@ static char const *const mcc_pause_labels[LABEL_COUNT] = {
     "All progress on this \r\nlevel will be lost.",
     "Saving last checkpoint...\r\nplease don't turn off\r\nyour Xbox console.",
     "ATTENTION", "RESTART LEVEL", "=CANCEL", "=SELECT", "=OK", "SAVING...",
-    "FRIENDLY FIRE ON", "FRIENDLY FIRE OFF"
+    "FRIENDLY FIRE ON", "FRIENDLY FIRE OFF", "SAVE MAP", "SAVE AS NEW.."
 };
+
+static boolean (*s_forge_save_enabled_fn)(void) = NULL;
+static void (*s_forge_save_trigger_fn)(void) = NULL;
+static void (*s_forge_save_as_new_trigger_fn)(void) = NULL;
+
+void mcc_pause_set_forge_save_callbacks(boolean (*enabled_fn)(void), void (*trigger_fn)(void), void (*trigger_new_fn)(void))
+{
+    s_forge_save_enabled_fn = enabled_fn;
+    s_forge_save_trigger_fn = trigger_fn;
+    s_forge_save_as_new_trigger_fn = trigger_new_fn;
+}
+
+void mcc_pause_trigger_forge_save(void)
+{
+    if (s_forge_save_trigger_fn)
+        s_forge_save_trigger_fn();
+}
+
+void mcc_pause_trigger_forge_save_as_new(void)
+{
+    if (s_forge_save_as_new_trigger_fn)
+        s_forge_save_as_new_trigger_fn();
+}
 
 static struct {
     unsigned char *arena;
@@ -79,6 +103,7 @@ static struct {
     long count, first, strings;
     unsigned short salt;
     boolean failed;
+    boolean forge_save;
     struct mcc_pause_assets assets;
     struct mcc_pause_tag tags[MCC_PAUSE_MAX_TAGS];
     long roots[MODE_COUNT][MCC_PAUSE_LAYOUT_COUNT];
@@ -346,16 +371,21 @@ static long mcc_pause_screen(short mode, short layout)
 {
     boolean campaign = mode <= COOP_CLIENT, pauses = mode == SOLO;
     boolean host = mode == COOP_HOST || mode == MP_HOST;
-    long root, list, children[6], buttons[6];
+    boolean forge_save = s_forge_save_enabled_fn && s_forge_save_enabled_fn() && layout == MCC_PAUSE_FULL;
+    boolean campaign_settings = campaign && mcc_pause.assets.settings && layout == MCC_PAUSE_FULL;
+    long root, list, children[8], buttons[8];
     short width = layout == MCC_PAUSE_QUARTER ? 320 : 640, height = layout == MCC_PAUSE_FULL ? 480 : 240;
-    short count = 0, child_count = 0, xs[6] = {0}, ys[6] = {0}, bx[6] = {0}, by[6] = {0};
-    short row = campaign ? (layout == MCC_PAUSE_QUARTER ? 24 : 28) : (layout == MCC_PAUSE_FULL ? 35 : 27);
-    short campaign_growth = campaign && mcc_pause.assets.settings && layout == MCC_PAUSE_FULL ?
-        (mode == SOLO ? 36 : 66) : 0;
+    short count = 0, child_count = 0, xs[8] = {0}, ys[8] = {0}, bx[8] = {0}, by[8] = {0};
+    short row = campaign ? (layout == MCC_PAUSE_QUARTER ? 24 : 28) : (forge_save ? 27 : (layout == MCC_PAUSE_FULL ? 35 : 27));
+    short campaign_growth = campaign_settings ? (mode == SOLO ? 36 : 66) : 0;
     short button_width = campaign && layout == MCC_PAUSE_QUARTER ? 264 : 202;
     short button_height = row < 28 ? row - 1 : 27, x, y, panel_height, i;
     struct mcc_pause_widget *widget;
     if (campaign_growth) row = 30;
+    if (campaign && forge_save) {
+        row = 26;
+        campaign_growth += 52;
+    }
     root = mcc_pause_widget("pause", 0, width, height, layout, NONE);
     widget = mcc_pause_definition(root); if (!widget) return NONE;
     widget->flags = 1 | (pauses ? 2 : 0);
@@ -364,9 +394,13 @@ static long mcc_pause_screen(short mode, short layout)
      * flags would also dismiss other split-screen players' menus. */
     mcc_pause_events(root, MCC_PAUSE_ACTION_RESUME, NONE, 128, TRUE);
     buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_RESUME, MCC_PAUSE_ACTION_RESUME, NONE, 128);
-    if (campaign_growth)
+    if (forge_save) {
+        buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_SAVE_MAP, MCC_PAUSE_ACTION_SAVE_MAP, NONE, 128);
+        buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_SAVE_AS_NEW_MAP, MCC_PAUSE_ACTION_SAVE_AS_NEW_MAP, NONE, 128);
+    }
+    if (campaign_settings)
         buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_SETTINGS, MCC_PAUSE_ACTION_SETTINGS, NONE, 128);
-    if (campaign_growth && mode != SOLO)
+    if (campaign_settings && mode != SOLO)
         buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_FRIENDLY_ON, MCC_PAUSE_ACTION_FRIENDLY_FIRE, NONE, 128 | 16);
     if (campaign) {
         buttons[count++] = mcc_pause_button(layout, button_width, button_height, LABEL_REVERT, 0,
@@ -395,6 +429,13 @@ static long mcc_pause_screen(short mode, short layout)
             children[child_count] = mcc_pause_panel(layout, 285, 159 + campaign_growth, MCC_PAUSE_ART_OBJECTIVES_PANEL);
             xs[child_count] = 287; ys[child_count++] = y - 9;
         }
+    } else if (forge_save && layout == MCC_PAUSE_FULL) {
+        panel_height = 229;
+        x = 218;
+        y = count <= 5 ? 175 : 168;
+        children[child_count] = mcc_pause_panel(layout, 226, panel_height, MCC_PAUSE_ART_FOOTER_PANEL);
+        xs[child_count] = x - 12;
+        ys[child_count++] = 137;
     } else {
         panel_height = layout == MCC_PAUSE_FULL ? 159 + (count - 2) * 35 : count * row + 48;
         x = layout == MCC_PAUSE_FULL ? 218 : (width - 202) / 2;
@@ -432,7 +473,7 @@ static long mcc_pause_screen(short mode, short layout)
         children[child_count] = footer;
         xs[child_count] = campaign ? (layout == MCC_PAUSE_QUARTER ? 28 : 87) : x + 17;
         ys[child_count++] = campaign ? (layout == MCC_PAUSE_FULL ? 296 + campaign_growth : layout == MCC_PAUSE_HALF ? 176 : 216) :
-            y - (layout == MCC_PAUSE_FULL ? 43 : 10) + panel_height - 25;
+            (forge_save && layout == MCC_PAUSE_FULL ? 137 + panel_height - 25 : y - (layout == MCC_PAUSE_FULL ? 43 : 10) + panel_height - 25);
     }
     mcc_pause_children(root, children, xs, ys, child_count);
     return root;
@@ -464,6 +505,7 @@ boolean mcc_pause_build(long first_index, short first_salt, struct mcc_pause_ass
     for (layout = 0; layout < MCC_PAUSE_LAYOUT_COUNT; ++layout)
         if (assets->font[layout] == NONE || assets->small_font[layout] == NONE) return FALSE;
     mcc_pause.first = first_index; mcc_pause.salt = (unsigned short)first_salt; mcc_pause.assets = *assets;
+    mcc_pause.forge_save = s_forge_save_enabled_fn && s_forge_save_enabled_fn() ? TRUE : FALSE;
     mcc_pause.arena = malloc(MCC_PAUSE_ARENA_BYTES);
     if (!mcc_pause.arena) return FALSE;
     memset(mcc_pause.confirm, 0xFF, sizeof(mcc_pause.confirm));
@@ -495,6 +537,11 @@ struct mcc_pause_tag const *mcc_pause_tag_at(long ordinal)
     return ordinal >= 0 && ordinal < mcc_pause.count ? &mcc_pause.tags[ordinal] : NULL;
 }
 boolean mcc_pause_owns(long handle) { return mcc_pause_definition(handle) != NULL; }
+boolean mcc_pause_needs_rebuild(void)
+{
+    boolean want = s_forge_save_enabled_fn && s_forge_save_enabled_fn() ? TRUE : FALSE;
+    return mcc_pause.arena && !mcc_pause.failed && mcc_pause.forge_save != want;
+}
 boolean mcc_pause_text_wrap_needed(long handle)
 {
     struct mcc_pause_widget const *widget = mcc_pause_definition(handle);

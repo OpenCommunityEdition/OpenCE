@@ -2827,6 +2827,8 @@ void unit_died(
 		object_set_garbage(unit_index, TRUE);
 		if (unit->unit.player_index != NONE)
 		{
+			/* port: preserve owner_player_index on dead player corpses so Forge Monitor mode never grabs them */
+			unit->object.owner_player_index = unit->unit.player_index;
 			player_died(unit->unit.player_index);
 			unit->unit.player_index = NONE;
 		}
@@ -8264,77 +8266,91 @@ static boolean unit_set_or_test_seat_and_weapon_label(
 	struct unit_definition *unit_definition = unit_definition_get(unit->definition_index);
 	struct animation_graph *animation_graph = animation_graph_definition_get(unit_definition->object.animation_graph.index);
 	boolean result = FALSE;
+	short attempt;
 
-	for (seat_index = 0; seat_index<animation_graph->unit_seats.count; ++seat_index)
+	/* port: if a dynamically imported custom weapon has a custom weapon_label not present in the unit's
+	   stock animation graph, fall back to "ar" on the second pass so players can pick up and use it */
+	for (attempt = 0; attempt < 2 && !result; ++attempt)
 	{
-		struct animation_graph_unit_seat *unit_seat = TAG_BLOCK_GET_ELEMENT(&animation_graph->unit_seats, seat_index, struct animation_graph_unit_seat);
-
-		if (!seat_label || !_stricmp(seat_label, unit_seat->label))
+		char const *effective_weapon_label = (attempt == 0) ? weapon_label : "ar";
+		if (attempt == 1 &&
+			(!weapon_label || weapon_label[0] == '\0' ||
+			 !strcmp(weapon_label, "unarmed") || !_stricmp(weapon_label, "ar")))
 		{
-			short weapon_class_index;
+			break;
+		}
 
-			for (weapon_class_index = 0; weapon_class_index<unit_seat->weapon_classes.count; ++weapon_class_index)
+		for (seat_index = 0; seat_index<animation_graph->unit_seats.count; ++seat_index)
+		{
+			struct animation_graph_unit_seat *unit_seat = TAG_BLOCK_GET_ELEMENT(&animation_graph->unit_seats, seat_index, struct animation_graph_unit_seat);
+
+			if (!seat_label || !_stricmp(seat_label, unit_seat->label))
 			{
-				short weapon_type_index;
+				short weapon_class_index;
 
-				struct animation_graph_weapon_class *weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, weapon_class_index, struct animation_graph_weapon_class);
-
-				for (weapon_type_index = 0; weapon_type_index<weapon_class->weapon_types.count; ++weapon_type_index)
+				for (weapon_class_index = 0; weapon_class_index<unit_seat->weapon_classes.count; ++weapon_class_index)
 				{
-					struct animation_graph_weapon_type *weapon_type = TAG_BLOCK_GET_ELEMENT(&weapon_class->weapon_types, weapon_type_index, struct animation_graph_weapon_type);
-					
-					if (!weapon_label ||
-						!strcmp(weapon_label, "unarmed") &&
-						weapon_type->label[0]=='\0'||
-						!_stricmp(weapon_label, weapon_type->label))
-					{
-						if (change_flag)
-						{
-							long anim_2 =
-								unit_seat->animations.count <= 2 ?
-								NONE :
-								animation_graph_animation_index_get(&unit_seat->animations)[2].animation_index;
-							boolean showing_acceleration;
-							
-							if (anim_2==NONE)
-							{
-								long anim_3 =
-									unit_seat->animations.count <= 3 ?
-									NONE :
-									animation_graph_animation_index_get(&unit_seat->animations)[3].animation_index;
-								
-								if (anim_3==NONE)
-								{
-									long anim_4 =
-										unit_seat->animations.count <= 4 ?
-										NONE :
-										animation_graph_animation_index_get(&unit_seat->animations)[4].animation_index;
+					short weapon_type_index;
 
-									if (anim_4==NONE)
+					struct animation_graph_weapon_class *weapon_class = TAG_BLOCK_GET_ELEMENT(&unit_seat->weapon_classes, weapon_class_index, struct animation_graph_weapon_class);
+
+					for (weapon_type_index = 0; weapon_type_index<weapon_class->weapon_types.count; ++weapon_type_index)
+					{
+						struct animation_graph_weapon_type *weapon_type = TAG_BLOCK_GET_ELEMENT(&weapon_class->weapon_types, weapon_type_index, struct animation_graph_weapon_type);
+						
+						if (!effective_weapon_label ||
+							!strcmp(effective_weapon_label, "unarmed") &&
+							weapon_type->label[0]=='\0'||
+							!_stricmp(effective_weapon_label, weapon_type->label))
+						{
+							if (change_flag)
+							{
+								long anim_2 =
+									unit_seat->animations.count <= 2 ?
+									NONE :
+									animation_graph_animation_index_get(&unit_seat->animations)[2].animation_index;
+								boolean showing_acceleration;
+								
+								if (anim_2==NONE)
+								{
+									long anim_3 =
+										unit_seat->animations.count <= 3 ?
+										NONE :
+										animation_graph_animation_index_get(&unit_seat->animations)[3].animation_index;
+									
+									if (anim_3==NONE)
 									{
-										showing_acceleration = FALSE;
-										goto acceleration_determined;
+										long anim_4 =
+											unit_seat->animations.count <= 4 ?
+											NONE :
+											animation_graph_animation_index_get(&unit_seat->animations)[4].animation_index;
+
+										if (anim_4==NONE)
+										{
+											showing_acceleration = FALSE;
+											goto acceleration_determined;
+										}
 									}
 								}
+								showing_acceleration = TRUE;
+								acceleration_determined:
+
+								if (unit->unit.animation.state!=_unit_state_user_animation)
+								{
+									unit->unit.animation.state = NONE;
+								}
+
+								unit->unit.animation.seat_index = seat_index;
+								unit->unit.animation.base_seat_index = seat_label_to_base_seat_index(seat_label);
+								unit->unit.animation.weapon_index = weapon_class_index;
+								unit->unit.animation.weapon_type_index = weapon_type_index;
+
+								SET_FLAG(unit->unit.animation.flags, _unit_animation_showing_acceleration_bit, showing_acceleration);
 							}
-							showing_acceleration = TRUE;
-							acceleration_determined:
 
-							if (unit->unit.animation.state!=_unit_state_user_animation)
-							{
-								unit->unit.animation.state = NONE;
-							}
-
-							unit->unit.animation.seat_index = seat_index;
-							unit->unit.animation.base_seat_index = seat_label_to_base_seat_index(seat_label);
-							unit->unit.animation.weapon_index = weapon_class_index;
-							unit->unit.animation.weapon_type_index = weapon_type_index;
-
-							SET_FLAG(unit->unit.animation.flags, _unit_animation_showing_acceleration_bit, showing_acceleration);
+							result = TRUE;
+							break;
 						}
-
-						result = TRUE;
-						break;
 					}
 				}
 			}
@@ -12209,6 +12225,13 @@ static void unit_drop_item(
 		}
 
 		item->item.ignore_object_index = unit_index;
+		/* port: mark items (weapons/grenades/equipment) dropped by a unit so Forge Monitor mode cannot grab them,
+		   while Spartan players can still pick them up or switch to them normally */
+		SET_FLAG(item->item.flags, _item_belongs_to_player_bit, TRUE);
+		if (unit->unit.player_index != NONE)
+			item->object.owner_player_index = unit->unit.player_index;
+		else if (unit->object.owner_player_index != NONE)
+			item->object.owner_player_index = unit->object.owner_player_index;
 		item_accelerate(item_index, &item_velocity, FALSE);
 	}
 

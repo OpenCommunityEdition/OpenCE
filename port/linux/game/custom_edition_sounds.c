@@ -47,8 +47,13 @@ the channels (port/linux/src/dsound_sdl.c decodes it).
 #define ADPCM_BLOCK_BYTES 36
 #define ADPCM_STEP_INDEX_MAXIMUM 88
 
-/* the decoded buffer grows by this much at a time */
-#define DECODED_GROWTH 0x100000
+/* The converted sounds are kept in chunks of this much, each sound whole in
+one (a larger sound has a chunk of its own). They were one buffer grown a
+megabyte at a time, and where the system cannot grow memory in place (the
+Switch: port/switch/host/host_syscall.c refuses mremap) each growth copied it
+all: lumoria_a.map's 57 MB stalled the load for 40 seconds, and then wanted
+61 MB in one piece that the guest's memory no longer had. */
+#define DECODED_CHUNK_BYTES 0x800000
 
 /* an Ogg Vorbis stream is decoded into a buffer that grows by this many
 frames; no packet decodes to more than 4096 frames */
@@ -84,11 +89,23 @@ static int const adpcm_step_table[ADPCM_STEP_INDEX_MAXIMUM + 1] =
 
 static int const adpcm_index_table[8] = { -1, -1, -1, -1, 2, 4, 6, 8 };
 
+/* a chunk's sounds start at base in the decoded offset space, one after
+another, used bytes of them */
+struct decoded_chunk
+{
+	byte *data;
+	unsigned long base;
+	unsigned long used;
+	unsigned long capacity;
+};
+
 static struct
 {
-	byte *decoded;
+	struct decoded_chunk *chunks;
+	long chunk_count;
+	long chunk_capacity;
+	/* the decoded offset space's size: every chunk's used bytes */
 	unsigned long decoded_bytes;
-	unsigned long decoded_capacity;
 	/* the most the region of the combined offset space for them holds */
 	unsigned long decoded_limit;
 } custom_edition_sounds_globals;
@@ -468,31 +485,62 @@ static boolean frames_conform(
 	return samples != NULL;
 }
 
-/* Room for `bytes` more in the decoded buffer: its offset, or NONE when the
-memory or the region for them runs out. */
-static long decoded_reserve(
-	unsigned long bytes)
+/* Room for `bytes` more of the decoded sounds, in one piece: where to write
+them, and (offset) their offset; NULL when the memory or the region for them
+runs out. decoded_commit counts them once written. */
+static byte *decoded_reserve(
+	unsigned long bytes,
+	long *offset)
 {
 	unsigned long needed = custom_edition_sounds_globals.decoded_bytes + bytes;
+	struct decoded_chunk *chunk = custom_edition_sounds_globals.chunk_count
+		? &custom_edition_sounds_globals.chunks[custom_edition_sounds_globals.chunk_count - 1]
+		: NULL;
 
 	if (needed < bytes || needed > custom_edition_sounds_globals.decoded_limit)
 	{
-		return NONE;
+		return NULL;
 	}
-	if (needed > custom_edition_sounds_globals.decoded_capacity)
+	if (!chunk || chunk->capacity - chunk->used < bytes)
 	{
-		unsigned long capacity = (needed + DECODED_GROWTH - 1) / DECODED_GROWTH * DECODED_GROWTH;
-		byte *grown = realloc(custom_edition_sounds_globals.decoded, capacity);
+		unsigned long capacity = MAX(bytes, DECODED_CHUNK_BYTES);
 
-		if (!grown)
+		if (custom_edition_sounds_globals.chunk_count == custom_edition_sounds_globals.chunk_capacity)
 		{
-			return NONE;
-		}
-		custom_edition_sounds_globals.decoded = grown;
-		custom_edition_sounds_globals.decoded_capacity = capacity;
-	}
+			long count = custom_edition_sounds_globals.chunk_capacity ? custom_edition_sounds_globals.chunk_capacity * 2 : 16;
+			struct decoded_chunk *grown = custom_edition_sounds_globals.chunks
+				? realloc(custom_edition_sounds_globals.chunks, count * sizeof(*grown))
+				: malloc(count * sizeof(*grown));
 
-	return (long)custom_edition_sounds_globals.decoded_bytes;
+			if (!grown)
+			{
+				return NULL;
+			}
+			custom_edition_sounds_globals.chunks = grown;
+			custom_edition_sounds_globals.chunk_capacity = count;
+		}
+		chunk = &custom_edition_sounds_globals.chunks[custom_edition_sounds_globals.chunk_count];
+		chunk->data = malloc(capacity);
+		if (!chunk->data)
+		{
+			return NULL;
+		}
+		chunk->base = custom_edition_sounds_globals.decoded_bytes;
+		chunk->used = 0;
+		chunk->capacity = capacity;
+		custom_edition_sounds_globals.chunk_count++;
+	}
+	*offset = (long)custom_edition_sounds_globals.decoded_bytes;
+
+	return chunk->data + chunk->used;
+}
+
+/* the `bytes` decoded_reserve made room for, written */
+static void decoded_commit(
+	unsigned long bytes)
+{
+	custom_edition_sounds_globals.chunks[custom_edition_sounds_globals.chunk_count - 1].used += bytes;
+	custom_edition_sounds_globals.decoded_bytes += bytes;
 }
 
 /* the format this build plays a sound in (sound_manager.c): Xbox ADPCM,
@@ -528,6 +576,7 @@ static boolean permutation_convert(
 	boolean decoded = FALSE;
 	unsigned long encoded_bytes;
 	byte *data;
+	byte *destination = NULL;
 	long offset = NONE;
 
 	/* (the loader checked the samples lie in the file; none at all is no sound) */
@@ -544,11 +593,11 @@ static boolean permutation_convert(
 	if (decoded && frames_conform(&frames, channels, playable_rate(sound)))
 	{
 		encoded_bytes = adpcm_encoded_bytes(frames.count, channels);
-		offset = decoded_reserve(encoded_bytes);
-		if (offset != NONE)
+		destination = decoded_reserve(encoded_bytes, &offset);
+		if (destination)
 		{
-			adpcm_encode(frames.samples, frames.count, channels, custom_edition_sounds_globals.decoded + offset);
-			custom_edition_sounds_globals.decoded_bytes += encoded_bytes;
+			adpcm_encode(frames.samples, frames.count, channels, destination);
+			decoded_commit(encoded_bytes);
 			permutation->compression = SOUND_COMPRESSION_XBOX_ADPCM;
 			permutation->samples.file_offset = decoded_offset + offset;
 			permutation->samples.size = (long)encoded_bytes;
@@ -557,7 +606,7 @@ static boolean permutation_convert(
 	}
 	frames_free(&frames);
 
-	return offset != NONE;
+	return destination != NULL && offset != NONE;
 }
 
 /* ---------- public code */
@@ -671,22 +720,49 @@ boolean custom_edition_sounds_read(
 	long size,
 	void *buffer)
 {
+	byte *out = buffer;
+	long index = 0;
+
 	if (offset < 0 || size < 0 ||
 		(unsigned long)offset + (unsigned long)size > custom_edition_sounds_globals.decoded_bytes)
 	{
 		return FALSE;
 	}
-	memcpy(buffer, custom_edition_sounds_globals.decoded + offset, size);
+	/* (from the chunk that holds each part: the chunks are in offset order,
+	and together they cover the space without a gap) */
+	while (size > 0 && index < custom_edition_sounds_globals.chunk_count)
+	{
+		struct decoded_chunk const *chunk = &custom_edition_sounds_globals.chunks[index];
+		unsigned long end = chunk->base + chunk->used;
 
-	return TRUE;
+		if ((unsigned long)offset >= end)
+		{
+			index++;
+			continue;
+		}
+		{
+			long part = (long)MIN((unsigned long)size, end - (unsigned long)offset);
+
+			memcpy(out, chunk->data + ((unsigned long)offset - chunk->base), part);
+			out += part;
+			offset += part;
+			size -= part;
+		}
+	}
+
+	return size == 0;
 }
 
 void custom_edition_sounds_dispose(
 	void)
 {
+	long index;
+
 	/* (none, when no sound needed decoding: debug_free does not take NULL) */
-	if (custom_edition_sounds_globals.decoded)
-		free(custom_edition_sounds_globals.decoded);
+	for (index = 0; index < custom_edition_sounds_globals.chunk_count; index++)
+		free(custom_edition_sounds_globals.chunks[index].data);
+	if (custom_edition_sounds_globals.chunks)
+		free(custom_edition_sounds_globals.chunks);
 	memset(&custom_edition_sounds_globals, 0, sizeof(custom_edition_sounds_globals));
 
 	return;

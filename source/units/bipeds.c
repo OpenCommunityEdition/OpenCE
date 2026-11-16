@@ -4379,6 +4379,7 @@ boolean biped_update(
 					}
 					else
 					{
+					short key_frame;
 					weapon_stop_reload(weapon_index);
 					first_person_weapon_message_from_unit(
 						biped_index,
@@ -4388,12 +4389,24 @@ boolean biped_update(
 						_weapon_first_person_animation_time_frame_count,
 						_first_person_weapon_animation_melee,
 						NONE);
-					biped->biped.player_melee_attack_tick = biped->biped.player_melee_ticks -
-						weapon_get_first_person_animation_time(
-							weapon_index,
-							_weapon_first_person_animation_time_private_key_frame,
-							_first_person_weapon_animation_melee,
-							NONE);
+					key_frame = weapon_get_first_person_animation_time(
+						weapon_index,
+						_weapon_first_person_animation_time_private_key_frame,
+						_first_person_weapon_animation_melee,
+						NONE);
+					/* port: fall back to unarmed melee timing if a custom weapon lacks an fp melee animation,
+					   and ensure private_key_frame_index == 0 still triggers melee damage mid-swing */
+					if (biped->biped.player_melee_ticks <= 0)
+					{
+						biped->biped.player_melee_ticks = UNARMED_MELEE_TICKS;
+						biped->biped.player_melee_attack_tick = UNARMED_MELEE_TICKS / 2;
+					}
+					else
+					{
+						if (key_frame <= 0 || key_frame >= biped->biped.player_melee_ticks)
+							key_frame = MAX(1, biped->biped.player_melee_ticks / 3);
+						biped->biped.player_melee_attack_tick = biped->biped.player_melee_ticks - key_frame;
+					}
 					}
 
 					melee_speedup_ticks = biped->biped.player_melee_ticks >> 2;

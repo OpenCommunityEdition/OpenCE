@@ -297,6 +297,10 @@ long mcc_pause_runtime_screen(short local_count, boolean first_player)
 {
     boolean network,host,teams=FALSE;
     if(!mcc_cache_tags_loaded() || !pause_runtime.table || !global_scenario) return NONE;
+    if(mcc_pause_needs_rebuild()) {
+        mcc_pause_runtime_unload();
+        if(!mcc_pause_runtime_load() || !pause_runtime.table) return NONE;
+    }
     network=game_connection()==_game_connection_network_server || game_connection()==_game_connection_network_client;
     host=global_network_game_server_get()!=NULL;
     if(global_scenario->type==1) teams=game_engine_get_variant()->universal_variant.teams;
