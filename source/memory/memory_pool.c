@@ -161,9 +161,9 @@ boolean memory_pool_block_allocate(
 	actual_size = size+sizeof(*block);
 	if (actual_size&3)
 		actual_size = (actual_size|3)+1;
-	/* port: the block the new one follows, not the whole pool (memory_pool_block_get) */
-	if (pool->last_block)
-		memory_pool_port_verify_block(pool, pool->last_block);
+	/* port: the pool and the block the new one follows, not the whole pool
+	(memory_pool_block_get) */
+	memory_pool_port_verify_block(pool, pool->last_block);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 124, size>=0);
 
 	block = pool->last_block
@@ -398,6 +398,10 @@ static void memory_pool_port_verify_block(
 	struct memory_pool_block *block)
 {
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 340, pool->signature==POOL_SIGNATURE);
+	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 341, pool->size>0);
+	/* (an empty pool has only its header to check) */
+	if (!block)
+		return;
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 355, block->header_signature==BLOCK_HEADER_SIGNATURE);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 356, block->trailer_signature==BLOCK_TRAILER_SIGNATURE);
 	match_assert("c:\\halo\\SOURCE\\memory\\memory_pool.c", 358, (byte *)block>=(byte *)pool->base_address);
