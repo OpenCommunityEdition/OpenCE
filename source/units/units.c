@@ -2488,9 +2488,9 @@ boolean unit_can_use_weapon(
 			struct unit_port_label_test *entry = &unit_port_label_tests[(hash + probe) % UNIT_PORT_LABEL_TEST_COUNT];
 
 			if (!entry->used ||
-				entry->animation_graph_index == animation_graph_index &&
+				(entry->animation_graph_index == animation_graph_index &&
 				entry->seat_label == seat_label &&
-				entry->weapon_label == weapon_label)
+				entry->weapon_label == weapon_label))
 			{
 				test = entry;
 				break;
