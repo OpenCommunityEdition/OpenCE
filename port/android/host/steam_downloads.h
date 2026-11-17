@@ -76,7 +76,7 @@ int steam_downloads_text_wanted(char *initial, int initial_size, int *secret);
 char const *steam_downloads_text_caption(int kind);
 void steam_downloads_text_typed(int kind, char const *text, int saved);
 
-/* ---------- the guest's (port/android/host_imports.list; guest_host.h
+/* ---------- the guest's (port/guest/host_imports.list; guest_host.h
 declares them, port/linux/src/steam_screen.c wraps them): its addresses */
 
 void host_steam_open(unsigned int data_root);

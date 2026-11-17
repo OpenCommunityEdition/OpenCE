@@ -60,7 +60,7 @@ def client(tmp_path_factory):
         # includes steam_downloads.c, so that is held to it too)
         warnings = ["-w"] if source.name == "steam_unpack.c" else ["-Wall", "-Wextra", "-Werror"]
         result = subprocess.run([clang, "-std=c11", "-D_GNU_SOURCE", "-DSTEAM_SEAL_TEST", *MBEDTLS_DEFINES, *warnings,
-                                 "-I", str(HOST), "-I", str(ROOT / "port/android/include"),
+                                 "-I", str(HOST), "-I", str(ROOT / "port/guest/include"),
                                  "-I", str(ROOT / "port/linux/src"), "-I", str(ZLIB), "-I", str(MBEDTLS / "include"),
                                  "-c", str(source), "-o", str(objects[-1])], capture_output=True, text=True)
         assert result.returncode == 0, result.stderr

@@ -43,7 +43,7 @@ struct xgpu_texture_description {
  BOOL cube_map;
 };
 static BOOL xgpu_mcc_texture_get(const DWORD *r,const D3DCOLOR *p,GLuint *t,GLenum *g,struct xgpu_texture_description *d) { return FALSE; }
-static int android_texture_fixes=1;
+static int halo_texture_fixes=1;
 static unsigned long serial=1, generation=1, uploads, next_texture;
 static unsigned long memory_watch_serial(void) { return serial; }
 static unsigned long memory_watch_generation(unsigned long a,unsigned long s) { return generation; }
@@ -268,7 +268,7 @@ int main(void) {
 }
 '''
     if platform == 'android-normal':
-        code = code.replace('static int android_texture_fixes=1;', 'static int android_texture_fixes=0;')
+        code = code.replace('static int halo_texture_fixes=1;', 'static int halo_texture_fixes=0;')
     code = code.replace('if(uploads!=2)return 3;',
                         'if(uploads!=2)return 3; if(ce_queries!=' + str(3 if platform == 'android' else 0) + ')return 4;')
     run_c(tmp_path,code)

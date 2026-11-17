@@ -21,7 +21,7 @@ android_build.py), so the assets are the committed source and Android needs
 no files beside its guest image.
 
 The data are 32-bit words, not bytes: the Android build passes the guest's
-assembly through tools/android_asm_convert.py, which rewrites identifiers in
+assembly through tools/guest_asm_convert.py, which rewrites identifiers in
 operands (it keeps .ascii strings as they are, but once garbled them).
 """
 
