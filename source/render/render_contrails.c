@@ -89,6 +89,22 @@ extern boolean render_contrails_enabled;
 /* port: said once */
 static boolean reported_bad_change_color = FALSE;
 
+/* ---------- private code */
+
+/* port: a point's state to draw it in. A point added since the points last
+aged (on a frame between ticks, contrail_update_points, or by a projectile's
+hit, contrail_owner_collision) has none yet: its first, which it is going
+into */
+static struct contrail_point_state *contrail_point_state_get(
+	struct contrail_definition *definition,
+	struct contrail_point_datum const *point)
+{
+	return TAG_BLOCK_GET_ELEMENT(
+		&definition->states,
+		point->state_index == NONE ? 0 : point->state_index,
+		struct contrail_point_state);
+}
+
 /* ---------- public code */
 
 real contrail_fade(
@@ -194,10 +210,8 @@ static void render_contrail(
 				real_vector3d facing_normal;
 
 				point = datum_get(contrail_point_data, point_index);
-				state = TAG_BLOCK_GET_ELEMENT(
-					&definition->states,
-					point->state_index,
-					struct contrail_point_state);
+				/* port: contrail_point_state_get, not state -1 */
+				state = contrail_point_state_get(definition, point);
 				color_scale = 1.f;
 				if (state->scale_flags & (1 << _contrail_state_color_bit))
 					color_scale = point->density;
