@@ -53,7 +53,7 @@ map's checksum when asked (crc32_combine's way), so one entry serves each.
 #if defined(__aarch64__)
 #include <arm_neon.h>
 #include <arm_acle.h>
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__linux__)
 #include <sys/auxv.h>
 #endif
 #endif
