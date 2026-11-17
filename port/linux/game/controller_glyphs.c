@@ -35,6 +35,7 @@ static struct
     struct bitmap_data *bitmap;
     long asset;
     boolean attempted;
+    void (*unbind)(unsigned long const *);
 } controller_glyph_cache[NUMBEROF(controller_glyph_assets)];
 
 short controller_glyph_style(void)
@@ -57,6 +58,8 @@ void controller_glyphs_dispose(void)
         if (controller_glyph_cache[i].bitmap)
         {
             hud_hires_register_placeholder(controller_glyph_cache[i].asset, NULL);
+            if (controller_glyph_cache[i].unbind)
+                controller_glyph_cache[i].unbind(controller_glyph_cache[i].bitmap->hardware_format);
             bitmap_delete(controller_glyph_cache[i].bitmap);
         }
     }
@@ -77,20 +80,14 @@ static short controller_glyph_asset_index(short style, short slot)
     return (short)(32 + family * 10 + slot - 4);
 }
 
-boolean controller_glyph_draw(short style, short index,
-    struct icon_hud_element_definition const *icon, rectangle2d *cursor, pixel32 color)
+/* Menu and gameplay draws must share the one placeholder registered per asset. */
+struct bitmap_data *controller_glyph_bitmap(short style, short slot, real_rectangle2d *uv)
 {
-    struct rasterizer_dynamic_screen_geometry_parameters parameters;
-    struct dynamic_screen_vertex vertices[4];
+    short key = controller_glyph_asset_index(style, slot);
     struct controller_glyph_asset const *entry;
     struct bitmap_data *bitmap;
-    short slot, key, i;
     long asset;
-    real scale, cell_width, cell_height, width, height, fit, x, y, center;
-    slot = index < 6 ? index : hud_button_control_slot(index,
-        icon->frame_rate > 0 ? game_time_get() / icon->frame_rate : 0);
-    key = controller_glyph_asset_index(style, slot);
-    if (key == NONE) return FALSE;
+    if (key == NONE) return NULL;
     entry = &controller_glyph_assets[key];
     if (!controller_glyph_cache[key].attempted)
     {
@@ -108,7 +105,33 @@ boolean controller_glyph_draw(short style, short index,
         }
     }
     bitmap = controller_glyph_cache[key].bitmap;
+    uv->x0 = entry->bounds[0] / 512.0f;
+    uv->y0 = entry->bounds[1] / 512.0f;
+    uv->x1 = entry->bounds[2] / 512.0f;
+    uv->y1 = entry->bounds[3] / 512.0f;
+    return bitmap;
+}
+
+boolean controller_glyph_draw_with_release(short style, short index,
+    struct icon_hud_element_definition const *icon, rectangle2d *cursor, pixel32 color,
+    void (*unbind)(unsigned long const *))
+{
+    struct rasterizer_dynamic_screen_geometry_parameters parameters;
+    struct dynamic_screen_vertex vertices[4];
+    struct controller_glyph_asset const *entry;
+    struct bitmap_data *bitmap;
+    short slot, key, i;
+    real_rectangle2d uv;
+    real scale, cell_width, cell_height, width, height, fit, x, y, center;
+    slot = index < 6 ? index : hud_button_control_slot(index,
+        icon->frame_rate > 0 ? game_time_get() / icon->frame_rate : 0);
+    key = controller_glyph_asset_index(style, slot);
+    if (key == NONE) return FALSE;
+    entry = &controller_glyph_assets[key];
+    bitmap = controller_glyph_bitmap(style, slot, &uv);
     if (!bitmap) return FALSE;
+    /* Cached artwork can acquire an external binding on a later draw. */
+    if (unbind) controller_glyph_cache[key].unbind = unbind;
     scale = local_player_count() > 1 ? 0.75f : 1.0f;
     cell_width = (slot < 6 ? 21.0f : slot < 8 ? 44.0f : 32.0f) * scale;
     cell_height = (slot < 6 ? 26.0f : slot < 8 ? 33.0f : 34.0f) * scale;
@@ -138,4 +161,10 @@ boolean controller_glyph_draw(short style, short index,
     rasterizer_psuedo_dynamic_screen_quad_draw(&parameters, vertices);
     cursor->x0 += (short)((slot < 4 ? 22.0f : slot < 6 ? 20.0f : slot < 8 ? 45.0f : 33.0f) * scale);
     return TRUE;
+}
+
+boolean controller_glyph_draw(short style, short index,
+    struct icon_hud_element_definition const *icon, rectangle2d *cursor, pixel32 color)
+{
+    return controller_glyph_draw_with_release(style, index, icon, cursor, color, NULL);
 }

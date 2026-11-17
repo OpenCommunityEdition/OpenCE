@@ -142,6 +142,7 @@ static void map_vote_fill_header(
 	header->type = type;
 	header->count = 1;
 	header->game_time = game_in_progress() ? game_time_get() : 0;
+	header->checkpoint_epoch = 0; /* Lobby votes are independent of the restored world. */
 }
 
 /* a text copied into a field, ended within it, printable ASCII */

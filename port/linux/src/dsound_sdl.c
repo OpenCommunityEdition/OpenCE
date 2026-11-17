@@ -1,27 +1,33 @@
+/* Adapted from OpenH1/OpenH1, revision 6750db5a6c9716857bd1e63d9ec188a20c49f1d3.
+ * Copyright OpenH1 contributors; AGPL-3.0-or-later.
+ * Provenance and hardware measurements: docs/reading/xbox_audio.md. */
+
 /*
 DSOUND_SDL.C
 
-Xbox DirectSound for the Linux build: a software mixer on an SDL3 audio
-stream.
+Xbox DirectSound for all ports: a software mixer on an SDL3 audio stream.
 
-The game plays everything through DirectSound streams: 16-bit stereo PCM
+The game plays most sounds through DirectSound streams: 16-bit stereo PCM
 (music and other uncompressed sounds) and Xbox ADPCM, mono or stereo, at 22
 or 44 kHz. A packet is decoded to 16-bit PCM when the game submits it, since
 the sound cache may reuse its memory once the packet completes. The mixer
 runs on SDL's audio thread; for every voice it resamples to the output rate
-with a windowed sinc low pass (which is how SetFrequency changes pitch;
-resampling) and applies:
+with the measured Xbox resampling kernel (which is how SetFrequency changes
+pitch; resampling) and applies:
 	- the stream volume (millibels),
 	- the front left and right mix bin volumes of 2D voices,
 	- for 3D voices, DirectSound's inverse distance rolloff between the
 	  minimum and maximum distance, an equal power pan from the source's
-	  direction in listener space, and the I3DL2 direct path, obstruction
+	  direction in listener space when HRTF is disabled, and the I3DL2 direct path, obstruction
 	  and occlusion levels, their high frequency levels a low pass at the
 	  environment's HF reference: a sound behind a wall is muffled,
 	- for 3D voices, the Doppler shift of the voice's and the listener's
-	  velocities, which moves the resampling step (doppler_ratio).
+	  velocities, which moves the resampling step (doppler_ratio). Positioned
+	  stereo sources also shift when audio.stereo_doppler is enabled.
 3D voices also send to an I3DL2 reverb of the environment the listener is in
-(reverb). Cones are not modelled. A look-ahead limiter keeps the sum under
+(dsound_xbox_reverb.inl). Mono 3D voices use the measured Xbox HRTF
+on stereo and surround outputs (dsound_xbox_hrtf.inl), enabled by default.
+Cones are not modelled. A look-ahead limiter keeps the sum under
 full scale (limit). A voice the game cuts off while it plays fades out over
 5 ms rather than stopping dead, which clicked (voice_cut).
 
@@ -29,10 +35,10 @@ The output is stereo or 5.1 (audio.channels). For 5.1 the speaker config
 reports AC-3, as an Xbox set to Dolby Digital does: the game then sends its
 2D voices to the center and back mix bins too (dsound_initialize_channel),
 3D voices and stereo voices positioned in the world are panned around the
-five full range speakers (surround_pan), and the reverb plays from the
+front and back pairs (surround_split), and the reverb plays from the
 front and back pairs. The mix bins 0-5 are in SDL's 5.1 order (FL, FR, FC,
 LFE, BL, BR), so bin n is output channel n. The game sends nothing to the
-LFE bin. Stereo output mixes exactly as before.
+LFE bin. An explicit LFE send is low-pass filtered at 86 Hz.
 
 Packets the mixer has finished are completed from DirectSoundDoWork, which
 the game calls every frame, and from Flush, never from the audio thread:
@@ -45,9 +51,14 @@ to finish before going on: never at once with the game's.
 Without an audio device, a clock thread runs the same mixer into a scratch
 buffer, so streams still drain at their real rate.
 
+The loading screen's four pitched chant voices use DirectSound buffers.
+Their PCM or Xbox ADPCM data is copied and decoded when set, then mixed
+dry into the front speakers under the master and effects volumes.
+
 audio.volume sets the master volume (default 1.0); audio.reverb = false
-turns the reverb off; audio.resampler = "linear" resamples between
-neighbouring frames instead of with the sinc low pass; audio.enabled = false
+turns the reverb off; audio.hrtf = false selects the legacy pan;
+audio.resampler = "xbox" uses the measured Xbox kernel by default. "sinc"
+selects a band-limited low pass, and "linear" interpolates neighbouring frames; audio.enabled = false
 skips opening a device; audio.channels chooses stereo or 5.1
 (port_config.c).
 */
@@ -73,22 +84,8 @@ skips opening a device; audio.channels chooses stereo or 5.1
 /* the frames a voice cut off fades out over (voice_cut): 5 ms */
 #define CUT_FADE_FRAMES 240
 
-#define XBOX_ADPCM_BLOCK_BYTES 36
-#define XBOX_ADPCM_BLOCK_SAMPLES 64
+#include "dsound_xbox_types.h"
 
-/* the resampler (resampling) */
-#define RESAMPLER_ZERO_CROSSINGS 24
-#define RESAMPLER_TABLE_STEPS 256
-#define RESAMPLER_CUTOFF 0.96
-#define RESAMPLER_KAISER_BETA 6.5
-/* (the fastest a voice plays: VOICE_FREQUENCY_MAXIMUM over OUTPUT_RATE) */
-#define RESAMPLER_MAXIMUM_STRETCH 4
-#define RESAMPLER_HISTORY 256
-#if defined(__GNUC__) || defined(__clang__)
-#define RESAMPLER_ALIGNED __attribute__((aligned(16)))
-#else
-#define RESAMPLER_ALIGNED
-#endif
 
 /* ---------- voices */
 
@@ -147,11 +144,8 @@ struct sdl_stream
 	millibels with occlusion, and its rolloff factor (SetI3DL2Source) */
 	LONG room, room_hf;
 	float room_rolloff_factor;
-	/* the voice's velocity in the game's units a second (SetVelocity), and
-	the Doppler ratio its resampling step was last moved by (0: none yet,
-	since the voice started: resampler_reset) */
+	/* the voice's velocity in the game's units a second (SetVelocity) */
 	float velocity[3];
-	float doppler;
 
 	struct voice_packet packets[MAXIMUM_STREAM_PACKETS];
 	unsigned long packet_head;
@@ -184,6 +178,22 @@ struct sdl_stream
 	float cut[CUT_FADE_FRAMES * MAXIMUM_OUTPUT_CHANNELS];
 	float cut_send[CUT_FADE_FRAMES];
 	unsigned long cut_played;
+	/* being flushed (stream_flush): the mixer leaves the packets not yet
+	given back, which the cut has played already, while the game's callback
+	runs without the lock */
+	BOOL flushing;
+	double current_step;
+	float current_doppler;
+	float target_left, target_right, target_room;
+	double target_step;
+	float target_direct_lowpass, target_room_lowpass;
+	float target_surround[2][MAXIMUM_OUTPUT_CHANNELS];
+	unsigned long ramp_frames;
+	BOOL hrtf_on;
+	float hrtf_mix;
+	struct hrtf_parameters hrtf_current, hrtf_target;
+	float hrtf_frames[2][HRTF_FRAMES];
+	float hrtf_bands[HRTF_BANDS - 1][2];
 };
 
 static pthread_mutex_t mixer_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -209,9 +219,26 @@ static struct
 } listener = { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 0 }, 1.0f, 1.0f, { 0, 0, 0 }, 1.0f };
 
 static float master_volume = 1.0f;
+
+/* Buffers own decoded samples independently of the game's loading memory.
+All mutable buffer state and the list are protected by mixer_lock. */
+struct sdl_buffer
+{
+	struct sdl_buffer *next;
+	ULONG reference_count;
+	unsigned long channels, block_bytes, block_frames;
+	BOOL adpcm, playing, looping;
+	short *samples;
+	unsigned long frames, loop_start, loop_end;
+	double position, rate;
+	float volume, current_volume;
+};
+
+static struct sdl_buffer *buffers;
 /* 2 or 6 (audio.channels), chosen when the device first opens; the game
 sets its mix bins by it, so it holds while the game runs */
 static unsigned long output_channels = 2;
+static BOOL hrtf_enabled = TRUE;
 
 /* the I3DL2 listener properties (SetI3DL2Listener), which the reverb models:
 DirectSound's defaults until the game sets an environment, their room level
@@ -223,6 +250,9 @@ static DSI3DL2LISTENER environment =
 static unsigned long environment_serial;
 /* audio.reverb */
 static BOOL reverb_enabled = TRUE;
+/* audio.stereo_doppler: positioned stereo voices shift as 3D ones do
+(doppler_ratio); the Xbox played stereo sounds at their own pitch */
+static BOOL stereo_doppler_enabled = FALSE;
 
 static float gain_from_millibels(LONG millibels)
 {
@@ -234,6 +264,20 @@ static float gain_from_millibels(LONG millibels)
 /* value, or 0 once it is far too small to hear: the state of a filter or of
 the reverb fed silence decays into the denormals, which many CPUs work out
 slowly, and neither x86 nor ARM flushes them to zero by default */
+static float voice_level(float gain)
+{
+	float size = fabsf(gain), level;
+
+	if (size >= VOICE_LEVEL_KNEE)
+		return gain;
+	if (size <= 0.0f)
+		return 0.0f;
+	level = (VOICE_LEVEL_SILENT + 20.0f * log10f(size)) * VOICE_LEVEL_STEP;
+	if (level <= 0.0f)
+		return 0.0f;
+	return gain < 0.0f ? -level : level;
+}
+
 static float flush_denormal(float value)
 {
 	return fabsf(value) < 1.0e-20f ? 0.0f : value;
@@ -389,63 +433,117 @@ static float distance_attenuation(const struct sdl_stream *stream, float distanc
 	return minimum / (minimum + rolloff_factor * (distance - minimum));
 }
 
-/* the speed of sound in air, meters a second, at which DirectSound's Doppler
-model has it */
-#define SPEED_OF_SOUND 343.3f
+/* ---------- Doppler
 
-/* the frequencies, hertz, an Xbox voice plays at (the XDK's DSBFREQUENCY_MIN
-and DSBFREQUENCY_MAX), the only limit on the Doppler shift */
-#define VOICE_FREQUENCY_MINIMUM 188.0
-#define VOICE_FREQUENCY_MAXIMUM 191983.0
+The game gives each 3D voice its velocity (units a second, relative to the
+listener: sound_manager.c update_channels) and the Xbox's DirectSound shifted
+its pitch by them, as a sound passing by is heard: a Banshee, a Ghost or a
+plasma bolt rising as it comes and falling as it goes. An Xbox's shift is
+the first order one: the frequency times 1 + (D v_listener - D v_source) / c,
+c the speed of sound, D the Doppler factor, the velocities' parts along the
+line from the listener to the source in metres a second (the distance
+factor's metres a unit), the source's away from the listener, the
+listener's towards the source. Recorded on an Xbox, a source passing at 20
+units a second was shifted 1.178 coming and 0.822 going, and at 40, 1.356
+and 0.644: the same either way, and twice as far at twice the speed, where
+(c + D v_listener) / (c + D v_source) gives 1.216 and 0.849, then 1.551 and
+0.738. Each part is held within the speed of sound, and the shift to an
+octave either way, so that a projectile passing close by, or a velocity
+that jumps (a teleport), takes no voice up out of hearing. A voice's shift
+is the one its position and velocities give at each mix, moved to over
+PARAMETER_RAMP_FRAMES as a change of its pitch is (doppler_heard): an
+Xbox's moved with each of the game's updates and settled within 2 ms.
+Recorded on an Xbox, a source passing at 40 units a second, its position set
+every 34 ms, stepped its pitch at each set; a glide over 80 ms (as the mixer
+had) was 166 cents off it, and 37 cents at 20 units a second. */
 
-/* the Doppler ratio of a 3D voice: the multiple of its pitch that its and
-the listener's velocities along the line between them give, (c - the
-listener's speed away from the source) / (c - the source's speed towards the
-listener), in meters a second (the game's units times the distance factor,
-times the Doppler factor). The game gives each voice its velocity relative
-to the listener and the listener none (sound_manager.c): a source coming at a
-still listener, as it is, and a listener coming at a still source a shade
-higher than it would be. A source coming at the speed of sound or faster,
-whose pitch the formula takes to infinity, and a listener outrunning the
-sound, which never reaches it, are as high and as low as a voice plays: the
-voice's frequency holds the ratio in (mix_voice) */
 static float doppler_ratio(const struct sdl_stream *stream)
 {
-	float to_listener[3], distance, scale, towards, away, ratio;
+	float offset[3], distance, source_speed, listener_speed = 0.0f, ratio, limit = DOPPLER_SPEED_OF_SOUND;
 	int axis;
 
-	/* (a positioned stereo voice: the game gives how fast it comes towards
-	the listener, which is still) */
-	if (!stream->has_3d && stream->stereo_positioned)
+	if (stereo_doppler_enabled && !stream->has_3d && stream->stereo_positioned)
 	{
-		towards = stream->stereo_approach * listener.distance_factor * listener.doppler_factor;
-		if (towards >= SPEED_OF_SOUND)
-			return 1.0e6f;
-		return SPEED_OF_SOUND / (SPEED_OF_SOUND - towards);
+		ratio = 1.0f + stream->stereo_approach * listener.distance_factor * listener.doppler_factor / DOPPLER_SPEED_OF_SOUND;
+		return ratio < 0.5f ? 0.5f : ratio > 2.0f ? 2.0f : ratio;
 	}
 	if (!stream->has_3d || stream->mode == DS3DMODE_DISABLE)
 		return 1.0f;
 	for (axis = 0; axis < 3; axis++)
-		to_listener[axis] = (stream->mode == DS3DMODE_HEADRELATIVE ? 0.0f : listener.position[axis]) -
-			stream->position[axis];
-	distance = sqrtf(dot3(to_listener, to_listener));
+	{
+		offset[axis] = stream->position[axis] -
+			(stream->mode == DS3DMODE_HEADRELATIVE ? 0.0f : listener.position[axis]);
+	}
+	distance = sqrtf(dot3(offset, offset));
 	if (distance < 1.0e-4f)
 		return 1.0f;
-	scale = listener.distance_factor * listener.doppler_factor / distance;
-	towards = dot3(stream->velocity, to_listener) * scale;
-	/* (a head relative voice moves with the listener) */
-	away = stream->mode == DS3DMODE_HEADRELATIVE ? 0.0f : dot3(listener.velocity, to_listener) * scale;
-	if (towards >= SPEED_OF_SOUND)
-		return 1.0e6f;
-	ratio = (SPEED_OF_SOUND - away) / (SPEED_OF_SOUND - towards);
-	return ratio > 0.0f ? ratio : 0.0f;
+	source_speed = listener.doppler_factor * listener.distance_factor * dot3(stream->velocity, offset) / distance;
+	/* (head-relative: the voice's velocity is the listener's already) */
+	if (stream->mode != DS3DMODE_HEADRELATIVE)
+		listener_speed = listener.doppler_factor * listener.distance_factor * dot3(listener.velocity, offset) / distance;
+	source_speed = source_speed < -limit ? -limit : source_speed > limit ? limit : source_speed;
+	listener_speed = listener_speed < -limit ? -limit : listener_speed > limit ? limit : listener_speed;
+	ratio = 1.0f + (listener_speed - source_speed) / DOPPLER_SPEED_OF_SOUND;
+	if (ratio > DOPPLER_MAXIMUM_RATIO)
+		ratio = DOPPLER_MAXIMUM_RATIO;
+	if (ratio < 1.0f / DOPPLER_MAXIMUM_RATIO)
+		ratio = 1.0f / DOPPLER_MAXIMUM_RATIO;
+	return ratio;
 }
 
-/* the gains of a 3D voice to the left and right, and the room rolloff's
-attenuation of its room send */
-static void spatialize(const struct sdl_stream *stream, float *left, float *right, float *room)
+/* the shift a voice plays in a mix: its doppler_ratio, kept for the
+voices' report (the step ramps to it, mix_voice) */
+static float doppler_heard(struct sdl_stream *stream)
 {
-	float offset[3], right_axis[3], distance, attenuation, pan, side, ahead;
+	stream->current_doppler = doppler_ratio(stream);
+	return stream->current_doppler;
+}
+
+#include "dsound_xbox_hrtf.inl"
+
+/* On 5.1 (AC-3) the Xbox played a 3D voice from the front pair of speakers
+and the back pair, never the center or the LFE: the same pair of ears' sound
+on both (the HRTF's, or the pan's), a sound behind heard as the direction
+mirrored ahead (azimuth 180 - azimuth), and its power split between the
+pairs by its direction, DirectSound's azimuth and elevation (hrtf_angles):
+the back pair's share 0.5 + (1 - |elevation| / 90)(|azimuth| / 90 - 1),
+held to 0 to 1. Ahead it is all in the front pair, behind all in the back,
+to the side half in each, above and below towards half. Recorded on an Xbox
+(its AC-3 decoded), a sweep at each 30 degrees around and at 45 and 135
+degrees 40 above and below: each pair's two speakers alike in time and level
+ahead and behind, both pairs the same time and level apart between their
+speakers to the side (660 us, the HRTF's), the back pair's share 0, 0, 0.21,
+0.50, 0.79, 1, 1 from ahead round to behind, 0.21 and 0.79 at 45 and 135
+degrees, up or down; the center and the LFE silent. So here; on stereo the
+front pair alone, all round (spatialize). pair: the front pair's gain and
+the back pair's */
+static void surround_split(float right, float up, float ahead, float *pair)
+{
+	float azimuth = 0.0f, elevation = 0.0f, share;
+
+	if (output_channels != 6)
+	{
+		pair[0] = 1.0f;
+		pair[1] = 0.0f;
+		return;
+	}
+	if (right * right + up * up + ahead * ahead > 1.0e-8f)
+		hrtf_angles(right, up, ahead, &azimuth, &elevation);
+	share = 0.5f + (1.0f - fabsf(elevation) / 90.0f) * (fabsf(azimuth) / 90.0f - 1.0f);
+	share = share < 0.0f ? 0.0f : share > 1.0f ? 1.0f : share;
+	pair[0] = sqrtf(1.0f - share);
+	pair[1] = sqrtf(share);
+}
+
+/* the gains of a 3D voice to the left and right (the pan's), the gains of
+the front and back pairs of speakers (surround_split) and the distance
+rolloff's attenuation (distance_gain); for a mono voice through the HRTF
+(hrtf_on: chosen, or crossfading from it), its gain to each ear and its way
+there (hrtf_out) */
+static void spatialize(const struct sdl_stream *stream, float *left, float *right, float *pair,
+	float *distance_gain, BOOL *hrtf_on, struct hrtf_parameters *hrtf_out)
+{
+	float offset[3], right_axis[3], distance, attenuation, pan, side, ahead, up;
 	int axis;
 
 	if (stream->mode == DS3DMODE_HEADRELATIVE)
@@ -453,6 +551,7 @@ static void spatialize(const struct sdl_stream *stream, float *left, float *righ
 		for (axis = 0; axis < 3; axis++)
 			offset[axis] = stream->position[axis];
 		side = offset[0];
+		up = offset[1];
 		ahead = offset[2];
 	}
 	else
@@ -464,6 +563,7 @@ static void spatialize(const struct sdl_stream *stream, float *left, float *righ
 		right_axis[1] = listener.top[2] * listener.front[0] - listener.top[0] * listener.front[2];
 		right_axis[2] = listener.top[0] * listener.front[1] - listener.top[1] * listener.front[0];
 		side = dot3(offset, right_axis);
+		up = dot3(offset, listener.top);
 		ahead = dot3(offset, listener.front);
 	}
 	/* in the game's units, those of the minimum and maximum distances: the
@@ -471,7 +571,7 @@ static void spatialize(const struct sdl_stream *stream, float *left, float *righ
 	here put every 3D sound 3 times as far away, up to 10 dB quieter */
 	distance = sqrtf(dot3(offset, offset));
 	attenuation = distance_attenuation(stream, distance, listener.rolloff_factor);
-	*room = distance_attenuation(stream, distance, environment.flRoomRolloffFactor + stream->room_rolloff_factor);
+	*distance_gain = attenuation;
 
 	/* equal power pan; close sources and sources straight ahead or behind
 	stay centred, and neither ear drops below a quarter */
@@ -487,6 +587,19 @@ static void spatialize(const struct sdl_stream *stream, float *left, float *righ
 		*left = cosf(angle) * 1.41421356f * 0.70710678f;
 		*right = sinf(angle) * 1.41421356f * 0.70710678f;
 	}
+	/* and through the HRTF, each ear at the pan's gain in the middle (-3
+	dB), the head's filters doing the rest */
+	surround_split(side, up, ahead, pair);
+	*hrtf_on = stream->channels == 1 && (hrtf_enabled || stream->hrtf_mix > 0.0f);
+	if (*hrtf_on)
+	{
+		/* (on 5.1 a sound behind as the direction mirrored ahead) */
+		hrtf_place(side, up, output_channels == 6 ? fabsf(ahead) : ahead, distance,
+			output_channels == 6 && ahead < 0.0f, hrtf_out);
+		hrtf_out->gain = 0.70710678f * attenuation * gain_from_millibels(stream->direct);
+		hrtf_out->pair[0] = pair[0];
+		hrtf_out->pair[1] = pair[1];
+	}
 	*left *= attenuation * gain_from_millibels(stream->direct);
 	*right *= attenuation * gain_from_millibels(stream->direct);
 }
@@ -494,18 +607,27 @@ static void spatialize(const struct sdl_stream *stream, float *left, float *righ
 /* the voice's gains to the left and right, and to the reverb (only 3D voices
 send to it, as their I3DL2 mix bin did on the Xbox), with the coefficients of
 the low passes of its direct path (3D voices: obstruction and occlusion
-muffle it) and of the send */
-static void voice_gains(const struct sdl_stream *stream, float *left, float *right, float *room,
-	float *direct_lowpass, float *room_lowpass)
+muffle it) and of the send; a 3D voice's gains of the front and back pairs
+of speakers (pair: surround_split; others 1 and 0); a 3D voice through the
+HRTF (hrtf_on) has its way to each ear too (hrtf_out) */
+static void voice_gains(const struct sdl_stream *stream, float *left, float *right, float *pair, float *room,
+	float *direct_lowpass, float *room_lowpass, BOOL *hrtf_on, struct hrtf_parameters *hrtf_out)
 {
+	float level_3d = -1.0f, level_direct = -1.0f;
+
+	pair[0] = 1.0f;
+	pair[1] = 0.0f;
 	*room = 0.0f;
 	*direct_lowpass = 0.0f;
 	*room_lowpass = 0.0f;
+	*hrtf_on = FALSE;
 	if (stream->has_3d && stream->mode != DS3DMODE_DISABLE)
 	{
-		float rolloff, cosine = frequency_cosine(environment.flHFReference);
+		float distance_gain, cosine = frequency_cosine(environment.flHFReference);
 
-		spatialize(stream, left, right, &rolloff);
+		spatialize(stream, left, right, pair, &distance_gain, hrtf_on, hrtf_out);
+		level_3d = VOICE_LEVEL_3D * distance_gain * stream->volume;
+		level_direct = level_3d * gain_from_millibels(stream->direct);
 		if (stream->direct_hf < stream->direct)
 			*direct_lowpass = lowpass_coefficient(gain_from_millibels(stream->direct_hf - stream->direct), cosine);
 		if (reverb_enabled)
@@ -513,7 +635,16 @@ static void voice_gains(const struct sdl_stream *stream, float *left, float *rig
 			LONG level = environment.lRoom + stream->room;
 			LONG high_level = environment.lRoom + environment.lRoomHF + stream->room_hf;
 
-			*room = gain_from_millibels(level) * rolloff;
+			/* VOICE_LEVEL_3D times the room level and the direct path's
+			distance rolloff, whatever the room rolloff: recorded on an
+			Xbox (issue 792's eighth run), the cave's reverb of a noise
+			burst 0.5 to 20 m away (minimum distance 1 m) is 6.0 dB over
+			its room level and rolloff to within 0.1 dB, at room levels of
+			-20, -10 and 0 dB and the source's own -10 alike, and a room
+			rolloff factor of 1 leaves it as it was. (#790's cap at the
+			rolloff, fitted at 2 and 10 m, was 4 dB loud from 3 m and 6
+			dB quiet within 1 m) */
+			*room = VOICE_LEVEL_3D * gain_from_millibels(level) * distance_gain;
 			if (*room > 0.0f && high_level < level)
 				*room_lowpass = lowpass_coefficient(gain_from_millibels(high_level - level), cosine);
 		}
@@ -553,9 +684,43 @@ static void voice_gains(const struct sdl_stream *stream, float *left, float *rig
 		*left = stream->mix_left;
 		*right = stream->mix_right;
 	}
-	*left *= stream->volume * master_volume;
-	*right *= stream->volume * master_volume;
-	*room *= stream->volume * master_volume;
+	/* (the Xbox's quietest levels before audio.volume, which it did not
+	have: voice_level) */
+	if (level_3d < 0.0f)
+	{
+		*left = voice_level(*left * stream->volume) * master_volume;
+		*right = voice_level(*right * stream->volume) * master_volume;
+		*room = voice_level(*room * stream->volume) * master_volume;
+	}
+	else
+	{
+		/* a 3D voice's are those of its volume and distance rolloff
+		together, at VOICE_LEVEL_3D times, its other gains after them:
+		recorded on an Xbox (issue 714's seventh run), a voice 10 m away
+		(-20 dB of rolloff, -23 with the pan's) stepped down from -20 dB
+		played as a 2D voice 14 dB quieter would, its direct path and its
+		reverb alike: exact to -30 dB, -40 at -42.8, -42 at -52.1, silent
+		from -44 (its whole level's would be silent from -34). Its direct
+		path's are of its direct level too (obstruction and occlusion
+		with it), its reverb's not: recorded again (issue 792's eighth
+		run), voices 0.5 to 40 m away, ahead, to the right and at 45
+		degrees, went silent where this says to within a dB, each ear at
+		the same step (the pan after it), and a voice 10 m away with a
+		direct level of -10 dB, or obstructed by -10 dB, 10 dB sooner,
+		its reverb where the voice's without it went. The HRTF's gain
+		too: without it every mono 3D voice on headphones played at full
+		volume, whatever audio.volume, audio.effects_volume and the
+		game's own gain said, and only the 2D voices followed them */
+		float scale = level_direct > 0.0f ?
+			voice_level(level_direct) / level_direct * stream->volume * master_volume : 0.0f;
+		float room_scale = level_3d > 0.0f ? voice_level(level_3d) / level_3d * stream->volume * master_volume : 0.0f;
+
+		*left *= scale;
+		*right *= scale;
+		*room *= room_scale;
+		if (*hrtf_on)
+			hrtf_out->gain *= scale;
+	}
 }
 
 /* the 5.1 speakers around the listener, clockwise from the center, and
@@ -568,10 +733,19 @@ static const float surround_ring_angle[SURROUND_RING_SPEAKERS + 1] =
 	0.0f, 0.52359878f, 1.91986218f, 4.36332313f, 5.75958653f, 6.28318531f,
 };
 
-/* the speaker gains of a sound from a direction, side (right) and ahead: an
-equal power pan between the two speakers either side of it, blended (in
-power) towards all five equally by spread, 0 to 1. Their power sums to 1, as
-the stereo pan's does */
+/* the speaker gains of a sound from a direction, side (right) and ahead:
+vector base amplitude panning (Pulkki's VBAP, in the plane) between the two
+speakers either side of it, blended (in power) towards all five equally by
+spread, 0 to 1. Their power sums to 1, as the stereo pan's does.
+
+VBAP takes the gains g1 and g2 whose sum g1 l1 + g2 l2 of the speakers'
+directions l1 and l2 points the sound's way p, then scales them to a power
+of 1: g1 = sin(a2 - a) / sin(a2 - a1) and g2 = sin(a - a1) / sin(a2 - a1),
+a the sound's angle, a1 and a2 the speakers', the common divisor gone with
+the scaling. So a sound at a speaker plays from it alone, one between two
+from both, as the tangent law of stereo panning puts a phantom image (the
+listener between them hears it where it is), and no pair is wider than 180
+degrees (the backs' 140 is the widest). */
 static void surround_pan(float side, float ahead, float spread, float *gains)
 {
 	float angle = atan2f(side, ahead);
@@ -587,12 +761,20 @@ static void surround_pan(float side, float ahead, float spread, float *gains)
 			break;
 	}
 	{
-		float width = surround_ring_angle[segment + 1] - surround_ring_angle[segment];
-		float position = (angle - surround_ring_angle[segment]) / width;
+		float first = sinf(surround_ring_angle[segment + 1] - angle);
+		float second = sinf(angle - surround_ring_angle[segment]);
+		float length;
 
-		position = position < 0.0f ? 0.0f : position > 1.0f ? 1.0f : position;
-		gains[surround_ring_channel[segment]] = cosf(position * 1.57079633f);
-		gains[surround_ring_channel[(segment + 1) % SURROUND_RING_SPEAKERS]] = sinf(position * 1.57079633f);
+		first = first > 0.0f ? first : 0.0f;
+		second = second > 0.0f ? second : 0.0f;
+		length = sqrtf(first * first + second * second);
+		if (length < 1.0e-6f)
+		{
+			first = 1.0f;
+			length = 1.0f;
+		}
+		gains[surround_ring_channel[segment]] = first / length;
+		gains[surround_ring_channel[(segment + 1) % SURROUND_RING_SPEAKERS]] = second / length;
 	}
 	for (speaker = 0; speaker < SURROUND_RING_SPEAKERS; speaker++)
 	{
@@ -604,65 +786,33 @@ static void surround_pan(float side, float ahead, float spread, float *gains)
 
 /* on 5.1, a voice's gains from each source channel to each speaker (the
 direct path's; its room send and low passes are voice_gains'):
-	- a 3D voice is panned around the speakers from its direction, a little
-	  spread so that it never vanishes between two, spread out towards all
-	  five inside its minimum distance and above or below, as the stereo pan
-	  centres those;
+	- a 3D voice's left and right gains (voice_gains: the pan's, with its
+	  volume) on the front pair and the back pair, at their gains (pair,
+	  surround_split), a mono voice's both from its one channel, a stereo
+	  voice's from its left and right; through the HRTF, its way to each
+	  ear (hrtf_process) instead, crossfaded with these as the choice
+	  changes;
 	- a stereo voice positioned in the world has its channels' middle (the
 	  first row) panned towards it in the front half, and their difference
 	  (the second) kept on the front pair as wide as the stereo mix keeps it;
 	- a 2D voice goes by its mix bins. */
-static void voice_surround_gains(const struct sdl_stream *stream, float gains[2][MAXIMUM_OUTPUT_CHANNELS])
+static void voice_surround_gains(const struct sdl_stream *stream, float left, float right, const float *pair,
+	float gains[2][MAXIMUM_OUTPUT_CHANNELS])
 {
-	float scale = stream->volume * master_volume;
 	unsigned long speaker;
 
 	memset(gains, 0, 2 * sizeof(gains[0]));
 	if (stream->has_3d && stream->mode != DS3DMODE_DISABLE)
 	{
-		float offset[3], right_axis[3], side, ahead, distance, horizontal, attenuation, spread = 0.1f;
-		int axis;
+		unsigned long second = stream->channels == 2 ? 1 : 0;
 
-		if (stream->mode == DS3DMODE_HEADRELATIVE)
-		{
-			for (axis = 0; axis < 3; axis++)
-				offset[axis] = stream->position[axis];
-			side = offset[0];
-			ahead = offset[2];
-		}
-		else
-		{
-			for (axis = 0; axis < 3; axis++)
-				offset[axis] = stream->position[axis] - listener.position[axis];
-			right_axis[0] = listener.top[1] * listener.front[2] - listener.top[2] * listener.front[1];
-			right_axis[1] = listener.top[2] * listener.front[0] - listener.top[0] * listener.front[2];
-			right_axis[2] = listener.top[0] * listener.front[1] - listener.top[1] * listener.front[0];
-			side = dot3(offset, right_axis);
-			ahead = dot3(offset, listener.front);
-		}
-		horizontal = sqrtf(side * side + ahead * ahead);
-		distance = sqrtf(dot3(offset, offset));
-		if (horizontal <= 1.0e-4f)
-			spread = 1.0f;
-		else if (distance > 1.0e-4f && 0.5f * (1.0f - horizontal / distance) > spread)
-			spread = 0.5f * (1.0f - horizontal / distance);
-		if (distance < stream->minimum_distance && stream->minimum_distance > 0.0f &&
-			1.0f - distance / stream->minimum_distance > spread)
-		{
-			spread = 1.0f - distance / stream->minimum_distance;
-		}
-		surround_pan(side, ahead, spread, gains[0]);
-		attenuation = distance_attenuation(stream, distance, listener.rolloff_factor) *
-			gain_from_millibels(stream->direct);
-		for (speaker = 0; speaker < MAXIMUM_OUTPUT_CHANNELS; speaker++)
-		{
-			gains[0][speaker] *= attenuation;
-			/* a stereo 3D voice: both channels from where it is */
-			if (stream->channels == 2)
-				gains[1][speaker] = gains[0][speaker] *= 0.5f;
-		}
+		gains[0][0] = left * pair[0];
+		gains[0][4] = left * pair[1];
+		gains[second][1] = right * pair[0];
+		gains[second][5] = right * pair[1];
+		return;
 	}
-	else if (stream->channels == 2 && stream->stereo_positioned)
+	if (stream->channels == 2 && stream->stereo_positioned)
 	{
 		float pan = stream->stereo_pan < -1.0f ? -1.0f : stream->stereo_pan > 1.0f ? 1.0f : stream->stereo_pan;
 		float angle = (pan + 1.0f) * 0.25f * 3.14159265f;
@@ -683,10 +833,11 @@ static void voice_surround_gains(const struct sdl_stream *stream, float gains[2]
 		if (stream->channels == 1)
 			memset(gains[1], 0, sizeof(gains[1]));
 	}
+	/* (voice_level, as voice_gains) */
 	for (speaker = 0; speaker < MAXIMUM_OUTPUT_CHANNELS; speaker++)
 	{
-		gains[0][speaker] *= scale;
-		gains[1][speaker] *= scale;
+		gains[0][speaker] = voice_level(gains[0][speaker] * stream->volume) * master_volume;
+		gains[1][speaker] = voice_level(gains[1][speaker] * stream->volume) * master_volume;
 	}
 }
 
@@ -716,24 +867,81 @@ next, so the blend is a multiply and an add a tap */
 #define RESAMPLER_TAPS (2 * RESAMPLER_ZERO_CROSSINGS)
 static float resampler_phases[RESAMPLER_TABLE_STEPS + 1][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
 static float resampler_deltas[RESAMPLER_TABLE_STEPS][RESAMPLER_TAPS] RESAMPLER_ALIGNED;
+/* the Xbox's resampler, as a voice's reverb send hears it: a sinc low pass at
+the source's own Nyquist rate, Hann windowed to SEND_ZERO_CROSSINGS frames
+each side (six taps), and never narrowed for a voice played faster than the
+output rate, so that it lets through about half of the source's top few
+kilohertz's images (-6 dB at the source's Nyquist rate) and aliases what a
+voice pitched up has above the output's. The reverb takes every other frame
+of the send unfiltered (reverb_process), which folds the send's top octave
+onto its bottom one: so a 44.1 kHz voice's images at 22 to 24 kHz are the
+reverb's low end. Recorded on an Xbox (OpenH1 issue 714, its sixth run:
+clicks and noise in the cave at 22.05, 44.1 and 48 kHz, at pitches 0.75 to
+1.5), a 44.1 kHz click's reverberation is 3.6 dB louder below 1 kHz at pitch
+1 than through the mixer's resampler, 6 dB pitched up 1.5 times, and a 48
+kHz one's 1 dB at 0.75; this low pass gives each within 0.5 dB (a width of
+three frames each side fits best, of two to eight, and a cutoff at the
+source's Nyquist rate, of 0.9 to 1.1 of it). At a phase of 0 it is the
+frames themselves, so a voice at the output's rate sends its frames as they
+are, as the Xbox's did. The direct path has a longer one (direct_phases). A row
+a phase, and its step to the next, as resampler_phases and resampler_deltas */
+static float send_phases[RESAMPLER_TABLE_STEPS + 1][SEND_TAPS] RESAMPLER_ALIGNED;
+static float send_deltas[RESAMPLER_TABLE_STEPS][SEND_TAPS] RESAMPLER_ALIGNED;
 
-/* how a voice's frames are converted to the output's rate: the windowed sinc
-low pass, or between the two frames either side (linear: it lets more of the
-images above the source's rate through, which some hear as brighter) */
+/* the Xbox's resampler on a voice's direct path, audio.resampler's "xbox"
+(the default): a low pass at the source's Nyquist rate, never narrowed, over
+four source frames each side, as recorded on an Xbox (OpenH1 issue 792, its
+eighth run: two trains of sixteen one-sample clicks at 22.05 kHz, pitched 1
+and 0.9, each click on another phase, the clicks' frames laid on one time
+line by the rate the Xbox played them at). In each source frame from the
+center it is a polynomial of the distance into the frame, as here: these
+play the recordings back to within -70 dB, with corners at the whole frames,
+where the best smooth low pass's is -35 dB. With it the Xbox's 22.05 kHz
+voices are played as the Xbox played them: the passband (-2.2 dB at 0.4 of
+the source's rate, -6.9 at 0.5; the Kaiser windowed sinc fitted before, -1.9
+and -6.0), the images a 4 kHz tone leaves at 0.82, 1.18 and 1.82 of the
+source's rate (-63, -71 and -79 dB: the sinc's -70, -99, -101) and the low
+pass's lobe from 1.3 to 1.6 of it, at -33 dB, which comes down to the
+output's 13 to 19 kHz (issue 714's seventh run: a 22.05 kHz click's images
+above 16 kHz, 9 to 40 dB over any smooth low pass's). It is the
+coefficients, not their phases: tables of 16 to 64 phases, unblended, fit
+the clicks worse than one blended. The Xbox's step a frame is rounded too
+(22050 Hz played at 22042.97, 17640 at 17636.72, 24000 and 12000 exactly),
+by under 0.6 cents, which is not copied. A row a frame from the center, its
+coefficients from the constant up */
+static const double direct_kernel[DIRECT_ZERO_CROSSINGS][DIRECT_KERNEL_ORDER + 1] =
+{
+	{ 1.0007795, -0.2495059, -1.3652166, 0.3404684, 0.4084059, -0.1349805 },
+	{ -0.0001219, -0.6004896, 0.7474932, 0.0843083, -0.3094547, 0.0781494 },
+	{ -0.0001317, 0.1000168, -0.0728184, -0.1081077, 0.1009553, -0.0199766 },
+	{ -0.0001926, -0.0076839, -0.0064829, 0.0419929, -0.0412200, 0.0134312 },
+};
+/* direct_kernel as a table of phases: a row a phase, and its step to the
+next, as resampler_phases */
+static float direct_phases[RESAMPLER_TABLE_STEPS + 1][DIRECT_TAPS] RESAMPLER_ALIGNED;
+static float direct_deltas[RESAMPLER_TABLE_STEPS][DIRECT_TAPS] RESAMPLER_ALIGNED;
+
+/* how a voice's frames are converted to the output's rate: the Xbox's low
+pass (direct_phases), the mixer's windowed sinc low pass, or between the two
+frames either side (linear: it lets more of the images above the source's
+rate through, which some hear as brighter) */
 enum resampler_mode
 {
+	RESAMPLER_XBOX,
 	RESAMPLER_SINC,
 	RESAMPLER_LINEAR
 };
 /* audio.resampler */
-static enum resampler_mode resampler_mode = RESAMPLER_SINC;
+static enum resampler_mode resampler_mode = RESAMPLER_XBOX;
 
-/* audio.resampler's mode: sinc for any value but "linear" */
+/* audio.resampler's mode: the Xbox's for any value but "sinc" and "linear" */
 static enum resampler_mode resampler_mode_read(void)
 {
 	const char *setting = config_string("audio.resampler");
 
-	return setting && !strcmp(setting, "linear") ? RESAMPLER_LINEAR : RESAMPLER_SINC;
+	if (setting && !strcmp(setting, "sinc"))
+		return RESAMPLER_SINC;
+	return setting && !strcmp(setting, "linear") ? RESAMPLER_LINEAR : RESAMPLER_XBOX;
 }
 
 static double bessel_i0(double x)
@@ -798,6 +1006,59 @@ static void resampler_phases_initialize(void)
 		for (tap = 0; tap < RESAMPLER_TAPS; tap++)
 			resampler_deltas[phase][tap] = resampler_phases[phase + 1][tap] - resampler_phases[phase][tap];
 	}
+	for (phase = 0; phase < RESAMPLER_TABLE_STEPS + 1; phase++)
+	{
+		for (tap = 0; tap < SEND_TAPS; tap++)
+		{
+			double distance = (double)((long)tap + 1 - SEND_ZERO_CROSSINGS) - (double)phase / RESAMPLER_TABLE_STEPS;
+			double angle = 3.14159265358979 * distance;
+
+			/* (on a frame, exactly it, and 0 at the others) */
+			if (phase % RESAMPLER_TABLE_STEPS == 0)
+				send_phases[phase][tap] = distance == 0.0 ? 1.0f : 0.0f;
+			else if (fabs(distance) >= SEND_ZERO_CROSSINGS)
+				send_phases[phase][tap] = 0.0f;
+			else
+			{
+				send_phases[phase][tap] = (float)(sin(angle) / angle *
+					(0.5 + 0.5 * cos(angle / SEND_ZERO_CROSSINGS)));
+			}
+		}
+	}
+	for (phase = 0; phase < RESAMPLER_TABLE_STEPS; phase++)
+	{
+		for (tap = 0; tap < SEND_TAPS; tap++)
+			send_deltas[phase][tap] = send_phases[phase + 1][tap] - send_phases[phase][tap];
+	}
+	for (phase = 0; phase < RESAMPLER_TABLE_STEPS + 1; phase++)
+	{
+		for (tap = 0; tap < DIRECT_TAPS; tap++)
+		{
+			double distance = fabs((double)((long)tap + 1 - DIRECT_ZERO_CROSSINGS) -
+				(double)phase / RESAMPLER_TABLE_STEPS);
+			unsigned long frame = (unsigned long)distance;
+
+			/* (on a frame, exactly it, and 0 at the others) */
+			if (phase % RESAMPLER_TABLE_STEPS == 0)
+				direct_phases[phase][tap] = distance == 0.0 ? 1.0f : 0.0f;
+			else if (frame >= DIRECT_ZERO_CROSSINGS)
+				direct_phases[phase][tap] = 0.0f;
+			else
+			{
+				double into = distance - (double)frame, weight = 0.0;
+				int power;
+
+				for (power = DIRECT_KERNEL_ORDER; power >= 0; power--)
+					weight = weight * into + direct_kernel[frame][power];
+				direct_phases[phase][tap] = (float)weight;
+			}
+		}
+	}
+	for (phase = 0; phase < RESAMPLER_TABLE_STEPS; phase++)
+	{
+		for (tap = 0; tap < DIRECT_TAPS; tap++)
+			direct_deltas[phase][tap] = direct_phases[phase + 1][tap] - direct_phases[phase][tap];
+	}
 }
 
 /* The low pass over a voice's frames, the sum of each frame times its weight:
@@ -841,6 +1102,31 @@ static float resampler_dot(const float *frames, const float *weights, const floa
 #endif
 }
 
+/* frames[0, DIRECT_TAPS) weighted by a row of direct_phases, as resampler_dot */
+static float direct_dot(const float *frames, const float *weights, const float *deltas, float blend)
+{
+#if RESAMPLER_LANES == 4
+	resampler_vector sum = { 0.0f, 0.0f, 0.0f, 0.0f }, blends = { blend, blend, blend, blend };
+	int tap;
+
+	for (tap = 0; tap < DIRECT_TAPS; tap += 4)
+	{
+		resampler_vector weight = *(const resampler_vector *)(weights + tap) +
+			*(const resampler_vector *)(deltas + tap) * blends;
+
+		sum += *(const resampler_unaligned_vector *)(frames + tap) * weight;
+	}
+	return (sum[0] + sum[1]) + (sum[2] + sum[3]);
+#else
+	float sum = 0.0f;
+	int tap;
+
+	for (tap = 0; tap < DIRECT_TAPS; tap++)
+		sum += frames[tap] * (weights[tap] + deltas[tap] * blend);
+	return sum;
+#endif
+}
+
 /* resampler_dot of two channels' frames, with the same weights */
 static void resampler_dot2(const float *left_frames, const float *right_frames, const float *weights,
 	const float *deltas, float blend, float *left, float *right)
@@ -866,6 +1152,45 @@ static void resampler_dot2(const float *left_frames, const float *right_frames, 
 #endif
 }
 
+/* the voice's frame at its phase, its channels' middle, through the Xbox's
+resampler (send_phases), for the reverb's send: as resampler_dot, over
+SEND_TAPS */
+static float send_frame(const struct sdl_stream *stream)
+{
+	double position = stream->phase * RESAMPLER_TABLE_STEPS;
+	unsigned long row = (unsigned long)position;
+	float blend = (float)(position - (double)row);
+	unsigned long first = (stream->center + 1 - SEND_ZERO_CROSSINGS) % RESAMPLER_HISTORY;
+	const float *left = stream->history[0] + first, *right = stream->history[1] + first;
+	const float *weights = send_phases[row], *deltas = send_deltas[row];
+	int tap;
+#if RESAMPLER_LANES == 4
+	resampler_vector sum = { 0.0f, 0.0f, 0.0f, 0.0f }, blends = { blend, blend, blend, blend };
+
+	for (tap = 0; tap < SEND_TAPS; tap += 4)
+	{
+		resampler_vector weight = *(const resampler_vector *)(weights + tap) +
+			*(const resampler_vector *)(deltas + tap) * blends;
+		resampler_vector frames = *(const resampler_unaligned_vector *)(left + tap);
+
+		if (stream->channels == 2)
+			frames = (frames + *(const resampler_unaligned_vector *)(right + tap)) * 0.5f;
+		sum += frames * weight;
+	}
+	return (sum[0] + sum[1]) + (sum[2] + sum[3]);
+#else
+	float sum = 0.0f;
+
+	for (tap = 0; tap < SEND_TAPS; tap++)
+	{
+		float frame = stream->channels == 2 ? 0.5f * (left[tap] + right[tap]) : left[tap];
+
+		sum += frame * (weights[tap] + deltas[tap] * blend);
+	}
+	return sum;
+#endif
+}
+
 /* a voice starting (over): silence before its first frame, which the output
 starts at */
 static void resampler_reset(struct sdl_stream *stream)
@@ -875,7 +1200,14 @@ static void resampler_reset(struct sdl_stream *stream)
 	stream->center = stream->history_count;
 	stream->phase = 0.0;
 	stream->silence = 0;
-	stream->doppler = 0.0f;
+}
+
+/* how much the low pass is narrowed for a voice taking frames step at a time:
+for one faster than the output rate, to keep what it takes above the output's
+band out (up to RESAMPLER_MAXIMUM_STRETCH times) */
+static float resampler_scale(double step)
+{
+	return step > 1.0 ? (float)(1.0 / (step < RESAMPLER_MAXIMUM_STRETCH ? step : RESAMPLER_MAXIMUM_STRETCH)) : 1.0f;
 }
 
 static float packet_sample(const struct voice_packet *packet, unsigned long frame, unsigned long channel,
@@ -943,42 +1275,48 @@ static BOOL voice_has_frames(struct sdl_stream *stream)
 the reverb's send (frames of mono) */
 static void mix_voice(struct sdl_stream *stream, float *output, float *send, unsigned long frames)
 {
-	double base_step, step, ramp_step, fastest;
+	double step, target_step, ramp_step;
 	float target_left, target_right, target_room, left, right, room, ramp_left, ramp_right, ramp_room, scale;
 	float target_direct_lowpass, target_room_lowpass, direct_lowpass, room_lowpass;
-	float ramp_direct_lowpass, ramp_room_lowpass;
+	float ramp_direct_lowpass, ramp_room_lowpass, share;
 	float direct_state[2], room_state;
-	float doppler, target_doppler;
 	long width;
-	unsigned long frame;
+	unsigned long frame, ramp_frames;
 	/* (a stereo voice panned towards its sound: voice_gains) */
 	BOOL positioned = stream->channels == 2 && stream->stereo_positioned;
+	/* (through the HRTF: whether it may take the voice, and whether its
+	filters run in this mix; how much of the voice they play, at the start,
+	the end and a frame's step; its parameters, and the direct path the
+	HRTF takes, hrtf_process) */
+	BOOL hrtf_on, hrtf_running;
+	float hrtf_mix, hrtf_mix_end, ramp_hrtf_mix, hrtf_mix_start;
+	struct hrtf_parameters target_hrtf;
+	float hrtf_direct[MIX_CHUNK_FRAMES];
 	/* on 5.1, the speakers' gains (voice_surround_gains) */
-	BOOL surround = output_channels == 6;
+	BOOL surround = output_channels == 6, surround_heard = FALSE;
 	float target_surround[2][MAXIMUM_OUTPUT_CHANNELS], surround_gains[2][MAXIMUM_OUTPUT_CHANNELS];
-	float ramp_surround[2][MAXIMUM_OUTPUT_CHANNELS];
+	float ramp_surround[2][MAXIMUM_OUTPUT_CHANNELS], pair[2];
 	unsigned long speaker;
 
-	if (stream->paused || !stream->packet_count || !stream->sample_rate)
+	if (stream->paused || stream->flushing || !stream->packet_count || !stream->sample_rate)
 		return;
-	base_step = (double)(stream->frequency ? stream->frequency : stream->sample_rate) / OUTPUT_RATE;
-	/* the Doppler shift moves the step, from the ratio of the last mix to
-	this one's across the mix, so the pitch glides as the game updates the
-	velocities (each tick) */
-	target_doppler = doppler_ratio(stream);
-	if (base_step * target_doppler * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)
-		target_doppler = (float)(VOICE_FREQUENCY_MAXIMUM / OUTPUT_RATE / base_step);
-	else if (base_step * target_doppler * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
-		target_doppler = (float)(VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE / base_step);
-	doppler = stream->doppler > 0.0f ? stream->doppler : target_doppler;
-	step = base_step * doppler;
-	ramp_step = base_step * (target_doppler - doppler) / (double)frames;
-	/* the low pass narrowed for a voice taking frames faster than the output
-	rate (at the faster of its steps), and the frames it reaches on each
-	side */
-	fastest = base_step * (doppler > target_doppler ? doppler : target_doppler);
-	scale = fastest > 1.0 ?
-		(float)(1.0 / (fastest < RESAMPLER_MAXIMUM_STRETCH ? fastest : RESAMPLER_MAXIMUM_STRETCH)) : 1.0f;
+	/* (at most MIX_CHUNK_FRAMES at a time: the HRTF's direct path) */
+	if (frames > MIX_CHUNK_FRAMES)
+	{
+		mix_voice(stream, output, send, MIX_CHUNK_FRAMES);
+		mix_voice(stream, output + MIX_CHUNK_FRAMES * output_channels, send + MIX_CHUNK_FRAMES,
+			frames - MIX_CHUNK_FRAMES);
+		return;
+	}
+	target_step = (double)(stream->frequency ? stream->frequency : stream->sample_rate) / OUTPUT_RATE *
+		doppler_heard(stream);
+	if (target_step * OUTPUT_RATE > VOICE_FREQUENCY_MAXIMUM)
+		target_step = VOICE_FREQUENCY_MAXIMUM / OUTPUT_RATE;
+	if (target_step * OUTPUT_RATE < VOICE_FREQUENCY_MINIMUM)
+		target_step = VOICE_FREQUENCY_MINIMUM / OUTPUT_RATE;
+	/* (the step ramps from the last mix's to it, as the gains do) */
+	step = stream->gains_valid ? stream->current_step : target_step;
+	scale = resampler_scale(step > target_step ? step : target_step);
 	width = (long)ceilf(RESAMPLER_ZERO_CROSSINGS / scale);
 	/* a voice that ran dry and stopped (below) starts over once it has
 	frames again: stream_process starts over only a stream with no packets,
@@ -989,13 +1327,40 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			return;
 		resampler_reset(stream);
 		stream->gains_valid = FALSE;
-		/* (starting over at this mix's shift) */
-		step = base_step * target_doppler;
-		ramp_step = 0.0;
+		step = target_step;
+		scale = resampler_scale(step);
+		width = (long)ceilf(RESAMPLER_ZERO_CROSSINGS / scale);
 	}
-	voice_gains(stream, &target_left, &target_right, &target_room, &target_direct_lowpass, &target_room_lowpass);
+	voice_gains(stream, &target_left, &target_right, pair, &target_room, &target_direct_lowpass,
+		&target_room_lowpass, &hrtf_on, &target_hrtf);
+	/* how much of the voice the HRTF plays: towards all of it while it is
+	chosen (hrtf_enabled), none otherwise, a frame's share of the crossfade
+	each frame (hrtf_mix_step), however many frames the mixes have; a voice
+	starting is at once where it is going */
+	hrtf_mix = hrtf_on ? stream->hrtf_mix : 0.0f;
+	hrtf_mix_end = hrtf_on && hrtf_enabled ? 1.0f : 0.0f;
+	if (!stream->gains_valid)
+		hrtf_mix = hrtf_mix_end;
+	ramp_hrtf_mix = hrtf_mix_end > hrtf_mix ? 1.0f / HRTF_FADE_FRAMES :
+		hrtf_mix_end < hrtf_mix ? -1.0f / HRTF_FADE_FRAMES : 0.0f;
+	hrtf_running = hrtf_on && (hrtf_mix > 0.0f || hrtf_mix_end > 0.0f);
+	/* (its filters start from silence, as the crossfade starts from none
+	of them) */
+	if (hrtf_running && (!stream->gains_valid || !stream->hrtf_on))
+	{
+		stream->hrtf_current = target_hrtf;
+		memset(stream->hrtf_frames, 0, sizeof(stream->hrtf_frames));
+		memset(stream->hrtf_bands, 0, sizeof(stream->hrtf_bands));
+	}
+	stream->hrtf_on = hrtf_running;
 	if (surround)
-		voice_surround_gains(stream, target_surround);
+		voice_surround_gains(stream, target_left, target_right, pair, target_surround);
+	/* a voice starting is at once at its gains, step and way through the
+	HRTF; a change to any of them, from the last mix's, ramps from where
+	they are to the new ones over PARAMETER_RAMP_FRAMES, then holds them: a
+	ramp the mix's frames end goes on in the next mix, and one changed
+	before its end ramps on from where it was, so that a change takes the
+	same frames however many the mixes have */
 	if (!stream->gains_valid)
 	{
 		if (surround)
@@ -1003,12 +1368,36 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		stream->current_left = target_left;
 		stream->current_right = target_right;
 		stream->current_room = target_room;
+		stream->current_step = target_step;
 		stream->current_direct_lowpass = target_direct_lowpass;
 		stream->current_room_lowpass = target_room_lowpass;
 		stream->direct_lowpass[0] = stream->direct_lowpass[1] = 0.0f;
 		stream->room_lowpass = 0.0f;
+		stream->ramp_frames = 0;
 		stream->gains_valid = TRUE;
 	}
+	else if (target_left != stream->target_left || target_right != stream->target_right ||
+		target_room != stream->target_room || target_step != stream->target_step ||
+		target_direct_lowpass != stream->target_direct_lowpass || target_room_lowpass != stream->target_room_lowpass ||
+		(surround && memcmp(target_surround, stream->target_surround, sizeof(target_surround))) ||
+		(hrtf_running && memcmp(&target_hrtf, &stream->hrtf_target, sizeof(target_hrtf))))
+	{
+		stream->ramp_frames = PARAMETER_RAMP_FRAMES;
+	}
+	stream->target_left = target_left;
+	stream->target_right = target_right;
+	stream->target_room = target_room;
+	stream->target_step = target_step;
+	stream->target_direct_lowpass = target_direct_lowpass;
+	stream->target_room_lowpass = target_room_lowpass;
+	if (surround)
+		memcpy(stream->target_surround, target_surround, sizeof(target_surround));
+	if (hrtf_running)
+		stream->hrtf_target = target_hrtf;
+	ramp_frames = stream->ramp_frames;
+	share = ramp_frames ? 1.0f / (float)ramp_frames : 0.0f;
+	step = stream->current_step;
+	ramp_step = ramp_frames ? (target_step - step) / (double)ramp_frames : 0.0;
 	left = stream->current_left;
 	right = stream->current_right;
 	room = stream->current_room;
@@ -1019,19 +1408,27 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 	direct_state[0] = stream->direct_lowpass[0];
 	direct_state[1] = stream->direct_lowpass[1];
 	room_state = stream->room_lowpass;
-	ramp_left = (target_left - left) / (float)frames;
-	ramp_right = (target_right - right) / (float)frames;
-	ramp_room = (target_room - room) / (float)frames;
-	ramp_direct_lowpass = (target_direct_lowpass - direct_lowpass) / (float)frames;
-	ramp_room_lowpass = (target_room_lowpass - room_lowpass) / (float)frames;
+	ramp_left = (target_left - left) * share;
+	ramp_right = (target_right - right) * share;
+	ramp_room = (target_room - room) * share;
+	ramp_direct_lowpass = (target_direct_lowpass - direct_lowpass) * share;
+	ramp_room_lowpass = (target_room_lowpass - room_lowpass) * share;
+	hrtf_mix_start = hrtf_mix;
 	if (surround)
 	{
 		for (speaker = 0; speaker < MAXIMUM_OUTPUT_CHANNELS; speaker++)
 		{
 			surround_gains[0][speaker] = stream->current_surround[0][speaker];
 			surround_gains[1][speaker] = stream->current_surround[1][speaker];
-			ramp_surround[0][speaker] = (target_surround[0][speaker] - surround_gains[0][speaker]) / (float)frames;
-			ramp_surround[1][speaker] = (target_surround[1][speaker] - surround_gains[1][speaker]) / (float)frames;
+			ramp_surround[0][speaker] = (target_surround[0][speaker] - surround_gains[0][speaker]) * share;
+			ramp_surround[1][speaker] = (target_surround[1][speaker] - surround_gains[1][speaker]) * share;
+			/* (a 2D voice may be heard from the center, the backs or the
+			LFE alone, its left and right gains 0) */
+			if (surround_gains[0][speaker] || surround_gains[1][speaker] || target_surround[0][speaker] ||
+				target_surround[1][speaker])
+			{
+				surround_heard = TRUE;
+			}
 		}
 	}
 
@@ -1063,7 +1460,7 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		if (stream->silence > (unsigned long)(2 * width))
 			break;
 
-		if (!left && !right && !room && !ramp_left && !ramp_right && !ramp_room)
+		if (!left && !right && !room && !ramp_left && !ramp_right && !ramp_room && !surround_heard)
 		{
 			/* a voice turned all the way down (out of earshot), and not
 			sending to the reverb, only moves on */
@@ -1078,6 +1475,18 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 
 			sample_left = left_frames[0] + (left_frames[1] - left_frames[0]) * fraction;
 			sample_right = right_frames[0] + (right_frames[1] - right_frames[0]) * fraction;
+		}
+		else if (resampler_mode == RESAMPLER_XBOX)
+		{
+			/* the Xbox's low pass (direct_phases), never narrowed */
+			double position = stream->phase * RESAMPLER_TABLE_STEPS;
+			unsigned long row = (unsigned long)position;
+			float blend = (float)(position - (double)row);
+			unsigned long first = (stream->center + 1 - DIRECT_ZERO_CROSSINGS) % RESAMPLER_HISTORY;
+
+			sample_left = direct_dot(stream->history[0] + first, direct_phases[row], direct_deltas[row], blend);
+			sample_right = stream->channels == 1 ? sample_left :
+				direct_dot(stream->history[1] + first, direct_phases[row], direct_deltas[row], blend);
 		}
 		else if (scale == 1.0f)
 		{
@@ -1114,10 +1523,15 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			if (stream->channels == 1)
 				sample_right = sample_left;
 		}
-		/* the room send, with its own low pass */
+		/* the room send, with its own low pass, through the Xbox's resampler
+		(send_phases), not the mixer's: the reverb folds the send's top
+		octave onto its bottom one, and the Xbox's let through images and
+		aliases there that the mixer's takes out (recorded, the cave's
+		reverberation of a click was 4 dB louder below 500 Hz at 48 kHz, 3.6
+		dB at 44.1 kHz) */
 		if (room || ramp_room)
 		{
-			float mono = stream->channels == 1 ? sample_left : 0.5f * (sample_left + sample_right);
+			float mono = send_frame(stream);
 
 			room_state = flush_denormal(mono + room_lowpass * (room_state - mono));
 			send[frame] += room_state * room;
@@ -1135,17 +1549,39 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 		{
 			/* the first row's gains take the left (a mono voice's only)
 			channel, or a positioned voice's middle; the second the right, or
-			its difference */
+			its difference; through the HRTF (hrtf_process, after), the pan's
+			share while the choice changes */
 			float *speakers = output + frame * MAXIMUM_OUTPUT_CHANNELS;
-			float first = positioned ? 0.5f * (sample_left + sample_right) : sample_left;
-			float second = positioned ? 0.5f * (sample_left - sample_right) : stream->channels == 2 ? sample_right : 0.0f;
+			float panned = hrtf_running ? 1.0f - hrtf_mix : 1.0f;
+			float first = (positioned ? 0.5f * (sample_left + sample_right) : sample_left) * panned;
+			float second = (positioned ? 0.5f * (sample_left - sample_right) :
+				stream->channels == 2 ? sample_right : 0.0f) * panned;
 
+			if (hrtf_running)
+			{
+				hrtf_direct[frame] = sample_left;
+				hrtf_mix = hrtf_mix_step(hrtf_mix, ramp_hrtf_mix, hrtf_mix_end);
+			}
 			for (speaker = 0; speaker < MAXIMUM_OUTPUT_CHANNELS; speaker++)
 			{
 				speakers[speaker] += first * surround_gains[0][speaker] + second * surround_gains[1][speaker];
 				surround_gains[0][speaker] += ramp_surround[0][speaker];
 				surround_gains[1][speaker] += ramp_surround[1][speaker];
 			}
+		}
+		else if (hrtf_running)
+		{
+			/* through the HRTF (hrtf_process, after), crossfaded with the
+			pan while the choice changes */
+			float panned = 1.0f - hrtf_mix;
+
+			hrtf_direct[frame] = sample_left;
+			if (panned > 0.0f)
+			{
+				output[frame * 2] += sample_left * left * panned;
+				output[frame * 2 + 1] += sample_left * right * panned;
+			}
+			hrtf_mix = hrtf_mix_step(hrtf_mix, ramp_hrtf_mix, hrtf_mix_end);
 		}
 		else if (stream->channels == 1)
 		{
@@ -1181,18 +1617,44 @@ static void mix_voice(struct sdl_stream *stream, float *output, float *send, uns
 			stream->phase -= 1.0;
 			stream->center++;
 		}
+		/* (at the ramp's end, exactly the new ones, held) */
+		if (frame + 1 == ramp_frames)
+		{
+			left = target_left;
+			right = target_right;
+			room = target_room;
+			direct_lowpass = target_direct_lowpass;
+			room_lowpass = target_room_lowpass;
+			step = target_step;
+			ramp_left = ramp_right = ramp_room = ramp_direct_lowpass = ramp_room_lowpass = 0.0f;
+			ramp_step = 0.0;
+			if (surround)
+			{
+				memcpy(surround_gains, target_surround, sizeof(surround_gains));
+				memset(ramp_surround, 0, sizeof(ramp_surround));
+			}
+		}
 	}
-	stream->doppler = target_doppler;
 	stream->direct_lowpass[0] = direct_state[0];
 	stream->direct_lowpass[1] = direct_state[1];
 	stream->room_lowpass = room_state;
-	stream->current_left = target_left;
-	stream->current_right = target_right;
-	stream->current_room = target_room;
-	stream->current_direct_lowpass = target_direct_lowpass;
-	stream->current_room_lowpass = target_room_lowpass;
+	/* (the frames mixed: all of them, or those before the voice ran dry) */
+	if (hrtf_running)
+	{
+		hrtf_process(stream, hrtf_direct, output, frame, ramp_frames, &target_hrtf, hrtf_mix_start, ramp_hrtf_mix,
+			hrtf_mix_end);
+	}
+	stream->hrtf_mix = hrtf_running ? hrtf_mix : hrtf_mix_end;
+	/* where the ramp got to, and the frames of it left */
+	stream->current_left = left;
+	stream->current_right = right;
+	stream->current_room = room;
+	stream->current_step = step;
+	stream->current_direct_lowpass = direct_lowpass;
+	stream->current_room_lowpass = room_lowpass;
 	if (surround)
-		memcpy(stream->current_surround, target_surround, sizeof(target_surround));
+		memcpy(stream->current_surround, surround_gains, sizeof(surround_gains));
+	stream->ramp_frames = ramp_frames > frame ? ramp_frames - frame : 0;
 }
 
 /* The game cuts a voice off (Flush) to play the next sound on its channel:
@@ -1220,7 +1682,7 @@ static void voice_cut(struct sdl_stream *stream)
 	mix_voice(stream, output, send, CUT_FADE_FRAMES);
 	for (frame = 0; frame < CUT_FADE_FRAMES; frame++)
 	{
-		float fade = 0.5f + 0.5f * cosf(3.14159265f * (float)(frame + 1) / CUT_FADE_FRAMES);
+		float fade = 0.5f + 0.5f * (float)cos(3.14159265358979 * (double)(frame + 1) / CUT_FADE_FRAMES);
 
 		/* (what is left of the earlier cut is read only where it is: past
 		it is whatever it was, a NaN perhaps, which no factor of 0 hides) */
@@ -1248,308 +1710,9 @@ static void mix_cut(struct sdl_stream *stream, float *output, float *send, unsig
 	}
 }
 
-/* ---------- reverb
+#include "dsound_xbox_reverb.inl"
 
-The Xbox ran an I3DL2 reverb on its audio DSP (the effects image the game
-downloads), fed by every 3D voice's I3DL2 mix bin. The game sets the listener
-properties from the sound environment the camera is in (sound_dsound_xbox.c
-dsound_set_listener_properties), and each 3D voice's room send from its
-reverb attenuation and occlusion (dsound_channel_set_I3DL2_properties). This
-is a reverb of the I3DL2 model on those properties, not the DSP's program:
-	- each 3D voice sends to a mono bus at the listener's and its own room
-	  levels, occlusion included, their high frequency levels a low pass at the
-	  HF reference, attenuated with distance by the room rolloff factors
-	  (voice_gains);
-	- the early reflections are REVERB_TAPS taps of the bus, starting the
-	  reflections delay later, at the reflections level;
-	- the late reverberation starts the reverb delay after the reflections:
-	  all-pass diffusers as strong as the diffusion, then a feedback delay
-	  network of REVERB_LINES lines, as long as the density makes them, each
-	  losing what decays it by 60 dB in the decay time, and its high
-	  frequencies in the decay time times the HF ratio, at the reverb level.
-Both are normalized to the energy sent, so their levels are relative to the
-room level, as I3DL2 gives them. A change of environment crossfades each
-delay's read from its old length to its new one, and each gain, over
-REVERB_FADE_FRAMES: what is reverberating carries on, without the click of a
-jump or the pitch shift of a sliding delay. audio.reverb = false fades the
-reverb out over as long and stops it. Once nothing has been sent for
-REVERB_QUIET_FRAMES and the reverberation is 120 dB down, the reverb stops
-until something is sent again (outdoors, in the menus). */
-
-#define REVERB_DELAY_SIZE 32768 /* the reflections and reverb delays, 0.3 + 0.1 s at most, and the taps */
-#define REVERB_TAPS 6
-#define REVERB_DIFFUSERS 4
-#define REVERB_DIFFUSER_SIZE 1024
-#define REVERB_LINES 8
-#define REVERB_LINE_SIZE 4096
-#define REVERB_FADE_FRAMES 4096 /* 85 ms */
-/* the input delays, then the diffusers, played out */
-#define REVERB_QUIET_FRAMES (REVERB_DELAY_SIZE + REVERB_DIFFUSERS * REVERB_DIFFUSER_SIZE)
-#define REVERB_QUIET_PEAK 1.0e-6f
-
-/* in milliseconds: the taps after the reflections delay, the diffusers, and
-the lines at full density */
-static const float reverb_tap_times[REVERB_TAPS] = { 0.0f, 3.1f, 5.3f, 7.9f, 11.2f, 14.9f };
-static const float reverb_tap_signs[REVERB_TAPS] = { 1.0f, 1.0f, -1.0f, 1.0f, 1.0f, -1.0f };
-static const float reverb_diffuser_times[REVERB_DIFFUSERS] = { 4.7f, 3.6f, 12.7f, 9.3f };
-static const float reverb_line_times[REVERB_LINES] = { 29.7f, 37.1f, 41.1f, 43.7f, 53.3f, 59.9f, 67.1f, 73.1f };
-/* which lines go in negated, and the two outputs' signs of the lines */
-static const float reverb_input_signs[REVERB_LINES] = { 1, -1, -1, 1, 1, -1, -1, 1 };
-static const float reverb_left_signs[REVERB_LINES] = { 1, -1, 1, -1, 1, -1, 1, -1 };
-static const float reverb_right_signs[REVERB_LINES] = { 1, 1, -1, -1, 1, 1, -1, -1 };
-
-/* what an environment sets: delays in samples, and gains */
-struct reverb_parameters
-{
-	unsigned long taps[REVERB_TAPS];
-	unsigned long late_delay;
-	unsigned long lengths[REVERB_LINES];
-	/* each line's gain a pass, and its low pass's coefficient */
-	float feedback[REVERB_LINES];
-	float damping[REVERB_LINES];
-	float reflections_gain, late_gain;
-	float diffusion;
-};
-
-static struct
-{
-	/* the bus of the current mix */
-	float send[MIX_CHUNK_FRAMES];
-	/* the environment serial and properties of the parameters faded to */
-	unsigned long serial;
-	DSI3DL2LISTENER properties;
-	/* the parameters fading from and to, and the frames of the fade left
-	(none: from is to) */
-	struct reverb_parameters from, to;
-	unsigned long fade;
-	/* the output's level, 1 while audio.reverb is on, moving to 0 when it
-	is turned off; whether the buffers are silent; and the frames since the
-	send or the output was last over REVERB_QUIET_PEAK */
-	float level;
-	BOOL silent;
-	unsigned long quiet;
-
-	/* the bus, delayed for the taps and the late reverberation */
-	float delay[REVERB_DELAY_SIZE];
-	unsigned long delay_position;
-
-	float diffusers[REVERB_DIFFUSERS][REVERB_DIFFUSER_SIZE];
-	unsigned long diffuser_lengths[REVERB_DIFFUSERS];
-	unsigned long diffuser_position;
-
-	float lines[REVERB_LINES][REVERB_LINE_SIZE];
-	unsigned long line_position;
-	/* each line's low pass */
-	float lowpass[REVERB_LINES];
-} reverb;
-
-static float clamp_real(float value, float minimum, float maximum)
-{
-	return value < minimum ? minimum : value > maximum ? maximum : value;
-}
-
-/* whole samples */
-static unsigned long reverb_samples(float seconds)
-{
-	return (unsigned long)floorf(seconds * OUTPUT_RATE + 0.5f);
-}
-
-/* the sample buffer got delay samples before position, crossfaded from the
-from delay to the to delay by fade (0 to 1) */
-static float reverb_read(const float *buffer, unsigned long mask, unsigned long position,
-	unsigned long from_delay, unsigned long to_delay, float fade)
-{
-	float from_sample = buffer[(position - from_delay) & mask];
-
-	if (from_delay == to_delay)
-		return from_sample;
-	return from_sample + (buffer[(position - to_delay) & mask] - from_sample) * fade;
-}
-
-static float reverb_blend(float from, float to, float fade)
-{
-	return from + (to - from) * fade;
-}
-
-static void reverb_parameters_set(struct reverb_parameters *parameters, const DSI3DL2LISTENER *properties)
-{
-	float decay = clamp_real(properties->flDecayTime, 0.1f, 20.0f);
-	/* a low pass loses high frequencies; a ratio over 1 would need them to
-	last longer */
-	float high_decay = decay * clamp_real(properties->flDecayHFRatio, 0.1f, 1.0f);
-	float scale = 0.25f + 0.75f * clamp_real(properties->flDensity / 100.0f, 0.0f, 1.0f);
-	float cosine = frequency_cosine(properties->flHFReference);
-	float mean_length = 0.0f, mean_feedback;
-	unsigned long reflections_delay;
-	int index;
-
-	for (index = 0; index < REVERB_LINES; index++)
-	{
-		float length = floorf(reverb_line_times[index] * 0.001f * OUTPUT_RATE * scale + 0.5f);
-		float high_feedback;
-
-		parameters->lengths[index] = (unsigned long)length;
-		parameters->feedback[index] = powf(10.0f, -3.0f * length / (decay * OUTPUT_RATE));
-		high_feedback = powf(10.0f, -3.0f * length / (high_decay * OUTPUT_RATE));
-		parameters->damping[index] = lowpass_coefficient(high_feedback / parameters->feedback[index], cosine);
-		mean_length += length / REVERB_LINES;
-	}
-	mean_feedback = powf(10.0f, -3.0f * mean_length / (decay * OUTPUT_RATE));
-	reflections_delay = reverb_samples(clamp_real(properties->flReflectionsDelay, 0.0f, 0.3f));
-	for (index = 0; index < REVERB_TAPS; index++)
-		parameters->taps[index] = reflections_delay + reverb_samples(reverb_tap_times[index] * 0.001f);
-	parameters->late_delay = reflections_delay + reverb_samples(clamp_real(properties->flReverbDelay, 0.0f, 0.1f));
-	/* the taps' energy, half of them to each side; the network's, whose
-	sound circulates until it decays */
-	parameters->reflections_gain = gain_from_millibels(properties->lReflections) /
-		sqrtf((float)REVERB_TAPS / OUTPUT_CHANNELS);
-	parameters->late_gain = gain_from_millibels(properties->lReverb) * sqrtf(1.0f - mean_feedback * mean_feedback);
-	parameters->diffusion = 0.7f * clamp_real(properties->flDiffusion / 100.0f, 0.0f, 1.0f);
-}
-
-/* a new environment, faded to unless the reverb is silent. The game sets the
-same one again several times a second in some places (Derelict), which
-changes nothing */
-static void reverb_update(const DSI3DL2LISTENER *properties, unsigned long serial)
-{
-	reverb.serial = serial;
-	if (!reverb.silent && !memcmp(properties, &reverb.properties, sizeof(*properties)))
-		return;
-	reverb.properties = *properties;
-	reverb_parameters_set(&reverb.to, properties);
-	if (reverb.silent)
-		reverb.from = reverb.to;
-	reverb.fade = reverb.silent ? 0 : REVERB_FADE_FRAMES;
-}
-
-static void reverb_clear(void)
-{
-	memset(reverb.delay, 0, sizeof(reverb.delay));
-	memset(reverb.diffusers, 0, sizeof(reverb.diffusers));
-	memset(reverb.lines, 0, sizeof(reverb.lines));
-	memset(reverb.lowpass, 0, sizeof(reverb.lowpass));
-	reverb.from = reverb.to;
-	reverb.fade = 0;
-	reverb.silent = TRUE;
-	reverb.quiet = 0;
-}
-
-static void reverb_initialize(void)
-{
-	int index;
-
-	for (index = 0; index < REVERB_DIFFUSERS; index++)
-		reverb.diffuser_lengths[index] = reverb_samples(reverb_diffuser_times[index] * 0.001f);
-	reverb.silent = TRUE;
-	reverb.level = reverb_enabled ? 1.0f : 0.0f;
-	reverb_update(&environment, environment_serial);
-}
-
-/* adds the reverberation of send to output, its level moving to
-target_level */
-static void reverb_process(const float *send, float *output, unsigned long frames, float target_level)
-{
-	const struct reverb_parameters *from = &reverb.from, *to = &reverb.to;
-	float input_scale = 1.0f / sqrtf((float)REVERB_LINES), peak = 0.0f;
-	unsigned long frame;
-	int index;
-
-	reverb.silent = FALSE;
-	for (frame = 0; frame < frames; frame++)
-	{
-		/* how far the fade from the old environment to the new is */
-		float fade = 1.0f - (float)reverb.fade / REVERB_FADE_FRAMES;
-		float early[OUTPUT_CHANNELS] = { 0.0f, 0.0f };
-		float outputs[REVERB_LINES], late_left = 0.0f, late_right = 0.0f, feedback_sum = 0.0f, value;
-		float diffusion = reverb_blend(from->diffusion, to->diffusion, fade);
-
-		reverb.delay[reverb.delay_position & (REVERB_DELAY_SIZE - 1)] = send[frame];
-		for (index = 0; index < REVERB_TAPS; index++)
-		{
-			early[index % OUTPUT_CHANNELS] += reverb_tap_signs[index] * reverb_read(reverb.delay, REVERB_DELAY_SIZE - 1,
-				reverb.delay_position, from->taps[index], to->taps[index], fade);
-		}
-
-		/* diffusers: w = x + g w', y = w' - g w */
-		value = reverb_read(reverb.delay, REVERB_DELAY_SIZE - 1, reverb.delay_position,
-			from->late_delay, to->late_delay, fade);
-		reverb.delay_position++;
-		for (index = 0; index < REVERB_DIFFUSERS; index++)
-		{
-			float *buffer = reverb.diffusers[index];
-			float delayed = buffer[(reverb.diffuser_position - reverb.diffuser_lengths[index]) & (REVERB_DIFFUSER_SIZE - 1)];
-			float written = flush_denormal(value + diffusion * delayed);
-
-			buffer[reverb.diffuser_position & (REVERB_DIFFUSER_SIZE - 1)] = written;
-			value = delayed - diffusion * written;
-		}
-		reverb.diffuser_position++;
-
-		/* the network: each line's output is damped and heard, then decayed
-		and mixed back into every line by a Householder reflection */
-		for (index = 0; index < REVERB_LINES; index++)
-		{
-			float line_output = reverb_read(reverb.lines[index], REVERB_LINE_SIZE - 1, reverb.line_position,
-				from->lengths[index], to->lengths[index], fade);
-			float damping = reverb_blend(from->damping[index], to->damping[index], fade);
-
-			reverb.lowpass[index] = flush_denormal(line_output + damping * (reverb.lowpass[index] - line_output));
-			late_left += reverb_left_signs[index] * reverb.lowpass[index];
-			late_right += reverb_right_signs[index] * reverb.lowpass[index];
-			outputs[index] = reverb.lowpass[index] * reverb_blend(from->feedback[index], to->feedback[index], fade);
-			feedback_sum += outputs[index];
-		}
-		feedback_sum *= 2.0f / REVERB_LINES;
-		for (index = 0; index < REVERB_LINES; index++)
-		{
-			reverb.lines[index][reverb.line_position & (REVERB_LINE_SIZE - 1)] =
-				flush_denormal(outputs[index] - feedback_sum + value * reverb_input_signs[index] * input_scale);
-		}
-		reverb.line_position++;
-
-		{
-			float reflections_gain = reverb_blend(from->reflections_gain, to->reflections_gain, fade);
-			float late_gain = reverb_blend(from->late_gain, to->late_gain, fade);
-			float left = early[0] * reflections_gain + late_left * late_gain;
-			float right = early[1] * reflections_gain + late_right * late_gain;
-
-			if (output_channels == 6)
-			{
-				/* from the front and back pairs, at the same power */
-				output[frame * 6] += left * reverb.level * 0.70710678f;
-				output[frame * 6 + 1] += right * reverb.level * 0.70710678f;
-				output[frame * 6 + 4] += left * reverb.level * 0.70710678f;
-				output[frame * 6 + 5] += right * reverb.level * 0.70710678f;
-			}
-			else
-			{
-				output[frame * 2] += left * reverb.level;
-				output[frame * 2 + 1] += right * reverb.level;
-			}
-			peak = fabsf(left) > peak ? fabsf(left) : peak;
-			peak = fabsf(right) > peak ? fabsf(right) : peak;
-			peak = fabsf(send[frame]) > peak ? fabsf(send[frame]) : peak;
-		}
-		if (reverb.fade && !--reverb.fade)
-			reverb.from = reverb.to;
-		reverb.level = clamp_real(target_level, reverb.level - 1.0f / REVERB_FADE_FRAMES,
-			reverb.level + 1.0f / REVERB_FADE_FRAMES);
-	}
-	reverb.quiet = peak > REVERB_QUIET_PEAK ? 0 : reverb.quiet + frames;
-}
-
-/* whether anything is sent to the reverb in send */
-static BOOL reverb_sent(const float *send, unsigned long frames)
-{
-	unsigned long frame;
-
-	for (frame = 0; frame < frames; frame++)
-	{
-		if (fabsf(send[frame]) > REVERB_QUIET_PEAK)
-			return TRUE;
-	}
-	return FALSE;
-}
+#include "dsound_xbox_lfe.inl"
 
 /* ---------- limiter
 
@@ -1563,7 +1726,7 @@ before each peak: the smallest gain the frames ahead need, averaged over the
 last LIMITER_LOOKAHEAD frames, is never more than a peak needs when it plays.
 The gain comes back up over LIMITER_RELEASE_SECONDS. */
 
-#define LIMITER_CEILING 0.891f /* -1 dBFS */
+#define LIMITER_CEILING 1.0f /* the measured Xbox output reaches full scale */
 #define LIMITER_LOOKAHEAD 64
 #define LIMITER_RELEASE_SECONDS 0.1f
 
@@ -1641,21 +1804,75 @@ static void limit(float *output, unsigned long frames)
 	}
 }
 
+/* The buffers' front pair, under the output limiter. Interpolate the two
+samples around the cursor, wrapping at the loop boundary. Unlike stream
+packets these samples stay alive until SetBufferData or Release. */
+static void mix_buffers(float *output, unsigned long frames)
+{
+	struct sdl_buffer *buffer;
+
+	for (buffer = buffers; buffer; buffer = buffer->next)
+	{
+		unsigned long frame, end;
+		double step = buffer->rate / OUTPUT_RATE;
+		float target = buffer->volume * master_volume;
+
+		if (!buffer->playing || !buffer->samples || !buffer->frames)
+			continue;
+		end = buffer->looping ? buffer->loop_end : buffer->frames;
+		for (frame = 0; frame < frames; frame++)
+		{
+			unsigned long index = (unsigned long)buffer->position, next = index + 1, channel;
+			float fraction = (float)(buffer->position - index);
+
+			if (next >= end)
+				next = buffer->looping ? buffer->loop_start : index;
+			/* About 10 ms to settle after starting or changing volume. */
+			buffer->current_volume = flush_denormal(buffer->current_volume +
+				(target - buffer->current_volume) * (1.0f / 120.0f));
+			for (channel = 0; channel < 2; channel++)
+			{
+				unsigned long source_channel = buffer->channels == 1 ? 0 : channel;
+				float a = buffer->samples[index * buffer->channels + source_channel];
+				float b = buffer->samples[next * buffer->channels + source_channel];
+
+				output[frame * output_channels + channel] +=
+					(a + (b - a) * fraction) * buffer->current_volume * (1.0f / 32768.0f);
+			}
+			buffer->position += step;
+			if (buffer->position >= end)
+			{
+				if (!buffer->looping)
+				{
+					buffer->playing = FALSE;
+					buffer->position = 0;
+					buffer->current_volume = 0;
+					break;
+				}
+				buffer->position = buffer->loop_start +
+					fmod(buffer->position - buffer->loop_start, end - buffer->loop_start);
+			}
+		}
+	}
+}
+
 static void mix(float *output, unsigned long frames)
 {
 	struct sdl_stream *stream;
 	DSI3DL2LISTENER properties;
-	BOOL enabled = reverb_enabled, changed = FALSE;
+	BOOL enabled, changed = FALSE;
 	unsigned long serial = 0;
 
 	memset(output, 0, frames * output_channels * sizeof(float));
 	memset(reverb.send, 0, frames * sizeof(float));
 	pthread_mutex_lock(&mixer_lock);
+	enabled = reverb_enabled;
 	for (stream = streams; stream; stream = stream->next)
 	{
 		mix_voice(stream, output, reverb.send, frames);
 		mix_cut(stream, output, reverb.send, frames);
 	}
+	mix_buffers(output, frames);
 	/* a new environment, once the fade to the last is over */
 	if (reverb.serial != environment_serial && !reverb.fade)
 	{
@@ -1674,6 +1891,13 @@ static void mix(float *output, unsigned long frames)
 		if ((!enabled && reverb.level <= 0.0f) || reverb.quiet > REVERB_QUIET_FRAMES)
 			reverb_clear();
 	}
+	/* OpenH1's Xbox captures put the final game mix at half the voice sum. */
+	{
+		unsigned long sample;
+		for (sample = 0; sample < frames * output_channels; sample++)
+			output[sample] *= 0.5f;
+	}
+	lfe_lowpass(output, frames);
 	/* the players' voices (voice_audio.c), dry, under the limiter; on 5.1
 	from the front pair */
 	if (output_channels == 6)
@@ -1789,7 +2013,10 @@ static void audio_start(void)
 	audio_started = TRUE;
 	master_volume = (float)config_real("audio.volume");
 	reverb_enabled = config_boolean("audio.reverb");
+	stereo_doppler_enabled = config_boolean("audio.stereo_doppler");
+	hrtf_enabled = config_boolean("audio.hrtf");
 	resampler_mode = resampler_mode_read();
+	hrtf_initialize();
 	resampler_initialize();
 	resampler_phases_initialize();
 	reverb_initialize();
@@ -2057,7 +2284,15 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 	struct sdl_stream *stream = stream_from_interface(object);
 
 	pthread_mutex_lock(&mixer_lock);
+	if (stream->flushing)
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return S_OK;
+	}
 	voice_cut(stream);
+	/* Completion callbacks release the lock. Only the captured fade may
+	play then, not the packets still awaiting cancellation. */
+	stream->flushing = TRUE;
 	while (stream->packet_count)
 	{
 		struct voice_packet *head = &stream->packets[stream->packet_head];
@@ -2067,6 +2302,7 @@ static HRESULT STDMETHODCALLTYPE stream_flush(IDirectSoundStream *object)
 		stream_complete_head(stream, XMEDIAPACKET_STATUS_FLUSHED,
 			head->finished ? head->packet.dwMaxSize : 0);
 	}
+	stream->flushing = FALSE;
 	stream->cursor = 0;
 	resampler_reset(stream);
 	/* (the next sound on the channel says where it is) */
@@ -2141,21 +2377,33 @@ VOID WINAPI DirectSoundDoWork(void)
 {
 	static unsigned long volume_read_at = (unsigned long)-1;
 
-	/* (audio.volume, audio.reverb and audio.resampler read again when the
+	/* (audio settings read again when the
 	settings change: on the game's thread, not the mixer's, whose lock the
 	config's file I/O would hold) */
 	if (volume_read_at != config_changes())
 	{
+		float volume = (float)config_real("audio.volume");
+		BOOL room = config_boolean("audio.reverb");
+		BOOL stereo_doppler = config_boolean("audio.stereo_doppler");
+		BOOL hrtf = config_boolean("audio.hrtf");
+		int resampler = resampler_mode_read();
+
 		volume_read_at = config_changes();
-		master_volume = (float)config_real("audio.volume");
-		reverb_enabled = config_boolean("audio.reverb");
-		resampler_mode = resampler_mode_read();
+		pthread_mutex_lock(&mixer_lock);
+		master_volume = volume;
+		reverb_enabled = room;
+		stereo_doppler_enabled = stereo_doppler;
+		hrtf_enabled = hrtf;
+		resampler_mode = resampler;
+		pthread_mutex_unlock(&mixer_lock);
 	}
 	streams_complete_finished();
 }
 
 VOID WINAPI DirectSoundUseFullHRTF(void)
 {
+	/* The measured full HRTF is already the default on every output. The
+	user can override it with audio.hrtf; there is no reduced HRTF bank. */
 }
 
 HRESULT WINAPI IDirectSound_GetCaps(LPDIRECTSOUND sound, LPDSCAPS caps)
@@ -2180,6 +2428,8 @@ HRESULT WINAPI IDirectSound_DownloadEffectsImage(LPDIRECTSOUND sound, LPCVOID im
 	LPCDSEFFECTIMAGELOC image_location, LPDSEFFECTIMAGEDESC *image_description)
 {
 	(void)sound;
+	/* Halo's environment effect is implemented by dsound_xbox_reverb.inl;
+	this backend does not execute uploaded MCPX DSP machine code. */
 	(void)image;
 	(void)image_size;
 	(void)image_location;
@@ -2443,10 +2693,25 @@ HRESULT WINAPI IDirectSoundStream_SetI3DL2Source(LPDIRECTSOUNDSTREAM stream, LPC
 	if (direct > 0)
 		direct = 0;
 	direct_hf = source->lDirect + source->lDirectHF + source->Obstruction.lHFLevel + source->Occlusion.lHFLevel;
-	/* the room send: occlusion muffles it as it does the direct path, and
-	obstruction does not reach it */
+	/* the room send: occlusion lowers and muffles it as it does the direct
+	path; obstruction does not lower it, but its muffling (its high
+	frequency level over its LF ratio's part) reaches it too. The Xbox
+	muffles a voice once, before its mix bins, the reverb's among them: an
+	Xbox recording of a voice obstructed by -1200 (LF ratio 0) in a hall is
+	the recording of it occluded by -1200, sample for sample (the
+	difference 38 dB down, the noise's), the reverb's tail as muffled as
+	the direct sound */
 	room = source->lRoom + (LONG)(source->Occlusion.lHFLevel * source->Occlusion.flLFRatio);
-	room_hf = source->lRoom + source->lRoomHF + source->Occlusion.lHFLevel;
+	/* the source's own Room HF does nothing: recorded on an Xbox (the test
+	bed's ninth run), the cave's reverb of a voice at a Room HF of -1204
+	was as loud at 10 kHz as at 250 Hz, and one at a Room and Room HF of
+	-1204 (the game's for most of its 3D sounds) or -2000 was 12 or 20 dB
+	down at every frequency, to 0.1 dB; the listener's Room HF (each
+	environment's) and occlusion's muffling reach the send as before. Taken
+	as the I3DL2 level it is, it muffled the reverberation of nearly every
+	3D sound by 12 dB more at the HF reference */
+	room_hf = source->lRoom + source->Occlusion.lHFLevel +
+		(source->Obstruction.lHFLevel - (LONG)(source->Obstruction.lHFLevel * source->Obstruction.flLFRatio));
 	{
 		STREAM_SETTER(
 			record->direct = direct;
@@ -2472,28 +2737,39 @@ HRESULT WINAPI IDirectSoundStream_SetConeAngles(LPDIRECTSOUNDSTREAM stream, DWOR
 HRESULT WINAPI IDirectSoundStream_SetConeOrientation(LPDIRECTSOUNDSTREAM stream, FLOAT x, FLOAT y, FLOAT z, DWORD apply) { (void)stream; (void)x; (void)y; (void)z; (void)apply; return DS_OK; }
 HRESULT WINAPI IDirectSoundStream_SetConeOutsideVolume(LPDIRECTSOUNDSTREAM stream, LONG volume, DWORD apply) { (void)stream; (void)volume; (void)apply; return DS_OK; }
 
-/* ---------- buffers
-
-The game's only buffer is a silent looping one that keeps the voice
-processor busy; it needs no mixing. */
-
-struct null_buffer
-{
-	ULONG reference_count;
-	LPVOID data;
-	DWORD size;
-	BOOL playing;
-};
+/* ---------- buffers */
 
 HRESULT WINAPI DirectSoundCreateBuffer(LPCDSBUFFERDESC description, LPDIRECTSOUNDBUFFER *result)
 {
-	struct null_buffer *buffer = calloc(1, sizeof(*buffer));
+	struct sdl_buffer *buffer;
+	const WAVEFORMATEX *format;
 
-	(void)description;
+	if (!result)
+		return DSERR_INVALIDCALL;
+	*result = NULL;
+	if (!description || !description->lpwfxFormat)
+		return DSERR_INVALIDCALL;
+	format = description->lpwfxFormat;
+	if ((format->nChannels != 1 && format->nChannels != 2) || !format->nSamplesPerSec ||
+		(format->wFormatTag != WAVE_FORMAT_XBOX_ADPCM &&
+			(format->wFormatTag != WAVE_FORMAT_PCM || format->wBitsPerSample != 16)))
+		return DSERR_UNSUPPORTED;
+	buffer = calloc(1, sizeof(*buffer));
 	if (!buffer)
 		return E_OUTOFMEMORY;
 	buffer->reference_count = 1;
+	buffer->channels = format->nChannels;
+	buffer->rate = format->nSamplesPerSec;
+	buffer->adpcm = format->wFormatTag == WAVE_FORMAT_XBOX_ADPCM;
+	buffer->block_bytes = buffer->channels * (buffer->adpcm ? XBOX_ADPCM_BLOCK_BYTES : 2);
+	buffer->block_frames = buffer->adpcm ? XBOX_ADPCM_BLOCK_SAMPLES : 1;
+	buffer->volume = (float)config_real("audio.effects_volume");
+	pthread_mutex_lock(&mixer_lock);
+	buffer->next = buffers;
+	buffers = buffer;
+	pthread_mutex_unlock(&mixer_lock);
 	*result = (LPDIRECTSOUNDBUFFER)buffer;
+	audio_start();
 	return DS_OK;
 }
 
@@ -2507,39 +2783,170 @@ HRESULT WINAPI IDirectSound_CreateSoundBuffer(LPDIRECTSOUND sound, LPCDSBUFFERDE
 
 ULONG WINAPI IDirectSoundBuffer_Release(LPDIRECTSOUNDBUFFER buffer)
 {
-	struct null_buffer *record = (struct null_buffer *)buffer;
-	ULONG count = --record->reference_count;
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer, **link;
+	ULONG count;
 
+	if (!record)
+		return 0;
+	pthread_mutex_lock(&mixer_lock);
+	count = --record->reference_count;
 	if (!count)
+	{
+		for (link = &buffers; *link && *link != record; link = &(*link)->next)
+			;
+		if (*link)
+			*link = record->next;
+		free(record->samples);
 		free(record);
+	}
+	pthread_mutex_unlock(&mixer_lock);
 	return count;
 }
 
 HRESULT WINAPI IDirectSoundBuffer_SetBufferData(LPDIRECTSOUNDBUFFER buffer, LPVOID data, DWORD size)
 {
-	struct null_buffer *record = (struct null_buffer *)buffer;
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer;
+	short *samples = NULL;
+	unsigned long frames = 0;
 
-	record->data = data;
-	record->size = size;
+	if (!record || (!data && size) || size % record->block_bytes ||
+		size / record->block_bytes > (size_t)-1 / (record->block_frames * record->channels * sizeof(short)))
+		return DSERR_INVALIDCALL;
+	if (size)
+	{
+		samples = record->adpcm ? decode_adpcm(data, size, record->channels, &frames) :
+			decode_pcm(data, size, record->channels, &frames);
+		if (!samples)
+			return E_OUTOFMEMORY;
+	}
+	pthread_mutex_lock(&mixer_lock);
+	free(record->samples);
+	record->samples = samples;
+	record->frames = record->loop_end = frames;
+	record->loop_start = 0;
+	record->position = 0;
+	record->playing = FALSE;
+	record->current_volume = 0;
+	pthread_mutex_unlock(&mixer_lock);
 	return DS_OK;
 }
 
 HRESULT WINAPI IDirectSoundBuffer_Play(LPDIRECTSOUNDBUFFER buffer, DWORD reserved1, DWORD reserved2, DWORD flags)
 {
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer;
+
 	(void)reserved1;
 	(void)reserved2;
-	(void)flags;
-	((struct null_buffer *)buffer)->playing = TRUE;
+	if (!record)
+		return DSERR_INVALIDCALL;
+	pthread_mutex_lock(&mixer_lock);
+	record->looping = (flags & DSBPLAY_LOOPING) != 0;
+	if (record->looping && record->position >= record->loop_end)
+		record->position = record->loop_start;
+	record->playing = record->frames != 0;
+	pthread_mutex_unlock(&mixer_lock);
 	return DS_OK;
 }
 
 HRESULT WINAPI IDirectSoundBuffer_Stop(LPDIRECTSOUNDBUFFER buffer)
 {
-	((struct null_buffer *)buffer)->playing = FALSE;
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer;
+
+	if (!record)
+		return DSERR_INVALIDCALL;
+	pthread_mutex_lock(&mixer_lock);
+	record->playing = FALSE;
+	record->current_volume = 0;
+	pthread_mutex_unlock(&mixer_lock);
 	return DS_OK;
 }
 
-HRESULT WINAPI IDirectSoundBuffer_SetCurrentPosition(LPDIRECTSOUNDBUFFER buffer, DWORD play_cursor) { (void)buffer; (void)play_cursor; return DS_OK; }
-HRESULT WINAPI IDirectSoundBuffer_SetLoopRegion(LPDIRECTSOUNDBUFFER buffer, DWORD loop_start, DWORD loop_length) { (void)buffer; (void)loop_start; (void)loop_length; return DS_OK; }
-HRESULT WINAPI IDirectSoundBuffer_SetPitch(LPDIRECTSOUNDBUFFER buffer, LONG pitch) { (void)buffer; (void)pitch; return DS_OK; }
-HRESULT WINAPI IDirectSoundBuffer_SetVolume(LPDIRECTSOUNDBUFFER buffer, LONG volume) { (void)buffer; (void)volume; return DS_OK; }
+HRESULT WINAPI IDirectSoundBuffer_SetCurrentPosition(LPDIRECTSOUNDBUFFER buffer, DWORD play_cursor)
+{
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer;
+	unsigned long frame;
+
+	if (!record || play_cursor % record->block_bytes)
+		return DSERR_INVALIDCALL;
+	pthread_mutex_lock(&mixer_lock);
+	if (play_cursor / record->block_bytes > record->frames / record->block_frames)
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return DSERR_INVALIDCALL;
+	}
+	frame = play_cursor / record->block_bytes * record->block_frames;
+	if (frame >= record->frames && (frame || record->frames))
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return DSERR_INVALIDCALL;
+	}
+	record->position = record->looping && frame >= record->loop_end ? record->loop_start : frame;
+	pthread_mutex_unlock(&mixer_lock);
+	return DS_OK;
+}
+
+HRESULT WINAPI IDirectSoundBuffer_SetLoopRegion(LPDIRECTSOUNDBUFFER buffer, DWORD loop_start, DWORD loop_length)
+{
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer;
+	unsigned long start, length;
+
+	if (!record || loop_start % record->block_bytes || loop_length % record->block_bytes || !loop_length)
+		return DSERR_INVALIDCALL;
+	pthread_mutex_lock(&mixer_lock);
+	if (loop_start / record->block_bytes > record->frames / record->block_frames ||
+		loop_length / record->block_bytes > record->frames / record->block_frames)
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return DSERR_INVALIDCALL;
+	}
+	start = loop_start / record->block_bytes * record->block_frames;
+	length = loop_length / record->block_bytes * record->block_frames;
+	if (start >= record->frames || length > record->frames - start)
+	{
+		pthread_mutex_unlock(&mixer_lock);
+		return DSERR_INVALIDCALL;
+	}
+	record->loop_start = start;
+	record->loop_end = start + length;
+	if (record->looping && record->position >= record->loop_end)
+		record->position = start;
+	pthread_mutex_unlock(&mixer_lock);
+	return DS_OK;
+}
+
+HRESULT WINAPI IDirectSoundBuffer_SetPitch(LPDIRECTSOUNDBUFFER buffer, LONG pitch)
+{
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer;
+	double rate;
+
+	if (!record)
+		return DSERR_INVALIDCALL;
+	/* Xbox pitch is absolute: zero means 48 kHz, with 4096 units per octave
+	(xboxdevwiki.net/APU, Pitch calculation). It is not a multiplier of the
+	buffer's original sample rate. Bound the exponent before applying the
+	same frequency limits as the game's stream voices. */
+	if (pitch < -32768) pitch = -32768;
+	if (pitch > 32767) pitch = 32767;
+	rate = 48000.0 * pow(2.0, (double)pitch / 4096.0);
+	if (rate < DSBFREQUENCY_MIN) rate = DSBFREQUENCY_MIN;
+	if (rate > DSBFREQUENCY_MAX) rate = DSBFREQUENCY_MAX;
+	pthread_mutex_lock(&mixer_lock);
+	record->rate = rate;
+	pthread_mutex_unlock(&mixer_lock);
+	return DS_OK;
+}
+
+HRESULT WINAPI IDirectSoundBuffer_SetVolume(LPDIRECTSOUNDBUFFER buffer, LONG volume)
+{
+	struct sdl_buffer *record = (struct sdl_buffer *)buffer;
+	float gain;
+
+	if (!record)
+		return DSERR_INVALIDCALL;
+	if (volume > 0) volume = 0;
+	gain = gain_from_millibels(volume) * (float)config_real("audio.effects_volume");
+	pthread_mutex_lock(&mixer_lock);
+	record->volume = gain;
+	pthread_mutex_unlock(&mixer_lock);
+	return DS_OK;
+}

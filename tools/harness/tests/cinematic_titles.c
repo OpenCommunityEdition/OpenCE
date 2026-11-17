@@ -93,6 +93,9 @@ static long halo_screen_width(void) { return screen_width; }
 /* draw_string.c's justifications, as a title's tag has them */
 enum { justified_left, justified_right, justified_center };
 
+/* MCC title adaptation is inactive for these Xbox/CE cases. */
+static boolean mcc_cache_tags_loaded(void) { return FALSE; }
+static void mcc_hud_title_bounds(rectangle2d *bounds, short justification, unsigned long flags) { }
 #include "under_test.inc"
 
 /* the title in its slot, at its start: up for up_time ticks, then fading out for fade_out_time */

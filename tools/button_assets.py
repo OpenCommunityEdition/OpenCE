@@ -136,6 +136,14 @@ def gameplay_control(entry: dict) -> np.ndarray:
     return pixels
 
 
+# MCC modern shoulder labels map to the Xbox black/white controls. These
+# redraws are placeholders, not CRC replacements for any native map bitmap.
+MCC_BUTTONS = [dict(name=f"mcc_{button}_butn__0", tag=f"mcc\\buttons\\{button}",
+                    bitmap=0, width=32, height=32, format="dxt3", scale=8,
+                    crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0])
+               for button in ("black", "white")]
+
+
 def document(width: int, height: int, body: str) -> str:
     return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
             f'viewBox="0 0 {width} {height}">\n{body}\n</svg>\n')
@@ -386,7 +394,7 @@ def layout(arguments) -> None:
     classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
     for entry, sprite in zip(classic_buttons, sprites):
         entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
-    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n")
+    LIST.write_text(json.dumps({"assets": entries + MCC_BUTTONS + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n")
 
 
 def build(arguments) -> None:

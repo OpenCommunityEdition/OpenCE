@@ -24,7 +24,9 @@ static void browser_word(short word, wchar_t *text, short length)
 
 static void region_to_wide(char const *region, wchar_t *wide, short size)
 {
-	swprintf(wide, size, L"%s", region);
+	short i;
+	for (i = 0; i + 1 < size && region[i]; i++) wide[i] = (unsigned char)region[i];
+	wide[i] = 0;
 }
 
 #include "under_test.inc"

@@ -98,6 +98,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "cseries/cseries.h"
 #include "cseries/errors.h"
 #include "game_state.h"
@@ -124,6 +125,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "units/units.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "mcc_campaign.h" /* port: port/linux/game/mcc_campaign.c */
 
 /* ---------- constants */
 
@@ -760,6 +762,7 @@ void custom_render_nav_point(
 			byte alpha;
 			real_rgb_color rgb_temp;
 
+			scale *= mcc_hud_bitmap_scale(bitmap_index); /* port: preserve MCC waypoint bitmap scaling. */
 			corner.x = (short)screen_position.x;
 			corner.y = (short)screen_position.y;
 			alpha = PIN(255 * fast_ftol_C(arrow->opacity), 0, 255);
@@ -905,6 +908,8 @@ void hud_render_nav_points(
 	}
 
 	game_engine_render_nav_points(local_player_index);
+	/* port: MCC campaign markers have separate state (mcc_campaign.c) */
+	mcc_campaign_render(local_player_index);
 
 	return;
 }

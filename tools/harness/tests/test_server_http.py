@@ -225,7 +225,8 @@ def generated(fault=None, faulty_function=None):
     config += "".join(f'\t"{hashlib.sha1(message[:length]).hexdigest()}",\n' for length in range(SHA1_LENGTHS))
     config += "};\n"
     json = mutated(read("port/linux/src/server_json.c"), '#include "../../third_party/jsmn/jsmn.h"', '#include "jsmn.h"')
-    text = ""
+    text = function(read("port/linux/game/mcc_package.c"), "mcc_package_name") + "\n"
+    text += function(read("port/linux/game/mcc_server.c"), "mcc_server_play_line") + "\n"
     for name in FUNCTIONS:
         code = function(source, name)
         if fault and name == faulty_function:

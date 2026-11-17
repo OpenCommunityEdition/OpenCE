@@ -3,7 +3,7 @@
 Gamepads > Button Appearance contains AUTO BUTTON DETECTION, enabled by default for new configurations.
 Saved choices are preserved. Detection limits Button
 Style to the controller assigned to the menu's player. Turning it off exposes all
-eleven styles; unknown or disconnected devices retain the saved manual choice.
+eleven controller styles plus Keyboard; unknown or disconnected devices retain the saved manual choice.
 Device detection always runs, including when the option is off.
 
 Xbox offers Classic, Gems, Dark Gems and Modern; PlayStation offers Classic, Gems,
@@ -17,7 +17,14 @@ default, keeps black/white buttons; Modern Xbox uses the existing LB/RB artwork.
 The preference is shared by local players, retained across controller changes and
 automatic detection, and changes no bindings. Other styles keep their bumpers.
 Appearance settings remain available with High-Res HUD off; the artwork changes
-apply when High-Res HUD is enabled in Graphics.
+apply when High-Res HUD is enabled in Graphics. Keyboard keycaps work independently.
+
+KEYBOARD GLYPHS is off by default. Enable it alongside AUTO BUTTON DETECTION
+to follow keyboard/mouse and controller activity in gameplay. The detected
+Keyboard row is read-only; saved controller and manual preferences are retained.
+With detection off, select Keyboard manually to keep keycaps. MENU GLYPHS, also
+off by default, extends the same selection to existing PC-menu A/B/X/Y legends
+and inline face-button tokens, independently of High-Res HUD. See [keyboard prompts](keyboard_prompts.md).
 
 ## Reading route
 

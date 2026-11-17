@@ -252,6 +252,8 @@ static struct
 static short hires_text_next_font = 0;
 /* port: the text's scale about a point (rasterizer_text_set_scale) */
 static real text_scale = 1.0f;
+/* port: scoped subpixel positioning for text beside vector-like adornments. */
+static real text_offset_x, text_offset_y;
 static real text_scale_origin_x = 0.0f;
 static real text_scale_origin_y = 0.0f;
 static pixel32 global_shadow_color = 0;
@@ -788,7 +790,8 @@ static void rasterizer_text_draw_scaled_character(
 	struct dynamic_screen_vertex scaled[NUMBER_OF_VERTICES_PER_QUADRILATERAL];
 	short vertex_index;
 
-	if (text_scale == 1.0f)
+	/* port: bypass the transform only when both scale and offset are neutral. */
+	if (text_scale == 1.0f && text_offset_x == 0.0f && text_offset_y == 0.0f)
 	{
 		rasterizer_text_draw_character(vertices);
 		return;
@@ -797,9 +800,9 @@ static void rasterizer_text_draw_scaled_character(
 	{
 		scaled[vertex_index] = vertices[vertex_index];
 		scaled[vertex_index].position.x =
-			text_scale_origin_x + (vertices[vertex_index].position.x - text_scale_origin_x) * text_scale;
+			text_scale_origin_x + (vertices[vertex_index].position.x - text_scale_origin_x) * text_scale + text_offset_x; /* port: scoped offset */
 		scaled[vertex_index].position.y =
-			text_scale_origin_y + (vertices[vertex_index].position.y - text_scale_origin_y) * text_scale;
+			text_scale_origin_y + (vertices[vertex_index].position.y - text_scale_origin_y) * text_scale + text_offset_y; /* port: scoped offset */
 	}
 	rasterizer_text_draw_character(scaled);
 
@@ -1232,4 +1235,84 @@ cache_hardware_format_character(
 	}
 
 	return;
+}
+
+
+/* port: public ink bounds use the same high-resolution glyph offsets and
+ * advances as drawing. Logical font-tag bounds include padding and cannot
+ * center a visible label precisely. Measurement never changes the draw font. */
+static real_rectangle2d measured_ink;
+static long measured_hires_font;
+static boolean measured_has_ink;
+
+static void rasterizer_measure_ink_character(struct parse_string_state *state,
+    struct font_header *font, struct font_character *character, pixel32 color,
+    short x0, short y0, short x, short y, short dx, short dy)
+{
+    struct text_hires_glyph glyph;
+    real left, top, right, bottom;
+    short row, column;
+    boolean found = FALSE;
+    (void)state; (void)color;
+    if (measured_hires_font != NONE && text_hires_glyph(measured_hires_font, character->character, &glyph))
+    {
+        left = x0 - x + character->bitmap_origin_x + (character->character_width - glyph.advance) * .5f + glyph.left;
+        right = left + glyph.right - glyph.left;
+        top = y0 - y + character->bitmap_origin_y + glyph.top;
+        bottom = top + glyph.bottom - glyph.top;
+        found = TRUE;
+    }
+    else
+    {
+        left = top = 32767.0f; right = bottom = -32768.0f;
+        for(row=y;row<y+dy;row++) for(column=x;column<x+dx;column++)
+            if(((byte *)font->pixels.address)[character->pixels_offset+row*character->bitmap_width+column])
+            {
+                left=MIN(left,x0-x+column); right=MAX(right,x0-x+column+1);
+                top=MIN(top,y0-y+row); bottom=MAX(bottom,y0-y+row+1); found=TRUE;
+            }
+    }
+    if(found)
+    {
+        if(!measured_has_ink) {measured_ink.x0=left;measured_ink.x1=right;measured_ink.y0=top;measured_ink.y1=bottom;}
+        else {measured_ink.x0=MIN(measured_ink.x0,left);measured_ink.x1=MAX(measured_ink.x1,right);
+              measured_ink.y0=MIN(measured_ink.y0,top);measured_ink.y1=MAX(measured_ink.y1,bottom);}
+        measured_has_ink=TRUE;
+    }
+}
+
+/* port: see rasterizer_measure_ink_character. Single synchronous drawing thread. */
+void rasterizer_unicode_string_ink_bounds(rectangle2d const *bounds, wchar_t const *text, real_rectangle2d *ink)
+{
+    long i;
+    measured_has_ink=FALSE;
+    measured_hires_font=hires_text_atlas ? hires_text_font_get(draw_string_get_font(),MAX(text_scale,1.0f)) : NONE;
+    for(i=0;measured_hires_font!=NONE && text[i];i++)
+        if(!text_hires_covers(measured_hires_font,(word)text[i])) measured_hires_font=NONE;
+    draw_unicode_string(rasterizer_measure_ink_character,bounds,NULL,NULL,0,text);
+    if(measured_has_ink) *ink=measured_ink;
+    else {ink->x0=ink->x1=bounds->x0;ink->y0=ink->y1=bounds->y0;}
+}
+
+/* port: restore the caller's state even when text drawing is unavailable. */
+void rasterizer_draw_unicode_string_offset(rectangle2d const *bounds, wchar_t const *text, real x, real y)
+{
+    real previous_x=text_offset_x,previous_y=text_offset_y;
+    text_offset_x+=x; text_offset_y+=y;
+    rasterizer_draw_unicode_string(bounds,NULL,NULL,0,text);
+    text_offset_x=previous_x;text_offset_y=previous_y;
+}
+
+/* port: scale only this string's coordinates before adding its placement offset.
+ * Restore all transform state, including when the renderer cannot draw text. */
+void rasterizer_draw_unicode_string_scaled_offset(rectangle2d const *bounds, wchar_t const *text,
+    real scale, real x, real y)
+{
+    real previous_scale = text_scale;
+    real previous_origin_x = text_scale_origin_x, previous_origin_y = text_scale_origin_y;
+    text_scale = scale;
+    text_scale_origin_x = text_scale_origin_y = 0.0f;
+    rasterizer_draw_unicode_string_offset(bounds, text, x, y);
+    text_scale = previous_scale;
+    text_scale_origin_x = previous_origin_x; text_scale_origin_y = previous_origin_y;
 }

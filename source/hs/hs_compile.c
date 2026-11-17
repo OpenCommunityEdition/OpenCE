@@ -415,11 +415,14 @@ symbols in this file:
 #include "hs/hs_library_internal.h"
 /* Empty reconstructed header removed; no declarations to include. */
 #include "hs/hs_scenario_definitions.h"
+#include "hs_console_state.h" /* port: port/linux/game/hs_console_state.inl */
 #include "interface/hud_definitions.h"
 #include "interface/interface.h"
 #include "memory/data.h"
 #include "scenario/scenario.h"
 #include "scenario/scenario_definitions.h"
+#include "mcc_script_parameters.h" /* port: port/linux/game/mcc_script_parameters.h */
+#include "mcc_scripts.h" /* port: port/linux/game/mcc_scripts.h */
 
 /* ---------- constants */
 
@@ -483,7 +486,7 @@ struct hs_compile_globals
 	char const *error;
 	long error_offset;
 	char error_buffer[256];
-	boolean malloced;
+	boolean malloced; /* port: unused console allocation flag; retain the original layout. */
 	boolean compiling_scenario;
 	boolean disallow_blocks;
 	boolean disallow_sets;
@@ -881,15 +884,7 @@ void hs_compile_dispose(
 		}
 	}
 
-	if (hs_compile_globals.malloced)
-	{
-		match_free(
-			"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-			0x8C,
-			hs_compile_globals.compiled_source);
-		hs_compile_globals.compiled_source = NULL;
-		hs_compile_globals.malloced = FALSE;
-	}
+	/* port: console source belongs to hs_console_state, not this compiler. */
 	hs_compile_globals.initialized = FALSE;
 
 	return;
@@ -910,36 +905,15 @@ long hs_compile_expression(
 
 	if (source_size < HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES)
 	{
-		if (global_scenario_index != NONE)
+		/* port: a later command must not overwrite a sleeping command's
+		strings; this bounded storage is restored with its saved threads. */
+		source_offset = 0;
+		hs_compile_globals.compiled_source = hs_console_source_acquire(source_size);
+		if (!hs_compile_globals.compiled_source)
 		{
-			match_assert(
-				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-				0xA6,
-				global_scenario_get()->hs_string_constants.size>=HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES);
-			/* port: none is written before the scenario's strings (hs_allocate
-			lets go of strings that aren't sound) */
-			if (global_scenario_get()->hs_string_constants.size<HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES)
-			{
-				*error_message = "the scenario has no room for the expression's text.";
-				*error_source = source;
-
-				return NONE;
-			}
-			source_offset = global_scenario_get()->hs_string_constants.size - HS_MAXIMUM_DYNAMIC_SOURCE_DATA_BYTES;
-			hs_compile_globals.compiled_source = global_scenario_get()->hs_string_constants.address;
-		}
-		else
-		{
-			source_offset = 0;
-			hs_compile_globals.compiled_source = match_malloc(
-				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-				0xAF,
-				source_size + 1);
-			hs_compile_globals.malloced = TRUE;
-			match_assert(
-				"c:\\halo\\SOURCE\\hs\\hs_compile.c",
-				0xB2,
-				hs_compile_globals.compiled_source);
+			*error_message = "console text storage is full or unavailable; finish pending commands or release string globals.";
+			*error_source = source;
+			return NONE;
 		}
 
 		memcpy(hs_compile_globals.compiled_source + source_offset, source, source_size);
@@ -992,6 +966,8 @@ long hs_compile_expression(
 			}
 		}
 
+		/* port: the root keeps its text until the command and its values end. */
+		hs_console_source_finish(hs_compile_globals.compiled_source, result);
 	}
 
 	return result;
@@ -2259,6 +2235,21 @@ static boolean hs_parse_primitive(
 	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 	boolean result = FALSE;
 
+	/* port: an MCC map's AI encounters and squads (mcc_scripts.c) */
+	{
+		int mcc_result = mcc_script_parse_ai(expression,
+			hs_compile_globals.compiled_source);
+		if (mcc_result >= 0)
+		{
+			if (!mcc_result)
+			{
+				hs_compile_globals.error = "this is not a valid MCC AI encounter or squad.";
+				hs_compile_globals.error_offset = expression->source_offset;
+			}
+			return mcc_result != 0;
+		}
+	}
+
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
 		0x4AF,
@@ -2553,6 +2544,20 @@ boolean hs_compile_postprocess(
 		expression_index = data_next_index(hs_syntax_data, expression_index))
 	{
 		struct hs_syntax_node *expression = hs_syntax_get(expression_index);
+
+		/* port: an MCC script's parameters (mcc_script_parameters.c) */
+		{
+			int mcc_parameter = mcc_parameter_compile(expression);
+			if (mcc_parameter >= 0)
+			{
+				if (!mcc_parameter)
+				{
+					hs_compile_globals.error = "invalid MCC script parameter.";
+					success = FALSE;
+				}
+				continue;
+			}
+		}
 
 		if (hs_type_valid(expression->type))
 		{

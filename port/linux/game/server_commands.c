@@ -733,7 +733,8 @@ static char const *const settable_settings[] =
 {
 	"server.name", "server.max_players", "server.min_players", "server.password", "server.public",
 	"server.rotation_fallback", "server.lobby_seconds", "server.postgame_seconds", "server.empty_seconds",
-	"server.idle_minutes", "server.team_start", "server.motd", "server.frame_rate", "server.web_password",
+	"server.idle_minutes", "server.team_start", "server.team_switch",
+	"server.team_switch_cooldown_seconds", "server.motd", "server.frame_rate", "server.web_password",
 	"server.web_moderator_password", "server.log_format", "server.log_addresses", "server.status_file",
 	"server.auto_update", "server.coop_difficulty", "server.region", "server.master_publish",
 	"server.master_publish_address", "server.metrics", "server.chat_filter", "server.chat_filter_slurs",
@@ -745,6 +746,7 @@ static char const *const settable_settings[] =
 	"network.text_chat", "network.voice_lobby", "network.voice_mode", "network.voice_kbps", "network.votekick",
 	"network.vote_end_game", "network.votekick_threshold", "network.votekick_percent", "network.votekick_minutes", "network.votekick_ban_minutes", "network.map_share", "network.map_share_upload",
 	"network.public_address", "network.coop_friendly_fire", "network.coop_player_collisions",
+	"network.vehicle_riding", "server.vehicle_riding_override_gametype",
 	"network.coop_ally_friendly_fire", "network.coop_team_wipe", "network.shield_effects", "network.fire_origins",
 };
 
@@ -802,6 +804,7 @@ static struct
 	{ "server.idle_minutes", NULL, "0", NULL },
 	{ "server.frame_rate", NULL, "30", "120" },
 	{ "server.team_start", "one|both|skip", NULL, NULL },
+	{ "server.team_switch_cooldown_seconds", NULL, "0", "3600" },
 	{ "server.log_format", "text|json", NULL, NULL },
 	{ "server.auto_update", "off|check|install", NULL, NULL },
 	{ "server.coop_difficulty", "easy|normal|hard|impossible", NULL, NULL },
@@ -825,7 +828,7 @@ static struct
 	{ "network.votekick_percent", NULL, "1", "100" },
 	{ "network.votekick_minutes", NULL, "0", "60" },
 	{ "network.votekick_ban_minutes", NULL, "1", "1440" },
-	{ "network.map_share_upload", NULL, "16", "20480" },
+	{ "network.map_share_upload", NULL, "16", "256000" },
 	{ "network.coop_friendly_fire", "off|on|shields_only|explosives_only", NULL, NULL },
 	{ "network.coop_team_wipe", "auto|revert|respawn", NULL, NULL },
 	{ "network.shield_effects", "stock|glow|light_show|overshield|glow_overshield|light_show_overshield|players", NULL,
