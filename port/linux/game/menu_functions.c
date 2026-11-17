@@ -78,6 +78,9 @@ their handlers open opens.
 #include "main/main.h"
 #include "networking/network_game_manager.h"
 #include "saved games/player_profile.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps.h"
+#include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
@@ -94,6 +97,7 @@ their handlers open opens.
 #include "mcc_share.h"
 #include "mcc_share_menu.h"
 #include "mcc_cache.h"
+#include "mcc_workshop.h"
 #include "game_modes.h"
 #include "network_voice.h"
 #include "network_map_vote.h"
@@ -104,6 +108,8 @@ their handlers open opens.
 #include "../src/master_list.h"
 #include "../src/player_link.h" /* port: port/linux/src/player_link.c */
 #include "../src/server_master.h"
+#include "../src/steam_screen.h" /* port: the Steam Workshop screen, port/linux/src/steam_screen.c */
+#include "../src/workshop_authors.h"
 #include "text_filter.h"
 
 #include <stdlib.h>
@@ -1262,6 +1268,33 @@ static void mcc_solo_map_text(short row, wchar_t *text)
 	mcc_menu_text_row(text);
 }
 
+static void mods_wide_text(char const *text, wchar_t *wide, short length);
+static void text_append(wchar_t *text, short size, wchar_t const *word);
+
+/* the help under a folder in the MCC map lists' panel, in a text box of this length */
+#define MCC_FOLDER_HELP_LENGTH (ROW_TEXT_LENGTH * 3)
+
+/* the help under the chosen folder; a Workshop item's folder's ends with its author, once Steam has said
+(workshop_authors.c). A collection's has none: it holds the items of many */
+static void mcc_folder_help_text(struct mcc_map_browser const *browser, wchar_t *help, short size)
+{
+	short row = browser->chosen;
+	char author[WORKSHOP_AUTHORS_NAME_SIZE];
+	/* (one more than the name: mods_wide_text keeps 2 for a line break) */
+	wchar_t wide[WORKSHOP_AUTHORS_NAME_SIZE + 1];
+
+	help[0] = 0;
+	text_append(help, size, browser->count ? L"Open folder to\r\nchoose a map." : L"No MCC maps found\r\nin this category.");
+	if (row < 0 || row >= browser->count || !browser->folders[row] || browser->groups[row] != NONE ||
+		!workshop_authors_get(mcc_maps_item_id(browser->entries[row]), author, sizeof(author)))
+	{
+		return;
+	}
+	mods_wide_text(author, wide, NUMBEROF(wide));
+	text_append(help, size, L"\r\nPublisher\r\n");
+	text_append(help, size, wide);
+}
+
 static void mcc_browser_description(struct widget_instance *description, struct mcc_map_browser *browser)
 {
 	short index = mcc_map_browser_index(browser, browser->chosen);
@@ -1271,10 +1304,12 @@ static void mcc_browser_description(struct widget_instance *description, struct 
 	mcc_map_description_show(description, index);
 	if (index == NONE)
 	{
+		wchar_t help[MCC_FOLDER_HELP_LENGTH];
+
 		mcc_map_browser_text(browser, browser->chosen, text);
 		text_set(named(description, "mcc_folder_name", 0), text);
-		text_set(named(description, "mcc_folder_help", 0), browser->count ?
-			L"Open folder to\r\nchoose a map." : L"No MCC maps found\r\nin this category.");
+		mcc_folder_help_text(browser, help, NUMBEROF(help));
+		text_set_length(named(description, "mcc_folder_help", 0), help, NUMBEROF(help));
 		visible_set(named(description, "mcc_folder_name", 0), TRUE);
 		visible_set(named(description, "mcc_folder_help", 0), TRUE);
 	}
@@ -6509,6 +6544,412 @@ static struct
 	unsigned long updated_at;
 } lobby_icons;
 
+/* the lobby's game data box as last drawn (menu_functions_text_box_drawn): the font and width a line of it is
+measured in (lobby_line_fits); NONE before it is drawn, when a line is counted against LOBBY_LINE_CHARACTERS */
+static struct
+{
+	long font;
+	short width;
+} lobby_data_box = { NONE, 0 };
+
+#define LOBBY_LINE_CHARACTERS 18
+
+/* ---------- the Steam Workshop (Settings > Network Setup > STEAM WORKSHOP:
+the host's port/android/host/steam_downloads.c through steam_screen.c,
+tools/port_settings.py's _steam_workshop; from Halo Content Evolved's):
+rows op_steam_<n> of a name and a state (steam_name, steam_state), the
+chosen row's details (steam_details_name, steam_details_text, measured as
+the Mods screen's are) and the chosen Workshop item's preview, over
+steam_picture (a text box: drawn by
+steam_picture_draw, from menu_functions_text_box_drawn) */
+
+#define STEAM_ROWS 11
+/* (as many as steam_details_text holds above the picture: more, and the last
+is cut short with "..." rather than lost under the box's edge) */
+#define STEAM_DETAILS_LINES 6
+#define STEAM_TEXTURE 256
+
+/* the text boxes measured, in the Mods screen's places (one screen is shown
+at a time) */
+static char const *const steam_text_box_names[NUMBER_OF_MOD_TEXT_BOXES] = { "steam_details_name",
+	"steam_details_text", "steam_name" };
+
+static struct
+{
+	short list_shown;
+	char shown[MOD_DETAILS_LENGTH];
+	char row_shown[STEAM_ROWS][2 * ROW_TEXT_LENGTH + 16];
+	/* the picture's texture (a Workshop item's preview), and which */
+	struct bitmap_data *picture;
+	unsigned long long preview_key;
+	/* the kind of text being typed (the host's; 0: none), in a text field
+	on the row it was asked for on, and the field's caption */
+	int typing;
+	struct widget_instance *typing_row;
+	char caption[64];
+	/* the password's field opened as the account was passed on, before the
+	host asked for it (steam_choose): its asking, when it comes, let go */
+	boolean password_early;
+	unsigned long password_early_at;
+	/* the row chosen as last passed to the host: one the host chose since
+	(a page's first item, as the page comes) is focused */
+	short chosen_set;
+} steam_screen;
+
+static struct widget_instance *steam_row(struct widget_instance *widget)
+{
+	for (; widget; widget = widget->parent)
+	{
+		if (widget->name && !strncmp(widget->name, "op_steam_", 9))
+			return widget;
+	}
+	return NULL;
+}
+
+static short steam_row_place(struct widget_instance *row)
+{
+	short place = row ? (short)(steam_screen_first() + atoi(row->name + 9) - 1) : NONE;
+
+	return place >= 0 && place < steam_screen_count() ? place : NONE;
+}
+
+static void steam_text_cancel(void);
+
+/* "port steam init" and "port steam close" */
+static boolean steam_screen_reset(boolean opening)
+{
+	short index;
+
+	steam_text_cancel();
+	if (opening)
+		steam_screen_open();
+	else
+		steam_screen_close();
+	steam_screen.list_shown = NONE;
+	steam_screen.shown[0] = 0;
+	csmemset(steam_screen.row_shown, 0, sizeof(steam_screen.row_shown));
+	for (index = 0; index < NUMBER_OF_MOD_TEXT_BOXES; index++)
+	{
+		mods_screen.fonts[index] = NONE;
+		mods_screen.widths[index] = 0;
+	}
+	return TRUE;
+}
+
+/* a text the host asked for, typed in a text field on its row (the
+system's keyboard on Android, text_field_open): A or Enter passes it on
+(steam_text_done), B cancels (steam_text_cancel); a password's shown as
+stars, and wiped once passed on */
+static void steam_text_done(char const *text)
+{
+	int kind = steam_screen.typing;
+
+	steam_screen.typing = 0;
+	steam_screen.typing_row = NULL;
+	(void)text;
+	/* (text_field.text, which this wipes) */
+	steam_screen_text_typed(kind, text_field.text, TRUE);
+	csmemset(text_field.before, 0, sizeof(text_field.before));
+}
+
+static void steam_text_cancel(void)
+{
+	int kind = steam_screen.typing;
+
+	if (!kind)
+		return;
+	steam_screen.typing = 0;
+	steam_screen.typing_row = NULL;
+	if (text_field_editing(NULL))
+		text_field_end(FALSE);
+	csmemset(text_field.text, 0, sizeof(text_field.text));
+	csmemset(text_field.before, 0, sizeof(text_field.before));
+	steam_screen_text_typed(kind, text_field.text, FALSE);
+}
+
+/* (a field let go of elsewhere: cancelled; else one opened, on the row
+focused, if the host wants something typed) */
+static void steam_text_update(struct widget_instance *focused)
+{
+	char initial[64];
+	int secret = 0;
+	int kind;
+
+	if (steam_screen.typing && (!text_field_editing(steam_screen.typing_row) || !steam_screen.typing_row->visible))
+		steam_text_cancel();
+	kind = 0;
+	/* (the host's asking comes a frame or more after the account, and is
+	the first it asks for then; given up on after a few seconds) */
+	if (steam_screen.password_early)
+	{
+		kind = steam_screen_text_wanted(initial, (int)sizeof(initial), &secret);
+		csmemset(initial, 0, sizeof(initial));
+		if (kind || system_milliseconds() - steam_screen.password_early_at > 5000)
+			steam_screen.password_early = FALSE;
+		if (kind == STEAM_TEXT_PASSWORD)
+			kind = 0;
+	}
+	if (steam_screen.typing || text_field_editing(NULL) || !focused)
+		return;
+	if (!kind)
+		kind = steam_screen_text_wanted(initial, (int)sizeof(initial), &secret);
+	if (!kind)
+		return;
+	steam_screen_text_caption(kind, steam_screen.caption, (int)sizeof(steam_screen.caption));
+	steam_screen.typing = kind;
+	steam_screen.typing_row = focused;
+	text_field_open(focused, initial, (short)(sizeof(initial) - 1), steam_text_done, secret ? TRUE : FALSE);
+	csmemset(initial, 0, sizeof(initial));
+}
+
+/* "port steam update": the model's rows, as the Mods screen's; the MCC
+catalog read again when the model put files in mcc_maps */
+static void steam_update(struct widget_instance *list)
+{
+	struct widget_instance *row;
+	struct widget_instance *focused;
+	struct widget_instance *details = list->parameters.list.extended_description;
+	short first;
+	short chosen;
+	short count;
+	short focused_index;
+
+	if (steam_screen_poll())
+		mcc_maps_rescan();
+	first = (short)steam_screen_first();
+	chosen = (short)steam_screen_chosen();
+	count = (short)steam_screen_count();
+	/* (a list opened, or a row the host chose: that row focused) */
+	if (steam_screen.list_shown != steam_screen_view() || chosen != steam_screen.chosen_set)
+	{
+		steam_screen.list_shown = (short)steam_screen_view();
+		if (chosen < first || chosen >= first + STEAM_ROWS)
+			first = (short)PIN(chosen - STEAM_ROWS / 2, 0, MAX(count - STEAM_ROWS, 0));
+		focus_row(list, count ? (short)(chosen - first) : NONE);
+		csmemset(steam_screen.row_shown, 0, sizeof(steam_screen.row_shown));
+	}
+	focused = steam_row(list->focused_child);
+	focused_index = focused ? (short)(atoi(focused->name + 9) - 1) : NONE;
+	if (focused_index == STEAM_ROWS - 1 && first + STEAM_ROWS < count && list_scrolls_at_end())
+	{
+		first++;
+		focus_row(list, --focused_index);
+	}
+	else if (focused_index == 0 && first > 0 && list_scrolls_at_end())
+	{
+		first--;
+		focus_row(list, ++focused_index);
+	}
+	if (first > 0 && first + STEAM_ROWS > count)
+		first = (short)MAX(0, count - STEAM_ROWS);
+	if (focused_index != NONE && first + focused_index < count)
+		chosen = (short)(first + focused_index);
+	steam_screen_set_first(first);
+	steam_screen_set_chosen(chosen);
+	steam_screen.chosen_set = chosen;
+	steam_text_update(focused);
+	for (row = list->child; row; row = row->next)
+	{
+		short place;
+		short row_index;
+		char name[ROW_TEXT_LENGTH];
+		char state[ROW_TEXT_LENGTH];
+		char shown[sizeof(steam_screen.row_shown[0])];
+
+		if (!row->name || strncmp(row->name, "op_steam_", 9))
+			continue;
+		row->animation.current_frame_index = row == focused ? 1 : 0;
+		place = steam_row_place(row);
+		row->visible = place != NONE;
+		if (place == NONE)
+		{
+			if (row == focused)
+				focus_row(list, count ? (short)(count - 1 - first) : NONE);
+			continue;
+		}
+		row_index = (short)PIN(atoi(row->name + 9) - 1, 0, STEAM_ROWS - 1);
+		/* (the row being typed on: the text field, until it is done) */
+		if (steam_screen.typing && row == steam_screen.typing_row)
+		{
+			wchar_t wide[ROW_TEXT_LENGTH];
+
+			text_field_show(named(row, "steam_name", 0), "", TRUE);
+			mods_wide_text("A: DONE", wide, ROW_TEXT_LENGTH);
+			text_set(named(row, "steam_state", 0), wide);
+			steam_screen.row_shown[row_index][0] = 0;
+			continue;
+		}
+		steam_screen_row(place, name, sizeof(name), state, sizeof(state));
+		snprintf(shown, sizeof(shown), "%s|%s|%ld", name, state, mods_screen.fonts[_mod_row_name]);
+		if (strcmp(shown, steam_screen.row_shown[row_index]))
+		{
+			char shortened[MOD_DETAILS_LENGTH];
+			wchar_t wide[ROW_TEXT_LENGTH];
+
+			if (mods_text_fits(_mod_row_name, name, strlen(name)))
+				snprintf(shortened, sizeof(shortened), "%s", name);
+			else
+				mods_text_shorten(_mod_row_name, name, strlen(name), shortened, sizeof(shortened));
+			mods_wide_text(shortened, wide, ROW_TEXT_LENGTH);
+			text_set(named(row, "steam_name", 0), wide);
+			mods_wide_text(state, wide, ROW_TEXT_LENGTH);
+			text_set(named(row, "steam_state", 0), wide);
+			snprintf(steam_screen.row_shown[row_index], sizeof(steam_screen.row_shown[0]), "%s", shown);
+		}
+	}
+	if (details)
+	{
+		char title[MOD_DETAILS_LENGTH];
+		char text[MOD_DETAILS_LENGTH];
+		char author[WORKSHOP_AUTHORS_NAME_SIZE];
+		char wrapped[MOD_DETAILS_LENGTH];
+		char shown[sizeof(steam_screen.shown)];
+		wchar_t wide[MOD_DETAILS_LENGTH];
+
+		steam_screen_details(count ? chosen : NONE, title, sizeof(title), text, sizeof(text), author, sizeof(author));
+		if (steam_screen.typing)
+		{
+			snprintf(title, sizeof(title), "%s", steam_screen.caption);
+			snprintf(text, sizeof(text), "Type it, then press A or Enter. B cancels.");
+			author[0] = 0;
+		}
+		/* (made again only when what they show, or its fonts, change: the author before the texts, whose ends this
+		may cut) */
+		snprintf(shown, sizeof(shown), "%ld %d %ld %d|%s|%s|%s", mods_screen.fonts[_mod_details_name],
+			mods_screen.widths[_mod_details_name], mods_screen.fonts[_mod_details_text],
+			mods_screen.widths[_mod_details_text], author, title, text);
+		if (strcmp(shown, steam_screen.shown))
+		{
+			snprintf(steam_screen.shown, sizeof(steam_screen.shown), "%s", shown);
+			wrapped[0] = 0;
+			mods_wrap(title, wrapped, sizeof(wrapped), _mod_details_name, 2, 0);
+			mods_wide_text(wrapped, wide, NUMBEROF(wide));
+			text_set_length(named(details, "steam_details_name", 0), wide, NUMBEROF(wide));
+			wrapped[0] = 0;
+			/* (an item's author, its publisher, under its description, which is cut short to leave its two lines) */
+			if (author[0])
+			{
+				short lines = mods_wrap(text, wrapped, sizeof(wrapped), _mod_details_text, STEAM_DETAILS_LINES - 2, 0);
+				char heading[sizeof(author) + 16];
+
+				snprintf(heading, sizeof(heading), "Publisher\n%s", author);
+				mods_wrap(heading, wrapped, sizeof(wrapped), _mod_details_text, lines + 2, lines);
+			}
+			else
+				mods_wrap(text, wrapped, sizeof(wrapped), _mod_details_text, STEAM_DETAILS_LINES, 0);
+			mods_wide_text(wrapped, wide, NUMBEROF(wide));
+			text_set_length(named(details, "steam_details_text", 0), wide, NUMBEROF(wide));
+		}
+	}
+}
+
+/* "port steam choose" (A on a row) */
+static boolean steam_choose(struct widget_instance *widget)
+{
+	short place = steam_row_place(steam_row(widget));
+
+	if (steam_screen.typing)
+	{
+		struct widget_instance *row = steam_screen.typing_row;
+
+		ui_play_audio_feedback_sound(SOUND_FORWARD);
+		if (!text_field_editing(NULL))
+			return TRUE;
+		/* (an empty account, password or code: Android's keyboard brought
+		back, which a tap on the row asks for once it has been closed;
+		passed on, it would be ignored and the sign-in left) */
+		if (!text_field.text[0] && steam_screen.typing != STEAM_TEXT_SEARCH)
+		{
+			platform_text_field(TRUE, text_field.masked);
+			return TRUE;
+		}
+		/* (A on the field: what was typed passed on; after the account, the
+		password's field opened in the same frame, which the host asks for
+		next: a keyboard hidden and asked for again a frame or two later is
+		not shown by Android) */
+		if (steam_screen.typing == STEAM_TEXT_ACCOUNT)
+		{
+			text_field_end(TRUE);
+			steam_screen_text_caption(STEAM_TEXT_PASSWORD, steam_screen.caption, (int)sizeof(steam_screen.caption));
+			steam_screen.typing = STEAM_TEXT_PASSWORD;
+			steam_screen.typing_row = row;
+			steam_screen.password_early = TRUE;
+			steam_screen.password_early_at = system_milliseconds();
+			text_field_open(row, "", 63, steam_text_done, TRUE);
+			return TRUE;
+		}
+		text_field_end(TRUE);
+		return TRUE;
+	}
+	if (place == NONE)
+		place = (short)steam_screen_chosen();
+	steam_screen_set_chosen(place);
+	steam_screen.chosen_set = place;
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	steam_screen_choose(place);
+	return TRUE;
+}
+
+/* "port steam back" (B, and BACK): a sign-in under way cancelled, a list
+left for the hub, else away */
+static boolean steam_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	ui_play_audio_feedback_sound(SOUND_BACK);
+	if (steam_screen.typing)
+	{
+		steam_text_cancel();
+		return TRUE;
+	}
+	if (steam_screen_back())
+		return TRUE;
+	ui_widget_port_go_back(widget);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* the texture of what steam_picture shows: the chosen Workshop item's
+preview, copied in once for each item chosen; NULL for none */
+static struct bitmap_data *steam_picture_texture(void)
+{
+	unsigned long long key = 0;
+
+	if (!steam_screen_picture(&key, NULL))
+		return NULL;
+	if (!steam_screen.picture)
+	{
+		steam_screen.picture = bitmap_2d_new(STEAM_TEXTURE, STEAM_TEXTURE, 0, 11 /* a8r8g8b8 */);
+		if (steam_screen.picture && !rasterizer_bitmap_new(steam_screen.picture))
+		{
+			bitmap_delete(steam_screen.picture);
+			steam_screen.picture = NULL;
+		}
+		if (!steam_screen.picture)
+			return NULL;
+		steam_screen.preview_key = 0;
+	}
+	if (steam_screen.preview_key != key)
+	{
+		if (steam_screen_picture(&key, (unsigned int *)steam_screen.picture->base_address) != STEAM_PICTURE_SIDE)
+			return NULL;
+		rasterizer_bitmap_changed(steam_screen.picture);
+		steam_screen.preview_key = key;
+	}
+	return steam_screen.picture;
+}
+
+/* (steam_picture's text box drawn: the picture over its bounds) */
+static void steam_picture_draw(rectangle2d const *bounds)
+{
+	struct bitmap_data *picture = steam_picture_texture();
+	rectangle2d source;
+
+	if (!picture)
+		return;
+	source.x0 = source.y0 = 0;
+	source.x1 = source.y1 = STEAM_TEXTURE;
+	draw_bitmap_in_rect(picture, bounds, &source, NULL, 0xFFFFFFFFUL, NULL, TRUE);
+}
+
 /* ui_widget.c's: a text box drawn, at the bounds its text was drawn in
 (its font and justification still set): a lobby row's player talking in
 voice chat (or muted) has a speaker just left of their name
@@ -6625,11 +7066,17 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 {
 	short row;
 
-	/* (the Mods screen's texts: the fonts and widths their lines are
-	measured in, mods_text_fits) */
+	/* (the Steam Workshop's picture) */
+	if (widget->name && !strcmp(widget->name, "steam_picture"))
+	{
+		steam_picture_draw(bounds);
+		return;
+	}
+	/* (the Mods screen's texts, and the Steam Workshop's in their places:
+	the fonts and widths their lines are measured in, mods_text_fits) */
 	for (row = 0; widget->name && row < NUMBER_OF_MOD_TEXT_BOXES; row++)
 	{
-		if (!strcmp(widget->name, mod_text_box_names[row]))
+		if (!strcmp(widget->name, mod_text_box_names[row]) || !strcmp(widget->name, steam_text_box_names[row]))
 		{
 			mods_screen.fonts[row] = draw_string_get_font();
 			mods_screen.widths[row] = (short)(bounds->x1 - bounds->x0);
@@ -6637,6 +7084,13 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 		}
 	}
 
+	/* (the lobby's game data: the font and width its author's line is measured in, lobby_line_fits) */
+	if (widget->name && !strcmp(widget->name, "lobby_game_data"))
+	{
+		lobby_data_box.font = draw_string_get_font();
+		lobby_data_box.width = (short)(bounds->x1 - bounds->x0);
+		return;
+	}
 	/* (as the lobby last updated them: the rows' widgets go with it) */
 	if (!lobby_icons.count || system_milliseconds() - lobby_icons.updated_at > 250)
 		return;
@@ -6680,6 +7134,65 @@ enum
 };
 
 static void map_vote_lobby_check(void);
+
+/* whether a line fits across the lobby's game data box, measured in its font as mods_text_fits measures (counted
+before the box is first drawn) */
+static boolean lobby_line_fits(wchar_t const *line)
+{
+	static real_argb_color const white = { 1.0f, 1.0f, 1.0f, 1.0f };
+	rectangle2d bounds;
+	rectangle2d text_bounds;
+	rectangle2d cursor;
+
+	if (lobby_data_box.font == NONE)
+		return ustrlen(line) <= LOBBY_LINE_CHARACTERS;
+	bounds.x0 = 0;
+	bounds.y0 = 0;
+	bounds.x1 = 0x3FFF;
+	bounds.y1 = 480;
+	draw_string_set_draw_mode(lobby_data_box.font, NONE, 0, 0, &white);
+	draw_unicode_string_compute_bounds(&bounds, line, &text_bounds, &cursor);
+	return MAX(text_bounds.x1, cursor.x0) - bounds.x0 <= lobby_data_box.width - MOD_TEXT_MARGIN;
+}
+
+/* the lobby panel's first line for an MCC map from the Steam Workshop, under the map's name: its author's name,
+once Steam has said (workshop_authors.c), cut short with "..." to stay one line (the box holds 7 lines, which a
+dedicated server's game already fills). The item is the one the host's game names (mcc_workshop.h), which a joiner
+still downloading the map has too; or this machine's copy's. FALSE for none */
+static boolean lobby_author_line(char const map_name[128], wchar_t *line, short size)
+{
+	struct mcc_workshop_item item;
+	char const *item_id = item.id;
+	char author[WORKSHOP_AUTHORS_NAME_SIZE];
+	wchar_t wide[WORKSHOP_AUTHORS_NAME_SIZE + 1];
+	short length, kept;
+
+	if (!mcc_level_name(map_name))
+		return FALSE;
+	if (!mcc_workshop_wire_unpack(map_name, &item))
+	{
+		short index = mcc_maps_find(map_name);
+
+		if (index == NONE)
+			return FALSE;
+		item_id = mcc_maps_item_id(index);
+	}
+	if (!workshop_authors_get(item_id, author, sizeof(author)))
+		return FALSE;
+	mods_wide_text(author, wide, NUMBEROF(wide));
+	length = (short)ustrlen(wide);
+	for (kept = length; ; kept--)
+	{
+		wide[kept] = 0;
+		line[0] = 0;
+		text_append(line, size, L"Publisher: ");
+		text_append(line, size, wide);
+		if (kept < length)
+			text_append(line, size, L"...");
+		if (!kept || lobby_line_fits(line))
+			return TRUE;
+	}
+}
 
 /* "port lobby update" */
 static void lobby_update(struct widget_instance *list)
@@ -6738,6 +7251,10 @@ static void lobby_update(struct widget_instance *list)
 		players while its director holds the countdown) */
 		boolean dedicated = lobby_joined_dedicated && !global_network_game_server_get();
 		wchar_t name[NUMBEROF(game->name) + ROW_TEXT_LENGTH];
+		/* (a Workshop map's author first, under the map's name, in the place of the empty line above the
+		countdown) */
+		wchar_t author[ROW_TEXT_LENGTH * 2];
+		boolean authored = lobby_author_line(game->map.name, author, NUMBEROF(author));
 
 		name[0] = 0;
 		if (dedicated)
@@ -6753,9 +7270,10 @@ static void lobby_update(struct widget_instance *list)
 		}
 		ustrncpy(gametype, game->variant.human_readable_game_description, NUMBEROF(gametype) - 1);
 		gametype[NUMBEROF(gametype) - 1] = 0;
-		usnprintf(text, NUMBEROF(text) - 1, L"%s%s\r\n%s\r\n%d of %d players\r\n\r\n%s", name, gametype,
+		usnprintf(text, NUMBEROF(text) - 1, L"%s%s%s%s\r\n%s\r\n%d of %d players\r\n%s%s", authored ? author : L"",
+			authored ? L"\r\n" : L"", name, gametype,
 			kind ? kind : engine_names[PIN(game->variant.game_engine_index, 0, 5)], lobby_player_count,
-			game->maximum_players,
+			game->maximum_players, authored ? L"" : L"\r\n",
 			seconds > 0 ? L"Starting in:" : game->machine_count < 2 || dedicated ? L"Waiting for players" : L"");
 		text[NUMBEROF(text) - 1] = 0;
 		if (seconds > 0)
@@ -6975,10 +7493,15 @@ static void preview_update(struct widget_instance *list)
 	visible_set(named(description, "lobby_right_item", 0), valid);
 	if (valid)
 	{
+		/* (a Workshop map's author first, as in the lobby: the advertisement names no item, so this machine's
+		copy's) */
+		wchar_t author[ROW_TEXT_LENGTH * 2];
+		boolean authored = lobby_author_line(game->map_name, author, NUMBEROF(author));
+
 		lobby_map_show(description, game->map_name);
-		usnprintf(text, NUMBEROF(text) - 1, L"%s\r\n%d of %d players\r\non %d machines",
-			game_kind_name(game->engine_type, advertised_game_kind(game), FALSE), game->player_count,
-			game->maximum_player_count, game->machine_count);
+		usnprintf(text, NUMBEROF(text) - 1, L"%s%s%s\r\n%d of %d players\r\non %d machines", authored ? author : L"",
+			authored ? L"\r\n" : L"", game_kind_name(game->engine_type, advertised_game_kind(game), FALSE),
+			game->player_count, game->maximum_player_count, game->machine_count);
 		text[NUMBEROF(text) - 1] = 0;
 		text_set_length(named(description, "lobby_game_data", 0), text, LOBBY_TEXT_LENGTH);
 		ustrncpy(name, game->game_name, NUMBEROF(game->game_name));
@@ -7560,8 +8083,8 @@ static struct gametype_option const gametype_options[] =
 	/* map sharing's (Server Setup's MAP SHARING: tools/port_settings.py's
 	MAP_SHARE_SETUP; map_share.c) */
 	{ "map_share_spinner", _option_setting, 0, 0, 2, { 0 }, "network.map_share", { "true", "false" } },
-	{ "map_share_upload_spinner", _option_setting, 0, 0, 8, { 0 }, "network.map_share_upload",
-		{ "256", "512", "1024", "2048", "4096", "8192", "16384", "20480" } },
+	{ "map_share_upload_spinner", _option_setting, 0, 0, 11, { 0 }, "network.map_share_upload",
+		{ "256", "512", "1024", "2048", "4096", "8192", "16384", "20480", "51200", "102400", "256000" } },
 	/* the vehicle options' VEHICLE RIDING, the gametype's (vehicle_riding.c) */
 	{ "vehicle_riding_spinner", _option_flag, 0, FLAG(_game_variant_vehicle_riding_bit), 2, { 1, 0 } },
 	/* vehicle options (the side's set and counts: vehicles_update) */
@@ -8544,13 +9067,19 @@ boolean pc_menu_event_function_invoke(
 		}
         else if (!strcmp(name,"port mcc share closed"))
             mcc_share_game_prompt_closed();
+        else if (!strcmp(name,"port steam init") || !strcmp(name,"port steam close"))
+            return steam_screen_reset(!strcmp(name,"port steam init"));
+        else if (!strcmp(name,"port steam choose"))
+            return steam_choose(widget);
+        else if (!strcmp(name,"port steam back"))
+            return steam_back(widget, widget_deleted);
         else if (!strcmp(name,"port mcc downloads open")) mcc_share_menu_open();
         else if (!strcmp(name,"port mcc downloads previous")) mcc_share_menu_step(-1);
         else if (!strcmp(name,"port mcc downloads next")) mcc_share_menu_step(1);
         else if (!strcmp(name,"port mcc downloads remove")) mcc_share_menu_remove();
         else if (!strcmp(name,"port mcc share download") || !strcmp(name,"port mcc share workshop") ||
-            !strcmp(name,"port mcc share cancel")) {
-            int action=!strcmp(name,"port mcc share download") ? 0 : !strcmp(name,"port mcc share workshop") ? 1 : 2;
+            !strcmp(name,"port mcc share cancel") || !strcmp(name,"port mcc share browser")) {
+            int action=!strcmp(name,"port mcc share download") ? 0 : !strcmp(name,"port mcc share workshop") ? 1 : !strcmp(name,"port mcc share browser") ? 3 : 2;
             *widget_deleted=TRUE;
             mcc_share_game_prompt_action(action);
             return TRUE;
@@ -8840,25 +9369,35 @@ void pc_menu_game_data_function_invoke(
         mcc_share_menu_text(text);
         text_set_length(widget,text,512);
     }
+    else if (!strcmp(name,"port steam update"))
+        steam_update(widget);
     else if (!strcmp(name,"port mcc downloads update")) {
         struct widget_instance *remove=named(widget,"remove",0);
         if (remove) {
             remove->visible=mcc_share_menu_can_remove();
             text_set(remove,mcc_share_menu_confirming() ? L"CONFIRM REMOVAL" : L"REMOVE SELECTED");
         }
-        if (widget->parameters.list.selected_index<1 ||
+        if (!widget->focused_child || !widget->focused_child->visible ||
+            widget->parameters.list.selected_index<1 || widget->parameters.list.selected_index>4 ||
             (widget->parameters.list.selected_index==3 && !mcc_share_menu_can_remove()))
-            widget->parameters.list.selected_index=4;
+            focus_row(widget,4);
     }
     else if (!strcmp(name,"port mcc share update")) {
         struct widget_instance *download=named(widget,"download",0);
         struct widget_instance *workshop=named(widget,"workshop",0);
+        struct widget_instance *browser=named(widget,"browser",0);
+        boolean steam=mcc_share_game_has_workshop();
+#if defined(HALO_ANDROID) || defined(HALO_WEB)
+        steam=FALSE;
+#endif
         if (download) download->visible=mcc_share_game_can_download();
-        if (workshop) workshop->visible=mcc_share_game_has_workshop();
+        if (workshop) workshop->visible=steam;
+        if (browser) browser->visible=mcc_share_game_has_workshop();
         if (widget->parameters.list.selected_index<1 ||
             (widget->parameters.list.selected_index==1 && !mcc_share_game_can_download()) ||
-            (widget->parameters.list.selected_index==2 && !mcc_share_game_has_workshop()))
-            widget->parameters.list.selected_index=mcc_share_game_can_download() ? 1 : mcc_share_game_has_workshop() ? 2 : 3;
+            (widget->parameters.list.selected_index==2 && !steam) ||
+            (widget->parameters.list.selected_index==3 && !mcc_share_game_has_workshop()))
+            focus_row(widget,mcc_share_game_can_download() ? 1 : steam ? 2 : mcc_share_game_has_workshop() ? 3 : 4);
     }
 	else if (!strcmp(name, "port mods update"))
 		mods_update(widget);

@@ -334,7 +334,7 @@ def default_settings():
         _setting("network.map_share", "boolean", True, "Hosting: send a player who joins without the game's Custom "
                  "Edition map the map.", "HALO_NET_MAP_SHARE"),
         _setting("network.map_share_upload", "integer", 1024, "Hosting: the most kilobytes a second the host sends "
-                 "of maps (16 to 20480).", "HALO_NET_MAP_SHARE_UPLOAD", low=16, high=20480),
+                 "of maps (16 to 256000).", "HALO_NET_MAP_SHARE_UPLOAD", low=16, high=256000),
         _setting("network.coop_friendly_fire", "string", "on", "Whether the players of an online co-op game hurt "
                  "each other.", "HALO_NET_COOP_FRIENDLY_FIRE", choices=["off", "on", "shields_only", "explosives_only"]),
         _setting("network.coop_ally_friendly_fire", "boolean", True, "Whether the players of an online co-op game "
@@ -374,6 +374,11 @@ def default_settings():
         _setting("server.team_start", "string", "one", "A team game: \"one\" starts with one team's players, "
                  "\"both\" waits for a player on each team, \"skip\" skips team games while one player waits.",
                  "HALO_SERVER_TEAM_START", choices=["one", "both", "skip"]),
+        _setting("server.team_switch", "boolean", True, "A player in a team game may say \"!switch\" in the chat to "
+                 "change teams (not in Infection; with auto team balance, only to the smaller team).",
+                 "HALO_SERVER_TEAM_SWITCH"),
+        _setting("server.team_switch_cooldown_seconds", "integer", 30, "Seconds a player waits after a !switch "
+                 "before another.", "HALO_SERVER_TEAM_SWITCH_COOLDOWN_SECONDS", low=0, high=3600),
         _setting("server.motd", "string", "", "A notice each machine is shown as it joins (127 characters); empty "
                  "for none.", "HALO_SERVER_MOTD"),
         _setting("server.frame_rate", "integer", 60, "Frames a second (30 to 120); the game's ticks stay 30 a second.",

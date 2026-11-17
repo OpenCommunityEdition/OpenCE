@@ -499,7 +499,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | The first-person weapon's and hands' field of view, in degrees across at 16:9, from 20 to 150. `0`: the weapon's stock view, also when `display.fov` widens the world. Refer to "Field of view". |
 | `display.viewmodel_visible` | `true` | `HALO_VIEWMODEL_VISIBLE` | `true`: the first-person weapon, hands and what is attached to them are drawn. `false`: they are not; firing, animation, sound and lights go on, and other players' models are drawn. |
 | `display.passenger_third_person` | `false` | `HALO_PASSENGER_THIRD_PERSON` | Third-person view for the Warthog's passenger and the Scorpion's four passengers. Uses the gunner's camera on the Warthog and the driver's on the Scorpion, within the passenger's firing arc. Smooth entry and exit; weapon zoom is disabled while riding. The reticle follows the shot's centre ray. Local view only. In the campaign and co-op only: not in multiplayer, where seeing around the vehicle would be an advantage. |
-| `display.viewmodel_shield` | `false` | `HALO_VIEWMODEL_SHIELD` | `true`: the energy shield's flare (its hits, its charging, its fall) is drawn on the first-person arms too, as on the body, with the unit's own shield shader, kept closer to the arms than to the body. The stock game draws it on the body only. |
+| `display.viewmodel_shield` | `false` | `HALO_VIEWMODEL_SHIELD` | `true`: the energy shield's flare (its hits, its charging, its fall) is drawn on the first-person arms too, as on the body, with the unit's own shield shader, with its final displacement limited by the arms' distance and the viewmodel field of view. The stock game draws it on the body only. |
 | `display.first_person_legs` | `false` | `HALO_FIRST_PERSON_LEGS` | `true`: your own body is drawn from the waist down in first person, so you see your legs when you look down, moving as the body's animation moves them. Refer to "Field of view". |
 | `display.shield_color` | `default` | `HALO_SHIELD_COLOR` | Your energy shield's flare as this machine draws it: `default` (the shield's own) or a multiplayer armor color (`white`, `black`, `red`, `blue`, `gray`, `yellow`, `green`, `pink`, `purple`, `cyan`, `cobalt`, `orange`, `teal`, `sage`, `brown`, `tan`, `maroon`, `salmon`), whatever the armor's, on the body and, with `display.viewmodel_shield`, on the first-person arms. The shield's own shader is drawn with its two colors replaced at their brightness; the flare is added to what is behind it, so `black` is drawn a faint grey. Only this machine sees it. |
 | `display.high_res_hud` | `true` | `HALO_HIGH_RES_HUD` | `true`: the HUD (meters, counters, panels and their outlines, the motion sensor, reticles, waypoints, scopes) is drawn from the high-res assets in `port/assets/hud`, 8x the size of the maps' bitmaps. The bitmaps with English text keep the maps' own. `false`: the maps' own bitmaps. |
@@ -537,7 +537,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.structure_culling` | `31` | `HALO_STRUCTURE_CULLING` | Which tests skip the triangles of the level (its walls, floors and terrain) that the camera cannot see before they are drawn, as bits added together: `1`, triangles outside the view; `2`, groups of triangles that all face away from the camera; `4`, single triangles that face away; `8`, smaller groups, so that more of them are skipped whole; `16`, the rooms nearest the camera first. Each test is conservative: the picture is the same, with fewer triangles drawn. `0`: the original walk, which draws every triangle of each visible room. The console's `structure_culling <bits>` changes it until the game quits, and `debug_structure_culling true` shows what was skipped (red: outside the view, blue: facing away). |
 | `display.shield_glow` | `false` | `HALO_SHIELD_GLOW` | `true`: as a unit's energy shield flares (hit, charging, falling), it lights what is around it and itself, as a plasma bolt does, in the shield shader's own color (a Spartan's gold, an Elite's blue), rising and falling with the flare seen on the body. An ordinary dynamic light of the game's, drawn with a light definition the map has (`shield_glow.c`). Up to 8 units near the camera. Video Setup's Extra Effects screen sets it. In a network game, the host's `network.shield_effects` decides, unless it is `players` (each player's own) or the game is co-op (always each player's own). |
 | `display.shield_glow_intensity` | `default` | `HALO_SHIELD_GLOW_INTENSITY` | The shield glow's reach and brightness: `default`, or `light_show` (three times as far, and at full strength from a third of the flare: a light is no brighter than full). The units glowing are those near any local player's camera, so each of a split screen's views has the same. Video Setup's Extra Effects screen sets it. In a network game, the host's `network.shield_effects` decides, unless it is `players` (each player's own) or the game is co-op (always each player's own). |
-| `display.overshield_effect` | `false` | `HALO_OVERSHIELD_EFFECT` | `true`: the overshield's flare rises up the body from the feet as it charges, with a soft edge (2 seconds, the charge's time from a full shield; 3 from a shield that was down; 2 from any other), then stays lit, whole, for as long as the overshield lasts, its energy moving at 30% of its speed, in its own color (the powerup's, 253, 78, 116), whatever shield color its player chose; the shield's own flares are not drawn over it, and its glow (`display.shield_glow`) rises and stays with it. With `display.viewmodel_shield` it comes up on the first-person arms as the rise reaches them. A hit on it plays what the projectile plays on an Elite's shield (its sound, sparks and light), when the map has that effect and it only shows and sounds. `false`: the overshield as the stock game draws it. Only this machine's drawing and sounds change (`overshield_effect.c`; the rise is a fade in the vertex shader, `d3d8_gl_set_height_fade`). Video Setup's Extra Effects screen sets it. In a network game, the host's `network.shield_effects` decides, unless it is `players` (each player's own) or the game is co-op (always each player's own). |
+| `display.overshield_effect` | `false` | `HALO_OVERSHIELD_EFFECT` | `true`: the overshield's flare rises up the body from the feet as it charges, with a soft edge (2 seconds, the charge's time from a full shield; 3 from a shield that was down; 2 from any other), then stays lit, whole, for as long as the overshield lasts, its energy moving at 30% of its speed, green above 200% shield and reddish-pink through 200%, at the shader's authored brightness, whatever shield color its player chose; the shield's own flares are not drawn over it, and its glow (`display.shield_glow`) rises and stays with it. With `display.viewmodel_shield` it comes up on the first-person arms as the rise reaches them. A hit on it plays what the projectile plays on an Elite's shield (its sound, sparks and light), when the map has that effect and it only shows and sounds. `false`: the overshield as the stock game draws it. Only this machine's drawing and sounds change (`overshield_effect.c`; the rise is a fade in the vertex shader, `d3d8_gl_set_height_fade`). Video Setup's Extra Effects screen sets it. In a network game, the host's `network.shield_effects` decides, unless it is `players` (each player's own) or the game is co-op (always each player's own). |
 | `display.model_detail` | `"stock"` | `HALO_MODEL_DETAIL` | Which level of detail (of up to five) each model is drawn at. The game measures a model by its size in the lines of its 480-line screen, at any resolution, so at 1440 lines a model three times larger than the levels were made for is drawn as the Xbox drew it. `"stock"`: as on the Xbox. `"native"`: measured in the lines of the display (not supersampling's), so more detail is kept at a distance at high resolutions, and small far models that the Xbox left out are drawn. `"highest"`: measured as `"native"` for which models are drawn, and those drawn at their most detailed level. With either, a part that has no geometry at the level chosen draws its most detailed level below that has some, and a level made for a model's inside (one for a size over 1000 pixels, as the top level of a10's cryotubes) is drawn only while the camera is inside the model. Models whose map gives one level (the trees and rocks of b30) do not change. On Android, which draws 480 lines, `"native"` is `"stock"`. |
 | `display.reversed_depth` | `true` | `HALO_REVERSED_DEPTH` | Not on Android or in a browser. `true`: the depth buffers hold 32-bit floats, reversed (1 at the near plane, 0 at the far), so that depth is about as precise far away as near. With the Xbox's 24 bits and its near plane of 0.0625 world units, surfaces a few millimetres apart (the light strips on Blood Gulch's base, 0.0016 to 0.013 world units in front of their walls, with no depth bias) are run together past some tens of world units and flicker through each other, which the Xbox's 480 lines hid. The renderer turns the game's depth around (its tests, clears, depth range and polygon offsets), and the vertex programs take the reversed depth from their projection's rows (w's row less z's), not from w - z, which would lose the precision at a distance. A z bias (decals, and lights drawn on a model, such as the Pelican's) keeps the Xbox's 24-bit depth units, added by the vertex programs: a floating-point buffer's polygon offset measures its units by the depth itself, a hundredth of the Xbox's at ten world units, and those lights sank into the hull. With either setting, a z bias's slope term is taken across the game's 480-line pixels, as on the Xbox, not across the display's smaller ones. `false`: 24 bits, as the Xbox's. Read at start. |
 | `display.hdr` | `false` | `HALO_HDR` | `true`: the back buffer that the 3D view is drawn into holds half floats (`GL_RGBA16F`) in place of 8 bits a channel, so that the light the game adds up (blended lights, glows, fog, particles) is kept past white in place of being clipped. Before the HUD and the menus, a tone mapping pass brings it back into the display's range (`display.hdr_tone_mapping`). The HUD and the menus do not change. On Android, only with a GPU that draws into half floats (OpenGL ES 3.2, `GL_EXT_color_buffer_half_float` or `GL_EXT_color_buffer_float`); otherwise off, with a line in the log. A change applies from the next frame. Video Setup's GRAPHICS screen sets it (HDR) and `display.hdr_output` (HDR DISPLAY). Refer to "HDR" in "What operates". |
@@ -615,9 +615,8 @@ the setting for one start of the game. It has priority over the file.
 | `network.fire_origins` | `true` | `HALO_NET_FIRE_ORIGINS` | Host: whether a client's reported hit that the shooter's camera had no line of sight to may still count from where the client says its player's shots leave, when that is not the camera (distributed message 93: a VR build's weapon hand, which may be past a corner the camera is behind). The hand must be within 0.4 world units of the camera, no more than 0.05 behind the eye along the line to the target, 0.2 to its side and 0.1 above it, with the line from the eye to it clear; the host logs how many hits counted only that way. `false`: from the camera and vehicles' guns only (`network_damage.c`). |
 | `network.vehicle_riding` | `false` | `HALO_NET_VEHICLE_RIDING` | Host: with `true`, a player standing on a moving vehicle is carried by it, turns with it, lands back on it after a jump and keeps its motion when stepping or jumping off; the vehicle it stands on does not hurt it. The base setting (co-op's options in Server Setup write it). In multiplayer (online, system link, split screen) the gametype's VEHICLE RIDING rule under Vehicle Options, saved with the gametype, overrides it; a gametype without the rule is off, whatever this setting says (stock gametypes and older saved ones have none). A co-op rotation entry's `riding` rule overrides it for that entry. Changes count from the next map; clients use the host's decision, including when joining mid-map, and its `debug.riding_` values. Film playback and the editor never ride. Saved games of builds before this setting are not offered or loaded. No row in the Settings menu. A map can choose for itself, winning over the base setting, the gametype and the dedicated override until the next map: with `(global boolean vehicle_riding true)` (or `false`; its value at the map's start counts, a later `set` does not), or with `(vehicle_riding true)` or `(vehicle_riding false)` in a startup script, which counts only on the map's first tick and wins over the global. The old `game.vehicle_riding` name is not read. |
 | `network.block_mouse_aim_assist` | `false` | `HALO_NET_BLOCK_MOUSE_AIM_ASSIST` | Host: Player Options > Aim Assist, Allowed or Block M+KB. Block overrides optional mouse magnetism while mouse/keyboard aims, including on the host, without changing the saved preference. Controllers and touch retain their existing behavior; bullet autoaim is unchanged. |
-| `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: send a player who joins without the game's Custom Edition map the map, and the resource maps that it needs and that the player does not have. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
-| `network.mcc_map_share` | `false` | `HALO_NET_MCC_MAP_SHARE` | SHARE MCC PACKAGES in Settings > Network Setup > Map Sharing. Host-only, explicit-list sharing of eligible local or Workshop packages; requires a gameplay fingerprint and maker in `mcc_share.txt`. Includes used package resources and recognized metadata/previews. The joiner needs Download Maps enabled and must accept the offer. See "MCC package sharing" for implementation status and limits. |
-| `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
+| `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: automatically offer CE maps and MCC packages. MCC base resources stay local to each machine; players consent before an MCC download. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
+| `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `256000`, 250 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
 | `network.map_seed` | `true` | `HALO_NET_MAP_SEED` | When you play in the game of another machine: help send its map to players who join without it. HELP SEND MAPS in Settings > Network Setup > Map Sharing. |
 | `network.map_seed_upload` | `256` | `HALO_NET_MAP_SEED_UPLOAD` | When you play in the game of another machine: the most kilobytes per second that the game sends of maps to other players (`16` to `10240`, 10 MB/s). UPLOAD LIMIT in Settings > Network Setup > Map Sharing. |
 | `network.map_download` | `true` | `HALO_NET_MAP_DOWNLOAD` | DOWNLOAD MAPS in Settings > Network Setup > Map Sharing. CE downloads from players as before; MCC permits a host offer and asks before transferring files. Off: CE leaves a missing-map game; MCC offers manual/Workshop installation and cancellation. |
@@ -648,6 +647,8 @@ the setting for one start of the game. It has priority over the file.
 | `server.empty_seconds` | `30` | `HALO_SERVER_EMPTY_SECONDS` | The seconds a game with nobody in it goes on before it ends. `0`: it does not end. A game whose last player leaves ends at once, as the game ends it. |
 | `server.idle_minutes` | `0` | `HALO_SERVER_IDLE_MINUTES` | The minutes a game goes on with no score before it ends. `0`: it does not end. |
 | `server.team_start` | `"one"` | `HALO_SERVER_TEAM_START` | A team game. `"one"`: it starts with the players of one team (the next players to join balance the teams). `"both"`: it waits, saying nothing, for a player on each team. `"skip"`: while one player waits, a team game (not one `sv_map` asked for) gives way to the rotation's next entry without teams, if it has one; checked when the lobby opens and again when its countdown would begin. |
+| `server.team_switch` | `true` | `HALO_SERVER_TEAM_SWITCH` | `true`: a player in a team game changes teams by saying `!switch` (or `!team`) in the chat; the line goes to no one, and everyone is told of the switch. Not in the postgame, co-op or Infection, and with the gametype's auto team balance only to a team with fewer players than theirs (one player bigger than the old at most after). A living player dies as they switch, no one's kill and no suicide scored. Refer to `docs/dedicated_server.md`, "Changing teams". |
+| `server.team_switch_cooldown_seconds` | `30` | `HALO_SERVER_TEAM_SWITCH_COOLDOWN_SECONDS` | The seconds a player waits after a `!switch` before another (`0` to `3600`; `0`: no wait). |
 | `server.motd` | `""` | `HALO_SERVER_MOTD` | A notice each machine sees when it joins (127 characters). Empty: none. |
 | `server.frame_rate` | `60` | `HALO_SERVER_FRAME_RATE` | The frames a second (30 to 120); the game's ticks stay at 30 a second. A server with no other machine runs 10 frames a second. |
 | `server.console`, `server.console_exit_on_eof` | `true`, `false` | `HALO_SERVER_CONSOLE`, `HALO_SERVER_CONSOLE_EXIT_ON_EOF` | `true`: the server takes commands from the standard input; it stops when the standard input ends if `server.console_exit_on_eof` is `true` (a panel can close it), after running the last line, whether or not a line's end ended it. |
@@ -719,7 +720,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.riding_enclosure_grace_ticks` | `4` | `HALO_RIDING_ENCLOSURE_GRACE_TICKS` | Calibration of `network.vehicle_riding`: how many player ticks in a row a player standing inside an enclosed vehicle (a ceiling within a jump and the vehicle's own floor under them) may miss that test while sliding about before the vehicle counts as open again, `0` to `30`; a fraction is cut off, a value that is not a number is `4`. Taken when a map or a saved game loads; in a network game a client uses the host's value. |
 | `debug.voice_test` | `false` | `HALO_VOICE_TEST` | Automatic tests of voice chat: a tone replaces the microphone, and each voice that the game hears is written to the log once each second. |
 | `debug.telnet_console`, `debug.telnet_console_port` | `false`, `2323` | `HALO_TELNET_CONSOLE`, `HALO_TELNET_CONSOLE_PORT` | The game listens on 127.0.0.1, on this port, for a script console (connect with telnet). The console has no password, so only this computer can reach it. |
-| `debug.profile_record`, `debug.profile_record_when`, `debug.profile_memory` | `false`, `"start"`, `256` | `HALO_PROFILE_RECORD`, `HALO_PROFILE_RECORD_WHEN`, `HALO_PROFILE_MEMORY` | Profiling builds only (`configure.py --profile`). Record without a command; `"start"` records from the first frame until the first map change, `"game"` records each game outside the main menu. Memory is 4Ã¢â‚¬â€œ1024 MB. Numbered `profile_<stamp>_<role>.part<n>.json` files remain in `profiles/` after recording. Refer to "Profiling builds" in the main README. |
+| `debug.profile_record`, `debug.profile_record_when`, `debug.profile_memory` | `false`, `"start"`, `256` | `HALO_PROFILE_RECORD`, `HALO_PROFILE_RECORD_WHEN`, `HALO_PROFILE_MEMORY` | Profiling builds only (`configure.py --profile`). Record without a command; `"start"` records from the first frame until the first map change, `"game"` records each game outside the main menu. Memory is 4â€“1024 MB. Numbered `profile_<stamp>_<role>.part<n>.json` files remain in `profiles/` after recording. Refer to "Profiling builds" in the main README. |
 
 
 With Mesa drivers, the game sends its GL calls through the GL thread of
@@ -736,7 +737,24 @@ See [MCC maps](../../docs/mcc_maps.md) for supported formats, resources and limi
 [MCC previews](../../docs/reading/mcc_level_previews.md) for menu discovery, and
 [browser imports](../../docs/reading/browser_imports.md) for browser storage.
 
-All map families use OpenCE network version 43. MCC content identity, sharing
+A Steam Workshop map shows its publisher: the Steam name of the account that
+published the item, who may not be the map's original maker.
+
+- The lobby: "Publisher:" and the name under the map's name, cut short with
+  "..." to stay one line. A player still downloading the map sees it too, and
+  so does the lobby of a game under way before joining it, when this machine
+  has the map.
+- The MCC map lists (multiplayer and campaign): "Publisher" and the name under
+  the map's description, which is cut short above them, and under a Workshop
+  item's folder. A collection's folder holds several makers' maps and shows
+  none.
+
+Steam is asked once a run, without signing in, so the name shows a moment
+after the map is shown, and not at all offline or in the web build (Steam
+does not answer a web page's requests).
+
+All map families use network version 44 (camera mode 32745); older peers
+cannot join, including OpenCE protocol 43 peers. MCC content identity, sharing
 consent and load-progress checks remain separate from the existing Xbox/CE paths;
 see [the network agreement](NETCODE.md#opence-network-agreement).
 
@@ -1295,13 +1313,14 @@ only invites, not listings.
 
 ### MCC package sharing
 
-MCC delivery is host-only and separate from Custom Edition sharing. The host enables **SHARE MCC PACKAGES** in Settings > Network Setup > Map
-Sharing (`network.mcc_map_share`, off by default; also
-`HALO_NET_MCC_MAP_SHARE`). It must list the exact map/used-resource SHA-256 and
-maker in the data root's `mcc_share.txt`, one line per approved identity:
-`<64 hexadecimal digits> <maker>`. The host log reports an unlisted fingerprint.
-This explicit approval does not come from a package name or a Workshop ID.
-Stock, unclassified, loose and shared-root packages are not offered.
+MCC delivery is host-only and separate from Custom Edition's transfer path.
+The existing **SHARE MAPS** setting in Server Setup > Map Sharing
+(`network.map_share`, on by default) automatically offers validated local and
+Workshop packages. No second toggle or manual approval file is required.
+The obsolete `network.mcc_map_share` setting and its environment variable no
+longer control sharing. An existing `mcc_share.txt` is read only for optional
+maker attribution; missing attribution is shown as "Not provided".
+Loose maps and the `_shared` base-resource folders are not shared packages.
 
 The joiner uses **DOWNLOAD MAPS** (`network.map_download`, on by default).
 Missing or differing content opens an offer showing size and maker; accepting
@@ -1311,12 +1330,22 @@ Workshop page when available, or install matching content manually, or cancel.
 The latest Workshop package may still differ from the host's copy; installation
 must be checked again. The prompt does not infer which version is newer.
 
+On desktop the prompt offers **OPEN IN STEAM** and **OPEN IN BROWSER**.
+The Steam action opens a fixed `CommunityFilePage` URI built from the validated
+numeric item ID. The prompt stays available so the browser action remains a
+fallback if Steam is absent or fails to navigate. Android uses the browser;
+the web build presents a browser-side click dialog. No URL opens merely
+because a host advertises an item, and the ID is not proof of provenance.
+
 The offer includes the current map and its actually used package resources,
 required recognized JSON, eligible referenced PNG previews and attribution
 files. Campaign metadata is obtained upfront; mission binaries/resources are
 obtained as needed. Unrelated resource files are omitted. A package depending
-on root/shared stock resources is refused with a host diagnostic, rather than
-silently redistributing those resources. A local dedicated-server folder needs
+on root/shared base resources can be shared: those files are omitted, and
+joiners use their own matching MCC installation or `mcc_maps/_shared` copies.
+Package resource copies matching locally installed base files are also omitted.
+The complete fingerprint still includes required base contents; missing or
+mismatched local resources prevent joining. A local dedicated-server folder needs
 no invented Workshop metadata or artwork to qualify.
 
 Each accepted download is checked in an exclusively owned staging directory,
@@ -1332,7 +1361,7 @@ The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
 not seed MCC downloads. Android requires no Steam for these files, but device
 runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
 transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
-for bounds, lifecycle and OpenCE network version **43**.
+for bounds, lifecycle and network version **44**.
 
 ### Map sharing
 
@@ -1358,8 +1387,12 @@ asked again. To keep the upload free for the game, the host sends at most
 `network.map_share_upload` (1024 KB/s: UPLOAD LIMIT in Server Setup > Map
 Sharing) and each other player at most `network.map_seed_upload` (256 KB/s:
 UPLOAD LIMIT in Settings > Network Setup > Map Sharing). Set these lower on
-a slow connection. DOWNLOAD MAPS there (`network.map_download`) turns
-downloading off: you then leave a game whose map you do not have.
+a slow connection. A download from one machine goes at most about 1 MB a
+frame (some 50 MB/s at 60 frames a second, 100 MB/s at 144), whatever the
+limit; the host's limit is shared by every download at once, so a host with
+a fast connection can choose up to 250 MB/s. DOWNLOAD MAPS there
+(`network.map_download`) turns downloading off: you then leave a game whose
+map you do not have.
 
 Maps keep their names. A game is on a map by its name (`hugeass`), and says
 which version of it by the start of the map's hash, so a game always loads
@@ -1486,7 +1519,7 @@ Only machines with the invite can find the game:
     leaving.
   So that every player can be named, the host trims the spaces around a
   name and removes characters that draw as nothing. A
-  letter with a mark is typed as the plain letter (`ban jose` for "JosÃƒÂ©").
+  letter with a mark is typed as the plain letter (`ban jose` for "JosÃ©").
   A name with nothing left to type becomes "Player", and a name that another
   player already has gets a number ("Player 2"). The game refuses a profile
   name that is blank, and a multiplayer game refuses a profile whose name was
@@ -1982,6 +2015,7 @@ Other changes:
 | `game/players.c`, `networking/network_server_manager.c` | Bots (`game/bots.c`, `bots.count`): the lobby of a local Slayer game takes the bot players, each the one player of a machine of its own that no real machine is, and every tick their actions come from `game/bots.c` instead of their empty queues. Nothing changes in a system link or internet game. |
 | `input/input_xbox.c`, `physics/collision_usage.c` | The clock is read only for a button held, and for collision tests only when their times are shown: a read of the clock is slow in a browser. |
 | `main/main.c`, `interface/hud.c`, `interface/hud_unit.c`, `interface/hud_draw.c`, `game/game_engine.c` | The text chat of network games (`game/network_chat.c`): its keys are read each frame, and the debug keys are not while a line is typed; each view's HUD draws its lines, above the motion sensor, whose place the HUD notes (the left of the last picture drawn); the scoreboard's menu has Mute voice and chat, and the host's Mute for everyone. |
+| `main/main.c`, `cutscene/cinematics.c`, `saved games/game_state.c` | While a cutscene can be skipped and the checkpoint its skip goes back to is taken, another checkpoint waits until the cutscene can no longer be skipped (`cinematic_skip_stop`) as one that is not safe would: a `game_save` gives up after as many ticks, a `game_save_totally_unsafe` at once, and a skip lets go of it. A map's script that saves every so often (Mercury Rising's `passive_saving`, a50's and b40's `general_save`) replaced the skip's checkpoint with one partway into the cutscene, and the skip played the rest of the cutscene again. |
 
 The x86 inline assembly of the game is replaced by C. Thus the compiler
 can optimize that code for each processor:

@@ -147,6 +147,9 @@ static struct {
     int stop_after_page;
     int check_result,check_polls,check_cancels,install_calls,install_ok,prepare_mode;
     int verify_heartbeats;
+    /* hash_begin's jobs: their files, polls each, cancels; a failing one */
+    char hash_paths[4][1024];
+    int hash_jobs, hash_polls[4], hash_cancels, hash_fail;
 } W;
 
 static uint32_t env_now(void *u) { (void)u; return W.clock; }
@@ -274,6 +277,31 @@ static int env_reuse(void *u, struct mcc_share_file const *file, char path[1024]
     snprintf(path,1024,"%scached/%s",J,W.reuse_missing ? "missing.map" : file->leaf);
     return 1;
 }
+/* a file hashed elsewhere: done on its third poll */
+static int env_hash_begin(void *u, char const *path)
+{
+    (void)u;
+    if (W.hash_jobs>=4) return -1;
+    snprintf(W.hash_paths[W.hash_jobs],sizeof(W.hash_paths[0]),"%s",path);
+    return W.hash_jobs++;
+}
+static int env_hash_poll(void *u, int job, uint8_t digest[32], uint64_t *size)
+{
+    struct mcc_sha256 h;
+    unsigned char *data;
+    unsigned bytes;
+    (void)u;
+    if (job<0 || job>=W.hash_jobs) exit(93);
+    if (++W.hash_polls[job]<3) return 0;
+    if (W.hash_fail) return -1;
+    data=read_file(W.hash_paths[job],&bytes);
+    if (!data) return -1;
+    mcc_sha256_begin(&h);mcc_sha256_add(&h,data,(int)bytes);mcc_sha256_end(&h,digest);
+    free(data);
+    *size=bytes;
+    return 1;
+}
+static void env_hash_cancel(void *u, int job) { (void)u;(void)job; W.hash_cancels++; }
 static void env_finished(void *u, int ok, char const *text)
 {
     (void)u;
@@ -413,6 +441,12 @@ static void entry(struct mcc_share_entry *e, int kind, char const *leaf, uint32_
     memset(e->sha256,7,32);
 }
 
+static char const *env_identity_error(void *user)
+{
+    (void)user;
+    return "Cannot read mcc_maps/_shared/multiplayer/sounds.map. Check access to this MCC resource.";
+}
+
 int main(int argc,char **argv)
 {
     unsigned i;
@@ -460,25 +494,25 @@ int main(int argc,char **argv)
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         CHECK(!strcmp(credit,"Example Maker"));
         CHECK(mcc_share_admit("mcc_maps/solar_flare/m0",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
-        /* off by default: the opt-in decides first and nothing is read from the list */
+        /* disabled sharing decides first and nothing is read from the optional list */
         CHECK(mcc_share_admit(LEVEL,0,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OFF && !credit[0]);
         /* unlisted, unknown fingerprint, other fingerprint */
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,"",0,credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,"",0,credit)==MCC_SHARE_RESULT_OK);
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,0,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
         d[0]^=1;
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         d[0]^=1;
-        /* listed without a maker: the joiner is pointed to the maker */
+        /* a missing maker is optional attribution, not an admission requirement */
         snprintf(list,sizeof(list),"%s\n",hex);
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NO_CREDIT && !credit[0]);
-        CHECK(mcc_share_admit("mcc_maps/2915693904/a10",1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NO_CREDIT && !credit[0]);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK && !credit[0]);
+        CHECK(mcc_share_admit("mcc_maps/2915693904/a10",1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK && !credit[0]);
         snprintf(list,sizeof(list),"%s Example Maker\n",hex);
-        /* Workshop origin permits an offer only with the same permission and credit. */
+        /* Workshop and local packages use the same automatic policy. */
         CHECK(mcc_share_admit("mcc_maps\\2915693904\\a10",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OK);
         CHECK(!strcmp(credit,"Example Maker"));
         CHECK(mcc_share_admit(LEVEL,0,MCC_SHARE_SIDECAR_VALID,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_OFF && !credit[0]);
-        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,"",0,credit)==MCC_SHARE_RESULT_NOT_SHAREABLE && !credit[0]);
+        CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_VALID,d,1,"",0,credit)==MCC_SHARE_RESULT_OK && !credit[0]);
         /* The remaining rules still refuse invalid origins/names and shared resources. */
         CHECK(mcc_share_admit(LEVEL,1,MCC_SHARE_SIDECAR_UNREADABLE,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
         CHECK(mcc_share_admit("mcc_maps\\loose",1,MCC_SHARE_SIDECAR_ABSENT,d,1,list,strlen(list),credit)==MCC_SHARE_RESULT_NOT_SHAREABLE);
@@ -878,7 +912,7 @@ int main(int argc,char **argv)
         for (i=0;i<5;i++) step();
         CHECK(!mcc_share_host_active(&W.host,MACHINE));                 /* the joiner's done ended it */
         CHECK(W.identity_calls==1);
-        CHECK(native_reads==16 && !native_cached_reads); /* four hashes and twelve chunk reads */
+        CHECK(native_reads==8 && !native_cached_reads); /* four hashes, and each file opened once for its chunks */
         CHECK(W.host_completions==1);
         mcc_share_host_request(&W.host,MACHINE,&W.join.terminal,sizeof(W.join.terminal));
         CHECK(W.host_completions==1); /* A replay cannot renew admission grace. */
@@ -1139,7 +1173,7 @@ int main(int argc,char **argv)
         W.reuse_mask=(1u<<MCC_SHARE_FILE_BITMAPS)|(1u<<MCC_SHARE_FILE_SOUNDS);
         if (!strcmp(argv[1],"reuse_bounded") || !strcmp(argv[1],"reuse_cancel") ||
             !strcmp(argv[1],"reuse_disconnect") || !strcmp(argv[1],"reuse_short_read")) {
-            bytes=3u*1024u*1024u+7;
+            bytes=9u*1024u*1024u+7;
             data=make_bytes(bytes,99);
             snprintf(path,sizeof(path),"%smcc_maps/solar_flare/bitmaps.map",H);
             CHECK(write_file(path,data,bytes));free(data);
@@ -1161,7 +1195,7 @@ int main(int argc,char **argv)
         if (!strcmp(argv[1],"reuse_bounded") || !strcmp(argv[1],"reuse_cancel") ||
             !strcmp(argv[1],"reuse_disconnect") || !strcmp(argv[1],"reuse_short_read")) {
             for (i=0;i<100 && !W.join.reuse_stream;i++) step();
-            CHECK(W.join.reuse_stream && W.join.stage.written==1024u*1024u);
+            CHECK(W.join.reuse_stream && W.join.stage.written==4u*1024u*1024u);
             CHECK(!W.file_requests[1] && !W.have_requests);
             snprintf(path,sizeof(path),"%scached/bitmaps.map",J);
             if (!strcmp(argv[1],"reuse_cancel") || !strcmp(argv[1],"reuse_disconnect")) {
@@ -1176,7 +1210,7 @@ int main(int argc,char **argv)
             else while (W.join.reuse_stream) {
                 uint32_t before=W.join.stage.done;
                 W.clock+=10000;step();frames++;
-                CHECK(!W.finished && W.join.stage.done-before<=1024u*1024u);
+                CHECK(!W.finished && W.join.stage.done-before<=4u*1024u*1024u);
                 CHECK(frames<10);
             }
         }
@@ -1209,6 +1243,51 @@ int main(int argc,char **argv)
                 }
             }
         }
+        return 0;
+    }
+
+    if (!strcmp(argv[1],"hashed_elsewhere") || !strcmp(argv[1],"hashed_elsewhere_fails")) {
+        W.host.env.hash_begin=env_hash_begin;
+        W.host.env.hash_poll=env_hash_poll;
+        W.host.env.hash_cancel=env_hash_cancel;
+        W.hash_fail=!strcmp(argv[1],"hashed_elsewhere_fails");
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        CHECK(run_until_finished(2000));
+        if (W.hash_fail) {
+            CHECK(!W.finished_ok && W.hash_jobs==1);
+            return 0;
+        }
+        /* each file hashed elsewhere, in turn, and the package the host's */
+        CHECK(W.finished_ok && W.hash_jobs==4 && !W.hash_cancels);
+        for (i=0;i<4;i++) CHECK(W.hash_polls[i]==3);
+        for (i=0;i<4;i++) {
+            char a[400],b[400];
+            snprintf(a,sizeof(a),"%smcc_maps/solar_flare/%s",H,names[i]);
+            snprintf(b,sizeof(b),"%smcc_maps/solar_flare/%s",J,names[i]);
+            CHECK(same_file(a,b));
+        }
+        return 0;
+    }
+
+    CASE("window") {
+        char path[400];
+        unsigned char *data;
+        unsigned bytes=1u<<20;
+        int max_outstanding=0,max_queued=0,identity_ok;
+        data=make_bytes(bytes,7);
+        snprintf(path,sizeof(path),"%smcc_maps/solar_flare/bitmaps.map",H);
+        CHECK(write_file(path,data,bytes));free(data);
+        snprintf(path,sizeof(path),"%smcc_maps/solar_flare",H);
+        identity_digest(path,W.digest,&identity_ok);CHECK(identity_ok);
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        for (i=0;i<5000 && !W.finished;i++) {
+            step();
+            if (W.join.outstanding>max_outstanding) max_outstanding=W.join.outstanding;
+            if (W.host.transfers[0].queued>max_queued) max_queued=W.host.transfers[0].queued;
+        }
+        /* every host queues 32 a transfer: as many in flight, never more */
+        CHECK(W.finished && W.finished_ok);
+        CHECK(max_outstanding==MCC_SHARE_CLIENT_WINDOW && max_queued<=MCC_SHARE_WINDOW*2);
         return 0;
     }
 
@@ -1429,6 +1508,13 @@ int main(int argc,char **argv)
         CHECK(staging_gone() && package_absent());
         snprintf(path,sizeof(path),"%smcc_maps/solar_flare",J);
         CHECK(!io_exists(path));
+        /* A local read failure survives stage cancellation and reaches the UI. */
+        W.join.env.identity_error=env_identity_error;W.finished=0;
+        CHECK(mcc_share_client_begin(&W.join,LEVEL,W.digest));
+        CHECK(run_until_finished(2000));
+        CHECK(!W.finished_ok && strstr(W.finished_text,"Cannot read") && strstr(W.finished_text,"sounds.map"));
+        CHECK(strstr(W.finished_text,"Nothing was installed") && staging_gone() && package_absent());
+        W.join.env.identity_error=NULL;
         /* a different fingerprint in the game record */
         W.identity_ok=1;W.finished=0;
         W.digest[5]^=1;

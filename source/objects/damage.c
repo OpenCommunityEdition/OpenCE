@@ -141,6 +141,7 @@ symbols in this file:
 #include "units/vehicles.h"
 #include "mcc_damage.h" /* port: port/linux/game/mcc_damage.c */
 #include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
+#include "server_team_switch.h" /* port: port/linux/game/server_team_switch.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1151,12 +1152,16 @@ static void object_damage_aftermath(
 			suicide at the same time (mcc_ui_teams.c) */
 			mcc_ui_team_respawn_damage(player_index, object_index,
 				TEST_FLAG(damage->flags, _damage_no_statistics_bit) != 0);
+			/* port: and a dedicated server's !switch's (server_team_switch.c) */
+			server_team_switch_damage(player_index, object_index,
+				TEST_FLAG(damage->flags, _damage_no_statistics_bit) != 0);
 			game_engine_player_killed(
 				player_index,
 				object_index,
 				player_index,
 				TRUE);
 			mcc_ui_team_respawn_damage(player_index, object_index, FALSE);
+			server_team_switch_damage(player_index, object_index, FALSE);
 		}
 	}
 

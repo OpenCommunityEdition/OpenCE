@@ -25,7 +25,7 @@ CASES = ["list", "admit", "manifest", "redirect", "stage_cancel", "stage_hash_an
          "reuse_missing", "reuse_backpressure", "have_fields", "done_expired", "done_cancelled",
          "verify_success", "verify_recheck", "verify_heartbeat", "verify_cancel", "verify_disconnect", "verify_timeout",
          "verify_refused", "verify_invalid", "verify_metadata_failure", "verify_receipt_failure",
-         "verify_install_failure", "verify_bind_failure"]
+         "verify_install_failure", "verify_bind_failure", "window", "hashed_elsewhere", "hashed_elsewhere_fails"]
 
 
 @pytest.fixture(scope="module")
@@ -59,7 +59,7 @@ def test_share(share_tool, tmp_path, case):
     ("if (file.size>MCC_SHARE_MAXIMUM_CREDIT_BYTES || !mcc_share_credit_allowed(name,(unsigned)strlen(name))) return 0;", "", "manifest"),
     # the host's opt-in and the rules decide before anything is offered
     ("if (!opt_in) return MCC_SHARE_RESULT_OFF;", "if (0 && !opt_in) return MCC_SHARE_RESULT_OFF;", "admit"),
-    ("package.content=listed ? MCC_SHARE_CONTENT_CUSTOM : MCC_SHARE_CONTENT_UNKNOWN;", "package.content=MCC_SHARE_CONTENT_CUSTOM;", "admit"),
+    ("package.content_known=digest_known;", "package.content_known=1;", "admit"),
     # the joiner takes only what it asked for
     ("head->offset!=share->stage.written ||", "", "hostile_chunk"),
     ("head->session!=share->session ||", "", "hostile_chunk"),
@@ -75,11 +75,17 @@ def test_share(share_tool, tmp_path, case):
      "if (!transfer->manifest_pending) {", "offer_delivery_deadline"),
     ("client_retry_terminal(share);\n    client_update(share);", "client_update(share);", "terminal_cancel"),
     ("if (kind!=MCC_SHARE_FILE_BITMAPS && kind!=MCC_SHARE_FILE_SOUNDS) return;", "(void)kind;", "have_fields"),
-    ("#define MCC_SHARE_REUSE_SLICE 0x100000u", "#define MCC_SHARE_REUSE_SLICE 0x800000u", "reuse_bounded"),
+    ("#define MCC_SHARE_REUSE_SLICE 0x400000u", "#define MCC_SHARE_REUSE_SLICE 0x1000000u", "reuse_bounded"),
     ("if (result==MCC_SHARE_CHECK_PENDING) return", "if (0 && result==MCC_SHARE_CHECK_PENDING) return", "verify_success"),
     ("cancel(stage->check_user);", "(void)cancel;", "verify_refused"),
     ("if (share->env.installed_ready && !share->env.installed_ready(share->env.user)) {",
      "if (0) {", "verify_success"),
+    # never more requests in flight than every host queues
+    ("while (share->outstanding<MCC_SHARE_CLIENT_WINDOW &&", "while (share->outstanding<MCC_SHARE_CLIENT_WINDOW+1 &&",
+     "window"),
+    # a file hashed elsewhere is waited for, and its digest taken
+    ("                if (!status) return;\n                transfer->hash_job_active=0;",
+     "                transfer->hash_job_active=0;", "hashed_elsewhere"),
 ])
 def test_negative_controls(tmp_path, before, after, case):
     """Each selected check must detect its intended fault in the real code."""

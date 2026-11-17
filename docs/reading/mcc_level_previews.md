@@ -34,6 +34,20 @@ from the root itself. There is no guessed filename or recursive image search.
 A local `mcc_maps` override resolves its own metadata even if its folder has
 the same Workshop ID as a Steam installation.
 
+Desktop local installs can retain the complete Workshop layout: copy the item
+folder into `mcc_maps` without flattening it. `mcc_local_package_path` in
+[mcc_local_package.c](../../port/linux/src/mcc_local_package.c) resolves nested
+maps and authored resources without Steam. The minimal `xbox_files.c` hook is
+needed because game loads, resource reads and dedicated servers all use the
+virtual file service. It handles only MCC package paths; Xbox and CE keep
+their existing resolution. Direct manual files win over nested copies.
+`mcc_manifest_package_root` resolves the package directory independently of
+the selected map's physical directory, keeping metadata and pictures at the
+correct root for both layouts. No new cache or persistent layout state is used.
+Virtual level names and transfer messages are unchanged; item five retains
+network protocol 44. The local-package regression tests cover both layouts,
+direct-file precedence, campaign metadata and refusal of linked nested paths.
+
 Android's folder and ZIP importer already retains PNG files and metadata
 subdirectories, while flattening the maps into the package root. Preview lookup
 is case-insensitive because imports normalize destination names. Steam is not

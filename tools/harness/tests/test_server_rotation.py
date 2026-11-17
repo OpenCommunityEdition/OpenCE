@@ -67,12 +67,17 @@ CASE_CONTROLS = {"custom-maps-case-sensitive"}
 
 def generated(fault=None):
     code = read("port/linux/src/server_rotation.c")
+    code = code.replace('#include "../game/mcc_server.h"', '#include "mcc_server.h"')
     if fault:
         code = mutated(code, *fault)
     # (the platform's headers: the test's stubs stand for what the file calls)
     stub = "/* (the test's stubs) */\n"
     return (("server_rotation.h", read("port/linux/src/server_rotation.h")), ("platform.h", stub),
-            ("port_config.h", stub), ("posix.h", stub), ("under_test.inc", code))
+            ("port_config.h", stub), ("posix.h", stub),
+            ("mcc_server.h", "/* MCC resolution is exercised by test_mcc_server.py. */\n"
+             "static void mcc_server_resolve(struct server_entry *entry) {(void)entry;}\n"
+             "static int mcc_server_maps_each(void (*each)(void *, const char *, const char *, const char *),"
+             "void *context) {(void)each; (void)context; return 0;}\n"), ("under_test.inc", code))
 
 
 @pytest.mark.parametrize("case", CASES)

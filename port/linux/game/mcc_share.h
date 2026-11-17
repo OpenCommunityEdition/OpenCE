@@ -4,9 +4,8 @@
  * and the package is installed only when it is the host's content. The Custom
  * Edition map sharing (map_share.c) is separate and unchanged.
  *
- * The host side is off unless network.mcc_map_share is on, and shares only what
- * the maintained rules (mcc_share_rules.c) and the host's own list
- * (mcc_share.txt, mcc_share_list.h) allow. */
+ * The host's network.map_share setting enables automatic package offers.
+ * MCC rules and planning retain namespace, file and resource boundaries. */
 #ifndef MCC_SHARE_H
 #define MCC_SHARE_H
 

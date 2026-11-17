@@ -21,7 +21,7 @@ int mcc_identity_accept_installed(char const name[128], unsigned char const dige
 /* A handler may take over a missing-package join. On success it owns releasing
  * the admission lease once the host confirms its transfer hold, refuses the
  * offer, or the player opts out. Queued intent must not release the hold. */
-void mcc_identity_set_missing(int (*handler)(char const name[128], unsigned char const digest[32],unsigned char const metadata[32]));
+void mcc_identity_set_missing(int (*handler)(char const name[128], unsigned char const digest[32],unsigned char const metadata[32],char const *reason));
 /* The content identity of the package this machine hosts, when level is that package. */
 int mcc_identity_host_package(char const *level, unsigned char digest[32]);
 void mcc_identity_disconnect(void);

@@ -47,6 +47,20 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
+  The camera sent is the host's first local player's. A dedicated server
+  has no local player, so while the scripts have the camera
+  (`camera_control`) its first observer films their camera as a player's
+  would (`director_unattended_scripted_camera`, director.c); before, it
+  never ran, and every client watched a cutscene from the world's origin.
+  Only the camera's values changed: no network version. A dedicated server
+  of an earlier build still sends that camera, which stays as a map's start
+  leaves an observer (at the world's origin, looking down x), where no shot
+  is. A client that gets it keeps the cutscene's view but watches the
+  cutscene's actors instead (`client_watch_cutscene`, network_coop.c): the
+  unit the host's scripts last started a custom animation on, which every
+  build sends, else its own player, framed as spectating frames a teammate
+  the scripts hold.
+
   The scripts' looping sounds (music, ambience, a cutscene's music and
   dialogue) are resent every two seconds, so a machine that joins hears
   them. The resends of one that plays once (a fake impulse looping sound)
@@ -183,7 +197,7 @@ lockstep netcode was removed, set to play it): it tells the player why.
 ## OpenCE network agreement
 
 OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
-version 43 (below, "Versions") replaces it.
+version 44 (below, "Versions") replaces it.
 Advertisements and ordinary join requests carry this one version; mismatched
 versions are rejected before admission. There is no separate MCC capability
 envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
@@ -454,6 +468,10 @@ ones, so a config change on the host waits for the next map; a co-op host's
 revert or saved-game load reads the config again, and the new values are
 sent again then. It ships with
 the rest of version 43, which stays 43.
+
+Version 44 unifies MCC offers under Map Sharing and lets a receiver satisfy
+omitted base resources with its own validated local files. Message layouts
+are unchanged; the changed sharing agreement requires matching peers.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -752,7 +770,9 @@ its name alone beside it, has its name given back as the map lists find it.
   downloading starts the others without it: the machine's players are held
   out of the game, and so is any player it asks for meanwhile (a machine
   whose download began in the lobby does not know the game has started),
-  and the machine joins the game in progress once the map is there. A
+  and the machine joins the game in progress once the map is there. Not
+  told to load, it is neither waited for nor timed out while the others
+  load, even if the map is there before they have loaded. A
   client told to start before its download is done (by a host of an earlier
   build) puts the start off until the map is there, rather than loading a
   map it does not have yet (the damaged disc error, which stops the game).
@@ -776,8 +796,13 @@ its name alone beside it, has its name given back as the map lists find it.
   others on port 5153 (of two downloading, the one of the lower machine
   connects). Each end says which files it has, whole or by piece, and tells
   the other of each piece it gets; the client asks for the rarest pieces
-  first (from a random place, so that clients ask for different pieces), two
-  at a time from each connection, sixteen in all, and the last few again of
+  first (from a random place, so that clients ask for different pieces),
+  eight at a time of the host (as many as every version sends at once: it
+  refuses more, so this needs no network version; two at a time held a
+  download from it to about 15 MB/s, a piece coming a round trip, about two
+  frames, after it is asked for), two of another player (who sends 10 MB/s
+  at most, so that a slow one holds few of the last pieces), thirty-two in
+  all, and the last few again of
   whoever is quicker. The pieces' hashes come from the host (from the
   others it named after ten seconds without them, and from the connections
   other machines made after thirty), all of them within a minute, checked
@@ -830,16 +855,16 @@ its name alone beside it, has its name given back as the map lists find it.
 
 MCC supports host-only delivery for eligible local and Workshop packages.
 It uses MCC-owned messages **103** (request) and **104** (response),
-separate from CE sharing 83-86. Every map family uses OpenCE version **43**.
+separate from CE sharing 83-86. Every map family uses network version **44** for automatic sharing and local base dependencies.
 The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
 the gameplay/resource identity and the required-JSON identity. The distributed
 header is 12 bytes, including its checkpoint epoch.
 
-- **Permission and admission.** `network.mcc_map_share` defaults off. The host
-  offers only its current map package, classified by its locally maintained
-  `mcc_share.txt`: `<gameplay SHA-256> <maker>`. Unknown content, missing credit,
-  known stock, loose maps and `_shared` are refused. Eligible Workshop and local
-  packages use the same policy. The client requires `network.map_download`
+- **Permission and admission.** The existing `network.map_share` setting
+  enables both CE and MCC sharing. MCC offers only the current validated
+  package automatically; no manual approval list is required. Loose maps and
+  `_shared` are not packages to offer. An existing `mcc_share.txt` may supply
+  optional maker attribution but cannot enable or block sharing. The client requires `network.map_download`
   (existing default on) and explicit acceptance of the size/maker prompt.
   Before acceptance it receives only an offer; it creates no stage and requests
   no file chunks. If either setting is off, the download action is absent.
@@ -850,6 +875,13 @@ header is 12 bytes, including its checkpoint epoch.
   survive that deliberate disconnect; it holds no host slot or transfer alive.
   Dismissal, another session or leaving the menu clears it. Live download
   consent still requires the current host's exact content identity.
+- **The game's start.** A machine fetching the package from the host (its
+  download prompt, then the transfer) does not hold the game's start, as a
+  Custom Edition map's downloader does not: the host leaves it and its players
+  out of the start (`network_game_server_hold_map_fetcher_players`) and it
+  joins the game in progress once it has the package. A machine still checking
+  its own copy does hold the start, until its admission ends: told to load
+  before then, it could not.
 - **Messages and bounds.** `MANIFEST` responses carry up to 16 file entries per
   page. The full offer has at most 168 entries, each with kind, a 128-byte path
   buffer, size and SHA-256. Exactly one map is required. `CHUNK` requests up to
@@ -862,8 +894,10 @@ header is 12 bytes, including its checkpoint epoch.
 - **Selected files.** `mcc_share_package_build` uses the validated resource
   selection cached by `mcc_validation_resources`; it does not scan arbitrary
   siblings. Only used package `bitmaps.map`/`sounds.map` are eligible, including
-  their resolved Workshop fallback paths. A required root/shared resource
-  refuses the offer with a host diagnostic naming the dependency. Recognized
+  their resolved Workshop fallback paths. Root/shared base resources and
+  package copies matching an installed base are omitted. Joiners must provide
+  matching local dependencies; the complete gameplay fingerprint still covers
+  their contents, and missing or mismatched resources prevent admission. Recognized
   package/campaign/mission JSON and referenced supported PNG previews travel
   with the map; `credits.txt`, `readme.txt`, `license.txt` and a valid bounded
   Workshop sidecar preserve attribution. `ModInfo.json` is parsed metadata,
@@ -913,6 +947,14 @@ or completed holds cannot be restarted by replaying `BEGIN` on the same
 connection and host revision. `READY` grants only the existing fifteen-second
 player-add grace; it does not prove that an untrusted client checked its files.
 Actual map loading still fingerprints content independently.
+
+Local validation enumerates distinct usable files only for resource types the
+map references. An explicit package override stays authoritative; an unreadable
+or invalid override reports its file error instead of trying base alternatives.
+Each distinct combination still requires the full gameplay SHA-256. An unchanged
+failed exact path is not hashed again after discovery rescans; changed files or
+required metadata permit a fresh check. These are local work and diagnostic
+changes, with no change to message layouts, fingerprint framing or version 44.
 
 After admission, synchronous MCC conversion has a separate bounded progress
 contract in `mcc_load_network.c` and `mcc_load_network_game.c`. Reliable message

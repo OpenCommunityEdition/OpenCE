@@ -18,6 +18,9 @@
 #define MCC_SHARE_LEVEL_SIZE 64
 #define MCC_SHARE_CHUNK_BYTES 3072
 #define MCC_SHARE_WINDOW 16
+/* The joiner's chunk requests in flight: every host queues MCC_SHARE_WINDOW * 2
+ * (32) of a transfer and ignores more, which stalls it, so never above that. */
+#define MCC_SHARE_CLIENT_WINDOW (MCC_SHARE_WINDOW * 2)
 #define MCC_SHARE_HOST_TRANSFERS 4
 #define MCC_SHARE_HOST_MACHINES 128
 #define MCC_SHARE_MANIFEST_PAGE 16
@@ -98,6 +101,8 @@ struct mcc_share_env {
     int (*send_request)(void *user, struct mcc_share_request const *request);
     int (*package_taken)(void *user, char const *level);         /* an installed map has this name */
     int (*identity_check)(void *user, char const *stage_dir);    /* enum mcc_share_check_result */
+    /* Optional local diagnostic retained through cancel_check until the next check. */
+    char const *(*identity_error)(void *user);
     void (*cancel_check)(void *user);                          /* release only this download's identity job */
     /* Promote the completed proof and bind the published content before DONE.
      * Failure leaves the installed package intact but refuses admission. */
@@ -118,6 +123,15 @@ struct mcc_share_env {
     /* Valid successful DONE, once after releasing its transfer slot. The
      * adapter may allow bounded time for the client's following AddPlayer. */
     void (*host_finished)(void *user, long machine);
+    /* Optional: a transfer the host gave up before offering it (the reply says only
+     * its result), and why, for the host's log. */
+    void (*host_refused)(void *user, long machine, char const *level, int result, char const *why);
+    /* Optional: a file's SHA-256 and size worked out elsewhere (the host's
+     * threads), not a slice a frame here. begin: a job, or -1 (hashed here);
+     * poll: 1 done, 0 not yet, -1 failed; cancel releases a job not done. */
+    int (*hash_begin)(void *user, char const *path);
+    int (*hash_poll)(void *user, int job, uint8_t digest[32], uint64_t *size);
+    void (*hash_cancel)(void *user, int job);
     /* joiner: the bytes free where the package will go, or 0 when that is not known */
     uint64_t (*free_bytes)(void *user);
     /* No files are written before accept. NULL retains automatic acceptance for callers
@@ -148,6 +162,15 @@ struct mcc_share_host_transfer {
     uint32_t hash_offset;
     struct mcc_sha256 hash;
     FILE *hash_stream;
+    /* hash_begin's job for the file in hand (hash_job_active: there is one),
+     * and what releases it should the transfer end first */
+    int hash_job, hash_job_active;
+    void (*hash_job_cancel)(void *user, int job);
+    void *hash_job_user;
+    /* the file being served, kept open between chunks (serve_file: its number, -1 none) */
+    FILE *serve_stream;
+    int serve_file;
+    uint32_t serve_offset;
     struct {
         uint8_t file;
         uint32_t offset, length;
@@ -206,11 +229,9 @@ struct mcc_share {
     struct mcc_share_stage stage;
 };
 
-/* The host's admission for a level: the maintained rules (mcc_share_decide, unchanged)
- * decide eligibility from the facts the game established locally; the host's list
- * (mcc_share_list.h) is the classification: the content is custom only when its exact
- * fingerprint is listed, and it is offered only with a maker to credit. Anything
- * unknown is refused. credit is the maker when the result is OK. */
+/* Host admission requires sharing enabled and a validated package identity.
+ * The optional legacy list supplies attribution, never permission or identity.
+ * credit may be empty. The package planner separately excludes base resources. */
 enum mcc_share_result mcc_share_admit(char const *level, int opt_in, enum mcc_share_sidecar sidecar,
     unsigned char const digest[32], int digest_known, char const *list, unsigned long list_length,
     char credit[MCC_SHARE_CREDIT_SIZE]);

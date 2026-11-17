@@ -113,50 +113,48 @@ Refer to [docs/custom_edition_caches.md](docs/custom_edition_caches.md).
 
 ## MCC maps
 
-OpenCE supports Halo 1 MCC Workshop maps through Steam discovery on Windows/Linux, package imports on Android, or manual installation.
-
-You still need the [Xbox game data](#a-copy-of-halo-combat-evolved-is-required). Obtain any required MCC resources from your own installed copy of Halo 1 in MCC.
+OpenCE supports Halo 1 MCC maps through Steam discovery on Windows/Linux,
+package imports on Android, and local installation. You still need the
+[Xbox game data](#a-copy-of-halo-combat-evolved-is-required) to run OpenCE.
+Obtain required MCC resources from your own installed copy of Halo 1 in MCC.
 
 ### Windows and Linux
 
-1. Subscribe to a Halo 1 MCC Workshop map or campaign and let Steam finish downloading it.
-2. Open **Settings > Network Setup > Map Sharing > MCC Packages**.
-3. Enable **STEAM DISCOVERY**. For campaign mission ordering and progression, also enable **CAMPAIGN MISSIONS**. Both are off by default.
-4. Reopen the map list. Restart OpenCE if the package is missing.
+Subscribe to a Halo 1 MCC Workshop mod and let Steam finish downloading it.
+OpenCE reads the installed package directly; Steam can be closed while playing.
+Steam discovery, campaign mission ordering and package collections are enabled
+by default. Their controls are under **Settings > Network Setup > Map Sharing >
+MCC Packages**. Reopen the map list after changing them or restart OpenCE after
+installing a new package.
 
-OpenCE reads Workshop packages directly—no copying required, and Steam can be closed while playing. Some maps also need the [shared resources](#shared-mcc-resources) below.
+If your Steam library is not detected, set `steam = 'C:\Steam'` under `[paths]`
+in `config.toml` to point to your Steam installation or library.
 
-If your Steam library is not detected, set its location under `[paths]` in `config.toml`:
+### Local installation
 
-```toml
-[paths]
-steam = 'C:\Steam'
-```
+Copy the complete folder from `steamapps/workshop/content/976730/<workshop ID>`
+into `mcc_maps`, beside `maps` and `custom_maps`. Keep its maps, JSON files,
+resources and artwork together. OpenCE reads the mod's name and supported PNG
+previews from its metadata, even with Steam discovery disabled.
+
+You can also make your own folder, such as `mcc_maps/MyMod`, and place `.map`
+files directly inside it. Keep package-supplied `bitmaps.map` and `sounds.map`
+with that package; do not mix resources from different mods. Metadata is
+optional for map-only installs, but needed for authored titles, previews and
+campaign ordering. See the [package layout guide](docs/mcc_maps.md#installation-and-menus).
 
 ### Android
 
-1. Copy the complete Workshop package folder, or a ZIP of it, to your phone. Find it on your computer under `steamapps/workshop/content/976730/<workshop ID>`.
-2. Keep its maps, resources, JSON files and artwork together.
-3. Quit OpenCE, long-press its launcher icon and select **Import MCC maps**.
-4. Choose **Workshop package**, then **Choose folder** or **Choose ZIP**, and follow the prompts.
-5. Import any required shared resources separately. Enable **CAMPAIGN MISSIONS** in MCC Packages for campaign ordering and progression.
-
-Steam is not needed on Android. See the [Android import guide](port/android/README.md#importing-mcc-packages).
-
-### Manual installation
-
-Create a folder such as `mcc_maps/MercuryRising` beside your existing `maps` and `custom_maps` folders.
-
-- Place the package’s level `.map` files directly inside it.
-- Keep any supplied `bitmaps.map` and `sounds.map` beside those levels. **Do not mix resources from different packages.**
-- Keep the package’s JSON files and PNG previews, preserving their metadata and image subfolders.
-- Enable **CAMPAIGN MISSIONS** for campaign ordering and progression.
-
-Map-only packages are valid, but copying only the maps from a complete package loses its metadata features. See the [package layout guide](docs/mcc_maps.md#installation-and-menus).
+Copy the complete Workshop folder or a ZIP of it to your phone. Quit OpenCE,
+long-press its launcher icon, choose **Import MCC maps > Workshop package**,
+and select the folder or ZIP. Import required shared resources separately.
+See the [Android import guide](port/android/README.md#importing-mcc-packages).
 
 ### Shared MCC resources
 
-Some maps need MCC’s standard resources. Copy these files once into your game data folder:
+With Steam discovery enabled, desktop builds can read required base resources
+from your installed Halo 1 MCC files. They are not copied into the mod. For
+manual setup, or when that installation is unavailable, use these locations:
 
 | File in your MCC installation | Destination in OpenCE |
 | --- | --- |
@@ -164,18 +162,24 @@ Some maps need MCC’s standard resources. Copy these files once into your game 
 | `halo1/maps/custom_edition/bitmaps.map` | `mcc_maps/_shared/multiplayer/bitmaps.map` |
 | `halo1/maps/custom_edition/sounds.map` | `mcc_maps/_shared/multiplayer/sounds.map` |
 
-**Use MCC’s files, not those from a standalone Custom Edition installation.** Steam discovery does not install these resources. On Android, use the **Singleplayer shared resources** and **Multiplayer shared resources** import options.
+Use MCC's files, not standalone Custom Edition resources. Package-supplied
+resources take priority. On Android, use the shared-resource import options.
+Self-contained maps need no shared files; missing or incompatible resources
+produce a diagnostic.
 
-Keep package-supplied resources inside their package folder; they take priority over shared resources. Self-contained maps need no shared files. OpenCE reports missing or incompatible resources when loading.
+### Hosting and sharing
 
-### MCC map support disclaimer 
+**Share Maps** in **Server Setup > Map Sharing** covers CE maps and eligible
+MCC packages automatically. MCC downloads ask for the joining player's consent
+and install separately, preserving their existing copy. Actual base resources
+are never sent: each player must provide matching local copies when required.
+A Workshop link opens Steam on desktop, with an explicit browser fallback.
+OpenCE does not update manually installed or host-downloaded packages for you.
 
-Halo 1 MCC version-13 packages use an independent loader and `mcc_maps` root.
-The stock menus support package selection, optional campaign missions, previews
-and host-only downloads when both host and client opt in. Desktop Workshop
-discovery, Android package imports and browser imports keep package resources
-separate from Xbox and Custom Edition data. Retail game data is not distributed.
-See the [MCC reading guide](docs/reading/README.md) for setup, limits and evidence.
+Dedicated servers use the same sharing setting and can host MCC multiplayer
+maps and co-op campaigns. See the [dedicated-server guide](docs/dedicated_server.md#mcc-maps).
+MCC loading remains separate from Xbox and Custom Edition loading; see
+[MCC support and limits](docs/mcc_maps.md) for details.
 
 ## Mods
 

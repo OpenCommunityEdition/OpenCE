@@ -174,7 +174,7 @@ static int receipt_read(char const *maps, struct mcc_share_io const *io,
     memcpy(receipt->item.maker,bytes+96,64);
     memcpy(receipt->item.workshop.id,bytes+160,24);
     memcpy(receipt->item.workshop.title,bytes+184,40);
-    if (!text_valid(receipt->item.source,64,1) || !text_valid(receipt->item.maker,64,1) ||
+    if (!text_valid(receipt->item.source,64,1) || !text_valid(receipt->item.maker,64,0) ||
         (!workshop_valid(&receipt->item.workshop) &&
          (receipt->item.workshop.id[0] || receipt->item.workshop.title[0]))) goto done;
     receipt->count=(int)count;
@@ -202,7 +202,7 @@ int mcc_share_storage_record(struct mcc_share_stage *stage, char const *source,
     unsigned size;
     if (!stage || stage->state!=MCC_SHARE_STAGE_STAGED || !stage->verified || !stage->owns_directory ||
         stage->count<1 || stage->count>MCC_SHARE_STAGE_FILES ||
-        !folder_valid(stage->folder) || !text_valid(maker,64,1) ||
+        !folder_valid(stage->folder) || !text_valid(maker,64,0) ||
         (workshop && !workshop_valid(workshop)) ||
         !mcc_package_name(source,canonical) || !text_valid(canonical,sizeof(canonical),1) ||
         strcmp(strrchr(canonical,'\\')+1,stage->level)) return 0;

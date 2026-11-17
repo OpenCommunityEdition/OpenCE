@@ -101,3 +101,69 @@ The `test_mcc_cache_format`, `test_mcc_resources`, `test_mcc_tag_validation`,
 synthetic data. Real package validation also needs rendering, scripts, gameplay,
 networking, unload/reload and campaign transitions. A successful conversion is
 not a completed playthrough.
+
+Local packages may keep their Workshop layout, with `ModInfo.json` at the
+package root and levels in `maps/`, or place levels directly in the package
+folder. The local resolver in
+[mcc_local_package.c](../../port/linux/src/mcc_local_package.c) preserves
+the same MCC virtual names for both layouts.
+
+Dedicated rotations dispatch MCC names through
+[mcc_server.c](../../port/linux/game/mcc_server.c), which validates MCC
+headers and enumerates the MCC catalog without changing Xbox or CE resolution.
+`mcc_server_request_rescan` queues `sv_reload` discovery until `mcc_server_update`
+runs in pregame, keeping HTTP reads and active gameplay free of rescans.
+For example, copy `mcc_maps/My Pack/arena.map`, run `sv_reload`, and refresh the
+web page in the lobby. Saving or playing that entry retains the spaces in its
+full MCC path. The HTTP command bridge calls `mcc_server_play_line` to validate
+the MCC namespace and quote that entry as one console argument. Legacy requests
+keep their established validation and command construction.
+`mcc_server_map_title` supplies the cached MCC catalog title to
+`network_game_server_list` in
+[network_server_manager.c](../../source/networking/network_server_manager.c).
+The small listing hook is needed because that shared caller otherwise strips
+every map to its filename before publishing. A Workshop level such as `2.map`
+can therefore appear as `Abyss`, while its full package path and content identity
+still govern joining. The existing listing text conversion limits the title to
+32 characters. This changes display text only, not the listing format, gameplay
+messages or protocol version. Missing MCC titles and Xbox/CE maps retain the
+existing filename fallback. The helper owns no state; catalog rescan and map
+transitions keep the existing discovery lifecycle.
+
+When installing a Workshop package manually on a dedicated server, preserve
+its `ModInfo.json` and referenced map JSON beside the flattened package's maps.
+These supply both menu titles and the metadata identity checked during joining.
+A maps-only copy does not match a complete Workshop installation, even when
+all `.map` bytes match. Prefer the Workshop item ID as the package folder name.
+
+With Map Sharing enabled, [mcc_share_package.c](../../port/linux/game/mcc_share_package.c)
+offers eligible packages automatically. Base resources stay local;
+[mcc_share_session.c](../../port/linux/game/mcc_share_session.c) validates
+the receiver's copies before publication. In
+[mcc_resource_check.inl](../../port/linux/game/mcc_resource_check.inl),
+`mcc_resources_candidates` fixes package overrides and enumerates only usable
+base files for referenced resource types. A resource-free map or a package with
+both overrides has one combination. `mcc_validation_check_step` hashes each
+distinct combination against the host's full digest and retains file-change
+checks; unreadable overrides produce a local diagnostic. The resource-selection,
+identity-candidate, sharing and server tests exercise these cases with synthetic
+files; they do not measure slow-device join times. Host downloads use separate
+folders and never replace the player's installed package. See
+[MCC installation and sharing](../mcc_maps.md) for prerequisites and limits.
+
+## Tracing a refused MCC conversion
+
+MCC refusal diagnostics resolve the original authoring tag path and add the field
+or zero-based element index plus the failed check. Start with
+[`mcc_diagnostics.c`](../../port/linux/game/mcc_diagnostics.c), then follow the
+converter named in the [complete before/after catalogue](../mcc_conversion_diagnostics.md).
+For example, `bitmaps[3]` identifies the fourth image inside the named `.bitmap`;
+sound errors include pitch-range/permutation indices and names, codec and payload
+location. Nested validation paths retain block indices. The source scenario name
+is captured before runtime renaming, and specialized bitmap copies report their
+source tag. Diagnostic state is owned and cleared by the MCC runtime.
+
+The catalogue distinguishes authored-data failures from missing resource files,
+allocation failures and damaged compiled-map headers. It also records the
+fallback when a corrupt map does not contain a safely readable tag name. These
+messages do not relax conversion checks or change Xbox/Custom Edition loading.

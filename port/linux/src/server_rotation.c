@@ -15,6 +15,7 @@ A dedicated server's rotation and gametype rules (server_rotation.h).
 #include "platform.h"
 #include "port_config.h"
 #include "posix.h"
+#include "../game/mcc_server.h"
 #endif
 
 /* ---------- the rules */
@@ -336,7 +337,7 @@ int server_rotation_parse_entry(const char *text, int length, struct server_entr
 	{
 		char *map = copy;
 		size_t map_length;
-		char prefix[12] = "";
+		char prefix[12] = "", mcc_prefix[9] = "";
 
 		while (is_space(*map))
 			map++;
@@ -358,7 +359,17 @@ int server_rotation_parse_entry(const char *text, int length, struct server_entr
 		/* (custom_maps\ in any case) */
 		if (map_length >= 12 && map[11] == '\\')
 			snprintf(prefix, sizeof(prefix), "%.11s", map);
-		if (text_equal_case(prefix, "custom_maps"))
+		/* Explicit MCC names are resolved by the MCC adapter. Bare names
+		retain their Xbox/CE lookup order. */
+		if (map_length >= 9 && map[8] == '\\')
+			snprintf(mcc_prefix, sizeof(mcc_prefix), "%.8s", map);
+		if (text_equal_case(mcc_prefix, "mcc_maps"))
+		{
+			entry->map_kind = _server_map_mcc;
+			snprintf(entry->level, sizeof(entry->level), "%s", map);
+			snprintf(entry->map_name, sizeof(entry->map_name), "%s", strrchr(map, '\\') + 1);
+		}
+		else if (text_equal_case(prefix, "custom_maps"))
 		{
 			entry->map_kind = _server_map_custom;
 			memcpy(entry->map, "custom_maps", 11);
@@ -651,6 +662,11 @@ void server_rotation_resolve(struct server_entry *entry)
 
 	if (entry->rejected[0])
 		return;
+	if (entry->map_kind == _server_map_mcc)
+	{
+		mcc_server_resolve(entry);
+		return;
+	}
 	custom_maps_folder(folder, sizeof(folder));
 	/* a name: the Xbox's map of it, else Custom Edition's */
 	if (entry->map_kind == _server_map_name)
@@ -756,6 +772,7 @@ int server_maps_each(void (*each)(void *context, const char *name, const char *l
 	count = maps_in_folder(folder, 0, each, context);
 	custom_maps_folder(folder, sizeof(folder));
 	count += maps_in_folder(folder, 1, each, context);
+	count += mcc_server_maps_each(each, context);
 	return count;
 }
 

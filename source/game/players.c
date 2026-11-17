@@ -240,6 +240,7 @@ symbols in this file:
 #include "devices/devices.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "bots.h" /* port: port/linux/game/bots.c */
+#include "server_team_switch.h" /* port: port/linux/game/server_team_switch.c */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
 #include "effects/effects.h"
@@ -613,6 +614,10 @@ void players_initialize_for_new_map(
 		sizeof(machine_to_player_table));
 	/* port: the bots of local games (port/linux/game/bots.c) */
 	bots_initialize_for_new_map();
+	/* port: a dedicated server's !switch: no cooldown or move is kept from
+	the last map, whose player indices this map's reuse
+	(server_team_switch.c) */
+	server_team_switch_initialize_for_new_map();
 
 	return;
 }

@@ -40,7 +40,7 @@ CLIENT_PORT = 0x141F
 MESSAGE_TYPE_PACKET = 3
 PACKET_VERSION = 1
 JOIN_TOKEN = b"message in a bottle"[:16]  # network_game_generate_join_game_token (DEBUG builds)
-NETWORK_VERSION = 43
+NETWORK_VERSION = 44
 SETTINGS_FRAGMENT_SIZE = 0xE00
 NONE = -1
 
