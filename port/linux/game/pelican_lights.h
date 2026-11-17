@@ -12,10 +12,11 @@ struct shader;
 
 /* ---------- prototypes */
 
-/* as an Xbox map's tags load (scenario_tags_load): the Pelican's light
-shaders noted and given the decal flag; how many were given it */
+/* as an Xbox map's tags load (scenario_tags_load), map_name its header's:
+the Pelican's light shaders noted and given the decal flag, but on a10; how
+many were given it */
 short pelican_lights_tags_loaded(
-	void);
+	char const *map_name);
 /* as any map's tags unload: none noted */
 void pelican_lights_tags_unloaded(
 	void);

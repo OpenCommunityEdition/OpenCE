@@ -8,7 +8,8 @@ against the hull with no depth bias; and the decals' bias, 8, left both cut
 through where the hull curves over them as a Pelican flies by. As a map's
 tags load lights flashing is given the flag and both are noted, and a
 model's decal drawn with either takes a bias of 32; every other shader
-keeps the one given, and nothing is noted once the tags unload.
+keeps the one given, and nothing is noted once the tags unload. On a10
+nothing is flagged or noted.
 test_pelican_lights.py takes the code from the sources (under_test.inc).
 */
 
@@ -16,6 +17,7 @@ test_pelican_lights.py takes the code from the sources (under_test.inc).
 
 #define SET_FLAG(f, b, v) ((v) ? ((f) |= (unsigned)FLAG(b)) : ((f) &= (unsigned)~FLAG(b)))
 #define NUMBEROF(array) (sizeof(array) / sizeof(array[0]))
+#define csstrcasecmp _stricmp
 
 struct shader
 {
@@ -64,18 +66,18 @@ int main(int argc, char **argv)
 	CASE("flagged")
 	{
 		shaders_reset();
-		CHECK(pelican_lights_tags_loaded() == 1, "not one changed");
+		CHECK(pelican_lights_tags_loaded("a30") == 1, "not one changed");
 		CHECK(test_shaders[0].flags == FLAG(1) && test_shaders[1].flags == FLAG(1), "flags %x and %x",
 			test_shaders[0].flags, test_shaders[1].flags);
 		CHECK(!test_shaders[2].flags, "another shader changed");
-		CHECK(pelican_lights_tags_loaded() == 0, "changed again");
+		CHECK(pelican_lights_tags_loaded("a30") == 0, "changed again");
 		return 0;
 	}
 	/* both lights biased 32, any other shader as given */
 	CASE("biased")
 	{
 		shaders_reset();
-		pelican_lights_tags_loaded();
+		pelican_lights_tags_loaded("a30");
 		CHECK(pelican_lights_zbias(&test_shaders[0].shader, 8) == 32, "lights %ld",
 			pelican_lights_zbias(&test_shaders[0].shader, 8));
 		CHECK(pelican_lights_zbias(&test_shaders[1].shader, 8) == 32, "lights flashing %ld",
@@ -89,13 +91,27 @@ int main(int argc, char **argv)
 	CASE("other maps")
 	{
 		shaders_reset();
-		pelican_lights_tags_loaded();
+		pelican_lights_tags_loaded("a30");
 		pelican_lights_tags_unloaded();
 		CHECK(pelican_lights_zbias(&test_shaders[1].shader, 8) == 8, "kept after the tags unloaded");
 		shaders_reset();
 		test_map_has_lights = FALSE;
-		CHECK(pelican_lights_tags_loaded() == 0, "changed with no such shaders");
+		CHECK(pelican_lights_tags_loaded("a30") == 0, "changed with no such shaders");
 		CHECK(pelican_lights_zbias(&test_shaders[0].shader, 8) == 8, "biased with no such shaders");
+		return 0;
+	}
+
+	/* a10: as the tags have them */
+	CASE("first level")
+	{
+		shaders_reset();
+		CHECK(pelican_lights_tags_loaded("a10") == 0, "changed on a10");
+		CHECK(!test_shaders[1].flags, "lights flashing flagged on a10");
+		CHECK(pelican_lights_zbias(&test_shaders[0].shader, 8) == 8, "lights biased on a10");
+		CHECK(pelican_lights_zbias(&test_shaders[1].shader, 8) == 8, "lights flashing biased on a10");
+		shaders_reset();
+		CHECK(pelican_lights_tags_loaded("b30") == 1 && pelican_lights_zbias(&test_shaders[1].shader, 8) == 32,
+			"b30 unchanged");
 		return 0;
 	}
 

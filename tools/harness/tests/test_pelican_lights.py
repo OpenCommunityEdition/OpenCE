@@ -2,7 +2,7 @@
 shader has no decal flag, so its lights were tested against the hull with no depth bias, and the decals' bias of 8
 left both light shaders cut through where the hull curves over them as a Pelican flies by (a30's and b30's
 extractions). lights flashing is made a decal as the tags load, and a model decal drawn with either shader is biased
-32; every other shader keeps its bias."""
+32; every other shader keeps its bias. a10, whose hangar Pelicans are left as on the Xbox, is not changed."""
 
 import re
 import sys
@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["flagged", "biased", "other maps"]
+CASES = ["flagged", "biased", "other maps", "first level"]
 
 SOURCE = "port/linux/game/pelican_lights.c"
 
@@ -27,6 +27,10 @@ NEGATIVE_CONTROLS = {
     "any-shader": (("\t\tif (shader == pelican_lights_shaders[index])", "\t\tif (TRUE)"), "biased"),
     # noted after the tags unload
     "kept": (("\t\tpelican_lights_shaders[index] = NULL;\n", ""), "other maps"),
+    # a10 changed too
+    "a10-too": (("map_name && !csstrcasecmp(map_name, PELICAN_LIGHTS_UNCHANGED_MAP)", "FALSE"), "first level"),
+    # every map left
+    "no-map": (("map_name && !csstrcasecmp(map_name, PELICAN_LIGHTS_UNCHANGED_MAP)", "map_name"), "first level"),
 }
 
 
@@ -48,7 +52,8 @@ def generated(fault=None):
 def test_wired():
     """An Xbox map's tags loaded and any map's unloaded call it, and a model's transparent decal takes its bias."""
     cache = read("source/cache/cache_files.c").replace("\r\n", "\n")
-    assert cache.index("pelican_lights_tags_loaded();") > cache.index("longsword_exhaust_tags_loaded();")
+    assert cache.index("pelican_lights_tags_loaded(") > cache.index("longsword_exhaust_tags_loaded();")
+    assert "pelican_lights_tags_loaded(cache_file_globals.header.name);" in cache
     assert "pelican_lights_tags_unloaded();" in function(cache, "scenario_tags_unload")
     transparent = read("source/rasterizer/xbox/rasterizer_xbox_transparent_geometry.c").replace("\r\n", "\n")
     assert ("shader_is_decal(group->shader) ?\n"

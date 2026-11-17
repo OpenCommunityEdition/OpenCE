@@ -8,19 +8,20 @@ shader with the decal flag is drawn right after the model, over its hull,
 with the decals' depth bias (D3DRS_ZBIAS, 8: rasterizer_xbox_transparent_
 geometry.c); one without is tested against the hull as it is. The tags give
 lights the flag and lights flashing none, so its lights won or lost
-against the hull by the last bits of depth, and one of a10's hangar
-Pelicans showed none. And where the hull curves away from the disks, seen
-at an angle as a Pelican takes off or flies by (the extractions at the end
-of a30 and b30), the hull rose over them by more than the bias: the lights
-were cut through and sank in, on the Xbox too.
+against the hull by the last bits of depth. And where the hull curves away
+from the disks, seen at an angle as a Pelican takes off or flies by (the
+extractions at the end of a30 and b30), the hull rose over them by more
+than the bias: the lights were cut through and sank in, on the Xbox too.
 
 As an Xbox map's tags load (scenario_tags_load), lights flashing is given
 the decal flag, and both shaders are noted: drawn with the model, they are
 biased PELICAN_LIGHTS_ZBIAS (pelican_lights_zbias), four times the decals',
 so that they lie whole over the hull at any angle (a30's take-off, traced,
 was cut at 8 and 16 and whole at 32 and 64). Nothing else's bias changes.
-A map whose shaders are named otherwise is left as it is. Only the drawing
-changes, nothing played or sent between machines.
+a10 (PELICAN_LIGHTS_UNCHANGED_MAP) is left as the tags have it, so that the
+Pelicans in its first cutscene's hangar, which sit still, are lit as on the
+Xbox. A map whose shaders are named otherwise is left as it is too. Only
+the drawing changes, nothing played or sent between machines.
 */
 
 /* ---------- headers */
@@ -39,6 +40,8 @@ changes, nothing played or sent between machines.
 #define PELICAN_LIGHTS_DECAL_BIT 1
 /* their depth bias, in the Xbox's z bias units (the decals' is 8) */
 #define PELICAN_LIGHTS_ZBIAS 32
+/* the map (its header's name) whose Pelicans keep the tags' lights */
+#define PELICAN_LIGHTS_UNCHANGED_MAP "a10"
 
 /* ---------- structures */
 
@@ -65,14 +68,16 @@ static struct shader const *pelican_lights_shaders[NUMBEROF(pelican_lights_shade
 /* ---------- public code */
 
 short pelican_lights_tags_loaded(
-	void)
+	char const *map_name)
 {
 	short changed = 0;
 	short index;
 
 	for (index = 0; index < NUMBEROF(pelican_lights_shader_names); index++)
 	{
-		long shader_index = tag_loaded(PELICAN_LIGHTS_TAG, pelican_lights_shader_names[index]);
+		long shader_index = map_name && !csstrcasecmp(map_name, PELICAN_LIGHTS_UNCHANGED_MAP) ?
+			NONE :
+			tag_loaded(PELICAN_LIGHTS_TAG, pelican_lights_shader_names[index]);
 		struct pelican_lights_chicago *chicago = shader_index != NONE ?
 			(struct pelican_lights_chicago *)tag_get(PELICAN_LIGHTS_TAG, shader_index) :
 			NULL;

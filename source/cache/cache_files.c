@@ -1443,11 +1443,11 @@ long scenario_tags_load(
 				longsword_exhaust_tags_loaded();
 			}
 			/* port: the Pelican's running lights drawn whole over its hull, as
-			its decals (port/linux/game/pelican_lights.c) */
+			its decals, but on a10 (port/linux/game/pelican_lights.c) */
 			{
-				extern short pelican_lights_tags_loaded(void);
+				extern short pelican_lights_tags_loaded(char const *map_name);
 
-				pelican_lights_tags_loaded();
+				pelican_lights_tags_loaded(cache_file_globals.header.name);
 			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
