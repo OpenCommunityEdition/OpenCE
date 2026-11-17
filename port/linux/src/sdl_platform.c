@@ -1947,7 +1947,7 @@ static void platform_invite_clipboard(BOOL look)
 			snprintf(seen, sizeof(seen), "%s", text);
 			/* (a link, not a bare code: 64 hex digits alone are as often a
 			checksum copied for something else) */
-			if (platform_text_has_invite_link(text) && p2p_join_invite(text))
+			if (platform_text_has_invite_link(text) && (p2p_mm_cancel(), p2p_join_invite(text)))
 			{
 #ifdef HALO_ANDROID
 				SDL_ShowAndroidToast("Joining the invite on the clipboard", 1, -1, 0, 0);
