@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/screen" type="column_list" width="640" height="480" bitmap="bitmaps/gradient" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<on event="created" run="port mcc downloads open"/>
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<data input="port mcc downloads update"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/description" x="40" y="80"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/previous" x="40" y="300"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/next" x="340" y="300"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/remove" x="195" y="340"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/back" x="195" y="390"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/title" x="40" y="24"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/title" type="text" width="560" height="40" text="MCC DOWNLOADS" font="ui\large_ui" color="#FF2896FF">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/description" type="text" controller="1" width="560" height="210" font="ui\small_ui" color="#FFFFFFFF">
+		<data input="port mcc downloads text"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/previous" type="text" width="250" height="32" text="PREVIOUS" font="ui\large_ui" color="#FF2896FF" align="center">
+		<on event="a" run="port mcc downloads previous"/>
+		<on event="start" run="port mcc downloads previous"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/next" type="text" width="250" height="32" text="NEXT" font="ui\large_ui" color="#FF2896FF" align="center">
+		<on event="a" run="port mcc downloads next"/>
+		<on event="start" run="port mcc downloads next"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/remove" type="text" width="250" height="32" font="ui\large_ui" color="#FF2896FF" align="center">
+		<on event="a" run="port mcc downloads remove"/>
+		<on event="start" run="port mcc downloads remove"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/mcc_downloads/back" type="text" width="250" height="32" text="BACK" font="ui\large_ui" color="#FF2896FF" align="center">
+		<on event="a" back="true"/>
+		<on event="start" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

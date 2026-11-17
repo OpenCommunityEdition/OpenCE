@@ -54,6 +54,12 @@ change it) */}}
 {{- if not (kindIs "invalid" .Values.server.masterPublish) }}
 {{- $env = append $env (dict "name" "HALO_SERVER_MASTER_PUBLISH" "value" (toString .Values.server.masterPublish)) }}
 {{- end }}
+{{- if not (kindIs "invalid" .Values.server.vehicleRidingOverrideGametype) }}
+{{- $env = append $env (dict "name" "HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE" "value" (toString .Values.server.vehicleRidingOverrideGametype)) }}
+{{- end }}
+{{- if not (kindIs "invalid" .Values.network.vehicleRiding) }}
+{{- $env = append $env (dict "name" "HALO_NET_VEHICLE_RIDING" "value" (toString .Values.network.vehicleRiding)) }}
+{{- end }}
 {{- if .Values.server.password.existingSecret }}
 {{- $env = append $env (dict "name" "HALO_SERVER_PASSWORD" "valueFrom" (dict "secretKeyRef" (dict "name" .Values.server.password.existingSecret "key" .Values.server.password.key))) }}
 {{- else if .Values.server.password.value }}

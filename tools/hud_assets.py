@@ -884,9 +884,9 @@ def build(arguments) -> None:
     names = {f"{entry['name']}.png" for entry in description["assets"]}
     # Other map families own their layouts and generated pictures. A native
     # rebuild must not treat their independently generated atlases as stale.
-    ce_layout = ASSETS / "ce_layout.json"
-    if ce_layout.is_file():
-        names.update(f"{entry['name']}.png" for entry in json.loads(ce_layout.read_text())["assets"])
+    for listing in ("ce_layout.json", "mcc_layout.json"):
+        if (ASSETS / listing).is_file():
+            names.update(f"{entry['name']}.png" for entry in json.loads((ASSETS / listing).read_text())["assets"])
     for stale in ASSETS.glob("*.png"):
         if stale.name not in names:
             stale.unlink()

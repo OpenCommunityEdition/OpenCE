@@ -65,6 +65,37 @@ none), `open` whether it takes players now.
 The release has a `halo-server` script beside `halo`, which runs
 `halo --server` with its arguments.
 
+## MCC maps
+
+Use the same executable and `--server` workflow with an explicit MCC namespace:
+
+```toml
+[server]
+rotation = 'mcc_maps\2898867177\Lava_Lab:slayer, mcc_maps\a10:coop'
+rotation_fallback = false
+```
+
+Install local maps/packages under the data root's `mcc_maps`, or enable
+`game.workshop_maps` to discover this machine's installed MCC Workshop items.
+An intact copied Workshop folder (`mcc_maps/<id>/maps/<level>.map`) and a
+manual package (`mcc_maps/<package>/<level>.map`) both use the rotation name
+`mcc_maps\<package>\<level>`: do not add the physical `maps` subfolder.
+Local packages work with Steam discovery disabled. Keep their metadata and
+authored resources together; the server resolves the same layout as clients.
+Campaign maps require `coop`; multiplayer maps require a multiplayer gametype.
+The MCC adapter checks version-13 headers without routing them through Xbox
+or CE loaders. Resource/content validation still occurs before gameplay.
+Base dependencies must be installed locally on the server and each player.
+The server still needs Xbox `maps/ui.map` for its menus.
+
+`sv_maps` and the web map picker include MCC multiplayer and campaign entries
+with kind `mcc` and their package identity. The MCC catalog is cached during
+server operation; restart after adding or removing local packages. Use `sv_map mcc_maps\2898867177\Lava_Lab slayer` for an immediate
+change. Rotations and voting preserve explicit MCC paths; bare map names keep
+their existing Xbox/CE lookup order. `network.map_share` automatically offers
+eligible MCC packages with custom resources, metadata and previews, excluding
+base resources. See [MCC package sharing](../port/linux/README.md#mcc-package-sharing).
+
 ## Exit codes and signals
 
 | Code | Meaning |
@@ -164,7 +195,7 @@ the game's console commands of those names.
 | `sv_masters`, `sv_publisher` | viewer | The master servers and how each answered; the publisher key's id and public key (never its seed) |
 | `say <text>` (`sv_say`) | moderator | A notice on every machine's screen |
 | `tell <player> <text>` | moderator | A notice on one player's machine |
-| `kick <player>` (`sv_kick`) | moderator | Drops the player's machine; it may join again |
+| `kick <player>` (`sv_kick`) | moderator | Drops the player's machine; it may join again. A player still in the game whose machine has gone is taken out (a ban of one is refused: there is nothing to ban) |
 | `ban <player> [<duration>] [<reason>]` (`sv_ban`) | moderator (a day at most), admin | Drops the player's machine and bans its address and hardware id, for the duration (else for ever). A moderator must give a duration of a day or less: a ban for ever, or longer, is refused |
 | `unban <number\|address\|hardware id>` (`sv_unban`) | admin | Takes a ban out of `bans.txt`; the machine may join again at once, by the LAN or the internet |
 | `sv_ban_address <address\|hardware id\|discord:<id>> [<duration>] [<reason>]` | admin | Bans an IPv4 address (`a.b.c.d`), a hardware id (up to 32 hex digits) or a verified Discord account (`discord:` and its id, below), its machine here or not: its line in `bans.txt` as `ban` writes it (the other part `none`), so that `sv_bans`, `unban` and `GET /api/bans` see it, and a machine present of that address or hardware id is dropped as `ban` drops it (`player_left`'s reason `banned`). Answers `ban <n> added` (`n`: its number in `sv_bans`) |
@@ -217,7 +248,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.name`, `server.max_players`, `server.min_players`,
 `server.password`, `server.public`, `server.rotation_fallback`,
 `server.lobby_seconds`, `server.postgame_seconds`, `server.empty_seconds`,
-`server.idle_minutes`, `server.team_start`, `server.motd`,
+`server.idle_minutes`, `server.team_start`, `server.team_switch`,
+`server.team_switch_cooldown_seconds`, `server.motd`,
 `server.frame_rate`, `server.web_password`,
 `server.web_moderator_password`, `server.log_format`,
 `server.log_addresses`, `server.status_file`, `server.auto_update`,
@@ -230,7 +262,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `server.update_game_minutes`, `server.max_machines_per_address`,
 `server.afk_kick_minutes`, `server.afk_kick_when_full`,
 `server.afk_kick_full_minutes`, `server.coop_bsp_switch`,
-`server.coop_bsp_switch_cooldown_seconds`, `server.map_vote`,
+`server.coop_bsp_switch_cooldown_seconds`,
+`server.vehicle_riding_override_gametype`, `server.map_vote`,
 `server.map_vote_choices`, `server.map_vote_seconds`, and
 `network.text_chat`,
 `network.voice_lobby`, `network.voice_mode`, `network.voice_kbps`,
@@ -239,8 +272,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `network.votekick_ban_minutes`, `network.map_share`,
 `network.map_share_upload`, `network.public_address`,
 `network.coop_friendly_fire`, `network.coop_player_collisions`,
-`network.coop_ally_friendly_fire`, `network.coop_team_wipe`, `network.shield_effects` and
-`network.fire_origins`. Of them,
+`network.coop_ally_friendly_fire`, `network.coop_team_wipe`, `network.shield_effects`,
+`network.fire_origins` and `network.vehicle_riding`. Of them,
 `server.status_file`, `server.auto_update` and `server.log_addresses` need
 the owner role: from the web's admin, `sv_set` of one of them (`POST
 /api/command`) answers `403 forbidden`, and `PUT /api/settings` leaves it
@@ -261,6 +294,7 @@ in either case, and is kept as the table spells it:
 | `server.empty_seconds`, `server.idle_minutes` | 0 or more |
 | `server.frame_rate` | 30 to 120 |
 | `server.team_start` | `one`, `both`, `skip` |
+| `server.team_switch_cooldown_seconds` | 0 to 3600 |
 | `server.log_format` | `text`, `json` |
 | `server.auto_update` | `off`, `check`, `install` |
 | `server.coop_difficulty` | `easy`, `normal`, `hard`, `impossible` |
@@ -285,10 +319,11 @@ in either case, and is kept as the table spells it:
 | `network.votekick_percent` | 1 to 100 |
 | `network.votekick_minutes` | 0 to 60 |
 | `network.votekick_ban_minutes` | 1 to 1440 |
-| `network.map_share_upload` | 16 to 20480 |
+| `network.map_share_upload` | 16 to 256000 |
 | `network.coop_friendly_fire` | `off`, `on`, `shields_only`, `explosives_only` |
 | `network.coop_team_wipe` | `auto`, `revert`, `respawn` (`auto`: a public server, `server.public` with internet play, only respawns the team) |
 | `network.shield_effects` | `stock`, `glow`, `light_show`, `overshield`, `glow_overshield`, `light_show_overshield`, `players` |
+| `network.vehicle_riding`, `server.vehicle_riding_override_gametype` | `true`, `false` (from the next map) |
 
 A dedicated server may also keep words out of its chat and its players'
 names (`server.chat_filter`, off by default): the words of streamer mode's
@@ -353,6 +388,63 @@ held. After a switch the zones wait `server.coop_bsp_switch_cooldown_seconds`
 (15) before another, the players told when they open; each switch is told
 to everyone, logged and a `coop_bsp_switch` event names who crossed.
 
+### Vehicle riding
+
+`network.vehicle_riding` is the base setting. In multiplayer the
+gametype's `vehicle_riding` rule ("Gametype files", below) overrides it:
+a gametype without the rule is off, whatever the base says. In co-op a
+rotation entry's own `riding` rule overrides it.
+`server.vehicle_riding_override_gametype = true` turns the gametype's
+override off, so multiplayer uses the base setting.
+Both settings default to `false`; changes through `sv_set` or the web
+page count from the next map. A map's own choice still wins.
+
+For example (a co-op entry's own rule and a map's choice still win):
+
+| `network.vehicle_riding` | `server.vehicle_riding_override_gametype` | Riding |
+| --- | --- | --- |
+| `true` | `false` | On in co-op; multiplayer follows each gametype |
+| `false` | `true` | Off in multiplayer (unless a map turns it on) |
+| `true` | `true` | On in co-op and multiplayer (unless a map turns it off) |
+
+### Changing teams
+
+In a team game a player changes their own team by saying `!switch` (or
+`!team`) in the chat, the whole line, in either case. The line goes to no
+one, not even when the player is muted: the server moves them, and everyone
+sees "Guven switched to the Blue team", or tells them alone why not. The
+server decides, and moves a player only
+
+- with `server.team_switch` on (the default);
+- while a team game is played: not in the postgame, nor in a game without
+  teams ("!switch works only in team games"), nor in co-op, nor in
+  Infection, whose teams are its roles ("Infection decides the teams");
+- once in `server.team_switch_cooldown_seconds` (30; 0: no wait), each player
+  ("You can switch teams again in 12 seconds");
+- with the gametype's auto team balance on (`balance` in a gametype file),
+  to a team that has fewer players than theirs, them counted: the new team
+  is then one player bigger than the old at most. 5 against 4 may become 4
+  against 5, but 4 against 4 stays ("Blue has 4 players, Red 4: that would
+  unbalance the teams"). With the balance off, a player may switch whatever
+  the numbers.
+
+A living player dies as they switch, a death no one is credited with: no
+suicide is scored and no kill counted, what they carry (a flag, the ball)
+drops, and they respawn on the new team after the gametype's respawn time
+(and its suicide penalty). They join the new team as they die, once what
+they carried has dropped, never while they still hold it; if another
+player kills them first, the kill is that player's and the switch is made
+all the same. While a switch waits for its death, the auto team balance's
+rule counts the player in the new team. A dead player changes team at once,
+and their respawn goes on as it was. The cooldowns start again with each
+map. The team scores stay as they were, the points a player scored staying with the
+team they scored them for, and the player's own score goes with them.
+Every machine sees the new team with the player's next life, as it does the
+auto team balance's moves, so a client of any network version takes it.
+Each switch is logged (`player`: `Guven switched to the Blue team
+(!switch)`); there is no event for it, as there is none for the auto team
+balance's moves.
+
 ### Updates
 
 `server.auto_update` is `install` by default (the Docker image's, `check`:
@@ -384,7 +476,8 @@ once, and joins. `server.vpn_policy`, live:
 | `off` | joins |
 
 The server fetches the netlist of each master it publishes to (the masters
-of `server.masters_file`) every hour, keeps the newest of each on disk
+of `server.masters_file`, or every built-in official master when it names
+none) every hour, keeps the newest of each on disk
 (`netlist-<master key id>.bin` beside `bans.txt`) and checks the union of
 them. Until it holds one, `server.vpn_fail` decides: `open` (the default)
 lets every machine in, `closed` refuses those from the internet as
@@ -569,7 +662,7 @@ are checked in all. `/api/login` takes `POST` alone (any other method:
 | `GET /api/gametypes/{name}` | viewer | `{"ok":true,"name":…,"text":"<the TOML>"}` |
 | `PUT /api/gametypes/{name}` | admin | `{"text":"<TOML>"}` → `{"ok":true}`, or `400 invalid` with `line` and `message` (a name is `a`–`z`, `0`–`9`, `_` and `-`, 32 at most) |
 | `DELETE /api/gametypes/{name}` | admin | `{"ok":true}` |
-| `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox` or `custom`; `title` is the map's display name, else its `name`) |
+| `GET /api/maps` | viewer | `{"ok":true,"maps":[{"name":"bloodgulch","level":"levels\\test\\bloodgulch\\bloodgulch","kind":"xbox","title":"Blood Gulch"}…]}` (`kind`: `xbox`, `custom` or `mcc`; `title` is the map's display name, else its `name`) |
 | `GET /api/bans` | admin | `{"ok":true,"bans":[{"n":0,"when":"2026-10-19 18:00:00","ip":"…","hwid":"…","discord_id":"…","discord_verified":true,"players":"…","reason":"…","until":<unix>\|null}…]}` |
 | `GET /api/vpn` | viewer | `{"ok":true,"policy":"link","fail":"open","lists":[{"master":"<url>","key_id":"…","serial":12,"generated":<unix>,"fetched":<unix>\|null,"ranges":30582,"error":""}…],"file":"<server.vpn_list>","allow_ranges":0,"block_ranges":0,"held":true,"refused":{"vpn_link_required":0,"vpn_blocked":0,"vpn_link_invalid":0,"vpn_link_too_new":0,"vpn_link_in_use":0}}` (`held`: a list is held, from a master or the file) |
 | `POST /api/vpn/check` | moderator | `{"ip":"203.0.113.5"}` → `{"ok":true,"listed":true,"by":"netlist"}` (`by`: `netlist`, `vpn_block.txt`, `vpn_allow.txt`, or `""`) |
@@ -820,6 +913,10 @@ a rotation that long is saved whole and read back after a restart.
   value it takes; a rule of another game engine than the gametype's is
   refused. 48 rules at most; a rule given twice is the last.
 
+A co-op entry's `riding` rule (`a10:coop+riding=true` or `=false`)
+overrides `network.vehicle_riding` for that entry only. An entry without
+it uses the setting; a map's own choice still wins over both.
+
 An entry that cannot be played (a map that is not there, a bad gametype
 file, a rule out of range) is left out with a warning, at the start and at
 `sv_reload`; `sv_rotation_set` and `PUT /api/rotation` change nothing when
@@ -831,6 +928,12 @@ played last, found again in the new list (the first entry only when none
 has been played yet). `sv_reload` takes the rotation again when its text
 changed, and also when only its entries' rejections changed (a map or a
 gametype file added or taken out since).
+
+`sv_reload` also requests an MCC catalog refresh. It runs on the next pregame
+frame, or after the current game returns to the lobby; it never rescans during
+gameplay or loading. Refresh the web page after that point to see newly copied
+MCC packages. Ordinary `/api/maps` requests reuse the catalog. Xbox and Custom
+Edition map enumeration is unchanged.
 
 `server.team_start` decides how a team game starts. `one` (the default)
 starts it with the players of one team. `both` waits, saying nothing,
@@ -874,6 +977,12 @@ A gametype a player's game saved is played with `file=<name>`: copy the
 saved gametype, as `<name>.gametype`, into the same `gametypes` folder
 (beside `config.toml` if there is one, else the data root's).
 
+`vehicle_riding` under `[universal]` is a boolean: `true` lets players
+standing on a moving vehicle ride along with it; no rule means off.
+Stock gametypes and older saved ones have it off. In rotation entries its
+short name is `riding` (`bloodgulch:ctf+riding=true`). The dedicated
+override and a map's own choice take precedence ("Vehicle riding", above).
+
 ## The listing
 
 A public server (`server.public`, with `network.online` and
@@ -898,7 +1007,7 @@ lists;
 | `gametypes/<name>.toml` | Gametype files: the `gametypes` folder beside `config.toml` if there is one, else the data root's |
 | `gametypes/<name>.gametype` | Gametypes saved by a player's game (`file=<name>` in the rotation): the same `gametypes` folder |
 | `publisher.key` | The publisher key for the master servers (beside `config.toml`). On Windows, a server's `config.toml` and `publisher.key` are given an access list of their owner alone (the entries inherited for Administrators and SYSTEM taken out) |
-| `masters.txt` | The master servers (`server.masters_file`: beside `config.toml`, else beside the executable); one that names none leaves the official master, built in |
+| `masters.txt` | The master servers (`server.masters_file`: beside `config.toml`, else beside the executable); one that names none leaves the official masters, built in: the server publishes to each, checks addresses against all their netlists and takes passes any of them signed (`docs/master_protocol.md`) |
 | `bans.txt`, `cheaters.txt`, `debug.txt` | In `paths.logs`, else the data root |
 | `vpn_allow.txt`, `vpn_block.txt`, `netlist-<master key id>.bin` | Beside `bans.txt`: ranges never refused as a VPN's, ranges refused besides, and the masters' netlists held ("VPNs and linked Discord accounts") |
 | `status.json` (`server.status_file`) | The status, written every 2 seconds |

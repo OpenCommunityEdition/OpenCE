@@ -78,6 +78,9 @@ their handlers open opens.
 #include "main/main.h"
 #include "networking/network_game_manager.h"
 #include "saved games/player_profile.h"
+#include "bitmaps/bitmap_group.h"
+#include "bitmaps/bitmaps.h"
+#include "rasterizer/xbox/rasterizer_xbox_hardware_bitmaps.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
@@ -85,7 +88,16 @@ their handlers open opens.
 #include "halo_menus.h"
 #include "controller_remap.h"
 #include "custom_edition_cache.h"
+#include "mcc_ui.h"
+#include "mcc_pause.h"
 #include "custom_edition_maps.h"
+#include "mcc_maps.h"
+#include "mcc_progress.h"
+#include "mcc_menu_text.h"
+#include "mcc_share.h"
+#include "mcc_share_menu.h"
+#include "mcc_cache.h"
+#include "mcc_workshop.h"
 #include "game_modes.h"
 #include "network_voice.h"
 #include "network_map_vote.h"
@@ -96,6 +108,8 @@ their handlers open opens.
 #include "../src/master_list.h"
 #include "../src/player_link.h" /* port: port/linux/src/player_link.c */
 #include "../src/server_master.h"
+#include "../src/steam_screen.h" /* port: the Steam Workshop screen, port/linux/src/steam_screen.c */
+#include "../src/workshop_authors.h"
 #include "text_filter.h"
 
 #include <stdlib.h>
@@ -668,6 +682,10 @@ static struct
 	short saved_game_to_delete;
 } campaign;
 
+/* MCC checkpoint identities are independent of the stock campaign's level
+ * numbers. Only MCC rows use this additional storage. */
+static char mcc_saved_game_names[MAXIMUM_ROWS][256];
+
 /* the descendant of the widget with the name (a widget's name is its
 definition's: the last part of ours), the nth of them */
 static struct widget_instance *descendant(struct widget_instance *widget, char const *name, long *nth)
@@ -970,12 +988,38 @@ static boolean campaign_menu_initialize(short controller)
 }
 
 /* "campaign menu continue": the saved game goes on */
+static boolean mcc_saved_game_read(char name[256], short *difficulty)
+{
+	boolean corrupted = FALSE;
+
+	name[0] = 0;
+	if (player_ui_get_active_player_profile_index(0) == NONE ||
+		!game_state_test_persistent_storage(name, difficulty, &corrupted) ||
+		!mcc_level_name(name))
+	{
+		name[0] = 0;
+		return FALSE;
+	}
+	*difficulty = (short)PIN(*difficulty, 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1);
+	return TRUE;
+}
+
 static boolean campaign_continue(short controller)
 {
 	struct player_profile profile;
 	char const *map_name;
 	short level, difficulty;
 
+	{
+		char mcc_name[256];
+		if (mcc_saved_game_read(mcc_name, &difficulty))
+		{
+			if (!campaign_profile(controller, &profile) || !mcc_cache_require(mcc_name, 0))
+				return campaign_fail();
+			campaign_start(mcc_name, difficulty, controller);
+			return TRUE;
+		}
+	}
 	if (!campaign_profile(controller, &profile) || !ui_widget_port_saved_game(&map_name, &level, &difficulty))
 		return campaign_fail();
 	campaign_start(map_name, difficulty, controller);
@@ -997,6 +1041,8 @@ enum
 	MAP_KIND_MULTIPLAYER,
 	MAP_KIND_CUSTOM_SINGLEPLAYER,
 	MAP_KIND_CUSTOM_MULTIPLAYER,
+	MAP_KIND_MCC_SINGLEPLAYER,
+	MAP_KIND_MCC_MULTIPLAYER,
 	NUMBER_OF_MAP_KINDS
 };
 
@@ -1008,7 +1054,14 @@ short ui_widget_port_multiplayer_maps(char const *const **names, short *last_use
 
 static boolean map_kind_singleplayer(short kind)
 {
+	if (kind == MAP_KIND_MCC_SINGLEPLAYER)
+		return TRUE;
 	return kind == MAP_KIND_SINGLEPLAYER || kind == MAP_KIND_CUSTOM_SINGLEPLAYER;
+}
+
+static boolean map_kind_mcc(short kind)
+{
+	return kind == MAP_KIND_MCC_SINGLEPLAYER || kind == MAP_KIND_MCC_MULTIPLAYER;
 }
 
 /* The kind the chooser shows, kept to the multiplayer kinds unless
@@ -1137,6 +1190,9 @@ static void map_description_show(struct widget_instance *description, short leve
 	struct widget_instance *widget;
 	short marker;
 
+	/* MCC folder descriptions have no map display index. */
+	visible_set(named(description, "mcc_folder_name", 0), FALSE);
+	visible_set(named(description, "mcc_folder_help", 0), FALSE);
 	visible_set(named(description, "replay_level_right_name", 0), level != NONE);
 	visible_set(named(description, "replay_level_right_pic", 0), level != NONE);
 	visible_set(named(description, "replay_level_right_data", 0), level != NONE);
@@ -1158,6 +1214,151 @@ static void map_description_show(struct widget_instance *description, short leve
 		widget->parameters.text_box.string_list_index = map;
 }
 
+/* MCC has its own catalog, selection state and namespace. Its name and
+description use its reserved display indices; an absent screenshot uses
+the stock unknown-map image without entering the CE picture provider. */
+static struct
+{
+	short first, chosen;
+	boolean campaign;
+} mcc_solo_list;
+
+static struct mcc_map_browser mcc_solo_browsers[2];
+
+static void mcc_browser_focus(struct widget_instance *list, struct mcc_map_browser *browser,
+	short *first, short *chosen)
+{
+	*chosen = browser->chosen;
+	*first = map_kind_first(*chosen, browser->count);
+	if (browser->count)
+		map_kind_focus(list, *first, *chosen);
+	else
+		focus_row(list, 0);
+}
+
+static void mcc_map_description_show(struct widget_instance *description, short index)
+{
+	struct widget_instance *picture, *badge;
+	short marker;
+	long profile = player_ui_get_active_player_profile_index(0);
+	unsigned flags = 0;
+
+	map_description_show(description, NONE, index == NONE ? NONE : (short)(MCC_MAPS_FIRST_DISPLAY_INDEX + index));
+	picture = named(description, "mp_map_right_pic", 0);
+	if (picture)
+		picture->animation.current_frame_index = index == NONE ? 13 : MCC_MAPS_FIRST_DISPLAY_INDEX + index;
+	if (profile == NONE)
+		profile = player_ui_get_player1_last_used_profile_index();
+	if (index != NONE && mcc_maps_campaign(index))
+		flags = mcc_progress_menu_flags(profile, mcc_maps_level_name(index), system_milliseconds());
+	for (marker = 0; marker < 3; marker++)
+	{
+		badge = named(description, "difficulty_indicator", marker);
+		if (badge)
+		{
+			badge->visible = (flags & (1u << (marker + 1))) != 0;
+			badge->animation.current_frame_index = marker + 1;
+		}
+	}
+}
+
+static void mcc_solo_map_text(short row, wchar_t *text)
+{
+	mcc_map_browser_text(&mcc_solo_browsers[mcc_solo_list.campaign], row, text);
+	mcc_menu_text_row(text);
+}
+
+static void mods_wide_text(char const *text, wchar_t *wide, short length);
+static void text_append(wchar_t *text, short size, wchar_t const *word);
+
+/* the help under a folder in the MCC map lists' panel, in a text box of this length */
+#define MCC_FOLDER_HELP_LENGTH (ROW_TEXT_LENGTH * 3)
+
+/* the help under the chosen folder; a Workshop item's folder's ends with its author, once Steam has said
+(workshop_authors.c). A collection's has none: it holds the items of many */
+static void mcc_folder_help_text(struct mcc_map_browser const *browser, wchar_t *help, short size)
+{
+	short row = browser->chosen;
+	char author[WORKSHOP_AUTHORS_NAME_SIZE];
+	/* (one more than the name: mods_wide_text keeps 2 for a line break) */
+	wchar_t wide[WORKSHOP_AUTHORS_NAME_SIZE + 1];
+
+	help[0] = 0;
+	text_append(help, size, browser->count ? L"Open folder to\r\nchoose a map." : L"No MCC maps found\r\nin this category.");
+	if (row < 0 || row >= browser->count || !browser->folders[row] || browser->groups[row] != NONE ||
+		!workshop_authors_get(mcc_maps_item_id(browser->entries[row]), author, sizeof(author)))
+	{
+		return;
+	}
+	mods_wide_text(author, wide, NUMBEROF(wide));
+	text_append(help, size, L"\r\nPublisher\r\n");
+	text_append(help, size, wide);
+}
+
+static void mcc_browser_description(struct widget_instance *description, struct mcc_map_browser *browser)
+{
+	short index = mcc_map_browser_index(browser, browser->chosen);
+	wchar_t text[ROW_TEXT_LENGTH];
+
+	visible_set(named(description, "mp_map_right_item", 0), TRUE);
+	mcc_map_description_show(description, index);
+	if (index == NONE)
+	{
+		wchar_t help[MCC_FOLDER_HELP_LENGTH];
+
+		mcc_map_browser_text(browser, browser->chosen, text);
+		text_set(named(description, "mcc_folder_name", 0), text);
+		mcc_folder_help_text(browser, help, NUMBEROF(help));
+		text_set_length(named(description, "mcc_folder_help", 0), help, NUMBEROF(help));
+		visible_set(named(description, "mcc_folder_name", 0), TRUE);
+		visible_set(named(description, "mcc_folder_help", 0), TRUE);
+	}
+}
+
+static boolean mcc_solo_folder_choose(struct widget_instance *list)
+{
+	struct mcc_map_browser *browser = &mcc_solo_browsers[mcc_solo_list.campaign];
+
+	if (!mcc_map_browser_enter(browser, mcc_solo_list.chosen))
+		return FALSE;
+	mcc_browser_focus(list, browser, &mcc_solo_list.first, &mcc_solo_list.chosen);
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	return TRUE;
+}
+
+static void mcc_solo_list_update(struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct mcc_map_browser *browser = &mcc_solo_browsers[mcc_solo_list.campaign];
+	short row = map_kind_rows_update(list, &mcc_solo_list.first, browser->count, mcc_solo_map_text);
+
+	if (row != NONE)
+	{
+		mcc_solo_list.chosen = row;
+		mcc_map_browser_select(browser, row);
+	}
+	mcc_browser_description(description, browser);
+	profile_name_show(description);
+}
+
+static boolean mcc_solo_choose(short controller)
+{
+	short index = mcc_map_browser_index(&mcc_solo_browsers[mcc_solo_list.campaign], mcc_solo_list.chosen);
+	char const *level_name = mcc_maps_level_name(index);
+	struct player_profile profile;
+
+	if (!level_name || !campaign_profile(controller, &profile))
+		return campaign_fail();
+	if (mcc_maps_campaign(index))
+	{
+		main_set_map_name(level_name);
+		main_defer_map_map_change();
+		return TRUE;
+	}
+	campaign_start(level_name, main_get_difficulty(), controller);
+	return FALSE;
+}
+
 /* New Game's list: SINGLEPLAYER's levels, the profile's reached, or
 MULTIPLAYER's maps, played alone to walk around (no game engine: a campaign
 game on the map); CUSTOM SINGLEPLAYER's maps played as the campaign's levels
@@ -1172,6 +1373,27 @@ static struct
 	short map_count;
 } level_list;
 
+/* Handle Back explicitly: a failed handler would propagate B to the
+screen's default back action even after returning to the package list. */
+static boolean mcc_solo_back(struct widget_instance *list, boolean *widget_deleted)
+{
+	struct widget_instance *child = named(list, "solo_level_select_list", 0);
+
+	if (child)
+		list = child;
+	if (map_kind_mcc(level_list.kind) && mcc_map_browser_back(&mcc_solo_browsers[mcc_solo_list.campaign]))
+	{
+		mcc_browser_focus(list, &mcc_solo_browsers[mcc_solo_list.campaign],
+			&mcc_solo_list.first, &mcc_solo_list.chosen);
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return TRUE;
+	}
+	ui_play_audio_feedback_sound(SOUND_BACK);
+	ui_widget_port_go_back(list);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
 /* a map list's entries of a kind (the Map screen's difficulties aside) */
 static short map_kind_count(short kind, short multiplayer_map_count)
 {
@@ -1183,6 +1405,10 @@ static short map_kind_count(short kind, short multiplayer_map_count)
 		return xbox_multiplayer_map_count(multiplayer_map_count);
 	case MAP_KIND_CUSTOM_SINGLEPLAYER:
 		return custom_edition_maps_count(TRUE);
+	case MAP_KIND_MCC_SINGLEPLAYER:
+		return mcc_maps_type_count(TRUE);
+	case MAP_KIND_MCC_MULTIPLAYER:
+		return mcc_maps_type_count(FALSE);
 	default:
 		return custom_edition_maps_count(FALSE);
 	}
@@ -1214,6 +1440,10 @@ static boolean level_list_initialize(struct widget_instance *list, short control
 {
 	struct player_profile profile;
 	short level, last_used;
+	short mcc_kind = level_list.kind;
+
+	mcc_maps_rescan();
+	mcc_solo_list.first = mcc_solo_list.chosen = 0;
 
 	if (!campaign_profile(controller, &profile))
 		return FALSE;
@@ -1230,6 +1460,16 @@ static boolean level_list_initialize(struct widget_instance *list, short control
 	level_list.first = map_kind_first(level, NUMBER_OF_SINGLE_PLAYER_LEVELS);
 	map_kind_set(list, level_list.kind);
 	map_kind_focus(list, level_list.first, level_list.chosen);
+	/* MCC keeps its folder when the difficulty screen recreates this list. */
+	if (map_kind_mcc(mcc_kind))
+	{
+		level_list.kind = mcc_kind;
+		mcc_solo_list.campaign = mcc_kind == MAP_KIND_MCC_SINGLEPLAYER;
+		mcc_map_browser_open(&mcc_solo_browsers[mcc_solo_list.campaign], mcc_solo_list.campaign);
+		map_kind_set(list, mcc_kind);
+		mcc_browser_focus(list, &mcc_solo_browsers[mcc_solo_list.campaign],
+			&mcc_solo_list.first, &mcc_solo_list.chosen);
+	}
 	return TRUE;
 }
 
@@ -1246,8 +1486,24 @@ static void level_list_update(struct widget_instance *list)
 
 	if (kind != level_list.kind)
 	{
+		if (map_kind_mcc(kind))
+		{
+			boolean chooser = focused_row(list) == 0;
+
+			mcc_solo_list.campaign = kind == MAP_KIND_MCC_SINGLEPLAYER;
+			mcc_map_browser_open(&mcc_solo_browsers[mcc_solo_list.campaign], mcc_solo_list.campaign);
+			mcc_browser_focus(list, &mcc_solo_browsers[mcc_solo_list.campaign],
+				&mcc_solo_list.first, &mcc_solo_list.chosen);
+			if (chooser)
+				focus_row(list, 0);
+		}
 		level_list.kind = kind;
 		level_list.first = level_list.chosen = 0;
+	}
+	if (map_kind_mcc(kind))
+	{
+		mcc_solo_list_update(list);
+		return;
 	}
 	count = map_kind_count(kind, level_list.map_count);
 	entry = map_kind_rows_update(list, &level_list.first, count,
@@ -1286,6 +1542,9 @@ static boolean level_choose(struct widget_instance *list, short controller)
 	level_list_update(list);
 	level = campaign.shown_level;
 	count = map_kind_count(level_list.kind, level_list.map_count);
+
+	if (map_kind_mcc(level_list.kind))
+		return mcc_solo_choose(controller);
 
 	if (level_list.kind != MAP_KIND_SINGLEPLAYER && (level_list.chosen < 0 || level_list.chosen >= count))
 		return campaign_fail();
@@ -1328,6 +1587,11 @@ static boolean difficulty_start(short difficulty, short controller)
 
 	if (!campaign_profile(controller, &profile))
 		return campaign_fail();
+	if (mcc_maps_level_campaign(map_name))
+	{
+		campaign_start(map_name, PIN(difficulty, 0, 3), controller);
+		return TRUE;
+	}
 	/* (a campaign level, or a Custom Edition campaign map) */
 	if (!custom_edition_maps_level_campaign(map_name))
 		map_name = main_get_solo_level_name(0);
@@ -1371,6 +1635,7 @@ static void saved_games_read(short controller)
 	short index;
 
 	campaign.saved_game_count = 0;
+	memset(mcc_saved_game_names, 0, sizeof(mcc_saved_game_names));
 	if (!campaign_profile(controller, &active))
 		return;
 	active_index = player_ui_get_active_player_profile_index(0);
@@ -1383,6 +1648,15 @@ static void saved_games_read(short controller)
 		if (!((unsigned long)profiles[index] & PROFILE_VALID_BIT) || !player_profile_get(profiles[index], &profile))
 			continue;
 		player_ui_set_active_player_profile(0, profiles[index], &profile);
+		if (mcc_saved_game_read(mcc_saved_game_names[campaign.saved_game_count], &saved_game->difficulty))
+		{
+			saved_game->profile_index = profiles[index];
+			saved_game->level = NONE;
+			ustrncpy(saved_game->profile_name, profile.player_name, MAXIMUM_PLAYER_PROFILE_NAME_LENGTH);
+			saved_game->profile_name[MAXIMUM_PLAYER_PROFILE_NAME_LENGTH] = 0;
+			campaign.saved_game_count++;
+			continue;
+		}
 		if (ui_widget_port_saved_game(&map_name, &saved_game->level, &saved_game->difficulty))
 		{
 			saved_game->profile_index = profiles[index];
@@ -1435,6 +1709,17 @@ static void saved_game_list_update(struct widget_instance *list)
 	{
 		struct campaign_saved_game const *saved_game = &campaign.saved_games[campaign.shown_saved_game];
 
+		if (mcc_saved_game_names[campaign.shown_saved_game][0])
+		{
+			short index = mcc_maps_find(mcc_saved_game_names[campaign.shown_saved_game]);
+			struct widget_instance *picture = named(description, "load_level_right_pic", 0);
+			level_description(description, "load_level",
+				index == NONE ? LEVEL_UNAVAILABLE : MCC_MAPS_FIRST_DISPLAY_INDEX + index,
+				FALSE, NULL, saved_game->difficulty);
+			if (picture) picture->animation.current_frame_index = LEVEL_UNAVAILABLE;
+			profile_name_show(description);
+			return;
+		}
 		level_description(description, "load_level", saved_game->level, FALSE, NULL, saved_game->difficulty);
 	}
 	else if (row != NONE)
@@ -1457,6 +1742,14 @@ static boolean saved_game_continue(short controller)
 	if (!player_profile_get(saved_game->profile_index, &profile))
 		return campaign_fail();
 	player_ui_set_active_player_profile(0, saved_game->profile_index, &profile);
+	if (mcc_saved_game_names[campaign.shown_saved_game][0])
+	{
+		char const *name = mcc_saved_game_names[campaign.shown_saved_game];
+		if (!mcc_cache_require(name, 0))
+			return campaign_fail();
+		campaign_start(name, saved_game->difficulty, controller);
+		return TRUE;
+	}
 	campaign_start(main_get_solo_level_name(saved_game->level), saved_game->difficulty, controller);
 	return TRUE;
 }
@@ -1743,6 +2036,8 @@ static void discord_account_show(struct widget_instance *list)
 The remaining options close the gap; the help and bottom buttons stay put. */
 /* Button Appearance filters its rows in the controller feature module. */
 #include "controller_buttons.h"
+#include "keyboard_prompts.h"
+#include "menu_button_glyphs.h"
 #include "controller_button_menu.inl"
 
 static void hud_button_style_row_show(struct widget_instance *list)
@@ -3356,13 +3651,89 @@ static void map_difficulty_text(short difficulty, wchar_t *text)
 	string_get("pc\\main_menu\\player_profiles_select\\difficulty_names", difficulty, text);
 }
 
+static struct
+{
+	short first, chosen, step, level;
+	boolean multiplayer_only;
+	boolean campaign;
+} mcc_host_list;
+
+static struct mcc_map_browser mcc_host_browsers[2];
+
+static void mcc_host_map_text(short row, wchar_t *text)
+{
+	mcc_map_browser_text(&mcc_host_browsers[mcc_host_list.campaign], row, text);
+	mcc_menu_text_row(text);
+}
+
+static void mcc_host_list_update(struct widget_instance *list)
+{
+	struct widget_instance *description = list->parameters.list.extended_description;
+	struct mcc_map_browser *browser = &mcc_host_browsers[mcc_host_list.campaign];
+	short count = mcc_host_list.step == MAP_STEP_DIFFICULTIES ? NUMBER_OF_GAME_DIFFICULTY_LEVELS :
+		browser->count;
+	short row = map_kind_rows_update(list, &mcc_host_list.first, count,
+		mcc_host_list.step == MAP_STEP_DIFFICULTIES ? map_difficulty_text : mcc_host_map_text);
+
+	if (row != NONE)
+	{
+		mcc_host_list.chosen = row;
+		if (mcc_host_list.step != MAP_STEP_DIFFICULTIES)
+			mcc_map_browser_select(browser, row);
+	}
+	if (mcc_host_list.step == MAP_STEP_DIFFICULTIES)
+		mcc_map_description_show(description, mcc_host_list.level);
+	else
+		mcc_browser_description(description, browser);
+	profile_name_show(description);
+}
+
+static boolean mcc_host_list_choose(struct widget_instance *list, boolean *widget_deleted)
+{
+	struct mcc_map_browser *browser = &mcc_host_browsers[mcc_host_list.campaign];
+	short index = mcc_host_list.step == MAP_STEP_DIFFICULTIES ? mcc_host_list.level :
+		mcc_map_browser_index(browser, mcc_host_list.chosen);
+	char const *level_name = mcc_maps_level_name(index);
+
+	if (mcc_host_list.step != MAP_STEP_DIFFICULTIES && mcc_map_browser_enter(browser, mcc_host_list.chosen))
+	{
+		mcc_browser_focus(list, browser, &mcc_host_list.first, &mcc_host_list.chosen);
+		ui_play_audio_feedback_sound(SOUND_FORWARD);
+		return FALSE;
+	}
+	if (!level_name)
+		return campaign_fail();
+	if (mcc_host_list.step == MAP_STEP_DIFFICULTIES)
+	{
+		if (!ui_widget_port_mcc_cooperative_level_choose(level_name, mcc_host_list.chosen))
+			return campaign_fail();
+		return ui_widget_port_open(list, SERVER_SETUP_NAME, widget_deleted);
+	}
+	if (!mcc_maps_campaign(index))
+		return ui_widget_port_mcc_multiplayer_map_choose(level_name);
+	if (mcc_host_list.multiplayer_only)
+		return campaign_fail();
+	mcc_map_browser_select(browser, mcc_host_list.chosen);
+	mcc_host_list.level = index;
+	mcc_host_list.step = MAP_STEP_DIFFICULTIES;
+	mcc_host_list.chosen = (short)PIN(main_get_difficulty(), 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1);
+	mcc_host_list.first = 0;
+	map_kind_focus(list, 0, mcc_host_list.chosen);
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	return FALSE;
+}
+
 /* "mp level list initialize": on the multiplayer map used last */
 static boolean map_list_initialize(struct widget_instance *list)
 {
 	char const *const *names;
 	short last_used = 0;
+	short mcc_kind = map_list.kind;
 
 	map_list.hosting = global_network_game_server_get() != NULL && !network_game_is_splitscreen_local();
+	mcc_maps_rescan();
+	csmemset(&mcc_host_list, 0, sizeof(mcc_host_list));
+	mcc_host_list.multiplayer_only = !map_list.hosting;
 	/* (the maps folders looked for again as the list opens) */
 	custom_edition_maps_look_again();
 	map_list.map_count = ui_widget_port_multiplayer_maps(&names, &last_used);
@@ -3375,6 +3746,15 @@ static boolean map_list_initialize(struct widget_instance *list)
 	}
 	map_kind_set(list, map_list.kind);
 	map_step_open(list, MAP_STEP_MAPS, last_used);
+	if (map_kind_mcc(mcc_kind) && (map_list.hosting || mcc_kind == MAP_KIND_MCC_MULTIPLAYER))
+	{
+		map_list.kind = mcc_kind;
+		mcc_host_list.campaign = mcc_kind == MAP_KIND_MCC_SINGLEPLAYER;
+		mcc_map_browser_open(&mcc_host_browsers[mcc_host_list.campaign], mcc_host_list.campaign);
+		map_kind_set(list, mcc_kind);
+		mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+			&mcc_host_list.first, &mcc_host_list.chosen);
+	}
 	return TRUE;
 }
 
@@ -3388,9 +3768,27 @@ static void map_list_update(struct widget_instance *list)
 
 	if (kind != map_list.kind)
 	{
+		if (map_kind_mcc(kind))
+		{
+			boolean chooser = focused_row(list) == 0;
+
+			csmemset(&mcc_host_list, 0, sizeof(mcc_host_list));
+			mcc_host_list.multiplayer_only = !map_list.hosting;
+			mcc_host_list.campaign = kind == MAP_KIND_MCC_SINGLEPLAYER;
+			mcc_map_browser_open(&mcc_host_browsers[mcc_host_list.campaign], mcc_host_list.campaign);
+			mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+				&mcc_host_list.first, &mcc_host_list.chosen);
+			if (chooser)
+				focus_row(list, 0);
+		}
 		map_list.kind = kind;
 		map_list.step = MAP_STEP_MAPS;
 		map_list.first = map_list.chosen = 0;
+	}
+	if (map_kind_mcc(kind))
+	{
+		mcc_host_list_update(list);
+		return;
 	}
 	count = map_step_count();
 	entry = map_kind_rows_update(list, &map_list.first, count, map_list.step == MAP_STEP_DIFFICULTIES ?
@@ -3426,6 +3824,9 @@ static boolean map_list_choose(struct widget_instance *list, boolean *widget_del
 	map_list_update(list);
 	chosen = map_list.chosen;
 
+	if (map_kind_mcc(map_list.kind))
+		return mcc_host_list_choose(list, widget_deleted);
+
 	if (chosen >= map_step_count())
 		return campaign_fail();
 	if (map_list.step == MAP_STEP_DIFFICULTIES)
@@ -3454,6 +3855,21 @@ static boolean map_list_choose(struct widget_instance *list, boolean *widget_del
 level, else out of the Map screen */
 static boolean map_list_back(struct widget_instance *list, boolean *widget_deleted)
 {
+	if (map_kind_mcc(map_list.kind) && mcc_host_list.step == MAP_STEP_DIFFICULTIES)
+	{
+		mcc_host_list.step = MAP_STEP_MAPS;
+		mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+			&mcc_host_list.first, &mcc_host_list.chosen);
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return TRUE;
+	}
+	if (map_kind_mcc(map_list.kind) && mcc_map_browser_back(&mcc_host_browsers[mcc_host_list.campaign]))
+	{
+		mcc_browser_focus(list, &mcc_host_browsers[mcc_host_list.campaign],
+			&mcc_host_list.first, &mcc_host_list.chosen);
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return TRUE;
+	}
 	ui_play_audio_feedback_sound(SOUND_BACK);
 	if (map_list.step == MAP_STEP_DIFFICULTIES)
 	{
@@ -3461,6 +3877,19 @@ static boolean map_list_back(struct widget_instance *list, boolean *widget_delet
 		return TRUE;
 	}
 	ui_widget_port_go_back(list);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* Screens consume B before forwarding events to their list children. */
+static boolean mcc_host_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	struct widget_instance *list = named(widget, "mp_map_select_list_2", 0);
+
+	if (list && map_kind_mcc(map_list.kind))
+		return map_list_back(list, widget_deleted);
+	ui_play_audio_feedback_sound(SOUND_BACK);
+	ui_widget_port_go_back(widget);
 	*widget_deleted = TRUE;
 	return TRUE;
 }
@@ -3690,6 +4119,9 @@ ui_widget_port_cooperative_level_choose). A Custom Edition map this machine
 has not is taken to be one: co-op is the only game with no game engine. */
 static boolean game_cooperative(struct network_game const *game)
 {
+	if (game && mcc_level_name(game->map.name))
+		return !game->variant.game_engine_index &&
+			(mcc_maps_level_campaign(game->map.name) || mcc_maps_find(game->map.name) == NONE);
 	return game && !game->variant.game_engine_index &&
 		(custom_edition_maps_level_campaign(game->map.name) ||
 		(custom_edition_level_name(game->map.name) && custom_edition_maps_display_index(game->map.name) == NONE));
@@ -3713,7 +4145,8 @@ static char const *const server_settings_gametype_rows[] =
 /* the most players a co-op game hosted starts with (maximum_players') */
 #define COOPERATIVE_DEFAULT_PLAYERS 16
 /* Server Setup's help for co-op's options' rows (CO-OP OPTIONS, VOICE AND
-VOTING), PASSWORD's and MAP SHARING's (its help_strings, tools/port_settings.py) */
+VOTING), PASSWORD's and MAP SHARING's (its help_strings,
+tools/port_settings.py) */
 #define COOPERATIVE_OPTIONS_HELP 12
 #define COOPERATIVE_VOICE_OPTIONS_HELP 13
 #define SERVER_PASSWORD_HELP 14
@@ -3782,6 +4215,8 @@ static void server_settings_private_set(boolean private_game)
 		platform_log("menus: could not write network.coop_public to config.toml");
 	}
 }
+
+static void setting_options_each(struct widget_instance *list, boolean save);
 
 /* "server settings init": the game's name (player 1's, else the one given
 last), the most players, the gametype's copy (once: the screen is made
@@ -4243,6 +4678,9 @@ static short campaign_level_of(char const *map_name)
 {
 	short level;
 
+	if (mcc_level_name(map_name))
+		return NONE;
+
 	/* (a Custom Edition map, custom_maps\a30, is never one) */
 	if (custom_edition_level_name(map_name))
 		return NONE;
@@ -4284,6 +4722,22 @@ static void map_display_name(char const *map_name, wchar_t *text)
 	char const *const *names;
 	short index;
 	short count = xbox_multiplayer_map_count(ui_widget_port_multiplayer_maps(&names, NULL));
+
+	if (mcc_level_name(map_name))
+	{
+		short mcc_index = mcc_maps_find(map_name);
+
+		if (mcc_index != NONE)
+			ustrncpy(text, mcc_maps_name(mcc_index), ROW_TEXT_LENGTH - 1);
+		else
+		{
+			for (index = 0; map_name[index] && index < ROW_TEXT_LENGTH - 1; index++)
+				text[index] = (wchar_t)(unsigned char)map_name[index];
+			text[index] = 0;
+		}
+		text[ROW_TEXT_LENGTH - 1] = 0;
+		return;
+	}
 
 	/* (a Custom Edition map's, if this machine has it: custom_edition_maps.c) */
 	if (custom_edition_level_name(map_name))
@@ -5753,7 +6207,9 @@ static boolean profile_settings_save(struct widget_instance *widget)
 		platform_log("menus: could not save the profile's changes");
 		return campaign_fail();
 	}
-	player_ui_begin_editing_profile(index);
+	/* Preserve MCC pause ownership when saving and reopening its profile. */
+	if (!mcc_ui_settings_profile_reopen(index))
+		player_ui_begin_editing_profile(index);
 	return TRUE;
 }
 
@@ -6035,6 +6491,20 @@ static void lobby_map_show(struct widget_instance *description, char const *map_
 	short count = xbox_multiplayer_map_count(ui_widget_port_multiplayer_maps(&names, NULL)), map = 19, index;
 	short level = campaign_level_of(map_name);
 	struct widget_instance *widget;
+	short mcc_index = mcc_maps_find(map_name);
+
+	if (mcc_index != NONE)
+	{
+		visible_set(named(description, "lobby_map_pic", 0), TRUE);
+		visible_set(named(description, "lobby_map_name", 0), TRUE);
+		visible_set(named(description, "replay_level_right_pic", 0), FALSE);
+		visible_set(named(description, "replay_level_right_name", 0), FALSE);
+		if ((widget = named(description, "lobby_map_pic", 0)) != NULL)
+			widget->animation.current_frame_index = MCC_MAPS_FIRST_DISPLAY_INDEX + mcc_index;
+		if ((widget = named(description, "lobby_map_name", 0)) != NULL)
+			widget->parameters.text_box.string_list_index = MCC_MAPS_FIRST_DISPLAY_INDEX + mcc_index;
+		return;
+	}
 
 	/* (by the scenario's own name: a map vote's choices name only that) */
 	for (index = 0; index < count; index++)
@@ -6074,19 +6544,539 @@ static struct
 	unsigned long updated_at;
 } lobby_icons;
 
+/* the lobby's game data box as last drawn (menu_functions_text_box_drawn): the font and width a line of it is
+measured in (lobby_line_fits); NONE before it is drawn, when a line is counted against LOBBY_LINE_CHARACTERS */
+static struct
+{
+	long font;
+	short width;
+} lobby_data_box = { NONE, 0 };
+
+#define LOBBY_LINE_CHARACTERS 18
+
+/* ---------- the Steam Workshop (Settings > Network Setup > STEAM WORKSHOP:
+the host's port/android/host/steam_downloads.c through steam_screen.c,
+tools/port_settings.py's _steam_workshop; from Halo Content Evolved's):
+rows op_steam_<n> of a name and a state (steam_name, steam_state), the
+chosen row's details (steam_details_name, steam_details_text, measured as
+the Mods screen's are) and the chosen Workshop item's preview, over
+steam_picture (a text box: drawn by
+steam_picture_draw, from menu_functions_text_box_drawn) */
+
+#define STEAM_ROWS 11
+/* (as many as steam_details_text holds above the picture: more, and the last
+is cut short with "..." rather than lost under the box's edge) */
+#define STEAM_DETAILS_LINES 6
+#define STEAM_TEXTURE 256
+
+/* the text boxes measured, in the Mods screen's places (one screen is shown
+at a time) */
+static char const *const steam_text_box_names[NUMBER_OF_MOD_TEXT_BOXES] = { "steam_details_name",
+	"steam_details_text", "steam_name" };
+
+static struct
+{
+	short list_shown;
+	char shown[MOD_DETAILS_LENGTH];
+	char row_shown[STEAM_ROWS][2 * ROW_TEXT_LENGTH + 16];
+	/* the picture's texture (a Workshop item's preview), and which */
+	struct bitmap_data *picture;
+	unsigned long long preview_key;
+	/* the kind of text being typed (the host's; 0: none), in a text field
+	on the row it was asked for on, and the field's caption */
+	int typing;
+	struct widget_instance *typing_row;
+	char caption[64];
+	/* the password's field opened as the account was passed on, before the
+	host asked for it (steam_choose): its asking, when it comes, let go */
+	boolean password_early;
+	unsigned long password_early_at;
+	/* the row chosen as last passed to the host: one the host chose since
+	(a page's first item, as the page comes) is focused */
+	short chosen_set;
+} steam_screen;
+
+static struct widget_instance *steam_row(struct widget_instance *widget)
+{
+	for (; widget; widget = widget->parent)
+	{
+		if (widget->name && !strncmp(widget->name, "op_steam_", 9))
+			return widget;
+	}
+	return NULL;
+}
+
+static short steam_row_place(struct widget_instance *row)
+{
+	short place = row ? (short)(steam_screen_first() + atoi(row->name + 9) - 1) : NONE;
+
+	return place >= 0 && place < steam_screen_count() ? place : NONE;
+}
+
+static void steam_text_cancel(void);
+
+/* "port steam init" and "port steam close" */
+static boolean steam_screen_reset(boolean opening)
+{
+	short index;
+
+	steam_text_cancel();
+	if (opening)
+		steam_screen_open();
+	else
+		steam_screen_close();
+	steam_screen.list_shown = NONE;
+	steam_screen.shown[0] = 0;
+	csmemset(steam_screen.row_shown, 0, sizeof(steam_screen.row_shown));
+	for (index = 0; index < NUMBER_OF_MOD_TEXT_BOXES; index++)
+	{
+		mods_screen.fonts[index] = NONE;
+		mods_screen.widths[index] = 0;
+	}
+	return TRUE;
+}
+
+/* a text the host asked for, typed in a text field on its row (the
+system's keyboard on Android, text_field_open): A or Enter passes it on
+(steam_text_done), B cancels (steam_text_cancel); a password's shown as
+stars, and wiped once passed on */
+static void steam_text_done(char const *text)
+{
+	int kind = steam_screen.typing;
+
+	steam_screen.typing = 0;
+	steam_screen.typing_row = NULL;
+	(void)text;
+	/* (text_field.text, which this wipes) */
+	steam_screen_text_typed(kind, text_field.text, TRUE);
+	csmemset(text_field.before, 0, sizeof(text_field.before));
+}
+
+static void steam_text_cancel(void)
+{
+	int kind = steam_screen.typing;
+
+	if (!kind)
+		return;
+	steam_screen.typing = 0;
+	steam_screen.typing_row = NULL;
+	if (text_field_editing(NULL))
+		text_field_end(FALSE);
+	csmemset(text_field.text, 0, sizeof(text_field.text));
+	csmemset(text_field.before, 0, sizeof(text_field.before));
+	steam_screen_text_typed(kind, text_field.text, FALSE);
+}
+
+/* (a field let go of elsewhere: cancelled; else one opened, on the row
+focused, if the host wants something typed) */
+static void steam_text_update(struct widget_instance *focused)
+{
+	char initial[64];
+	int secret = 0;
+	int kind;
+
+	if (steam_screen.typing && (!text_field_editing(steam_screen.typing_row) || !steam_screen.typing_row->visible))
+		steam_text_cancel();
+	kind = 0;
+	/* (the host's asking comes a frame or more after the account, and is
+	the first it asks for then; given up on after a few seconds) */
+	if (steam_screen.password_early)
+	{
+		kind = steam_screen_text_wanted(initial, (int)sizeof(initial), &secret);
+		csmemset(initial, 0, sizeof(initial));
+		if (kind || system_milliseconds() - steam_screen.password_early_at > 5000)
+			steam_screen.password_early = FALSE;
+		if (kind == STEAM_TEXT_PASSWORD)
+			kind = 0;
+	}
+	if (steam_screen.typing || text_field_editing(NULL) || !focused)
+		return;
+	if (!kind)
+		kind = steam_screen_text_wanted(initial, (int)sizeof(initial), &secret);
+	if (!kind)
+		return;
+	steam_screen_text_caption(kind, steam_screen.caption, (int)sizeof(steam_screen.caption));
+	steam_screen.typing = kind;
+	steam_screen.typing_row = focused;
+	text_field_open(focused, initial, (short)(sizeof(initial) - 1), steam_text_done, secret ? TRUE : FALSE);
+	csmemset(initial, 0, sizeof(initial));
+}
+
+/* "port steam update": the model's rows, as the Mods screen's; the MCC
+catalog read again when the model put files in mcc_maps */
+static void steam_update(struct widget_instance *list)
+{
+	struct widget_instance *row;
+	struct widget_instance *focused;
+	struct widget_instance *details = list->parameters.list.extended_description;
+	short first;
+	short chosen;
+	short count;
+	short focused_index;
+
+	if (steam_screen_poll())
+		mcc_maps_rescan();
+	first = (short)steam_screen_first();
+	chosen = (short)steam_screen_chosen();
+	count = (short)steam_screen_count();
+	/* (a list opened, or a row the host chose: that row focused) */
+	if (steam_screen.list_shown != steam_screen_view() || chosen != steam_screen.chosen_set)
+	{
+		steam_screen.list_shown = (short)steam_screen_view();
+		if (chosen < first || chosen >= first + STEAM_ROWS)
+			first = (short)PIN(chosen - STEAM_ROWS / 2, 0, MAX(count - STEAM_ROWS, 0));
+		focus_row(list, count ? (short)(chosen - first) : NONE);
+		csmemset(steam_screen.row_shown, 0, sizeof(steam_screen.row_shown));
+	}
+	focused = steam_row(list->focused_child);
+	focused_index = focused ? (short)(atoi(focused->name + 9) - 1) : NONE;
+	if (focused_index == STEAM_ROWS - 1 && first + STEAM_ROWS < count && list_scrolls_at_end())
+	{
+		first++;
+		focus_row(list, --focused_index);
+	}
+	else if (focused_index == 0 && first > 0 && list_scrolls_at_end())
+	{
+		first--;
+		focus_row(list, ++focused_index);
+	}
+	if (first > 0 && first + STEAM_ROWS > count)
+		first = (short)MAX(0, count - STEAM_ROWS);
+	if (focused_index != NONE && first + focused_index < count)
+		chosen = (short)(first + focused_index);
+	steam_screen_set_first(first);
+	steam_screen_set_chosen(chosen);
+	steam_screen.chosen_set = chosen;
+	steam_text_update(focused);
+	for (row = list->child; row; row = row->next)
+	{
+		short place;
+		short row_index;
+		char name[ROW_TEXT_LENGTH];
+		char state[ROW_TEXT_LENGTH];
+		char shown[sizeof(steam_screen.row_shown[0])];
+
+		if (!row->name || strncmp(row->name, "op_steam_", 9))
+			continue;
+		row->animation.current_frame_index = row == focused ? 1 : 0;
+		place = steam_row_place(row);
+		row->visible = place != NONE;
+		if (place == NONE)
+		{
+			if (row == focused)
+				focus_row(list, count ? (short)(count - 1 - first) : NONE);
+			continue;
+		}
+		row_index = (short)PIN(atoi(row->name + 9) - 1, 0, STEAM_ROWS - 1);
+		/* (the row being typed on: the text field, until it is done) */
+		if (steam_screen.typing && row == steam_screen.typing_row)
+		{
+			wchar_t wide[ROW_TEXT_LENGTH];
+
+			text_field_show(named(row, "steam_name", 0), "", TRUE);
+			mods_wide_text("A: DONE", wide, ROW_TEXT_LENGTH);
+			text_set(named(row, "steam_state", 0), wide);
+			steam_screen.row_shown[row_index][0] = 0;
+			continue;
+		}
+		steam_screen_row(place, name, sizeof(name), state, sizeof(state));
+		snprintf(shown, sizeof(shown), "%s|%s|%ld", name, state, mods_screen.fonts[_mod_row_name]);
+		if (strcmp(shown, steam_screen.row_shown[row_index]))
+		{
+			char shortened[MOD_DETAILS_LENGTH];
+			wchar_t wide[ROW_TEXT_LENGTH];
+
+			if (mods_text_fits(_mod_row_name, name, strlen(name)))
+				snprintf(shortened, sizeof(shortened), "%s", name);
+			else
+				mods_text_shorten(_mod_row_name, name, strlen(name), shortened, sizeof(shortened));
+			mods_wide_text(shortened, wide, ROW_TEXT_LENGTH);
+			text_set(named(row, "steam_name", 0), wide);
+			mods_wide_text(state, wide, ROW_TEXT_LENGTH);
+			text_set(named(row, "steam_state", 0), wide);
+			snprintf(steam_screen.row_shown[row_index], sizeof(steam_screen.row_shown[0]), "%s", shown);
+		}
+	}
+	if (details)
+	{
+		char title[MOD_DETAILS_LENGTH];
+		char text[MOD_DETAILS_LENGTH];
+		char author[WORKSHOP_AUTHORS_NAME_SIZE];
+		char wrapped[MOD_DETAILS_LENGTH];
+		char shown[sizeof(steam_screen.shown)];
+		wchar_t wide[MOD_DETAILS_LENGTH];
+
+		steam_screen_details(count ? chosen : NONE, title, sizeof(title), text, sizeof(text), author, sizeof(author));
+		if (steam_screen.typing)
+		{
+			snprintf(title, sizeof(title), "%s", steam_screen.caption);
+			snprintf(text, sizeof(text), "Type it, then press A or Enter. B cancels.");
+			author[0] = 0;
+		}
+		/* (made again only when what they show, or its fonts, change: the author before the texts, whose ends this
+		may cut) */
+		snprintf(shown, sizeof(shown), "%ld %d %ld %d|%s|%s|%s", mods_screen.fonts[_mod_details_name],
+			mods_screen.widths[_mod_details_name], mods_screen.fonts[_mod_details_text],
+			mods_screen.widths[_mod_details_text], author, title, text);
+		if (strcmp(shown, steam_screen.shown))
+		{
+			snprintf(steam_screen.shown, sizeof(steam_screen.shown), "%s", shown);
+			wrapped[0] = 0;
+			mods_wrap(title, wrapped, sizeof(wrapped), _mod_details_name, 2, 0);
+			mods_wide_text(wrapped, wide, NUMBEROF(wide));
+			text_set_length(named(details, "steam_details_name", 0), wide, NUMBEROF(wide));
+			wrapped[0] = 0;
+			/* (an item's author, its publisher, under its description, which is cut short to leave its two lines) */
+			if (author[0])
+			{
+				short lines = mods_wrap(text, wrapped, sizeof(wrapped), _mod_details_text, STEAM_DETAILS_LINES - 2, 0);
+				char heading[sizeof(author) + 16];
+
+				snprintf(heading, sizeof(heading), "Publisher\n%s", author);
+				mods_wrap(heading, wrapped, sizeof(wrapped), _mod_details_text, lines + 2, lines);
+			}
+			else
+				mods_wrap(text, wrapped, sizeof(wrapped), _mod_details_text, STEAM_DETAILS_LINES, 0);
+			mods_wide_text(wrapped, wide, NUMBEROF(wide));
+			text_set_length(named(details, "steam_details_text", 0), wide, NUMBEROF(wide));
+		}
+	}
+}
+
+/* "port steam choose" (A on a row) */
+static boolean steam_choose(struct widget_instance *widget)
+{
+	short place = steam_row_place(steam_row(widget));
+
+	if (steam_screen.typing)
+	{
+		struct widget_instance *row = steam_screen.typing_row;
+
+		ui_play_audio_feedback_sound(SOUND_FORWARD);
+		if (!text_field_editing(NULL))
+			return TRUE;
+		/* (an empty account, password or code: Android's keyboard brought
+		back, which a tap on the row asks for once it has been closed;
+		passed on, it would be ignored and the sign-in left) */
+		if (!text_field.text[0] && steam_screen.typing != STEAM_TEXT_SEARCH)
+		{
+			platform_text_field(TRUE, text_field.masked);
+			return TRUE;
+		}
+		/* (A on the field: what was typed passed on; after the account, the
+		password's field opened in the same frame, which the host asks for
+		next: a keyboard hidden and asked for again a frame or two later is
+		not shown by Android) */
+		if (steam_screen.typing == STEAM_TEXT_ACCOUNT)
+		{
+			text_field_end(TRUE);
+			steam_screen_text_caption(STEAM_TEXT_PASSWORD, steam_screen.caption, (int)sizeof(steam_screen.caption));
+			steam_screen.typing = STEAM_TEXT_PASSWORD;
+			steam_screen.typing_row = row;
+			steam_screen.password_early = TRUE;
+			steam_screen.password_early_at = system_milliseconds();
+			text_field_open(row, "", 63, steam_text_done, TRUE);
+			return TRUE;
+		}
+		text_field_end(TRUE);
+		return TRUE;
+	}
+	if (place == NONE)
+		place = (short)steam_screen_chosen();
+	steam_screen_set_chosen(place);
+	steam_screen.chosen_set = place;
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
+	steam_screen_choose(place);
+	return TRUE;
+}
+
+/* "port steam back" (B, and BACK): a sign-in under way cancelled, a list
+left for the hub, else away */
+static boolean steam_back(struct widget_instance *widget, boolean *widget_deleted)
+{
+	ui_play_audio_feedback_sound(SOUND_BACK);
+	if (steam_screen.typing)
+	{
+		steam_text_cancel();
+		return TRUE;
+	}
+	if (steam_screen_back())
+		return TRUE;
+	ui_widget_port_go_back(widget);
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+
+/* the texture of what steam_picture shows: the chosen Workshop item's
+preview, copied in once for each item chosen; NULL for none */
+static struct bitmap_data *steam_picture_texture(void)
+{
+	unsigned long long key = 0;
+
+	if (!steam_screen_picture(&key, NULL))
+		return NULL;
+	if (!steam_screen.picture)
+	{
+		steam_screen.picture = bitmap_2d_new(STEAM_TEXTURE, STEAM_TEXTURE, 0, 11 /* a8r8g8b8 */);
+		if (steam_screen.picture && !rasterizer_bitmap_new(steam_screen.picture))
+		{
+			bitmap_delete(steam_screen.picture);
+			steam_screen.picture = NULL;
+		}
+		if (!steam_screen.picture)
+			return NULL;
+		steam_screen.preview_key = 0;
+	}
+	if (steam_screen.preview_key != key)
+	{
+		if (steam_screen_picture(&key, (unsigned int *)steam_screen.picture->base_address) != STEAM_PICTURE_SIDE)
+			return NULL;
+		rasterizer_bitmap_changed(steam_screen.picture);
+		steam_screen.preview_key = key;
+	}
+	return steam_screen.picture;
+}
+
+/* (steam_picture's text box drawn: the picture over its bounds) */
+static void steam_picture_draw(rectangle2d const *bounds)
+{
+	struct bitmap_data *picture = steam_picture_texture();
+	rectangle2d source;
+
+	if (!picture)
+		return;
+	source.x0 = source.y0 = 0;
+	source.x1 = source.y1 = STEAM_TEXTURE;
+	draw_bitmap_in_rect(picture, bounds, &source, NULL, 0xFFFFFFFFUL, NULL, TRUE);
+}
+
 /* ui_widget.c's: a text box drawn, at the bounds its text was drawn in
 (its font and justification still set): a lobby row's player talking in
 voice chat (or muted) has a speaker just left of their name
 (port/linux/game/network_voice.c) */
+/* Only the PC join screen reuses this Xbox-authored label in a wider panel.
+ * Supply its parent's horizontal bounds; the feature owns mixed-run layout. */
+void pc_menu_widget_text_bounds(long tag, rectangle2d *bounds, short *text_offset);
+
+/* The compact pause footer has room after SELECT, but little before CANCEL.
+ * Recover its spare gap and balance the added width around its center. Full-size
+ * legends instead have spare space on their left. Shift the whole widget so
+ * its text and mouse target follow the keycap. */
+short menu_functions_glyph_offset(struct widget_instance *widget)
+{
+    struct widget_instance *sibling;
+    char const *name, *leaf;
+    rectangle2d bounds;
+    short text_offset, extra = 0, balance = 0, width, button, accept_x = 0, label_end = 0, gap = 0;
+    boolean compact;
+    if (!widget->parent || !menu_button_glyph_keyboard_active(controller_of(widget))) return 0;
+    if (menu_button_glyph_key_width(0) <= 0) return 0;
+    if (mcc_pause_owns(widget->parent->definition_tag_index))
+        return mcc_pause_key_offset(widget->parent->definition_tag_index,
+            widget->definition_tag_index, menu_button_glyph_compact_key_width(0), menu_button_glyph_compact_key_width(1));
+    name = tag_get_name(widget->parent->definition_tag_index);
+    leaf = name ? strrchr(name, '\\') : NULL;
+    if (!leaf || (strcmp(leaf, "\\button_key") && strcmp(leaf, "\\button_key_options") &&
+        strcmp(leaf, "\\mp_button_key") && strcmp(leaf, "\\button_key_sm") &&
+        strcmp(leaf, "\\confirm_buttons"))) return 0;
+    compact = !strcmp(leaf, "\\button_key_sm");
+    /* Confirmation legends use confirm_buttons while containing the same
+     * small face-button slots as the pause footer. Match their authored slots. */
+    for (sibling = widget->parent->child; sibling; sibling = sibling->next)
+    {
+        name = tag_get_name(sibling->definition_tag_index);
+        leaf = name ? strrchr(name, '\\') : NULL;
+        if (leaf && !strcmp(leaf, "\\a_butn_sm")) compact = TRUE;
+    }
+    if (compact)
+    {
+        /* These groups have varying authored gaps. Recover spare
+         * space or add missing space, keeping eight units after CANCEL. */
+        for (sibling = widget->parent->child; sibling; sibling = sibling->next)
+        {
+            name = tag_get_name(sibling->definition_tag_index);
+            leaf = name ? strrchr(name, '\\') : NULL;
+            if (leaf && !strcmp(leaf, "\\a_butn_sm")) accept_x = sibling->horizontal_offset;
+        }
+        for (sibling = widget->parent->child; sibling; sibling = sibling->next)
+        {
+            name = tag_get_name(sibling->definition_tag_index);
+            leaf = name ? strrchr(name, '\\') : NULL;
+            if (!leaf || leaf[1] != '=' || sibling->horizontal_offset >= accept_x) continue;
+            pc_menu_widget_text_bounds(sibling->definition_tag_index, &bounds, &text_offset);
+            label_end = MAX(label_end, sibling->horizontal_offset + bounds.x1);
+        }
+        if (label_end) gap = accept_x - label_end - 8;
+    }
+    for (sibling = widget->parent->child; sibling; sibling = sibling->next)
+    {
+        name = tag_get_name(sibling->definition_tag_index);
+        leaf = name ? strrchr(name, '\\') : NULL;
+        if (!leaf) continue;
+        button = (!strcmp(leaf, "\\a_butn") || !strcmp(leaf, "\\a_butn_sm")) ? 0 :
+            (!strcmp(leaf, "\\b_butn") || !strcmp(leaf, "\\b_butn_sm")) ? 1 :
+            (!strcmp(leaf, "\\x_butn") || !strcmp(leaf, "\\x_butn_sm")) ? 2 :
+            (!strcmp(leaf, "\\y_butn") || !strcmp(leaf, "\\y_butn_sm")) ? 3 : NONE;
+        if (button == NONE) continue;
+        width = compact ? menu_button_glyph_compact_key_width(button) : menu_button_glyph_key_width(button);
+        pc_menu_widget_text_bounds(sibling->definition_tag_index, &bounds, &text_offset);
+        width = MAX(0, width - (bounds.x1 - bounds.x0));
+        /* Compact footers are B/CANCEL followed by A/SELECT (or A/OK).
+         * Balance the extra width on both ends around the authored center. */
+        if (compact && button == 0) width -= gap;
+        if (compact) balance += button == 0 ? width : button == 1 ? -width : 0;
+        if (compact ? button != 0 || sibling->horizontal_offset > widget->horizontal_offset :
+            sibling->horizontal_offset <= widget->horizontal_offset) continue;
+        extra += width;
+    }
+    return compact ? extra - balance / 2 : -extra;
+}
+
+/* MCC owns its generated key items. Only keyboard mode asks it for their
+ * identities; native controller drawing and the Xbox menu choice stay intact. */
+short menu_functions_glyph_button(struct widget_instance *widget, short native)
+{
+    if (native == NONE && widget->parent &&
+        menu_button_glyph_keyboard_active(controller_of(widget)))
+        return mcc_pause_key_button(widget->parent->definition_tag_index, widget->definition_tag_index);
+    return native;
+}
+
+boolean menu_functions_glyph_text(struct widget_instance *widget, rectangle2d const *bounds)
+{
+    rectangle2d definition, parent;
+    short text_offset, ignored;
+    rectangle2d panel = *bounds;
+    char const *name, *parent_name;
+    if (!widget->parent) return FALSE;
+    name = tag_get_name(widget->definition_tag_index);
+    parent_name = tag_get_name(widget->parent->definition_tag_index);
+    if (!name || !parent_name ||
+        !strstr(name, "\\press_start_to_join") ||
+        !strstr(parent_name, "\\lobby\\join4_qtr_join")) return FALSE;
+    pc_menu_widget_text_bounds(widget->definition_tag_index, &definition, &text_offset);
+    pc_menu_widget_text_bounds(widget->parent->definition_tag_index, &parent, &ignored);
+    panel.x0 = bounds->x0 - definition.x0 - text_offset -
+        widget->horizontal_offset + parent.x0;
+    panel.x1 = panel.x0 + parent.x1 - parent.x0;
+    return menu_button_glyph_join_draw(widget->parameters.text_box.text, controller_of(widget), &panel);
+}
+
 void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d const *bounds)
 {
 	short row;
 
-	/* (the Mods screen's texts: the fonts and widths their lines are
-	measured in, mods_text_fits) */
+	/* (the Steam Workshop's picture) */
+	if (widget->name && !strcmp(widget->name, "steam_picture"))
+	{
+		steam_picture_draw(bounds);
+		return;
+	}
+	/* (the Mods screen's texts, and the Steam Workshop's in their places:
+	the fonts and widths their lines are measured in, mods_text_fits) */
 	for (row = 0; widget->name && row < NUMBER_OF_MOD_TEXT_BOXES; row++)
 	{
-		if (!strcmp(widget->name, mod_text_box_names[row]))
+		if (!strcmp(widget->name, mod_text_box_names[row]) || !strcmp(widget->name, steam_text_box_names[row]))
 		{
 			mods_screen.fonts[row] = draw_string_get_font();
 			mods_screen.widths[row] = (short)(bounds->x1 - bounds->x0);
@@ -6094,6 +7084,13 @@ void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d c
 		}
 	}
 
+	/* (the lobby's game data: the font and width its author's line is measured in, lobby_line_fits) */
+	if (widget->name && !strcmp(widget->name, "lobby_game_data"))
+	{
+		lobby_data_box.font = draw_string_get_font();
+		lobby_data_box.width = (short)(bounds->x1 - bounds->x0);
+		return;
+	}
 	/* (as the lobby last updated them: the rows' widgets go with it) */
 	if (!lobby_icons.count || system_milliseconds() - lobby_icons.updated_at > 250)
 		return;
@@ -6137,6 +7134,65 @@ enum
 };
 
 static void map_vote_lobby_check(void);
+
+/* whether a line fits across the lobby's game data box, measured in its font as mods_text_fits measures (counted
+before the box is first drawn) */
+static boolean lobby_line_fits(wchar_t const *line)
+{
+	static real_argb_color const white = { 1.0f, 1.0f, 1.0f, 1.0f };
+	rectangle2d bounds;
+	rectangle2d text_bounds;
+	rectangle2d cursor;
+
+	if (lobby_data_box.font == NONE)
+		return ustrlen(line) <= LOBBY_LINE_CHARACTERS;
+	bounds.x0 = 0;
+	bounds.y0 = 0;
+	bounds.x1 = 0x3FFF;
+	bounds.y1 = 480;
+	draw_string_set_draw_mode(lobby_data_box.font, NONE, 0, 0, &white);
+	draw_unicode_string_compute_bounds(&bounds, line, &text_bounds, &cursor);
+	return MAX(text_bounds.x1, cursor.x0) - bounds.x0 <= lobby_data_box.width - MOD_TEXT_MARGIN;
+}
+
+/* the lobby panel's first line for an MCC map from the Steam Workshop, under the map's name: its author's name,
+once Steam has said (workshop_authors.c), cut short with "..." to stay one line (the box holds 7 lines, which a
+dedicated server's game already fills). The item is the one the host's game names (mcc_workshop.h), which a joiner
+still downloading the map has too; or this machine's copy's. FALSE for none */
+static boolean lobby_author_line(char const map_name[128], wchar_t *line, short size)
+{
+	struct mcc_workshop_item item;
+	char const *item_id = item.id;
+	char author[WORKSHOP_AUTHORS_NAME_SIZE];
+	wchar_t wide[WORKSHOP_AUTHORS_NAME_SIZE + 1];
+	short length, kept;
+
+	if (!mcc_level_name(map_name))
+		return FALSE;
+	if (!mcc_workshop_wire_unpack(map_name, &item))
+	{
+		short index = mcc_maps_find(map_name);
+
+		if (index == NONE)
+			return FALSE;
+		item_id = mcc_maps_item_id(index);
+	}
+	if (!workshop_authors_get(item_id, author, sizeof(author)))
+		return FALSE;
+	mods_wide_text(author, wide, NUMBEROF(wide));
+	length = (short)ustrlen(wide);
+	for (kept = length; ; kept--)
+	{
+		wide[kept] = 0;
+		line[0] = 0;
+		text_append(line, size, L"Publisher: ");
+		text_append(line, size, wide);
+		if (kept < length)
+			text_append(line, size, L"...");
+		if (!kept || lobby_line_fits(line))
+			return TRUE;
+	}
+}
 
 /* "port lobby update" */
 static void lobby_update(struct widget_instance *list)
@@ -6195,6 +7251,10 @@ static void lobby_update(struct widget_instance *list)
 		players while its director holds the countdown) */
 		boolean dedicated = lobby_joined_dedicated && !global_network_game_server_get();
 		wchar_t name[NUMBEROF(game->name) + ROW_TEXT_LENGTH];
+		/* (a Workshop map's author first, under the map's name, in the place of the empty line above the
+		countdown) */
+		wchar_t author[ROW_TEXT_LENGTH * 2];
+		boolean authored = lobby_author_line(game->map.name, author, NUMBEROF(author));
 
 		name[0] = 0;
 		if (dedicated)
@@ -6210,9 +7270,10 @@ static void lobby_update(struct widget_instance *list)
 		}
 		ustrncpy(gametype, game->variant.human_readable_game_description, NUMBEROF(gametype) - 1);
 		gametype[NUMBEROF(gametype) - 1] = 0;
-		usnprintf(text, NUMBEROF(text) - 1, L"%s%s\r\n%s\r\n%d of %d players\r\n\r\n%s", name, gametype,
+		usnprintf(text, NUMBEROF(text) - 1, L"%s%s%s%s\r\n%s\r\n%d of %d players\r\n%s%s", authored ? author : L"",
+			authored ? L"\r\n" : L"", name, gametype,
 			kind ? kind : engine_names[PIN(game->variant.game_engine_index, 0, 5)], lobby_player_count,
-			game->maximum_players,
+			game->maximum_players, authored ? L"" : L"\r\n",
 			seconds > 0 ? L"Starting in:" : game->machine_count < 2 || dedicated ? L"Waiting for players" : L"");
 		text[NUMBEROF(text) - 1] = 0;
 		if (seconds > 0)
@@ -6432,10 +7493,15 @@ static void preview_update(struct widget_instance *list)
 	visible_set(named(description, "lobby_right_item", 0), valid);
 	if (valid)
 	{
+		/* (a Workshop map's author first, as in the lobby: the advertisement names no item, so this machine's
+		copy's) */
+		wchar_t author[ROW_TEXT_LENGTH * 2];
+		boolean authored = lobby_author_line(game->map_name, author, NUMBEROF(author));
+
 		lobby_map_show(description, game->map_name);
-		usnprintf(text, NUMBEROF(text) - 1, L"%s\r\n%d of %d players\r\non %d machines",
-			game_kind_name(game->engine_type, advertised_game_kind(game), FALSE), game->player_count,
-			game->maximum_player_count, game->machine_count);
+		usnprintf(text, NUMBEROF(text) - 1, L"%s%s%s\r\n%d of %d players\r\non %d machines", authored ? author : L"",
+			authored ? L"\r\n" : L"", game_kind_name(game->engine_type, advertised_game_kind(game), FALSE),
+			game->player_count, game->maximum_player_count, game->machine_count);
 		text[NUMBEROF(text) - 1] = 0;
 		text_set_length(named(description, "lobby_game_data", 0), text, LOBBY_TEXT_LENGTH);
 		ustrncpy(name, game->game_name, NUMBEROF(game->game_name));
@@ -6758,8 +7824,8 @@ static void join4_update(struct widget_instance *widget)
 	join4_keyboard();
 	text_set(named(screen, "join4_hint", 0),
 		system_milliseconds() < join4.notice_until ? join4.notice :
-		halo_keyboard_shares_gamepad() && halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS ?
-			L"SPACE: join    ENTER: select    ESC: back" : L"ENTER: select    ESC: back");
+		menu_button_glyph_join_hint(halo_keyboard_shares_gamepad() &&
+			halo_gamepad_count() < MAXIMUM_LOCAL_PLAYERS, controller_of(screen)));
 }
 
 static long join4_tag(void)
@@ -7013,11 +8079,14 @@ static struct gametype_option const gametype_options[] =
 		{ "true", "false" } },
 	{ "coop_ally_friendly_fire_spinner", _option_setting, 0, 0, 2, { 0 }, "network.coop_ally_friendly_fire",
 		{ "true", "false" } },
+	{ "coop_vehicle_riding_spinner", _option_setting, 0, 0, 2, { 0 }, "network.vehicle_riding", { "true", "false" } },
 	/* map sharing's (Server Setup's MAP SHARING: tools/port_settings.py's
 	MAP_SHARE_SETUP; map_share.c) */
 	{ "map_share_spinner", _option_setting, 0, 0, 2, { 0 }, "network.map_share", { "true", "false" } },
-	{ "map_share_upload_spinner", _option_setting, 0, 0, 8, { 0 }, "network.map_share_upload",
-		{ "256", "512", "1024", "2048", "4096", "8192", "16384", "20480" } },
+	{ "map_share_upload_spinner", _option_setting, 0, 0, 11, { 0 }, "network.map_share_upload",
+		{ "256", "512", "1024", "2048", "4096", "8192", "16384", "20480", "51200", "102400", "256000" } },
+	/* the vehicle options' VEHICLE RIDING, the gametype's (vehicle_riding.c) */
+	{ "vehicle_riding_spinner", _option_flag, 0, FLAG(_game_variant_vehicle_riding_bit), 2, { 1, 0 } },
 	/* vehicle options (the side's set and counts: vehicles_update) */
 	{ "vehicles_respawn_spinner", _option_short, OPTIONS_FIELD(vehicle_respawn_time), 0, 7,
 		{ 0, 30, 60, 90, 120, 180, 300 } },
@@ -7637,12 +8706,20 @@ static void gametype_option_help(struct widget_instance *list)
 		with it when widget_instance_render_recursive draws and notes targets. */
 		{
 			short y = 73;
+			short visible = 0;
+			short spacing = 30;
+
+			for (row = list->child; row; row = row->next)
+				if (row->visible && !strncmp(row->name, "op_coop_", 8))
+					visible++;
+			if (visible > 1)
+				spacing = MIN(30, (341 - 1 - 73 - 28) / (visible - 1));
 
 			for (row = list->child; row; row = row->next)
 				if (row->visible && !strncmp(row->name, "op_coop_", 8))
 				{
 					row->vertical_offset = y;
-					y += 30;
+					y += spacing;
 				}
 		}
 	}
@@ -7925,6 +9002,10 @@ boolean pc_menu_event_function_invoke(
 		{
 			return map_list_back(widget, widget_deleted);
 		}
+		else if (!strcmp(name, "port mcc host folder back"))
+		{
+			return mcc_host_back(widget, widget_deleted);
+		}
 		else if (!strcmp(name, "mp profiles list initialize"))
 		{
 			if (!strcmp(widget->name, "playlist_select_list"))
@@ -7984,6 +9065,25 @@ boolean pc_menu_event_function_invoke(
 		{
 			settings_each(screen_of(widget), setting_default_show);
 		}
+        else if (!strcmp(name,"port mcc share closed"))
+            mcc_share_game_prompt_closed();
+        else if (!strcmp(name,"port steam init") || !strcmp(name,"port steam close"))
+            return steam_screen_reset(!strcmp(name,"port steam init"));
+        else if (!strcmp(name,"port steam choose"))
+            return steam_choose(widget);
+        else if (!strcmp(name,"port steam back"))
+            return steam_back(widget, widget_deleted);
+        else if (!strcmp(name,"port mcc downloads open")) mcc_share_menu_open();
+        else if (!strcmp(name,"port mcc downloads previous")) mcc_share_menu_step(-1);
+        else if (!strcmp(name,"port mcc downloads next")) mcc_share_menu_step(1);
+        else if (!strcmp(name,"port mcc downloads remove")) mcc_share_menu_remove();
+        else if (!strcmp(name,"port mcc share download") || !strcmp(name,"port mcc share workshop") ||
+            !strcmp(name,"port mcc share cancel") || !strcmp(name,"port mcc share browser")) {
+            int action=!strcmp(name,"port mcc share download") ? 0 : !strcmp(name,"port mcc share workshop") ? 1 : !strcmp(name,"port mcc share browser") ? 3 : 2;
+            *widget_deleted=TRUE;
+            mcc_share_game_prompt_action(action);
+            return TRUE;
+        }
 		else if (!strcmp(name, "port mods init") || !strcmp(name, "port mods close"))
 		{
 			return mods_screen_reset();
@@ -8158,7 +9258,13 @@ boolean pc_menu_event_function_invoke(
 		}
 		else if (!strcmp(name, "solo level set map"))
 		{
+			if (map_kind_mcc(level_list.kind) && mcc_solo_folder_choose(widget))
+				return FALSE;
 			return level_choose(widget, controller);
+		}
+		else if (!strcmp(name, "port mcc solo folder back"))
+		{
+			return mcc_solo_back(widget, widget_deleted);
 		}
 		else if (!strcmp(name, "difficulty item select"))
 		{
@@ -8253,6 +9359,46 @@ void pc_menu_game_data_function_invoke(
 		controls_update(widget);
 	else if (!strcmp(name, "port controller update"))
 		pad_editor_update(widget);
+    else if (!strcmp(name,"port mcc share text")) {
+        wchar_t text[512];
+        mcc_share_game_prompt_text(text);
+        text_set_length(widget,text,512);
+    }
+    else if (!strcmp(name,"port mcc downloads text")) {
+        wchar_t text[512];
+        mcc_share_menu_text(text);
+        text_set_length(widget,text,512);
+    }
+    else if (!strcmp(name,"port steam update"))
+        steam_update(widget);
+    else if (!strcmp(name,"port mcc downloads update")) {
+        struct widget_instance *remove=named(widget,"remove",0);
+        if (remove) {
+            remove->visible=mcc_share_menu_can_remove();
+            text_set(remove,mcc_share_menu_confirming() ? L"CONFIRM REMOVAL" : L"REMOVE SELECTED");
+        }
+        if (!widget->focused_child || !widget->focused_child->visible ||
+            widget->parameters.list.selected_index<1 || widget->parameters.list.selected_index>4 ||
+            (widget->parameters.list.selected_index==3 && !mcc_share_menu_can_remove()))
+            focus_row(widget,4);
+    }
+    else if (!strcmp(name,"port mcc share update")) {
+        struct widget_instance *download=named(widget,"download",0);
+        struct widget_instance *workshop=named(widget,"workshop",0);
+        struct widget_instance *browser=named(widget,"browser",0);
+        boolean steam=mcc_share_game_has_workshop();
+#if defined(HALO_ANDROID) || defined(HALO_WEB)
+        steam=FALSE;
+#endif
+        if (download) download->visible=mcc_share_game_can_download();
+        if (workshop) workshop->visible=steam;
+        if (browser) browser->visible=mcc_share_game_has_workshop();
+        if (widget->parameters.list.selected_index<1 ||
+            (widget->parameters.list.selected_index==1 && !mcc_share_game_can_download()) ||
+            (widget->parameters.list.selected_index==2 && !steam) ||
+            (widget->parameters.list.selected_index==3 && !mcc_share_game_has_workshop()))
+            focus_row(widget,mcc_share_game_can_download() ? 1 : steam ? 2 : mcc_share_game_has_workshop() ? 3 : 4);
+    }
 	else if (!strcmp(name, "port mods update"))
 		mods_update(widget);
 	else if (!strcmp(name, "color picker update"))

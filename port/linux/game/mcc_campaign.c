@@ -1,0 +1,742 @@
+/* MCC campaign operations. No native function/global table is extended or
+ * replaced. State belongs to MCC snapshots, never the Xbox/CE tag data. */
+#include "mcc_campaign.h"
+#include "mcc_cache.h"
+#include "mcc_script_effects.h"
+#include "mcc_game_speed.h"
+#include "ai/actor_definitions.h"
+#include "mcc_ui_network.h"
+#include "main/main.h"
+#include "errors.h"
+#include "cache/sound_cache.h"
+#include "sound/sound_definitions.h"
+#include "hs/hs.h"
+#include "hs/hs_scenario_definitions.h"
+#include "hs/object_lists.h"
+#include "game/game.h"
+#include "game/cheats.h"
+#include "game/players.h"
+#include "interface/hud.h"
+#include "interface/hud_definitions.h"
+#include "memory/data.h"
+#include "objects/objects.h"
+#include "physics/physics.h"
+#include "scenario/scenario.h"
+#include "scenario/scenario_definitions.h"
+#include "units/units.h"
+#include "network_distributed.h"
+#include "network_coop.h"
+#include "effects/player_effects.h"
+#include <stdint.h>
+#include <string.h>
+
+enum { MCC_NAV_POSITION=1, MCC_NAV_FLAG, MCC_NAV_OBJECT, MCC_NAV_LIMIT=8 };
+struct mcc_campaign_nav {
+    short kind, team, arrow, reserved;
+    long reference;
+    char name[64];
+    real_point3d position;
+    real offset;
+};
+struct mcc_campaign_state {
+    uint32_t version;
+    real gravity;
+    real dialog_gain;
+    uint32_t flags;
+    struct mcc_campaign_nav nav[MCC_NAV_LIMIT];
+    real effects_gain;
+    real ambient_base,ambient_scale;
+    real music_gain;
+    real model_ambient;
+};
+typedef char mcc_campaign_state_size[sizeof(struct mcc_campaign_state)==MCC_CAMPAIGN_SNAPSHOT_BYTES ? 1 : -1];
+static struct mcc_campaign_state mcc_campaign;
+/* Checkpoints store this extension in their reserved footer, preserving the
+ * fixed addresses of existing thread and object-name storage. */
+typedef char mcc_campaign_ambient_offset[offsetof(struct mcc_campaign_state,model_ambient)==MCC_CAMPAIGN_SNAPSHOT_V5_BYTES ? 1 : -1];
+static real *mcc_model_ambient;
+static real mcc_original_model_ambient;
+static real mcc_original_gravity;
+static real mcc_original_dialog_gain;
+static boolean mcc_original_infinite_ammo;
+static real mcc_original_ambient_base,mcc_original_ambient_scale;
+static boolean mcc_original_loud_dialog,mcc_original_ignore_player;
+static boolean *mcc_ignore_player;
+static boolean mcc_campaign_owned;
+static boolean *mcc_screen_flashes;
+static boolean mcc_original_screen_flashes;
+enum { MCC_CAMPAIGN_FLASHES_DISABLED = 1u << 11 };
+extern real sound_gain_under_dialog;
+extern real object_light_ambient_base,object_light_ambient_scale;
+extern boolean loud_dialog_hack;
+extern short const hs_external_global_count;
+
+boolean mcc_campaign_global_settable(short index)
+{
+    char const *name;
+    if (!mcc_cache_tags_loaded() || index<0 || index>=hs_external_global_count) return FALSE;
+    name=hs_global_external_get(index)->name;
+    return mcc_script_effect_global(name) || !csstrcasecmp(name,"sound_gain_under_dialog") || !csstrcasecmp(name,"cheat_infinite_ammo") ||
+        !csstrcasecmp(name,"object_light_ambient_base") || !csstrcasecmp(name,"object_light_ambient_scale") ||
+        !csstrcasecmp(name,"loud_dialog_hack") || !csstrcasecmp(name,"ai_debug_ignore_player") ||
+        !csstrcasecmp(name,"rasterizer_screen_flashes") ||
+        !csstrcasecmp(name,"rasterizer_model_lighting_ambient");
+}
+
+static int mcc_campaign_real(real value) { return value>=-1000000.0f && value<=1000000.0f; }
+static real mcc_campaign_argument(long value)
+{
+    union { long bits; real number; } result;
+    result.bits=value; return result.number;
+}
+
+void mcc_campaign_begin(void)
+{
+    mcc_script_effects_begin();
+    mcc_game_speed_reset();
+    if (!mcc_campaign_owned) {
+        short index=hs_find_global_by_name("ai_debug_ignore_player");
+        struct hs_external_global_definition *global=index!=NONE && ((unsigned short)index&0x8000) &&
+            (index&0x7fff)<hs_external_global_count ?
+            hs_global_external_get(index&0x7fff) : NULL;
+        mcc_ignore_player=global && global->type==_hs_type_boolean ? global->address : NULL;
+        index=hs_find_global_by_name("rasterizer_screen_flashes");
+        global=index!=NONE && ((unsigned short)index&0x8000) && (index&0x7fff)<hs_external_global_count ?
+            hs_global_external_get(index&0x7fff) : NULL;
+        mcc_screen_flashes=global && global->type==_hs_type_boolean ? global->address : NULL;
+        mcc_original_screen_flashes=mcc_screen_flashes ? *mcc_screen_flashes : TRUE;
+        index=hs_find_global_by_name("rasterizer_model_lighting_ambient");
+        global=index!=NONE && ((unsigned short)index&0x8000) && (index&0x7fff)<hs_external_global_count ?
+            hs_global_external_get(index&0x7fff) : NULL;
+        mcc_model_ambient=global && global->type==_hs_type_real ? global->address : NULL;
+        mcc_original_model_ambient=mcc_model_ambient ? *mcc_model_ambient : 0.0f;
+        mcc_original_gravity=global_gravity;mcc_original_dialog_gain=sound_gain_under_dialog;mcc_campaign_owned=TRUE;
+        mcc_original_infinite_ammo=cheat.infinite_ammo;
+        mcc_original_ambient_base=object_light_ambient_base;mcc_original_ambient_scale=object_light_ambient_scale;
+        mcc_original_loud_dialog=loud_dialog_hack;
+        mcc_original_ignore_player=mcc_ignore_player ? *mcc_ignore_player : FALSE;
+    }
+    memset(&mcc_campaign,0,sizeof(mcc_campaign));
+    mcc_campaign.version=6; mcc_campaign.gravity=1.0f;
+    mcc_campaign.effects_gain=1.0f;
+    mcc_campaign.music_gain=1.0f;
+    mcc_campaign.model_ambient=mcc_original_model_ambient;
+    mcc_campaign.dialog_gain=mcc_original_dialog_gain;
+    global_gravity=mcc_original_gravity;
+    sound_gain_under_dialog=mcc_original_dialog_gain;
+    cheat.infinite_ammo=mcc_original_infinite_ammo;
+    object_light_ambient_base=mcc_campaign.ambient_base=mcc_original_ambient_base;
+    object_light_ambient_scale=mcc_campaign.ambient_scale=mcc_original_ambient_scale;
+    loud_dialog_hack=mcc_original_loud_dialog;
+    if (mcc_ignore_player) *mcc_ignore_player=mcc_original_ignore_player;
+    if (mcc_screen_flashes) *mcc_screen_flashes=mcc_original_screen_flashes;
+    if (mcc_model_ambient) *mcc_model_ambient=mcc_original_model_ambient;
+}
+
+/* Script startup also runs for map_reset without unloading the cache. */
+void mcc_campaign_reset_model_lighting(void)
+{
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned && mcc_model_ambient)
+        *mcc_model_ambient=mcc_original_model_ambient;
+}
+
+void mcc_campaign_dispose(void)
+{
+    mcc_script_effects_dispose();
+    mcc_game_speed_reset();
+    if (mcc_campaign_owned) {
+        global_gravity=mcc_original_gravity;sound_gain_under_dialog=mcc_original_dialog_gain;
+        cheat.infinite_ammo=mcc_original_infinite_ammo;
+        object_light_ambient_base=mcc_original_ambient_base;object_light_ambient_scale=mcc_original_ambient_scale;
+        loud_dialog_hack=mcc_original_loud_dialog;
+        if (mcc_ignore_player) *mcc_ignore_player=mcc_original_ignore_player;
+        if (mcc_screen_flashes) *mcc_screen_flashes=mcc_original_screen_flashes;
+        if (mcc_model_ambient) *mcc_model_ambient=mcc_original_model_ambient;
+    }
+    mcc_campaign_owned=FALSE;
+    mcc_ignore_player=NULL;
+    mcc_screen_flashes=NULL;
+    mcc_model_ambient=NULL;
+    memset(&mcc_campaign,0,sizeof(mcc_campaign));
+}
+
+void mcc_campaign_snapshot(void *out)
+{
+    mcc_campaign.dialog_gain=sound_gain_under_dialog;
+    if (mcc_model_ambient) mcc_campaign.model_ambient=*mcc_model_ambient;
+    if (game_connection()!=_game_connection_network_client)
+        mcc_campaign.flags=(mcc_campaign.flags&8u) | (cheat.infinite_ammo ? 1u : 0u) | (loud_dialog_hack ? 2u : 0u) |
+            (mcc_ignore_player && *mcc_ignore_player ? 4u : 0u) |
+            (mcc_script_effects_snapshot()<<4) |
+            (mcc_screen_flashes && !*mcc_screen_flashes ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u);
+    mcc_campaign.ambient_base=object_light_ambient_base;mcc_campaign.ambient_scale=object_light_ambient_scale;
+    memcpy(out,&mcc_campaign,sizeof(mcc_campaign));
+}
+
+int mcc_campaign_validate(void const *in, unsigned long bytes)
+{
+    struct mcc_campaign_state state;
+    int i,j;
+    if (!in || (bytes!=sizeof(state) && bytes!=MCC_CAMPAIGN_SNAPSHOT_V5_BYTES && bytes!=MCC_CAMPAIGN_SNAPSHOT_V4_BYTES && bytes!=MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)) return 0;
+    memset(&state,0,sizeof(state));state.effects_gain=state.music_gain=1.0f;
+    state.model_ambient=mcc_original_model_ambient;
+    state.ambient_base=mcc_original_ambient_base;state.ambient_scale=mcc_original_ambient_scale;
+    memcpy(&state,in,bytes);
+    if ((bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES && state.version!=1u) ||
+        (bytes==MCC_CAMPAIGN_SNAPSHOT_V4_BYTES && (state.version<2u || state.version>4u)) ||
+        (bytes==MCC_CAMPAIGN_SNAPSHOT_V5_BYTES && state.version!=5u) ||
+        (bytes==sizeof(state) && state.version!=6u)) return 0;
+    if (!(state.effects_gain>=0.0f && state.effects_gain<=4.0f) ||
+        !(state.music_gain>=0.0f && state.music_gain<=1.0f) ||
+        (state.flags & ~(state.version==1u ? 1u : state.version==2u ? 15u :
+            15u|(MCC_EFFECT_MASK<<4)|(state.version>=4u ? MCC_CAMPAIGN_FLASHES_DISABLED : 0u))) ||
+        !mcc_campaign_real(state.ambient_base) || !mcc_campaign_real(state.ambient_scale) ||
+        !mcc_campaign_real(state.model_ambient) ||
+        !mcc_campaign_real(state.dialog_gain) ||
+        !(state.gravity>=-1000.0f && state.gravity<=1000.0f)) return 0;
+    for (i=0;i<MCC_NAV_LIMIT;i++) {
+        struct mcc_campaign_nav const *nav=&state.nav[i];
+        if (nav->kind<0 || nav->kind>MCC_NAV_OBJECT || nav->reserved ||
+            !mcc_campaign_real(nav->position.x) || !mcc_campaign_real(nav->position.y) ||
+            !mcc_campaign_real(nav->position.z) || !mcc_campaign_real(nav->offset) ||
+            !memchr(nav->name,0,sizeof(nav->name))) return 0;
+        if (!nav->kind) continue;
+        if (nav->team<0 || nav->team>=10 || nav->arrow<0) return 0;
+        if (hud_globals && nav->arrow>=hud_globals->waypoint.arrows.count) return 0;
+        if (nav->kind==MCC_NAV_FLAG && (nav->reference<0 ||
+            nav->reference>=global_scenario_get()->cutscene_flags.count)) return 0;
+        if (nav->kind==MCC_NAV_OBJECT && nav->reference==NONE) return 0;
+        for (j=0;j<i;j++) {
+            struct mcc_campaign_nav const *other=&state.nav[j];
+            if (nav->kind==other->kind && nav->team==other->team &&
+                (nav->kind==MCC_NAV_POSITION ? !strcmp(nav->name,other->name) : nav->reference==other->reference)) return 0;
+        }
+    }
+    return 1;
+}
+
+int mcc_campaign_restore(void const *in, unsigned long bytes)
+{
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned || !mcc_campaign_validate(in,bytes)) return 0;
+    mcc_campaign.effects_gain=1.0f;
+    mcc_campaign.music_gain=1.0f;
+    mcc_campaign.model_ambient=mcc_original_model_ambient;
+    mcc_campaign.ambient_base=mcc_original_ambient_base;mcc_campaign.ambient_scale=mcc_original_ambient_scale;
+    memcpy(&mcc_campaign,in,bytes);
+    if (bytes==MCC_CAMPAIGN_SNAPSHOT_V1_BYTES)
+        mcc_campaign.flags|=(mcc_original_loud_dialog ? 2u : 0u) | (mcc_original_ignore_player ? 4u : 0u);
+    if (mcc_campaign.version<4u && !mcc_original_screen_flashes)
+        mcc_campaign.flags|=MCC_CAMPAIGN_FLASHES_DISABLED;
+    mcc_campaign.version=6;
+    mcc_script_effects_restore((mcc_campaign.flags>>4)&MCC_EFFECT_MASK);
+    global_gravity=mcc_original_gravity*mcc_campaign.gravity;
+    sound_gain_under_dialog=mcc_campaign.dialog_gain;
+    object_light_ambient_base=mcc_campaign.ambient_base;object_light_ambient_scale=mcc_campaign.ambient_scale;
+    loud_dialog_hack=(mcc_campaign.flags&2u)!=0;
+    if (mcc_screen_flashes) *mcc_screen_flashes=!(mcc_campaign.flags&MCC_CAMPAIGN_FLASHES_DISABLED);
+    if (mcc_model_ambient) *mcc_model_ambient=mcc_campaign.model_ambient;
+    /* The native client cheat policy remains authoritative. Only the host
+     * runs campaign scripts and decides ammunition consumption. */
+    if (game_connection()!=_game_connection_network_client) cheat.infinite_ammo=(mcc_campaign.flags&1u)!=0;
+    if (mcc_ignore_player && game_connection()!=_game_connection_network_client) *mcc_ignore_player=(mcc_campaign.flags&4u)!=0;
+    return 1;
+}
+
+/* D20 disables damage flashes while fading over a BSP switch. The native
+ * renderer gates both with one switch; only an active MCC fade bypasses it. */
+boolean mcc_campaign_fade_active(void)
+{
+    real_rgb_color color;
+    short ticks;
+    boolean fading_out;
+    long start;
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned) return FALSE;
+    player_effect_port_screen_fade_get(&color,&ticks,&fading_out,&start);
+    return ticks>=0 && (fading_out || game_time_get()-start<=ticks);
+}
+
+static void mcc_cooperative_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    hs_return(thread,game_is_cooperative() || network_coop_active());
+}
+
+static void mcc_flashlight_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    struct unit_datum *unit;
+    if (!args) return;
+    /* A race can destroy its vehicles while another script still holds
+     * their handles. Validate the salt and unit type before querying. */
+    unit=unit_try_and_get(args[0]);
+    hs_return(thread,unit && TEST_FLAG(unit->unit.flags,_unit_integrated_light_on_bit));
+}
+
+real mcc_campaign_effects_gain(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned ? mcc_campaign.effects_gain : 1.0f;
+}
+
+boolean mcc_campaign_unlimited_ammo(void)
+{
+    return mcc_cache_tags_loaded() && mcc_campaign_owned &&
+        (game_connection()==_game_connection_network_client ? (mcc_campaign.flags&1u)!=0 : cheat.infinite_ammo);
+}
+
+/* Script muting is additional to the player's audio settings, and belongs
+ * to this map's checkpoint/network state. Music is muted too. */
+real mcc_campaign_mix_gain(boolean music)
+{
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned) return 1.0f;
+    return (mcc_campaign.flags&8u) ? 0.0f : music ? mcc_campaign.music_gain : mcc_campaign.effects_gain;
+}
+
+static void mcc_sound_enable_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    if (!args) return;
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned && game_connection()!=_game_connection_network_client) {
+        if ((boolean)args[0]) mcc_campaign.flags&=~8u;
+        else mcc_campaign.flags|=8u;
+    }
+    hs_return(thread,0);
+}
+
+static void mcc_map_reset_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    hs_return(thread,0);
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned || game_connection()==_game_connection_network_client) return;
+    if (game_connection()==_game_connection_network_server) {
+        if (!mcc_ui_restart_network_game()) error(_error_silent,"mcc: scripted network map restart could not be requested");
+    } else main_reset_map();
+}
+
+static void mcc_effects_gain_get_evaluate(short function, long thread, boolean initialize)
+{
+    union { real number; long bits; } result;
+    (void)function;(void)initialize;
+    result.number=mcc_campaign_effects_gain();hs_return(thread,result.bits);
+}
+
+static void mcc_effects_gain_set_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    real gain;
+    if (!args) return;
+    gain=mcc_campaign_argument(args[0]);
+    if (mcc_campaign_owned && game_connection()!=_game_connection_network_client &&
+        gain>=0.0f && gain<=4.0f) mcc_campaign.effects_gain=gain;
+    hs_return(thread,0);
+}
+
+/* The map's music multiplier does not overwrite the player's volume setting. */
+static void mcc_music_gain_set_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    real gain;
+    if (!args) return;
+    gain=mcc_campaign_argument(args[0]);
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned &&
+        game_connection()!=_game_connection_network_client && gain>=0.0f && gain<=1.0f)
+        mcc_campaign.music_gain=gain;
+    hs_return(thread,0);
+}
+
+/* MCC's MP team query returns living units, including remote players.
+ * Team numbers are player teams, not the unit's campaign allegiance. */
+static void mcc_team_players_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    long list,index;
+    short team;
+    if (!args) return;
+    team=(short)args[0];
+    list=object_list_new();
+    if (list!=NONE && mcc_cache_tags_loaded() && team>=0 && team<HALO_PORT_MAXIMUM_NETWORK_PLAYERS) {
+        for (index=data_next_index(player_data,NONE);index!=NONE;index=data_next_index(player_data,index)) {
+            struct player_datum *player=player_try_and_get(index);
+            struct unit_datum *unit=player ? unit_try_and_get(player->unit_index) : NULL;
+            if (unit && !player->quit_out_of_game && player->team_index==team &&
+                !TEST_FLAG(unit->object.damage_flags,_object_dead_bit)) object_list_add(list,player->unit_index);
+        }
+    }
+    hs_return(thread,list);
+}
+
+static void mcc_campaign_nav_change(short kind, short team, short arrow, long reference,
+    char const *name, real_point3d const *position, real offset)
+{
+    int i,slot=-1;
+    if (team<0 || team>=10 || !mcc_campaign_real(offset) ||
+        (kind==MCC_NAV_POSITION && (!name || strlen(name)>=64 || !position ||
+        !mcc_campaign_real(position->x) || !mcc_campaign_real(position->y) || !mcc_campaign_real(position->z)))) return;
+    for (i=0;i<MCC_NAV_LIMIT;i++) {
+        struct mcc_campaign_nav *nav=&mcc_campaign.nav[i];
+        if (!nav->kind) { if (slot<0) slot=i; continue; }
+        if (nav->kind==kind && nav->team==team &&
+            (kind==MCC_NAV_POSITION ? !strcmp(nav->name,name) : nav->reference==reference)) { slot=i; break; }
+    }
+    if (slot<0) { error(_error_silent,"mcc: campaign navigation point capacity reached"); return; }
+    if (arrow!=NONE && (!hud_globals || arrow<0 || arrow>=hud_globals->waypoint.arrows.count ||
+        (kind==MCC_NAV_FLAG && (reference<0 || reference>=global_scenario_get()->cutscene_flags.count)) ||
+        (kind==MCC_NAV_OBJECT && !object_try_and_get(reference)))) return;
+    memset(&mcc_campaign.nav[slot],0,sizeof(mcc_campaign.nav[slot]));
+    if (arrow!=NONE) {
+        struct mcc_campaign_nav *nav=&mcc_campaign.nav[slot];
+        nav->kind=kind;nav->team=team;nav->arrow=arrow;nav->reference=reference;nav->offset=offset;
+        if (position) nav->position=*position;
+        if (name) memcpy(nav->name,name,strlen(name)+1);
+    }
+}
+
+void mcc_campaign_render(short local_player)
+{
+    struct player_datum *player;
+    long player_index;
+    real_point3d head;
+    int i;
+    if (!mcc_cache_tags_loaded() || !mcc_campaign_owned || local_player<0 ||
+        local_player>=MAXIMUM_NUMBER_OF_LOCAL_PLAYERS || !hud_globals ||
+        hud_globals->waypoint.arrow_bitmap.index==NONE) return;
+    player_index=local_player_get_player_index(local_player);
+    player=player_index==NONE ? NULL : player_try_and_get(player_index);
+    if (!player || !unit_try_and_get(player->unit_index)) return;
+    unit_get_head_position(player->unit_index,&head);
+    for (i=0;i<MCC_NAV_LIMIT;i++) {
+        struct mcc_campaign_nav const *nav=&mcc_campaign.nav[i];
+        real_point3d position=nav->position;
+        long reference=NONE;
+        short screen;
+        if (!nav->kind || nav->team!=player->team_index || nav->arrow>=hud_globals->waypoint.arrows.count) continue;
+        if (nav->kind==MCC_NAV_FLAG) {
+            struct scenario *scenario=global_scenario_get();
+            if (nav->reference<0 || nav->reference>=scenario->cutscene_flags.count) continue;
+            position=((struct scenario_cutscene_flag *)scenario->cutscene_flags.address)[nav->reference].position;
+        } else if (nav->kind==MCC_NAV_OBJECT) {
+            real radius;
+            struct object_datum *object=object_try_and_get(nav->reference);
+            if (!object || TEST_FLAG(object->object.damage_flags,_object_dead_bit)) continue;
+            reference=nav->reference;
+            object_get_bounding_sphere(reference,&position,&radius);
+        }
+        position.z+=nav->offset;
+        screen=hud_get_nav_point_render_type(local_player,&head,&position,reference);
+        custom_render_nav_point(local_player,&position,nav->arrow,screen);
+    }
+}
+
+static void mcc_local_players_evaluate(short function, long thread, boolean initialize)
+{
+    long list=object_list_new();
+    short local;
+    (void)function;(void)initialize;
+    if (list!=NONE) for (local=0;local<MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;local++) {
+        long index=local_player_get_player_index(local);
+        struct player_datum *player=index==NONE ? NULL : player_try_and_get(index);
+        struct unit_datum *unit=player ? unit_try_and_get(player->unit_index) : NULL;
+        if (unit && !TEST_FLAG(unit->object.damage_flags,_object_dead_bit)) object_list_add(list,player->unit_index);
+    }
+    hs_return(thread,list);
+}
+
+static void mcc_authority_evaluate(short function, long thread, boolean initialize)
+{
+    short connection=game_connection();
+    (void)function;(void)initialize;
+    hs_return(thread,connection==_game_connection_local || connection==_game_connection_network_server);
+}
+
+static void mcc_alive_count_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize),index,cursor;
+    short count=0;
+    if (!args) return;
+    if (args[0]!=NONE && datum_try_and_get(object_list_header_data,args[0]))
+        for (index=object_list_get_first(args[0],&cursor);index!=NONE;index=object_list_get_next(args[0],&cursor)) {
+            struct object_datum *object=object_try_and_get(index);
+            if (object && !TEST_FLAG(object->object.damage_flags,_object_dead_bit) && count<32767) ++count;
+        }
+    hs_return(thread,count);
+}
+
+static void mcc_authoritative_time_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    hs_return(thread,game_connection()==_game_connection_network_client ?
+        distributed_latest_host_time() : game_time_get());
+}
+
+static void mcc_position_distance_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize),object,cursor;
+    real_point3d target,origin;
+    union { real number; long bits; } result;
+    if (!args) return;
+    result.number=-1.0f;
+    if (function==MCC_HS_CAMPAIGN_FIRST+21) {
+        struct scenario *scenario=global_scenario_get();
+        short flag=(short)args[1];
+        if (flag<0 || flag>=scenario->cutscene_flags.count) {hs_return(thread,result.bits);return;}
+        target=((struct scenario_cutscene_flag *)scenario->cutscene_flags.address)[flag].position;
+    } else {
+        target.x=mcc_campaign_argument(args[1]);target.y=mcc_campaign_argument(args[2]);target.z=mcc_campaign_argument(args[3]);
+    }
+    if (args[0]!=NONE && datum_try_and_get(object_list_header_data,args[0]) &&
+        mcc_campaign_real(target.x) && mcc_campaign_real(target.y) && mcc_campaign_real(target.z)) {
+        for (object=object_list_get_first(args[0],&cursor);object!=NONE;object=object_list_get_next(args[0],&cursor)) {
+            if (object_try_and_get(object)) {
+                real distance;
+                object_get_origin(object,&origin);distance=distance3d(&origin,&target);
+                if (result.number<0 || distance<result.number) result.number=distance;
+            }
+        }
+    }
+    hs_return(thread,result.bits);
+}
+
+static void mcc_gravity_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    if (args) {
+        real scale=mcc_campaign_argument(args[0]);
+        if (scale>=-1000.0f && scale<=1000.0f && mcc_campaign_owned && game_connection()!=_game_connection_network_client) {
+            mcc_campaign.gravity=scale;global_gravity=mcc_original_gravity*scale;
+        }
+        hs_return(thread,0);
+    }
+}
+
+static void mcc_physics_reset_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    if (mcc_campaign_owned && game_connection()!=_game_connection_network_client) {
+        mcc_campaign.gravity=1.0f;global_gravity=mcc_original_gravity;
+    }
+    hs_return(thread,0);
+}
+
+static void mcc_breadcrumbs_active_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    /* This is feature availability, not whether a marker currently exists. */
+    hs_return(thread,TRUE);
+}
+
+/* MCC integer operators use 32-bit values, including a zero-filling right
+ * shift. Use unsigned operations so high bits and overflow are defined on
+ * both native x86 and the Android guest. Nonnegative counts wrap at 32;
+ * negative counts produce an empty mask/result. */
+static void mcc_bits_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    uint32_t value,mask,result;
+    short shift;
+    if (!args) return;
+    value=(uint32_t)args[0];shift=(short)args[1];
+    mask=shift<0 ? 0u : (UINT32_C(1) << ((unsigned)shift&31u));
+    switch (function-MCC_HS_CAMPAIGN_FIRST) {
+    case 13: result=value&(uint32_t)args[1];break;
+    case 14: result=value|(uint32_t)args[1];break;
+    case 15: result=shift<0 ? 0u : value << ((unsigned)shift&31u);break;
+    case 16: result=shift<0 ? 0u : value >> ((unsigned)shift&31u);break;
+    case 17: result=(value&mask)!=0;break;
+    case 18: result=(boolean)args[2] ? value|mask : value&~mask;break;
+    default: result=0;break;
+    }
+    hs_return(thread,(long)result);
+}
+
+static void mcc_abs_real_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    /* HS real values are IEEE-754 words; clearing the sign also handles -0. */
+    if (args) hs_return(thread,(long)((uint32_t)args[0]&UINT32_C(0x7fffffff)));
+}
+
+static void mcc_cinematic_abort_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    /* Schedule the native skip/revert after script evaluation. Its existing
+     * skippable-checkpoint and co-op host rules remain authoritative. */
+    if (mcc_cache_tags_loaded() && game_connection()!=_game_connection_network_client)
+        main_skip_cinematic();
+    hs_return(thread,0);
+}
+
+static void mcc_spawn_vehicles_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    /* The existing engine service places the loaded globals' vehicle list.
+     * Object creation is already replicated by the host's object channel. */
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned &&
+        game_connection()!=_game_connection_network_client) cheat_all_vehicles();
+    hs_return(thread,0);
+}
+
+static void mcc_spawn_weapons_evaluate(short function, long thread, boolean initialize)
+{
+    (void)function;(void)initialize;
+    /* Use the loaded map's weapon list and existing host object replication. */
+    if (mcc_cache_tags_loaded() && mcc_campaign_owned &&
+        game_connection()!=_game_connection_network_client) cheat_all_weapons();
+    hs_return(thread,0);
+}
+
+static void mcc_object_type_predict_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    long tag;
+    boolean tag_index_is_group(long index,long group);
+    if (!args) return;
+    tag=args[0];
+    /* Cursed Halo A10's intro names an actor variant in object_type_predict.
+     * Precache its referenced unit instead of reading actv data as an object. */
+    if (mcc_cache_tags_loaded() && tag!=NONE) {
+        if (tag_index_is_group(tag,ACTOR_VARIANT_DEFINITION_TAG))
+            tag=actor_variant_definition_get(tag)->unit_reference.index;
+        if (tag!=NONE && tag_index_is_group(tag,OBJECT_DEFINITION_TAG)) object_definition_predict(tag);
+        else if (tag!=NONE) error(_error_silent,"mcc: object_type_predict cannot preload non-object tag %08lx",tag);
+    }
+    hs_return(thread,0);
+}
+
+static void mcc_unit_kill(short function, long thread, boolean initialize, void (*kill)(long))
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    if (!args) return;
+    /* Tiny Halo's startup and Mercury2's credits can name absent units.
+     * Validate the handle and unit type before entering the native routines;
+     * those require a live datum. Preserve argument evaluation and yielding. */
+    if (mcc_cache_tags_loaded() && game_connection()!=_game_connection_network_client &&
+        unit_try_and_get(args[0])) kill(args[0]);
+    hs_return(thread,0);
+}
+
+static void mcc_unit_kill_evaluate(short function, long thread, boolean initialize)
+{
+    mcc_unit_kill(function,thread,initialize,unit_kill);
+}
+
+static void mcc_unit_kill_silent_evaluate(short function, long thread, boolean initialize)
+{
+    mcc_unit_kill(function,thread,initialize,unit_kill_silent);
+}
+
+static void mcc_print_if_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    void hs_print(char const *message);
+    if (!args) return;
+    if ((boolean)args[0] && args[1]) hs_print((char const *)args[1]);
+    hs_return(thread,0);
+}
+
+static void mcc_impulse_predict_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    struct sound_definition *sound;
+    long range,permutation;
+    if (!args) return;
+    /* Preload without creating a playing sound, acquiring references or
+     * choosing a random permutation. The boolean requests a blocking load. */
+    if (args[0]!=NONE) {
+        sound=sound_definition_get(args[0]);
+        for (range=0;range<sound->pitch_ranges.count;range++) {
+            struct sound_pitch_range *pitch=(struct sound_pitch_range *)sound->pitch_ranges.address+range;
+            for (permutation=0;permutation<pitch->permutations.count;permutation++)
+                _sound_cache_sound_request((struct sound_permutation *)pitch->permutations.address+permutation,
+                    (boolean)args[1],TRUE,FALSE);
+        }
+    }
+    hs_return(thread,0);
+}
+
+static void mcc_nav_evaluate(short function, long thread, boolean initialize);
+static boolean mcc_sleep_parse(short function, long expression)
+{
+    extern struct data_array *hs_syntax_data;
+    struct hs_syntax_node *call=datum_try_and_get(hs_syntax_data,expression),*predicate,*argument;
+    (void)function;
+    if (!call || !(predicate=datum_try_and_get(hs_syntax_data,call->data))) return FALSE;
+    if (predicate->next_node_index==NONE) return TRUE;
+    argument=datum_try_and_get(hs_syntax_data,predicate->next_node_index);
+    return argument && argument->next_node_index==NONE && hs_parse(predicate->next_node_index,_hs_type_script);
+}
+
+boolean hs_macro_function_parse(short function,long expression);
+struct mcc_campaign_definition { struct hs_function_definition function;short rest[6]; };
+static struct mcc_campaign_definition mcc_campaign_functions[]={
+    {{_hs_type_object_list,0,"local_players",hs_macro_function_parse,mcc_local_players_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_boolean,0,"game_is_authoritative",hs_macro_function_parse,mcc_authority_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_void,0,"sleep_forever",mcc_sleep_parse,mcc_sleep_forever_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_real,0,"objects_distance_to_position",hs_macro_function_parse,mcc_position_distance_evaluate,NULL,NULL,4,{_hs_type_object_list}},{_hs_type_real,_hs_type_real,_hs_type_real}},
+    {{_hs_type_void,0,"physics_set_gravity",hs_macro_function_parse,mcc_gravity_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
+    {{_hs_type_void,0,"physics_constants_reset",hs_macro_function_parse,mcc_physics_reset_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_boolean,0,"breadcrumbs_nav_points_active",hs_macro_function_parse,mcc_breadcrumbs_active_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_void,0,"breadcrumbs_activate_team_nav_point_position",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,7,{_hs_type_navpoint}},{_hs_type_enum_team,_hs_type_real,_hs_type_real,_hs_type_real,_hs_type_string,_hs_type_real}},
+    {{_hs_type_void,0,"breadcrumbs_deactivate_team_nav_point",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,2,{_hs_type_enum_team}},{_hs_type_string}},
+    {{_hs_type_void,0,"breadcrumbs_activate_team_nav_point_flag",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,4,{_hs_type_navpoint}},{_hs_type_enum_team,_hs_type_cutscene_flag,_hs_type_real}},
+    {{_hs_type_void,0,"breadcrumbs_deactivate_team_nav_point_flag",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,2,{_hs_type_enum_team}},{_hs_type_cutscene_flag}},
+    {{_hs_type_void,0,"breadcrumbs_activate_team_nav_point_object",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,4,{_hs_type_navpoint}},{_hs_type_enum_team,_hs_type_object,_hs_type_real}},
+    {{_hs_type_void,0,"breadcrumbs_deactivate_team_nav_point_object",hs_macro_function_parse,mcc_nav_evaluate,NULL,NULL,2,{_hs_type_enum_team}},{_hs_type_object}},
+    {{_hs_type_long_integer,0,"bitwise_and",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_long_integer}},
+    {{_hs_type_long_integer,0,"bitwise_or",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_long_integer}},
+    {{_hs_type_long_integer,0,"bitwise_left_shift",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_short_integer}},
+    {{_hs_type_long_integer,0,"bitwise_right_shift",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_short_integer}},
+    {{_hs_type_long_integer,0,"bit_test",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,2,{_hs_type_long_integer}},{_hs_type_short_integer}},
+    {{_hs_type_long_integer,0,"bit_toggle",hs_macro_function_parse,mcc_bits_evaluate,NULL,NULL,3,{_hs_type_long_integer}},{_hs_type_short_integer,_hs_type_boolean}},
+    {{_hs_type_void,0,"print_if",hs_macro_function_parse,mcc_print_if_evaluate,NULL,NULL,2,{_hs_type_boolean}},{_hs_type_string}},
+    {{_hs_type_void,0,"sound_impulse_predict",hs_macro_function_parse,mcc_impulse_predict_evaluate,NULL,NULL,2,{_hs_type_sound}},{_hs_type_boolean}},
+    {{_hs_type_real,0,"objects_distance_to_flag",hs_macro_function_parse,mcc_position_distance_evaluate,NULL,NULL,2,{_hs_type_object_list}},{_hs_type_cutscene_flag}},
+    {{_hs_type_short_integer,0,"list_count_not_dead",hs_macro_function_parse,mcc_alive_count_evaluate,NULL,NULL,1,{_hs_type_object_list}},{0}},
+    {{_hs_type_boolean,0,"script_finished",hs_macro_function_parse,mcc_script_finished_evaluate,NULL,NULL,1,{_hs_type_string}},{0}},
+    {{_hs_type_long_integer,0,"game_time_authoritative",hs_macro_function_parse,mcc_authoritative_time_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_real,0,"sound_get_effects_gain",hs_macro_function_parse,mcc_effects_gain_get_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_void,0,"sound_set_effects_gain",hs_macro_function_parse,mcc_effects_gain_set_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
+    {{_hs_type_void,0,"sound_enable",hs_macro_function_parse,mcc_sound_enable_evaluate,NULL,NULL,1,{_hs_type_boolean}},{0}},
+    {{_hs_type_void,0,"map_reset",hs_macro_function_parse,mcc_map_reset_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_real,0,"abs_real",hs_macro_function_parse,mcc_abs_real_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
+    {{_hs_type_void,0,"cinematic_abort",hs_macro_function_parse,mcc_cinematic_abort_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_void,0,"cheat_all_vehicles",hs_macro_function_parse,mcc_spawn_vehicles_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_void,0,"object_type_predict",hs_macro_function_parse,mcc_object_type_predict_evaluate,NULL,NULL,1,{_hs_type_object_definition}},{0}},
+    {{_hs_type_void,0,"unit_kill",hs_macro_function_parse,mcc_unit_kill_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}},
+    {{_hs_type_void,0,"unit_kill_silent",hs_macro_function_parse,mcc_unit_kill_silent_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}},
+    {{_hs_type_boolean,0,"game_is_cooperative",hs_macro_function_parse,mcc_cooperative_evaluate,NULL,NULL,0,{0}},{0}},
+    {{_hs_type_boolean,0,"unit_get_current_flashlight_state",hs_macro_function_parse,mcc_flashlight_evaluate,NULL,NULL,1,{_hs_type_unit}},{0}},
+    {{_hs_type_void,0,"sound_set_music_gain",hs_macro_function_parse,mcc_music_gain_set_evaluate,NULL,NULL,1,{_hs_type_real}},{0}},
+    {{_hs_type_object_list,0,"players_on_multiplayer_team",hs_macro_function_parse,mcc_team_players_evaluate,NULL,NULL,1,{_hs_type_short_integer}},{0}},
+    {{_hs_type_void,0,"cheat_all_weapons",hs_macro_function_parse,mcc_spawn_weapons_evaluate,NULL,NULL,0,{0}},{0}}
+};
+
+struct hs_function_definition *mcc_campaign_function(short index)
+{
+    index=(short)(index-MCC_HS_CAMPAIGN_FIRST);
+    return index>=0 && index<NUMBEROF(mcc_campaign_functions) ? &mcc_campaign_functions[index].function : NULL;
+}
+short mcc_campaign_find(char const *name)
+{
+    short i;
+    for (i=0;i<NUMBEROF(mcc_campaign_functions);i++)
+        if (!csstrcasecmp(name,mcc_campaign_functions[i].function.name)) return (short)(MCC_HS_CAMPAIGN_FIRST+i);
+    return NONE;
+}
+
+static void mcc_nav_evaluate(short function, long thread, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread,initialize);
+    if (!args) return;
+    if (mcc_campaign_owned && game_connection()!=_game_connection_network_client) switch (function-MCC_HS_CAMPAIGN_FIRST) {
+    case 7: {
+        real_point3d position;
+        position.x=mcc_campaign_argument(args[2]);position.y=mcc_campaign_argument(args[3]);position.z=mcc_campaign_argument(args[4]);
+        mcc_campaign_nav_change(MCC_NAV_POSITION,(short)args[1],(short)args[0],NONE,(char const *)args[5],&position,mcc_campaign_argument(args[6]));break;
+    }
+    case 8: { real_point3d unused={0};mcc_campaign_nav_change(MCC_NAV_POSITION,(short)args[0],NONE,NONE,(char const *)args[1],&unused,0);break; }
+    case 9: mcc_campaign_nav_change(MCC_NAV_FLAG,(short)args[1],(short)args[0],(short)args[2],NULL,NULL,mcc_campaign_argument(args[3]));break;
+    case 10: mcc_campaign_nav_change(MCC_NAV_FLAG,(short)args[0],NONE,(short)args[1],NULL,NULL,0);break;
+    case 11: mcc_campaign_nav_change(MCC_NAV_OBJECT,(short)args[1],(short)args[0],args[2],NULL,NULL,mcc_campaign_argument(args[3]));break;
+    case 12: mcc_campaign_nav_change(MCC_NAV_OBJECT,(short)args[0],NONE,args[1],NULL,NULL,0);break;
+    }
+    hs_return(thread,0);
+}

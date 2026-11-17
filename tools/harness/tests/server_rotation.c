@@ -541,7 +541,7 @@ int main(int argc, char **argv)
 		{
 			{ "score", "score_to_win" }, { "respawn", "respawn_time" }, { "weapons", "weapon_set" },
 			{ "vehicles", "vehicle_set" }, { "time", "time_limit" }, { "ff", "friendly_fire" },
-			{ "balance", "auto_team_balance" },
+			{ "balance", "auto_team_balance" }, { "riding", "vehicle_riding" },
 		};
 		static char const *const tables[] = { "universal", "options", "ctf", "slayer", "king", "oddball", "race" };
 		int index, other;
@@ -594,6 +594,28 @@ int main(int argc, char **argv)
 		CHECK(!strcmp(server_rule_find("assault")->table, "ctf") && server_rule_find("assault")->engines == _server_engine_ctf,
 			"assault is not ctf's");
 		CHECK(!strcmp(server_rule_find("moving_hill")->table, "king"), "moving_hill is not king's");
+		return 0;
+	}
+	CASE("riding-rule")
+	{
+		CHECK(playable("bloodgulch:ctf+riding=true"), "riding was rejected: %s", entry.rejected);
+		CHECK(entry.rule_count == 1 && !strcmp(entry.rules[0].key, "vehicle_riding") && entry.rules[0].value == 1,
+			"%d rules, the first %s = %ld", entry.rule_count, entry.rules[0].key, entry.rules[0].value);
+		CHECK(playable("bloodgulch:ctf+vehicle_riding=off") && rule_of("vehicle_riding") == 0, "vehicle_riding=off: %ld",
+			rule_of("vehicle_riding"));
+		CHECK(rejected_with("bloodgulch:ctf+riding=maybe", "vehicle_riding takes true or false, not \"maybe\""),
+			"riding=maybe: %s", entry.rejected);
+		CHECK(rejected_with("bloodgulch:ctf+radar=maybe", "radar takes true or false, not \"maybe\""),
+			"radar=maybe: %s", entry.rejected);
+		CHECK(playable("bloodgulch:ctf+RIDING=true") && rule_of("vehicle_riding") == 1, "RIDING=true: %s", entry.rejected);
+		return 0;
+	}
+	CASE("riding-coop-entry")
+	{
+		CHECK(playable("a10:coop+riding=false"), "a co-op entry's riding was rejected: %s", entry.rejected);
+		CHECK(!strcmp(entry.gametype, "coop") && entry.rule_count == 1 && rule_of("vehicle_riding") == 0,
+			"%s, %d rules, riding %ld", entry.gametype, entry.rule_count, rule_of("vehicle_riding"));
+		CHECK(playable("a10:coop+riding=true") && rule_of("vehicle_riding") == 1, "a10:coop+riding=true: %s", entry.rejected);
 		return 0;
 	}
 	/* numbers in range, booleans' words, choices' words and indices; why not */

@@ -3,7 +3,7 @@
 static void controller_button_rows_show(struct widget_instance *list)
 {
     static char const *rows[] = {"op_hud_button_style", "op_hud_button_style_xbox",
-        "op_hud_button_style_ps", "op_hud_button_style_switch"};
+        "op_hud_button_style_ps", "op_hud_button_style_switch", "op_detected_button_style"};
     static char const *spinners[] = {"hud_button_style_spinner", "hud_button_style_xbox_spinner",
         "hud_button_style_ps_spinner", "hud_button_style_switch_spinner"};
     struct widget_instance *automatic = named(list, "auto_button_detection_spinner", 0);
@@ -12,7 +12,7 @@ static void controller_button_rows_show(struct widget_instance *list)
     struct pc_menu_setting *setting;
     struct controller_device device;
     short index, family = 0, selected, port;
-    boolean bumper_visible = FALSE;
+    boolean bumper_visible = FALSE, detect = FALSE;
     wchar_t caption[64];
     if (!automatic) return;
     port = controller_of(list);
@@ -20,11 +20,19 @@ static void controller_button_rows_show(struct widget_instance *list)
     setting = pc_menu_setting_get(automatic->definition_tag_index);
     index = automatic->parameters.list.selected_index;
     if (setting && index >= 0 && index < setting->value_count && !strcmp(setting->values[index], "true"))
+    {
+        detect = TRUE;
         family = (short)device.family;
+    }
     if (family < 0 || family > 3) family = 0;
+    spinner = named(list, "keyboard_glyphs_spinner", 0);
+    setting = spinner ? pc_menu_setting_get(spinner->definition_tag_index) : NULL;
+    index = spinner ? spinner->parameters.list.selected_index : -1;
+    if (detect && setting && index >= 0 && index < setting->value_count &&
+        !strcmp(setting->values[index], "true") && keyboard_prompt_active(port)) family = 4;
     shown = named(list, rows[family], 0);
     if (!shown) return;
-    for (index = 0; index < 4; index++)
+    for (index = 0; index < 5; index++)
     {
         row = named(list, rows[index], 0);
         if (!row) continue;
@@ -33,11 +41,12 @@ static void controller_button_rows_show(struct widget_instance *list)
     }
     if (bumper)
     {
-        spinner = named(list, spinners[family], 0);
+        spinner = family < 4 ? named(list, spinners[family], 0) : NULL;
         setting = spinner ? pc_menu_setting_get(spinner->definition_tag_index) : NULL;
         index = spinner ? spinner->parameters.list.selected_index : -1;
         if (setting && index >= 0 && index < setting->value_count)
-            bumper_visible = controller_button_style_index(setting->values[index]) < 3;
+            bumper_visible = strcmp(setting->values[index], "keyboard") &&
+                controller_button_style_index(setting->values[index]) < 3;
         /* Last option in Button Appearance; help and bottom buttons stay put. */
         bumper->visible = bumper_visible;
         if (!bumper_visible && list->focused_child == bumper) list->focused_child = shown;
@@ -45,7 +54,7 @@ static void controller_button_rows_show(struct widget_instance *list)
     for (selected = 0, child = list->child; child; child = child->next, selected++)
         if (child == list->focused_child) list->parameters.list.selected_index = selected;
     label = shown->child;
-    if (label)
+    if (label && family < 4)
     {
         usnprintf(caption, NUMBEROF(caption), L"BUTTON STYLE (P%d):", port + 1);
         text_set(label, caption);

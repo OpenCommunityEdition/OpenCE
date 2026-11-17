@@ -1594,3 +1594,18 @@ void bitmap_draw_string(
 
 	return;
 }
+
+/* port: scoped adornments restore the caller's text formatting and indentation. */
+void draw_string_get_format(short *style, short *justification, unsigned long *flags)
+{
+    *style = font_drawing_globals.current_style;
+    *justification = font_drawing_globals.current_justification;
+    *flags = font_drawing_globals.current_flags;
+}
+
+/* port: see draw_string_get_format. */
+void draw_string_get_indents(short *initial, short *paragraph)
+{
+    *initial = font_drawing_globals.initial_indent;
+    *paragraph = font_drawing_globals.paragraph_indent;
+}

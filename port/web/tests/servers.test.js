@@ -86,8 +86,9 @@ test("masters.json: https masters (with a path or none) with an Ed25519 key, fou
   assert.deepStrictEqual(require('../site/masters.json'), { masters: [] });
 });
 
-test("the official master is asked when masters.json names none", () => {
-  const official = ['https://master.opencommunityedition.com'];
+test("the official masters are asked when masters.json names none", () => {
+  const official = ['https://master.opencommunityedition.com', 'https://ocemaster.halobase.net',
+    'https://masterce.unicade.io'];
   const key = 'ed25519:' + 'ab'.repeat(32);
   assert.deepStrictEqual(servers.mastersOrDefault({ masters: [] }).map((item) => item.url), official);
   assert.deepStrictEqual(servers.mastersOrDefault(null).map((item) => item.url), official);
@@ -95,6 +96,9 @@ test("the official master is asked when masters.json names none", () => {
     .map((item) => item.url), official);
   assert.deepStrictEqual(Buffer.from(servers.mastersOrDefault(null)[0].key).toString('hex'),
     '89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa');
+  assert.deepStrictEqual(servers.mastersOrDefault(null).map((item) => Buffer.from(item.key).toString('hex')).slice(1),
+    ['1d018c4d1e182585948cd807f19133122c1a1484a74dcffa7792d18012573459',
+      '22aa04b7cf041af39c2e9765b5da10989254ed49fa23b730cd90e6d36a0a411a']);
   assert.deepStrictEqual(servers.mastersOrDefault({ masters: [{ url: 'https://a.example', key }] })
     .map((item) => item.url), ['https://a.example']);
 });

@@ -1127,6 +1127,8 @@
 		<string text="Vehicles will respawn every 2 minutes if idle." map="4"/>
 		<string text="Vehicles will respawn every 3 minutes if idle." map="5"/>
 		<string text="Vehicles will respawn every 5 minutes if idle." map="6"/>
+		<string text="Players standing on a vehicle are carried by it.\nOff: as the original game, riders slide off."/>
+		<string text="Players standing on a vehicle are carried by it.\nOff: as the original game, riders slide off."/>
 		<string text="Adjust vehicle placement for the Red Team." map="7"/>
 		<string text="Adjust vehicle placement for the Blue Team." map="8"/>
 		<string text="The map will contain the default vehicles specified\nin the map.  Includes Warthogs, Scorpion tanks, \nGhosts, Banshees and Covenant Gun Turrets." map="9"/>
@@ -1212,6 +1214,7 @@
 		<string text="GUN TURRET:" map="6"/>
 		<string text="VEHICLE RESPAWN TIME:" map="7"/>
 		<string text="SIDE:" map="8"/>
+		<string text="VEHICLE RIDING:"/>
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/audio_settings/audio_option_labels" map="ui\shell\main_menu\settings_select\player_setup\player_profile_edit\audio_settings\audio_option_labels">
 		<string text="MASTER VOLUME:" map="0"/>

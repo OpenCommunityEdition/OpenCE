@@ -39,6 +39,13 @@ about 115 MB, built at the first start), `logs/` (`HALO_LOG_ROOT`:
 The template's variables are passed as `HALO_*` variables, which win over
 `config.toml`: `sv_set` and the web page cannot change those settings.
 
+Vehicle riding base (`network.vehicle_riding`) and Override gametype
+vehicle riding (`server.vehicle_riding_override_gametype`) both default
+to `false`. The base is overridden in multiplayer by each gametype's riding rule
+(a gametype without the rule is off);
+the override setting, set to `true`, turns that override off. A co-op entry's `+riding` rule or a
+map's own choice takes precedence (docs/dedicated_server.md, "Vehicle riding").
+
 ## PufferPanel versions
 
 The template is in the format of PufferPanel 2's templates (`run.command`

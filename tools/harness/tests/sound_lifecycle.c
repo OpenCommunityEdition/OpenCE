@@ -45,6 +45,10 @@ static struct sound_datum *checked_sound(long index) {
 #define render_debug_looping_sound(...) ((void)0)
 #define player_effect_continuous_refresh(...) ((void)0)
 #define csmemcpy memcpy
+#define VALID_INDEX(i,c) ((i)>=0&&(i)<(c))
+/* coop_sound_sync.c's: no co-op client's sounds here */
+#define coop_sound_sync_place(...) _coop_sound_sync_play
+#define coop_sound_sync_refreshed(...) ((void)0)
 static int _sound_cache_sound_request(struct sound_permutation *p,int a,int b,int c) {
  (void)p;(void)a;(void)b;(void)c;return TRUE;
 }
@@ -103,6 +107,15 @@ int main(int argc,char **argv) {
  CASE("fresh-impulse") {
   struct sound_source source={.scale=1.f,.gain=1.f};long i=sound_new_impulse(0,&source,0,NULL,NULL,0);
   CHECK(i!=NONE && sound_calculate_fade(i)==1.f,"new impulse audible");return 0;
+ }
+ CASE("own-obstruction") {
+  struct sound_source source={.scale=1.f,.gain=1.f,.obstruction=NAN,.occlusion=NAN};
+  sound_refresh_looping(0,123,&source,_looping_sound_refresh_start,FALSE,0.f);
+  CHECK(loops[0].source.obstruction==0.f && loops[0].source.occlusion==0.f,"a new loop does not take its owner's unset obstruction");
+  loops[0].source.obstruction=.3f;loops[0].source.occlusion=.2f;
+  sound_refresh_looping(0,123,&source,_looping_sound_refresh_loop,FALSE,0.f);
+  CHECK(loops[0].source.obstruction==.3f && loops[0].source.occlusion==.2f,"a loop keeps its own obstruction across its owner's refresh");
+  return 0;
  }
  if(!strcmp(case_name,"four-tracks")) test_loop_definition.tracks.count=4;
  refresh(_looping_sound_refresh_start);long primary=loops[0].tracks[0].primary_sound_index,secondary=NONE;

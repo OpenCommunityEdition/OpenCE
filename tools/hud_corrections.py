@@ -16,23 +16,17 @@ def cell(rect, name, crop):
 
 def scope_cells(kind):
     # Stock visible coverage is 9x9 texels: Xbox [36,4,45,13],
-    # and CE [52,1,61,10].
+    # CE [52,1,61,10], and MCC [112,4,148,40] at four times the scale.
     # This supplied crop includes black padding, so a 10x10 placement
     # reproduces that footprint within one output pixel. Keep the crop,
     # its antialiasing and the stock centre; do not fill the sprite cell.
     if kind == 'ce':
         return [cell([0, 0, 25, 18], 'scope', [50, 26, 188, 112]),
                 cell([51.5, 0.5, 61.5, 10.5], 'scope', [241, 12, 301, 73])]
-    # The Xbox zoom labels' stock glyphs (alpha >= 128) do not fill their
-    # sprites [0,0,31,24] and [0,24,43,48]: 2x covers [5,5,26,19] (21x14
-    # texels) and 10x [6,29,38,43] (32x14), with the rest of each sprite
-    # empty. Filling the sprite drew them a third larger than the Xbox's.
-    # These placements put the supplied glyphs on the stock bounds: 10x
-    # within one output pixel; 2x within three, its supplied glyphs being
-    # wider for their height (1.65) than the stock's (1.50), which a
-    # proportional resize cannot change.
-    rectangles = [[4.125, 4.875, 26.75, 19.0], [5.25, 28.75, 38.5, 43.125],
-                  [35.5, 3.5, 45.5, 13.5]]
+    # Xbox labels fill the stock glyph bounds, not the padded sprite cells.
+    # Keep the independently packed MCC sheet in its own coordinate system.
+    rectangles = ([[4, 4, 100, 64], [4, 76, 148, 140], [110, 2, 150, 42]] if kind == 'mcc' else
+                  [[4.125, 4.875, 26.75, 19.0], [5.25, 28.75, 38.5, 43.125], [35.5, 3.5, 45.5, 13.5]])
     return [cell(rect, 'scope', crop) for rect, crop in zip(rectangles,
         [[50, 26, 188, 112], [50, 168, 247, 253], [241, 12, 301, 73]])]
 
@@ -69,6 +63,18 @@ def rebuild():
         ('[\n' + ',\n'.join('  '+json.dumps(e) for e in v) + '\n ]' if isinstance(v, list) else json.dumps(v))
         for k, v in compatible.items()) + '\n}\n')
     write_asset(entry)
+    mcc = {'assets': [dict(name='mcc_rocket_reticle', tag=r'mcc\hud\rocket_reticle', bitmap=0,
+        width=256, height=256, scale=2, crc=0, cells=[cell([0, 0, 256, 256], 'rocket', [92, 92, 1188, 1188])]),
+        dict(name='mcc_sniper_scope', tag=r'mcc\hud\sniper_scope', bitmap=0, width=256, height=256, scale=2, crc=0,
+             cells=scope_cells('mcc'))]}
+    (ASSETS / 'mcc_layout.json').write_text(json.dumps(mcc, indent=1)+'\n')
+    for entry in mcc['assets']:
+        write_asset(entry)
+    for entry in json.loads(button_assets.LIST.read_text())['assets']:
+        if entry['name'] in {f'classic_{letter}__0' for letter in 'abxy'}:
+            image = button_assets.bleed(button_assets.render(button_assets.classic(
+                entry['svg'], entry['classic'], entry.get('letter', (0, 0))), entry['scale']))
+            Image.fromarray(image).save(button_assets.ASSETS / (entry['name']+'.png'), optimize=True)
 
 
 if __name__ == '__main__':

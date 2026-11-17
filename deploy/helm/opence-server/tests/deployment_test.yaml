@@ -76,7 +76,8 @@ tests:
         instance: eu-1
         region: eu
         masterPublish: false
-      network: { tunnelPort: 2303, publicAddress: "halo.example.com:2303" }
+        vehicleRidingOverrideGametype: true
+      network: { tunnelPort: 2303, publicAddress: "halo.example.com:2303", vehicleRiding: true }
     asserts:
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_NAME, value: Test server } }
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_ROTATION, value: "bloodgulch:ctf, sidewinder:team_slayer+score=50" } }
@@ -88,6 +89,8 @@ tests:
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_INSTANCE, value: eu-1 } }
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_REGION, value: eu } }
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_MASTER_PUBLISH, value: "false" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_NET_VEHICLE_RIDING, value: "true" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE, value: "true" } }
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_NET_TUNNEL_PORT, value: "2303" } }
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_NET_PUBLIC_ADDRESS, value: "halo.example.com:2303" } }
       - equal: { path: 'spec.template.spec.containers[0].ports[0]', value: { name: tunnel, containerPort: 2303, protocol: UDP } }
@@ -106,14 +109,19 @@ tests:
       - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_LOBBY_SECONDS")]' }
       - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_LOG_FORMAT")]' }
       - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_MASTER_PUBLISH")]' }
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_NET_VEHICLE_RIDING")]' }
+      - notExists: { path: 'spec.template.spec.containers[0].env[?(@.name == "HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE")]' }
 
   - it: sets a false or zero value that is given
     set:
-      server: { public: false, masterPublish: false, lobbySeconds: 0 }
+      server: { public: false, masterPublish: false, lobbySeconds: 0, vehicleRidingOverrideGametype: false }
+      network: { vehicleRiding: false }
     asserts:
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_PUBLIC, value: "false" } }
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_MASTER_PUBLISH, value: "false" } }
       - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_LOBBY_SECONDS, value: "0" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_NET_VEHICLE_RIDING, value: "false" } }
+      - contains: { path: 'spec.template.spec.containers[0].env', content: { name: HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE, value: "false" } }
 
   - it: refuses a name longer than the game's 15 characters (the values' schema, or the template)
     set:

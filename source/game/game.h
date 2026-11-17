@@ -197,6 +197,8 @@ void game_time_start(void);
 /* the game time set, before the first tick (a distributed game joined in
 progress: the host's) */
 void game_time_set_distributed(long time);
+/* port: catch up through normal ticks to a reliable host update's time. */
+void game_time_synchronize_distributed(long time);
 void game_time_update(real time_delta_sec);
 
 /* ---------- prototypes/MAIN.C */

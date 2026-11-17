@@ -32,6 +32,9 @@ __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 halo.log to the game it reports */
 int crash_reporter_process(void);
 
+/* mcc_memory.c retains failures from before the log was available. */
+void mcc_memory_log_startup(void);
+
 __attribute__((constructor))
 static void windows_startup(void)
 {
@@ -59,6 +62,8 @@ static void windows_startup(void)
 				setvbuf(stderr, NULL, _IONBF, 0);
 		}
 	}
+	if (!crash_reporter_process())
+		mcc_memory_log_startup();
 }
 
 static int errno_from_windows_error(DWORD error)

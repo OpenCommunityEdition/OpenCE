@@ -176,6 +176,7 @@ void scripted_camera_enable(
 	boolean enabled)
 {
 	camera_script_globals.enabled = enabled;
+	sound_listener_motion_reset(NONE); /* port: entering or leaving a scripted camera is a cut */
 	camera_script_globals.first_update = TRUE;
 	return;
 }
@@ -205,6 +206,7 @@ void scripted_camera_set_animation(
 					camera_script_globals.camera_point_index = NONE;
 					camera_script_globals.relative_object_index = NONE;
 					camera_script_globals.mode = _camera_script_mode_animation;
+					sound_listener_motion_reset(NONE); /* port: a new track has no preceding motion sample */
 					camera_script_globals.first_update = TRUE;
 					camera_script_globals.animation_index = animation_index;
 					camera_script_globals.animation_graph_index = animation_graph_index;
@@ -228,6 +230,7 @@ void scripted_camera_set_first_person(
 	if (unit_index != NONE)
 	{
 		camera_script_globals.mode = _camera_script_mode_first_person;
+		sound_listener_motion_reset(NONE); /* port: camera attachment changes discontinuously */
 		camera_script_globals.first_update = TRUE;
 		camera_script_globals.relative_object_index = unit_index;
 	}
@@ -247,6 +250,7 @@ void scripted_camera_set_dead(
 	if (unit_index != NONE)
 	{
 		camera_script_globals.mode = _camera_script_mode_dead;
+		sound_listener_motion_reset(NONE); /* port: camera attachment changes discontinuously */
 		camera_script_globals.first_update = TRUE;
 		camera_script_globals.relative_object_index = unit_index;
 	}
@@ -281,6 +285,9 @@ void scripted_camera_set(
 		camera_point_index,
 		struct scenario_cutscene_camera_point);
 	camera_time = (short)transition_time / TICKS_PER_SECOND;
+	/* port: short cuts also need an explicit reset, before the observer moves */
+	if (camera_time <= 0)
+		sound_listener_motion_reset(NONE);
 	camera_script_globals.mode = _camera_script_mode_point;
 	camera_script_globals.first_update = TRUE;
 	camera_script_globals.camera_point_index = camera_point_index;
@@ -317,6 +324,8 @@ void scripted_camera_set_camera_point_relative(
 	word transition_time,
 	long relative_object_index)
 {
+	/* port: co-op applies this point every tick with zero transition time;
+	keep listener motion history until an actual camera or lifecycle change */
 	camera_script_globals.mode = _camera_script_mode_point;
 	camera_script_globals.camera_point_index = NONE;
 	camera_script_globals.point = *position;
