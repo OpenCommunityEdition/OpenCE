@@ -58,6 +58,8 @@ void game_state_save_core(
 	const char *name);
 boolean game_state_reverted(
 	void);
+/* port: checked MCC sidecar storage uses the otherwise-unused CPU tail. */
+void *game_state_port_cpu_region(unsigned long *used, unsigned long *capacity);
 void *game_state_malloc(
 	const char *name,
 	const char *type,

@@ -119,6 +119,7 @@ symbols in this file:
 
 #include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 #include "director.h"
+#include "mcc_camera.h" /* port: port/linux/game/mcc_camera.c */
 
 #include "camera_scripting.h"
 #include "dead_camera.h"
@@ -132,6 +133,7 @@ symbols in this file:
 #include "orbiting_camera.h"
 
 #include "editor/editor_stubs.h"
+#include "game/game.h" /* port: game_connection */
 #include "game/players.h"
 #include "input/input.h"
 #include "main/console.h"
@@ -266,6 +268,7 @@ void director_dispose_from_old_map(
 	short local_player_index;
 
 	controller_remap_reset(); /* port: release held actions and camera context between maps */
+	sound_listener_motion_reset(NONE); /* port: discard motion across map unload */
 
 	for (local_player_index = 0; local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS; local_player_index++)
 	{
@@ -400,6 +403,14 @@ short director_desired_perspective(
 			following = TRUE;
 	}
 
+	/* port: MCC weapon cameras must select the same perspective for display
+	 * and deterministic aiming. The adapter leaves legacy maps and seats alone. */
+	if (mcc_camera_weapon_following(unit_index))
+	{
+		*perspective = _director_perspective_third_person;
+		following = TRUE;
+	}
+
 	return following;
 }
 
@@ -451,6 +462,7 @@ static void director_set_camera(
 	struct director *director = director_get(local_player_index);
 
 	director->camera_proc = camera_proc;
+	sound_listener_motion_reset(local_player_index); /* port: camera selection is not listener motion */
 	director->debug_input_scale = 1.f;
 	director->debug_controls = FALSE;
 	if (interpolate)
@@ -1063,6 +1075,7 @@ void director_initialize_for_new_map(
 {
 	short local_player_index;
 
+	sound_listener_motion_reset(NONE); /* port: also called when restoring a saved game */
 	controller_remap_reset(); /* port: release held actions and camera context between maps */
 
 	director_globals.game_mode = game_in_editor() ? _director_mode_editor : _director_mode_game;
@@ -1164,9 +1177,48 @@ void director_update(
 
 			observer_set_camera(local_player_index, &director->command);
 		}
+		/* port: a host with no player of its own runs the scripts' camera all
+		the same, without a player's controls or choice of camera
+		(director_unattended_scripted_camera) */
+		else if (director_unattended_scripted_camera(local_player_index))
+		{
+			struct camera_control controls;
+			struct observer_command command;
+			struct director *director = director_get(local_player_index);
+
+			csmemset(&controls, 0, sizeof(controls));
+			controls.local_player_index = local_player_index;
+			controls.seconds_elapsed = time_delta_sec;
+			csmemset(&command, 0, sizeof(command));
+			if (director->camera_proc == (director_camera_update_proc)scripted_camera_update)
+			{
+				director->camera_proc(
+					director->camera_data,
+					&controls,
+					&command);
+			}
+			if (TEST_FLAG(command.flags, _observer_command_valid_bit))
+				director->command = command;
+			else
+				SET_FLAG(director->command.flags, _observer_command_valid_bit, FALSE);
+			observer_set_camera(local_player_index, &director->command);
+		}
 	}
 
 	return;
+}
+
+/* port: a dedicated server has no local player, so no director or observer
+ran for it, and a cutscene's camera never left the world's origin: its co-op
+clients, shown the host's camera (network_coop.c), watched that. The first
+observer films the scripts' camera for it, as a host's first local player's
+does, while they have the camera (camera_control) */
+boolean director_unattended_scripted_camera(
+	short local_player_index)
+{
+	return local_player_index == 0 && *director_camera_scripted &&
+		local_player_get_next(NONE) == NONE &&
+		game_connection() == _game_connection_network_server;
 }
 
 void director_initialize_for_saved_game(

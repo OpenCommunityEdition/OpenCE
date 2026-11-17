@@ -13,56 +13,16 @@ signals:
 	- a voice out of earshot, which is not resampled, moves on as one heard
 	  does, and is heard the same once it comes into earshot;
 	- mono voices heard as stereo ones with both channels the same are;
-	- audio.resampler = "linear": each frame between the two around it.
+	- audio.resampler = "linear": each frame between the two around it;
+	- overlapping cut fades in stereo and 5.1, and cancellation while the
+	  audio thread mixes during a packet completion callback.
 "render" writes voices at each rate and a scene's whole mix as raw floats
 (test_mixer.py compares the resampler adding four taps at a time with it
 adding tap by tap), "metrics" prints the figures and "bench" times a game's
 worth of voices.
 */
 
-#include "harness.h"
-
-#include <math.h>
-#include <pthread.h>
-
-typedef int BOOL;
-typedef unsigned long DWORD;
-typedef long LONG;
-typedef unsigned long ULONG;
-typedef void *LPVOID;
-typedef void (*LPFNXMEDIAOBJECTCALLBACK)(void *, void *, DWORD);
-typedef struct { void *lpVtbl; } IDirectSoundStream;
-typedef struct { void *pvBuffer; DWORD dwMaxSize; } XMEDIAPACKET;
-typedef struct
-{
-	LONG lRoom, lRoomHF;
-	float flRoomRolloffFactor, flDecayTime, flDecayHFRatio;
-	LONG lReflections;
-	float flReflectionsDelay;
-	LONG lReverb;
-	float flReverbDelay, flDiffusion, flDensity, flHFReference;
-} DSI3DL2LISTENER;
-#define DSBVOLUME_MIN (-10000)
-#define DS3DMODE_NORMAL 0x00000000
-#define DS3DMODE_HEADRELATIVE 0x00000001
-#define DS3DMODE_DISABLE 0x00000002
-
-/* the settings (port_config.c): audio.resampler, which a case sets */
-static const char *resampler_setting;
-
-static const char *config_string(const char *name)
-{
-	return !strcmp(name, "audio.resampler") ? resampler_setting : NULL;
-}
-
-/* the players' voices (voice_audio.c): none */
-static void voice_audio_mix(float *output, unsigned long frames)
-{
-	(void)output;
-	(void)frames;
-}
-
-#include "under_test.inc"
+#include "mixer_fixture.h"
 
 #define PI 3.14159265358979323846
 #define CHUNK 512 /* frames a mix, as SDL asks on Linux */
@@ -76,11 +36,15 @@ static struct sdl_stream *voice_new(const short *samples, unsigned long frames, 
 {
 	struct sdl_stream *stream = calloc(1, sizeof(*stream));
 
+	stream->cut_played = CUT_FADE_FRAMES;
+	stream->reference_count = 1;
 	stream->channels = channels;
 	stream->sample_rate = rate;
 	stream->frequency = frequency;
 	stream->volume = 1.0f;
 	stream->mix_left = stream->mix_right = 1.0f;
+	stream->surround_bins[0][0] = 1.0f;
+	stream->surround_bins[channels - 1][1] = 1.0f;
 	stream->room = stream->room_hf = DSBVOLUME_MIN;
 	stream->packets[0].samples = malloc(frames * channels * sizeof(short));
 	memcpy(stream->packets[0].samples, samples, frames * channels * sizeof(short));
@@ -90,40 +54,7 @@ static struct sdl_stream *voice_new(const short *samples, unsigned long frames, 
 	return stream;
 }
 
-static void voice_delete(struct sdl_stream *stream)
-{
-	free(stream->packets[0].samples);
-	free(stream);
-}
-
-/* frames of the voice mixed alone, CHUNK at a time: the left channel, or
-both (stereo: interleaved) */
-static void render(struct sdl_stream *stream, float *output, unsigned long frames, BOOL stereo)
-{
-	static float buffer[CHUNK * 2], send[CHUNK];
-	unsigned long done, frame;
-
-	for (done = 0; done < frames; done += CHUNK)
-	{
-		unsigned long count = frames - done < CHUNK ? frames - done : CHUNK;
-
-		memset(buffer, 0, sizeof(buffer));
-		memset(send, 0, sizeof(send));
-		mix_voice(stream, buffer, send, count);
-		for (frame = 0; frame < count; frame++)
-		{
-			if (stereo)
-			{
-				output[(done + frame) * 2] = buffer[frame * 2];
-				output[(done + frame) * 2 + 1] = buffer[frame * 2 + 1];
-			}
-			else
-			{
-				output[done + frame] = buffer[frame * 2];
-			}
-		}
-	}
-}
+#include "mixer_signals.h"
 
 /* ---------- the reference: the same low pass in double precision */
 
@@ -159,67 +90,6 @@ static double reference_frame(const double *source, long frames, double step, un
 }
 
 /* ---------- signals */
-
-static unsigned long random_state = 1;
-
-static double random_uniform(void)
-{
-	random_state = random_state * 1103515245UL + 12345UL;
-	return (double)((random_state >> 8) & 0xffffff) / 16777216.0 * 2.0 - 1.0;
-}
-
-/* frames of a signal as 16-bit samples (and as the doubles they are) */
-static void quantize(const double *signal, short *samples, double *exact, unsigned long frames)
-{
-	unsigned long frame;
-
-	for (frame = 0; frame < frames; frame++)
-	{
-		long value = lround(signal[frame] * 32767.0);
-
-		samples[frame] = (short)(value > 32767 ? 32767 : value < -32768 ? -32768 : value);
-		exact[frame] = samples[frame] / 32768.0;
-	}
-}
-
-/* ---------- figures */
-
-/* the amplitude of a sine of frequency cycles a frame in signal[first, last),
-and the power of the rest relative to the sine's, in dB */
-static void tone_fit(const float *signal, unsigned long first, unsigned long last, double frequency,
-	double *amplitude, double *rest_db)
-{
-	double ss = 0, sc = 0, cc = 0, ys = 0, yc = 0, a, b, determinant, rest = 0, tone = 0;
-	unsigned long n;
-
-	for (n = first; n < last; n++)
-	{
-		double s = sin(2.0 * PI * frequency * n), c = cos(2.0 * PI * frequency * n);
-
-		ss += s * s;
-		sc += s * c;
-		cc += c * c;
-		ys += signal[n] * s;
-		yc += signal[n] * c;
-	}
-	determinant = ss * cc - sc * sc;
-	a = (ys * cc - yc * sc) / determinant;
-	b = (yc * ss - ys * sc) / determinant;
-	for (n = first; n < last; n++)
-	{
-		double fit = a * sin(2.0 * PI * frequency * n) + b * cos(2.0 * PI * frequency * n);
-
-		rest += (signal[n] - fit) * (signal[n] - fit);
-		tone += fit * fit;
-	}
-	*amplitude = sqrt(a * a + b * b);
-	*rest_db = 10.0 * log10(rest / tone + 1e-30);
-}
-
-static double decibels(double ratio)
-{
-	return 20.0 * log10(ratio + 1e-30);
-}
 
 /* the mixer's output against the reference's for a signal at rate played at
 frequency: the error's power relative to the reference's, in dB, and its
@@ -332,17 +202,6 @@ static double sweep_figure(unsigned long rate, double top)
 	return 10.0 * log10(error / power + 1e-30);
 }
 
-static double *noise(unsigned long frames)
-{
-	double *signal = malloc(frames * sizeof(double));
-	unsigned long n;
-
-	random_state = 1;
-	for (n = 0; n < frames; n++)
-		signal[n] = 0.5 * random_uniform();
-	return signal;
-}
-
 /* ---------- a scene: a game's worth of voices, for "render" and "bench" */
 
 /* voices: mono 22 kHz sounds in the world (indoors sending to the reverb,
@@ -402,21 +261,6 @@ static void scene(unsigned long voices, unsigned long silent, BOOL indoor, doubl
 	}
 	free(mono);
 	free(stereo);
-}
-
-/* the scene's voices out of earshot come into it */
-static void scene_approach(void)
-{
-	struct sdl_stream *stream;
-
-	for (stream = streams; stream; stream = stream->next)
-	{
-		if (stream->direct == DSBVOLUME_MIN)
-		{
-			stream->position[2] = 3.0f;
-			stream->direct = stream->room = 0;
-		}
-	}
 }
 
 /* ---------- 3D voices: Doppler */
@@ -518,6 +362,295 @@ static void bench(unsigned long voices, unsigned long silent, BOOL indoor, doubl
 		indoor ? " indoors" : "", 100.0 * elapsed / seconds, elapsed * 1e9 / ((double)chunks * CHUNK));
 }
 
+/* Run the audio worker while a real flush completion callback has dropped
+the mixer lock. The handshake makes the problematic interleaving repeatable. */
+static pthread_mutex_t flush_test_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t flush_test_done = PTHREAD_COND_INITIALIZER;
+static struct sdl_stream *flush_test_stream;
+static float flush_output[2 * 100 * MAXIMUM_OUTPUT_CHANNELS], flush_send[2 * 100];
+static unsigned long flush_callbacks;
+static BOOL flush_worker_done;
+
+static void *flush_mix_worker(void *unused)
+{
+	unsigned long offset = flush_callbacks * 100;
+
+	(void)unused;
+	pthread_mutex_lock(&mixer_lock);
+	mix_voice(flush_test_stream, flush_output + offset * output_channels, flush_send + offset, 100);
+	mix_cut(flush_test_stream, flush_output + offset * output_channels, flush_send + offset, 100);
+	pthread_mutex_unlock(&mixer_lock);
+	pthread_mutex_lock(&flush_test_lock);
+	flush_worker_done = TRUE;
+	pthread_cond_signal(&flush_test_done);
+	pthread_mutex_unlock(&flush_test_lock);
+	return NULL;
+}
+
+static void flush_test_callback(void *context, void *packet, DWORD status)
+{
+	pthread_t worker;
+
+	CHECK(context == flush_test_stream, "wrong stream context");
+	CHECK(packet == flush_test_stream, "wrong packet context");
+	CHECK(status == XMEDIAPACKET_STATUS_FLUSHED, "flush completed with %lu", status);
+	CHECK(flush_callbacks < 2, "duplicate completion callback");
+	/* A repeated flush from a completion callback must not restart cancellation. */
+	stream_flush(&flush_test_stream->object);
+	pthread_mutex_lock(&flush_test_lock);
+	flush_worker_done = FALSE;
+	CHECK(!pthread_create(&worker, NULL, flush_mix_worker, NULL), "cannot create mixer worker");
+	pthread_detach(worker);
+	while (!flush_worker_done)
+		pthread_cond_wait(&flush_test_done, &flush_test_lock);
+	pthread_mutex_unlock(&flush_test_lock);
+	flush_callbacks++;
+}
+
+/* Exercise mono/stereo sources and both output layouts without game assets. */
+static void test_cut_overlap(void)
+{
+	static short samples[16000];
+	static float scratch[MIX_CHUNK_FRAMES * MAXIMUM_OUTPUT_CHANNELS], send[MIX_CHUNK_FRAMES];
+	static float old_cut[CUT_FADE_FRAMES * MAXIMUM_OUTPUT_CHANNELS], old_send[CUT_FADE_FRAMES];
+	static float next[CUT_FADE_FRAMES * MAXIMUM_OUTPUT_CHANNELS], next_send[CUT_FADE_FRAMES];
+	unsigned long layout, channels, mode, spatial, n, frame, speaker;
+
+	for (n = 0; n < 16000; n++)
+		samples[n] = (short)(12000 * sin(2.0 * PI * n / 93.0));
+	for (layout = 2; layout <= 6; layout += 4)
+	for (channels = 1; channels <= 2; channels++)
+	for (mode = RESAMPLER_XBOX; mode <= RESAMPLER_LINEAR; mode++)
+	for (spatial = 0; spatial < 2; spatial++)
+	{
+		struct sdl_stream *stream = voice_new(samples, 8000, channels, 44100, 0), reference;
+
+		output_channels = layout;
+		hrtf_enabled = spatial;
+		resampler_mode = mode;
+		stream->has_3d = TRUE;
+		stream->position[2] = 2.0f;
+		stream->minimum_distance = 1.0f;
+		stream->maximum_distance = 100.0f;
+		stream->room = 0;
+		stream->room_hf = 0;
+		memset(scratch, 0, sizeof(scratch));
+		memset(send, 0, sizeof(send));
+		mix_voice(stream, scratch, send, 512);
+		voice_cut(stream);
+		memcpy(old_cut, stream->cut, sizeof(old_cut));
+		memcpy(old_send, stream->cut_send, sizeof(old_send));
+		mix_cut(stream, scratch, send, 100);
+		CHECK(stream->cut_played == 100, "first fade already drained");
+		/* The next voice on this channel has started before it is cut too. */
+		stream->cursor = 0;
+		resampler_reset(stream);
+		stream->gains_valid = FALSE;
+		mix_voice(stream, scratch, send, 100);
+		reference = *stream;
+		memset(next, 0, sizeof(next));
+		memset(next_send, 0, sizeof(next_send));
+		mix_voice(&reference, next, next_send, CUT_FADE_FRAMES);
+		voice_cut(stream);
+		for (frame = 0; frame < CUT_FADE_FRAMES; frame++)
+		{
+			float fade = 0.5f + 0.5f * (float)cos(3.14159265358979 * (double)(frame + 1) / CUT_FADE_FRAMES);
+			float expected_send = next_send[frame] * fade +
+				(frame < CUT_FADE_FRAMES - 100 ? old_send[frame + 100] : 0.0f);
+			CHECK(fabsf(stream->cut_send[frame] - expected_send) < 1e-6f, "lost overlapping room send");
+			for (speaker = 0; speaker < layout; speaker++)
+			{
+				float expected = next[frame * layout + speaker] * fade +
+					(frame < CUT_FADE_FRAMES - 100 ? old_cut[(frame + 100) * layout + speaker] : 0.0f);
+				CHECK(fabsf(stream->cut[frame * layout + speaker] - expected) < 1e-6f,
+					"lost overlapping output: layout %lu, channel %lu, frame %lu", layout, speaker, frame);
+			}
+		}
+		memset(scratch, 0, sizeof(scratch));
+		memset(send, 0, sizeof(send));
+		mix_cut(stream, scratch, send, 100);
+		mix_cut(stream, scratch + 100 * layout, send + 100, 200);
+		for (frame = 0; frame < 300; frame++)
+		{
+			CHECK(send[frame] == (frame < CUT_FADE_FRAMES ? stream->cut_send[frame] : 0.0f),
+				"cut send did not drain exactly");
+			for (speaker = 0; speaker < layout; speaker++)
+				CHECK(scratch[frame * layout + speaker] ==
+					(frame < CUT_FADE_FRAMES ? stream->cut[frame * layout + speaker] : 0.0f),
+					"cut output did not drain exactly");
+		}
+		voice_delete(stream);
+	}
+}
+
+static void test_flush(void)
+{
+	static short samples[20000];
+	static float warm[512 * MAXIMUM_OUTPUT_CHANNELS], send[512];
+	static float expected[CUT_FADE_FRAMES * MAXIMUM_OUTPUT_CHANNELS], expected_send[CUT_FADE_FRAMES];
+	unsigned long layout, n, frame;
+	DWORD status, completed;
+	XMEDIAPACKET packet;
+
+	for (n = 0; n < 20000; n++)
+		samples[n] = 16384;
+	for (layout = 2; layout <= 6; layout += 4)
+	{
+		struct sdl_stream *stream = voice_new(samples, 10000, 1, 48000, 0), reference;
+
+		output_channels = layout;
+		stream->has_3d = TRUE;
+		stream->position[2] = 2.0f;
+		stream->minimum_distance = 1.0f;
+		stream->maximum_distance = 100.0f;
+		stream->room = stream->room_hf = 0;
+		stream->packets[0].packet.pContext = stream;
+		stream->packets[0].packet.dwMaxSize = 20000;
+		memset(&packet, 0, sizeof(packet));
+		packet.pvBuffer = samples;
+		packet.dwMaxSize = 20000;
+		packet.pdwStatus = &status;
+		packet.pdwCompletedSize = &completed;
+		packet.pContext = stream;
+		CHECK(stream_process(&stream->object, &packet, NULL) == S_OK, "cannot queue second packet");
+		memset(warm, 0, sizeof(warm));
+		memset(send, 0, sizeof(send));
+		mix_voice(stream, warm, send, 512);
+		reference = *stream;
+		voice_cut(&reference);
+		memcpy(expected, reference.cut, sizeof(expected));
+		memcpy(expected_send, reference.cut_send, sizeof(expected_send));
+		flush_test_stream = stream;
+		flush_callbacks = 0;
+		memset(flush_output, 0, sizeof(flush_output));
+		memset(flush_send, 0, sizeof(flush_send));
+		stream->context = stream;
+		stream->callback = flush_test_callback;
+		CHECK(stream_flush(&stream->object) == S_OK, "flush failed");
+		CHECK(flush_callbacks == 2 && status == XMEDIAPACKET_STATUS_FLUSHED && completed == 0,
+			"packets were not synchronously cancelled");
+		CHECK(!stream->packet_count && !stream->packets[0].samples && !stream->packets[1].samples,
+			"packet samples retained after flush");
+		for (frame = 0; frame < 200; frame++)
+		{
+			CHECK(fabsf(flush_send[frame] - expected_send[frame]) < 1e-6f, "live room send during flush");
+			for (n = 0; n < layout; n++)
+				CHECK(fabsf(flush_output[frame * layout + n] - expected[frame * layout + n]) < 1e-6f,
+					"live voice mixed over fade during flush at frame %lu", frame);
+		}
+		/* The empty second flush must not replay or discard the remaining fade. */
+		stream_flush(&stream->object);
+		memset(warm, 0, sizeof(warm));
+		memset(send, 0, sizeof(send));
+		mix_cut(stream, warm, send, 512);
+		for (frame = 0; frame < 512; frame++)
+		{
+			CHECK(send[frame] == (frame < 40 ? expected_send[frame + 200] : 0.0f), "wrong final room tail");
+			for (n = 0; n < layout; n++)
+				CHECK(warm[frame * layout + n] ==
+					(frame < 40 ? expected[(frame + 200) * layout + n] : 0.0f), "wrong final output tail");
+		}
+		stream->callback = NULL;
+		CHECK(stream_process(&stream->object, &packet, NULL) == S_OK, "cannot restart after flush");
+		memset(warm, 0, sizeof(warm));
+		mix_voice(stream, warm, send, 512);
+		CHECK(fabsf(warm[100 * layout]) > 0.01f, "flush left the stream muted");
+		streams = stream;
+		CHECK(stream_release(&stream->object) == 0 && !streams, "released stream retained");
+	}
+}
+
+static void test_cut_lifecycle(void)
+{
+	short samples[1000];
+	float output[512 * MAXIMUM_OUTPUT_CHANNELS], send[512];
+	struct sdl_stream *stream;
+	unsigned long n;
+
+	for (n = 0; n < 1000; n++)
+		samples[n] = 16384;
+	stream = voice_new(samples, 1000, 1, 48000, 0);
+	voice_cut(stream);
+	CHECK(stream->cut_played == CUT_FADE_FRAMES, "unplayed voice acquired a fade");
+	memset(output, 0, sizeof(output));
+	memset(send, 0, sizeof(send));
+	mix_voice(stream, output, send, 512);
+	IDirectSoundStream_Pause(&stream->object, DSSTREAMPAUSE_PAUSE);
+	voice_cut(stream);
+	CHECK(stream->cut_played == CUT_FADE_FRAMES, "paused voice acquired a fade");
+	stream_flush(&stream->object);
+	CHECK(stream->paused && !stream->packet_count, "flush changed pause state");
+	IDirectSoundStream_Pause(&stream->object, DSSTREAMPAUSE_RESUME);
+	CHECK(!stream->paused, "resume failed");
+	voice_cut(stream);
+	CHECK(stream->cut_played == CUT_FADE_FRAMES, "empty stream acquired a fade");
+	streams = stream;
+	stream_release(&stream->object);
+	CHECK(!streams, "released paused stream retained");
+	/* A short voice ends before 5 ms; capture must not read beyond its packet. */
+	stream = voice_new(samples, 40, 1, 48000, 0);
+	mix_voice(stream, output, send, 10);
+	voice_cut(stream);
+	memset(output, 0, sizeof(output));
+	memset(send, 0, sizeof(send));
+	mix_cut(stream, output, send, 512);
+	for (n = CUT_FADE_FRAMES; n < 512; n++)
+		CHECK(output[n * 2] == 0.0f && send[n] == 0.0f, "short packet leaked beyond its fade");
+	voice_delete(stream);
+}
+
+/* Reusing a stream after Flush must not carry the previous sound's ear
+history into its replacement. Compare with a fresh voice, excluding the
+separately owned cut fade. */
+static void test_hrtf_restart(void)
+{
+	short samples[4000];
+	float actual[512 * MAXIMUM_OUTPUT_CHANNELS], expected[512 * MAXIMUM_OUTPUT_CHANNELS];
+	float send[512], expected_send[512];
+	unsigned long layout, mode, n;
+
+	for (n = 0; n < 4000; n++)
+		samples[n] = (short)(14000 * sin(2.0 * PI * n / 57.0));
+	hrtf_enabled = TRUE;
+	for (layout = 2; layout <= 6; layout += 4)
+	for (mode = RESAMPLER_XBOX; mode <= RESAMPLER_LINEAR; mode++)
+	{
+		struct sdl_stream *reused = voice_new(samples, 4000, 1, 44100, 0);
+		struct sdl_stream *fresh = voice_new(samples, 4000, 1, 44100, 0);
+		XMEDIAPACKET packet;
+
+		output_channels = layout;
+		resampler_mode = mode;
+		reused->has_3d = fresh->has_3d = TRUE;
+		reused->minimum_distance = fresh->minimum_distance = 1.0f;
+		reused->maximum_distance = fresh->maximum_distance = 100.0f;
+		reused->position[0] = 2.0f;
+		reused->position[1] = 1.0f;
+		memset(actual, 0, sizeof(actual));
+		memset(send, 0, sizeof(send));
+		mix_voice(reused, actual, send, 512);
+		stream_flush(&reused->object);
+		memset(&packet, 0, sizeof(packet));
+		packet.pvBuffer = samples;
+		packet.dwMaxSize = sizeof(samples);
+		CHECK(stream_process(&reused->object, &packet, NULL) == S_OK, "replacement packet failed");
+		reused->position[0] = fresh->position[0] = -2.0f;
+		reused->position[1] = fresh->position[1] = -1.0f;
+		memset(actual, 0, sizeof(actual));
+		memset(expected, 0, sizeof(expected));
+		memset(send, 0, sizeof(send));
+		memset(expected_send, 0, sizeof(expected_send));
+		mix_voice(reused, actual, send, 512);
+		mix_voice(fresh, expected, expected_send, 512);
+		for (n = 0; n < 512 * layout; n++)
+			CHECK(fabsf(actual[n] - expected[n]) < 1.0e-6f, "HRTF history leaked after flush at %lu", n);
+		for (n = 0; n < 512; n++)
+			CHECK(fabsf(send[n] - expected_send[n]) < 1.0e-6f, "room history leaked after flush at %lu", n);
+		voice_delete(reused);
+		voice_delete(fresh);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	char const *case_name = argc > 1 ? argv[1] : "";
@@ -527,11 +660,21 @@ int main(int argc, char **argv)
 	};
 	unsigned long index;
 
+#ifdef _WIN32
+	_setmode(_fileno(stdout), _O_BINARY);
+#endif
+	hrtf_initialize();
+	hrtf_enabled = FALSE;
+	resampler_mode = RESAMPLER_SINC;
 	resampler_initialize();
 	resampler_phases_initialize();
 
 	/* the resampler is the low pass worked out exactly: noise at every rate,
 	the error well under 16-bit's */
+	CASE("cut-overlap") { test_cut_overlap(); return 0; }
+	CASE("flush") { test_flush(); return 0; }
+	CASE("hrtf-restart") { test_hrtf_restart(); return 0; }
+	CASE("cut-lifecycle") { test_cut_lifecycle(); return 0; }
 	CASE("reference")
 	{
 		double *signal = noise(30000);
@@ -644,6 +787,7 @@ int main(int argc, char **argv)
 			/* (it fades in over a mix from 0; the loud one does the same) */
 			quiet->volume = 1.0f;
 			loud->current_left = loud->current_right = 0.0f;
+			loud->ramp_frames = PARAMETER_RAMP_FRAMES;
 			render(quiet, skipped, 40000, TRUE);
 			render(loud, heard, 40000, TRUE);
 			for (n = 0; n < 40000 * 2; n++)
@@ -704,8 +848,6 @@ int main(int argc, char **argv)
 		free(signal);
 		return 0;
 	}
-	/* audio.resampler = "linear": each frame the two source frames around
-	it, weighted by how near it is to each */
 	/* a voice cut off at the top of its wave (voice_cut, as stream_flush
 	does) carries on and fades out over CUT_FADE_FRAMES: no step to silence
 	larger than the sine's own, from it at full level to nothing, and nothing
@@ -791,7 +933,7 @@ int main(int argc, char **argv)
 				memset(buffer, 0, sizeof(buffer));
 				memset(send, 0, sizeof(send));
 				/* cut once, and again while that cut plays */
-				if (chunk == 3 || (chunk == 5 && rand() % 2))
+				if (chunk == 3 || (chunk == 4 && rand() % 2))
 				{
 					voice_cut(stream);
 					stream->cursor = 0;
@@ -813,6 +955,7 @@ int main(int argc, char **argv)
 		free(exact);
 		return 0;
 	}
+	/* linear interpolation between the surrounding source frames */
 	CASE("linear")
 	{
 		double *signal = noise(30000);
@@ -849,110 +992,90 @@ int main(int argc, char **argv)
 		resampler_setting = "sinc";
 		CHECK(resampler_mode_read() == RESAMPLER_SINC, "audio.resampler = \"sinc\" is not read as sinc");
 		resampler_setting = NULL;
-		CHECK(resampler_mode_read() == RESAMPLER_SINC, "audio.resampler unset is not read as sinc");
+		CHECK(resampler_mode_read() == RESAMPLER_XBOX, "audio.resampler unset is not read as xbox");
 		free(output);
 		free(exact);
 		free(samples);
 		free(signal);
 		return 0;
 	}
-	/* the Doppler shift: a 1 kHz voice 10 units ahead, a unit being 3.048 m,
-	its pitch moved by c / (c - the source's speed towards the listener) and
-	(c - the listener's speed away from it) / c, nothing for a velocity
-	across the line or for a 2D voice but a positioned stereo one, and nothing held but the frequency, to
-	what an Xbox voice plays at (191983 Hz, four times 48 kHz, up; 188 Hz
-	down) */
-	CASE("doppler")
+	/* A live pitch change keeps both ends of the ramp inside the Xbox
+	voice frequency range, including the measured Doppler shift. */
+	CASE("doppler-limits")
 	{
-		static const struct
-		{
-			float source, across, listener;
-			BOOL is_3d;
-			double hertz;
-		} cases[] = {
-			{ 0.0f, 0.0f, 0.0f, TRUE, 1000.0 },
-			/* 10 units a second (30.48 m/s) towards the listener and away */
-			{ -10.0f, 0.0f, 0.0f, TRUE, 1000.0 * 343.3 / (343.3 - 30.48) },
-			{ 10.0f, 0.0f, 0.0f, TRUE, 1000.0 * 343.3 / (343.3 + 30.48) },
-			/* the listener 10 units a second towards the source */
-			{ 0.0f, 0.0f, 10.0f, TRUE, 1000.0 * (343.3 + 30.48) / 343.3 },
-			{ 0.0f, 10.0f, 0.0f, TRUE, 1000.0 },
-			{ -10.0f, 0.0f, 0.0f, FALSE, 1000.0 },
-			/* past half the speed of sound (182.88 m/s), more than an
-			octave up coming; going at 609.6 m/s, more than an octave down */
-			{ -60.0f, 0.0f, 0.0f, TRUE, 1000.0 * 343.3 / (343.3 - 182.88) },
-			{ 200.0f, 0.0f, 0.0f, TRUE, 1000.0 * 343.3 / (343.3 + 609.6) },
-			/* nearly and past the speed of sound: as fast as a voice plays */
-			{ -100.0f, 0.0f, 0.0f, TRUE, 1000.0 * 191983.0 / 48000.0 },
-			{ -200.0f, 0.0f, 0.0f, TRUE, 1000.0 * 191983.0 / 48000.0 },
-		};
+		unsigned long mode, limit;
 
-		listener.distance_factor = 3.048f;
-		for (index = 0; index < sizeof(cases) / sizeof(cases[0]); index++)
+		for (mode = 0; mode < 2; mode++)
+		for (limit = 0; limit < 2; limit++)
 		{
 			struct sdl_stream *stream = voice_ahead(10.0f);
-			double hertz, level, room_level;
+			float buffer[CHUNK * 2] = { 0 }, send[CHUNK] = { 0 };
+			double phase, rate;
+			unsigned long center;
 
-			stream->has_3d = cases[index].is_3d;
-			stream->velocity[2] = cases[index].source;
-			stream->velocity[0] = cases[index].across;
-			listener.velocity[2] = cases[index].listener;
-			voice_figures(stream, &hertz, &level, &room_level);
-			CHECK(fabs(hertz / cases[index].hertz - 1.0) < 1.0e-4, "case %lu: %.2f Hz, %.2f Hz wanted", index, hertz,
-				cases[index].hertz);
+			resampler_mode = mode ? RESAMPLER_LINEAR : RESAMPLER_SINC;
+			listener.distance_factor = 3.048f;
+			/* Source at supersonic approach, or listener outrunning sound. */
+			stream->velocity[2] = limit ? -200.0f : 0.0f;
+			listener.velocity[2] = limit ? 0.0f : -200.0f;
+			stream->frequency = limit ? 96000 : 100;
+			mix_voice(stream, buffer, send, CHUNK);
+			stream->frequency = limit ? 192000 : 50;
+			center = stream->center;
+			phase = stream->phase;
+			mix_voice(stream, buffer, send, CHUNK);
+			rate = ((double)(stream->center - center) + stream->phase - phase) * OUTPUT_RATE / CHUNK;
+			CHECK(fabs(rate - (limit ? 191983.0 : 188.0)) < 0.1,
+				"pitch change escaped frequency limit: %.3f Hz (mode %lu)", rate, mode);
 			voice_delete(stream);
 		}
 		listener.velocity[2] = 0.0f;
-		/* a positioned stereo voice (2D), shifted as one would be by how
-		fast the game says it comes towards the listener: 10 units a second */
-		{
-			struct sdl_stream *stream = voice_ahead(10.0f);
-			double hertz, level, room_level, wanted = 1000.0 * 343.3 / (343.3 - 30.48);
+		return 0;
+	}
+	CASE("doppler-stereo")
+	{
+		unsigned long mode, speakers, enabled, frame, chunk;
+		short samples[48000 * 2];
+		float buffer[CHUNK * 6], send[CHUNK], left[8192];
 
-			stream->has_3d = FALSE;
+		/* Two actual source channels: identical frequency, unequal amplitude. */
+		for (frame = 0; frame < 48000; frame++)
+		{
+			samples[frame * 2] = (short)(16000.0 * sin(2.0 * PI * 1000.0 * frame / 48000.0));
+			samples[frame * 2 + 1] = samples[frame * 2] / 2;
+		}
+		CHECK(!stereo_doppler_enabled, "stereo Doppler must initially be off");
+		for (mode = 0; mode < 2; mode++)
+		for (speakers = 2; speakers <= 6; speakers += 4)
+		{
+			struct sdl_stream *stream = voice_new(samples, 48000, 2, 48000, 0);
+
 			stream->stereo_positioned = TRUE;
 			stream->stereo_approach = 10.0f;
-			voice_figures(stream, &hertz, &level, &room_level);
-			CHECK(fabs(hertz / wanted - 1.0) < 1.0e-4, "a positioned stereo voice: %.2f Hz, %.2f Hz wanted", hertz,
-				wanted);
-			voice_delete(stream);
-		}
-		/* a change of velocity glides across the next mix: the pitch of
-		each stretch of it between the two */
-		{
-			struct sdl_stream *stream = voice_ahead(10.0f);
-			static float buffer[CHUNK * 2], send[CHUNK], left[CHUNK];
-			double before, after, wanted = 1000.0 * 343.3 / (343.3 - 30.48), quarter[4];
-			unsigned long chunk, frame, part;
-
-			for (chunk = 0; chunk < 8; chunk++)
+			stream->stereo_distance_fade = 1.0f;
+			listener.distance_factor = 3.048f;
+			resampler_mode = mode ? RESAMPLER_LINEAR : RESAMPLER_SINC;
+			output_channels = speakers;
+			/* Enable and then disable on the same playing voice. */
+			for (enabled = 0; enabled < 3; enabled++)
 			{
-				memset(buffer, 0, sizeof(buffer));
-				mix_voice(stream, buffer, send, CHUNK);
+				double hertz, wanted = enabled == 1 ? 1000.0 * (1.0 + 30.48 / 343.0) : 1000.0;
+
+				stereo_doppler_enabled = enabled == 1;
+				for (chunk = 0; chunk < 8192 / CHUNK; chunk++)
+				{
+					memset(buffer, 0, sizeof(buffer));
+					memset(send, 0, sizeof(send));
+					mix_voice(stream, buffer, send, CHUNK);
+					for (frame = 0; frame < CHUNK; frame++)
+						left[chunk * CHUNK + frame] = buffer[frame * speakers];
+				}
+				hertz = measured_frequency(left, 2048, 8192);
+				CHECK(fabs(hertz - wanted) < 0.2, "stereo setting %lu, speakers %lu, mode %lu: %.2f Hz expected %.2f",
+					enabled, speakers, mode, hertz, wanted);
 			}
-			for (frame = 0; frame < CHUNK; frame++)
-				left[frame] = buffer[frame * 2];
-			before = measured_frequency(left, 0, CHUNK);
-			stream->velocity[2] = -10.0f;
-			memset(buffer, 0, sizeof(buffer));
-			mix_voice(stream, buffer, send, CHUNK);
-			for (frame = 0; frame < CHUNK; frame++)
-				left[frame] = buffer[frame * 2];
-			for (part = 0; part < 4; part++)
-				quarter[part] = measured_frequency(left, part * CHUNK / 4, (part + 1) * CHUNK / 4 + 1);
-			memset(buffer, 0, sizeof(buffer));
-			mix_voice(stream, buffer, send, CHUNK);
-			for (frame = 0; frame < CHUNK; frame++)
-				left[frame] = buffer[frame * 2];
-			after = measured_frequency(left, 0, CHUNK);
-			CHECK(fabs(before - 1000.0) < 1.0 && fabs(after - wanted) < 1.0, "%.1f Hz before, %.1f Hz after (%.1f)",
-				before, after, wanted);
-			CHECK(quarter[0] > before + 5.0 && quarter[0] < quarter[3] - 20.0 && quarter[3] < after - 5.0,
-				"no glide: %.1f, then %.1f %.1f %.1f %.1f, then %.1f Hz", before, quarter[0], quarter[1], quarter[2],
-				quarter[3], after);
 			voice_delete(stream);
 		}
-		listener.distance_factor = 1.0f;
 		return 0;
 	}
 	CASE("metrics")

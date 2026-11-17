@@ -206,16 +206,20 @@ async function runChecks() {
   addCheck('webgl', webgl ? 'good' : 'bad', 'WebGL 2 from a worker');
   const opfs = !!(navigator.storage && navigator.storage.getDirectory);
   addCheck('opfs', opfs ? 'good' : 'bad', "The site's private storage (OPFS)");
+  const locks = !!(navigator.locks && navigator.locks.request && navigator.locks.query);
+  addCheck('locks', locks ? 'good' : 'bad', 'Safe storage between tabs (Web Locks)',
+    locks ? '' : 'use a current desktop Chrome, Edge or Firefox');
   const memory = window.crossOriginIsolated && memoryAvailable();
   addCheck('memory', memory ? 'good' : 'bad', 'Memory for the game (2.1 GB)',
     memory ? '' : 'this browser could not give the game that much: a 64-bit browser on a computer has it');
-  const required = ['secure', 'isolated', 'webgl', 'opfs', 'memory'];
+  const required = ['secure', 'isolated', 'webgl', 'opfs', 'locks', 'memory'];
   return required.every((name) => results[name] === 'good');
 }
 
 // ---------- the game data (xiso-worker.js)
 
 let dataReady = false;
+let launcherStorageActive = false;
 
 function formatBytes(bytes) {
   return bytes >= 1e9 ? (bytes / 1e9).toFixed(2) + ' GB' : Math.round(bytes / 1e6) + ' MB';
@@ -249,8 +253,28 @@ async function refreshStorage() {
   $('persist').disabled = persisted;
 }
 
-function importData(message) {
-  const worker = new Worker('xiso-worker.js');
+// Existing Xbox/mod workers retain their formats and copy behavior. This page
+// guard only prevents storage mutation while another tab has an open game.
+async function beginStorageTask(statusId) {
+  if (mapImportWorker || launcherStorageActive || gameStarted) return null;
+  setImporting(true);
+  try {
+    const release = await window.HaloMapStorage.lock(window.HaloMapStorage.GUARD);
+    let held = true;
+    return async () => { if (held) { held = false; await release(); setImporting(false); updatePlay(); } };
+  } catch (error) {
+    $(statusId).textContent = error.message;
+    setImporting(false); updatePlay();
+    return null;
+  }
+}
+
+async function importData(message) {
+  const release = await beginStorageTask('import-text');
+  if (!release) return;
+  let worker;
+  try { worker = new Worker('xiso-worker.js'); }
+  catch (error) { await release(); $('import-text').textContent = error.message; return; }
   $('import-progress').hidden = false;
   $('import-bar').style.width = '0';
   $('import-text').textContent = 'Reading…';
@@ -265,7 +289,7 @@ function importData(message) {
       return;
     }
     worker.terminate();
-    setImporting(false);
+    await release();
     if (data.type === 'done') {
       $('import-text').textContent = `Copied ${data.files} files.`;
       logLine(`import: ${data.files} files, ${data.bytes} bytes`);
@@ -275,19 +299,25 @@ function importData(message) {
     }
     await refreshData();
   };
-  worker.onerror = (event) => {
+  worker.onerror = async (event) => {
     worker.terminate();
-    setImporting(false);
+    await release();
     $('import-text').textContent = 'The copy failed: ' + event.message;
   };
   worker.postMessage(message);
 }
 
 function setImporting(importing) {
-  for (const id of ['image-label', 'folder-label']) $(id).classList.toggle('disabled', importing);
-  $('image-input').disabled = importing;
-  $('folder-input').disabled = importing;
-  $('play').disabled = importing || !canPlay();
+  launcherStorageActive = importing;
+  const busy = importing || !!mapImportWorker;
+  for (const id of ['image-label', 'folder-label']) $(id).classList.toggle('disabled', busy);
+  $('image-input').disabled = busy;
+  $('folder-input').disabled = busy;
+  for (const id of mapImportControls) $(id).disabled = busy;
+  $('mod-label').classList.toggle('disabled', busy);
+  $('mod-input').disabled = busy;
+  $('delete-data').disabled = busy || !dataReady;
+  $('play').disabled = busy || !canPlay();
 }
 
 $('image-input').addEventListener('change', (event) => {
@@ -299,6 +329,74 @@ $('folder-input').addEventListener('change', (event) => {
   const files = [...event.target.files];
   event.target.value = '';
   if (files.length) importData({ type: 'folder', files });
+});
+
+// CE and MCC imports have separate format policy and storage roots. The
+// worker's transaction owns cancellation/recovery; terminating it is not cancel.
+let mapImportWorker = null;
+const mapImportControls = ['ce-files-input', 'ce-folder-input', 'mcc-folder-input', 'mcc-package-name'];
+
+async function refreshCustomMaps() {
+  const counts = { ce: 0, mcc: 0 };
+  try {
+    const root = await navigator.storage.getDirectory();
+    for (const [kind, folder] of [['ce', 'custom_maps'], ['mcc', 'mcc_maps']]) {
+      let dir;
+      try { dir = await root.getDirectoryHandle(folder); }
+      catch (error) { if (error.name === 'NotFoundError') continue; throw error; }
+      let scanned = 0;
+      for await (const [name, handle] of dir.entries()) {
+        if (++scanned > 4096) throw new Error('Too many stored map entries to list.');
+        if (kind === 'ce' && handle.kind === 'file' && /\.map$/i.test(name) && !/^(bitmaps|sounds|loc)\.map$/i.test(name)) counts.ce++;
+        if (kind === 'mcc' && handle.kind === 'directory' && name !== '_shared' &&
+            (await window.HaloMapStorage.dispatch('visible', { folder: name })).visible) counts.mcc++;
+      }
+    }
+    $('custom-maps-list').textContent = `${counts.ce} CE maps and ${counts.mcc} MCC packages in this browser.`;
+  } catch (error) { $('custom-maps-list').textContent = 'Could not list custom maps: ' + error.message; }
+}
+
+function mapImport(family, selected) {
+  if (mapImportWorker || launcherStorageActive || gameStarted || !selected.length) return;
+  const worker = new Worker(family === 'ce' ? 'ce-import-worker.js' : 'mcc-import-worker.js');
+  mapImportWorker = worker;
+  setImporting(false);
+  $('map-import-cancel').hidden = false;
+  $('map-import-cancel').disabled = false;
+  $('map-import-status').textContent = 'Checking the selected files…';
+  updatePlay();
+  if (navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  async function finished(message) {
+    if (mapImportWorker !== worker) return;
+    worker.terminate(); mapImportWorker = null;
+    setImporting(false);
+    $('map-import-cancel').hidden = true;
+    $('map-import-status').textContent = message;
+    await refreshCustomMaps(); await refreshStorage(); updatePlay();
+  }
+  worker.onmessage = event => {
+    const data = event.data;
+    if (data.type === 'progress') {
+      $('map-import-status').textContent = `Copying ${data.file}: ${formatBytes(data.done)} of ${formatBytes(data.total)}`;
+    } else if (data.type === 'done') {
+      finished(`Imported ${data.title}: ${data.files} files (${formatBytes(data.bytes)}).`);
+    } else if (data.type === 'error') finished(data.message);
+  };
+  worker.onerror = event => finished('Import stopped: ' + event.message + '. Storage recovery will run before the next game.');
+  worker.postMessage({ type: 'import', files: selected, options: { name: $('mcc-package-name').value } });
+}
+
+for (const [id, family] of [['ce-files-input', 'ce'], ['ce-folder-input', 'ce'], ['mcc-folder-input', 'mcc']]) {
+  $(id).addEventListener('change', event => {
+    const selected = [...event.target.files]; event.target.value = '';
+    mapImport(family, selected);
+  });
+}
+$('map-import-cancel').addEventListener('click', () => {
+  if (!mapImportWorker) return;
+  $('map-import-cancel').disabled = true;
+  $('map-import-status').textContent = 'Cancelling and removing the unfinished import…';
+  mapImportWorker.postMessage({ type: 'cancel' });
 });
 
 // ---------- mods (mods-worker.js): /data/mods, all of them played unless
@@ -355,8 +453,12 @@ async function refreshMods() {
   await refreshStorage();
 }
 
-function modTask(message) {
-  const worker = new Worker('mods-worker.js');
+async function modTask(message) {
+  const release = await beginStorageTask('mods-status');
+  if (!release) return;
+  let worker;
+  try { worker = new Worker('mods-worker.js'); }
+  catch (error) { await release(); $('mods-status').textContent = error.message; return; }
   $('mod-label').classList.add('disabled');
   $('mod-input').disabled = true;
   worker.onmessage = async (event) => {
@@ -366,6 +468,7 @@ function modTask(message) {
       return;
     }
     worker.terminate();
+    await release();
     $('mod-label').classList.remove('disabled');
     $('mod-input').disabled = false;
     await refreshMods();
@@ -374,6 +477,7 @@ function modTask(message) {
   };
   worker.onerror = async (event) => {
     worker.terminate();
+    await release();
     $('mod-label').classList.remove('disabled');
     $('mod-input').disabled = false;
     await refreshMods();
@@ -390,18 +494,22 @@ $('mod-input').addEventListener('change', (event) => {
 
 $('delete-data').addEventListener('click', async () => {
   if (!confirm('Delete the maps copied into this browser? Saved games stay.')) return;
-  const root = await navigator.storage.getDirectory();
-  await root.removeEntry('maps', { recursive: true }).catch(() => {});
-  // (and the game's copies of them, save/z/cache000.map and on)
+  const release = await beginStorageTask('data-status');
+  if (!release) return;
   try {
-    const drive = await (await root.getDirectoryHandle('save')).getDirectoryHandle('z');
-    for await (const [name] of drive.entries()) {
-      if (/^cache\d+\.map$/i.test(name)) await drive.removeEntry(name).catch(() => {});
+    const root = await navigator.storage.getDirectory();
+    await root.removeEntry('maps', { recursive: true }).catch(() => {});
+    // (and the game's copies of them, save/z/cache000.map and on)
+    try {
+      const drive = await (await root.getDirectoryHandle('save')).getDirectoryHandle('z');
+      for await (const [name] of drive.entries()) {
+        if (/^cache\d+\.map$/i.test(name)) await drive.removeEntry(name).catch(() => {});
+      }
+    } catch {
+      // no saved games yet
     }
-  } catch {
-    // no saved games yet
-  }
-  await refreshData();
+    await refreshData();
+  } finally { await release(); }
 });
 
 $('persist').addEventListener('click', async () => {
@@ -511,7 +619,7 @@ let gameStopped = false;
 let wakeLock = null;
 
 function canPlay() {
-  return checksPassed && dataReady && !gameStarted;
+  return checksPassed && dataReady && !gameStarted && !mapImportWorker && !launcherStorageActive;
 }
 
 // the Ready to play screen's rows: a row good or bad, and its value
@@ -667,6 +775,30 @@ function showLinkPage(url) {
   $('ask').hidden = false;
 }
 
+// Workshop metadata is untrusted. Construct only this page from a bounded ID;
+// the browser-side click also supplies the user activation for opening a tab.
+function showMccWorkshop(id) {
+  if (typeof id !== 'string' || !id.length || id.length > 20 || /[^0-9]/.test(id)) return;
+  $('ask-title').textContent = 'Steam Workshop';
+  $('ask-text').textContent = `Open Workshop item ${id}. Check the item before subscribing.`;
+  const buttons = [];
+  for (const [label, url] of [
+    ['Open in Steam', `steam://url/CommunityFilePage/${id}`],
+    ['Open in browser', `https://steamcommunity.com/sharedfiles/filedetails/?id=${id}`],
+  ]) {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.addEventListener('click', () => window.open(url, '_blank', 'noopener'));
+    buttons.push(button);
+  }
+  const close = document.createElement('button');
+  close.textContent = 'Close';
+  close.addEventListener('click', () => { $('ask').hidden = true; });
+  $('ask-buttons').replaceChildren(...buttons, close);
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  $('ask').hidden = false;
+}
+
 $('invite-copy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText($('invite-link').value);
@@ -705,6 +837,14 @@ function loadScript(src) {
 async function play() {
   if (!canPlay()) return;
   gameStarted = true;
+  try {
+    await window.HaloMapStorage.startGame();
+  } catch (error) {
+    gameStarted = false;
+    updatePlay();
+    $('play-note').textContent = error.message;
+    return;
+  }
   watchFrames();
   $('launcher').hidden = true;
   $('update').hidden = true;
@@ -731,6 +871,7 @@ async function play() {
       haloNetSend: (address, reliable, bytes) => window.HaloNet.send(address, reliable, bytes),
       // internet play's WebRTC connections (p2p.js)
       haloP2P: (command, connection, bytes) => window.HaloP2P.command(command, connection, bytes),
+      haloMccStorage: (action, payload) => window.HaloMapStorage.dispatch(action, payload),
       haloMessage: (kind, text) => {
         logLine(text);
         if (kind === 2) showInvite(text);
@@ -738,6 +879,7 @@ async function play() {
         // (the game quits, as the player asked: the page starts again)
         if (kind === 4) location.reload();
         if (kind === 5) showLinkPage(text);
+        if (kind === 6) showMccWorkshop(text);
       },
       // a question the game waits on (sdl_platform.c's platform_ask: the
       // mods that cannot be played together), answered with a button's index
@@ -872,6 +1014,7 @@ document.addEventListener('visibilitychange', async () => {
   if (results.opfs === 'good') {
     await refreshData();
     await refreshMods();
+    await refreshCustomMaps();
   } else {
     updatePlay();
   }

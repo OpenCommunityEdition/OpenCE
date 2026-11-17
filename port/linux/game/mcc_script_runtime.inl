@@ -1,0 +1,298 @@
+/* Included after the native interpreter's declarations. This MCC-only
+ * adapter uses its existing stack service, so arguments, recursion, sleep
+ * and checkpoint state remain inside each checkpointed thread stack. */
+#include "mcc_script_parameters.h"
+#include "mcc_scripts.h"
+#include "mcc_campaign.h"
+#include "mcc_game_speed.h"
+
+/* Once an if has selected a branch, its frame only forwards that branch's
+ * result. MCC's deeply nested equipment selectors need not retain all those
+ * forwarding frames. Keep script-call frames (lexical parameters) intact and
+ * only elide identical result types, so native casts and sleep remain valid.
+ * All live state stays in the checkpointed thread buffer. */
+static boolean mcc_hs_if_tail(short function, long thread_index, boolean initialize)
+{
+    struct hs_thread_datum *thread;
+    struct hs_syntax_node *call, *predicate, *condition, *branch;
+    long *state, selected, *destination;
+    if (!mcc_cache_tags_loaded() || function != _hs_function_if || initialize) return FALSE;
+    thread = hs_thread_get(thread_index);
+    state = (long *)thread->stack->data;
+    if (state[1] != NONE) return FALSE;
+    call = hs_syntax_get(thread->stack->expression_index);
+    predicate = call ? hs_syntax_get(call->data) : NULL;
+    condition = predicate ? hs_syntax_get(predicate->next_node_index) : NULL;
+    branch = condition ? hs_syntax_get(condition->next_node_index) : NULL;
+    if (!branch) { hs_syntax_error(thread_index); return TRUE; }
+    selected = (boolean)state[0] ? condition->next_node_index : branch->next_node_index;
+    if (selected == NONE) return FALSE;
+    branch = hs_syntax_get(selected);
+    if (!branch) { hs_syntax_error(thread_index); return TRUE; }
+    if (branch->type != call->type) return FALSE;
+    destination = thread->stack->previous->result;
+    thread->stack = thread->stack->previous;
+    hs_evaluate(thread_index, selected, destination);
+    return TRUE;
+}
+
+static void mcc_hs_speed_reconcile(word designator, boolean write)
+{
+    struct hs_global_datum *global;
+    union { long bits; real number; } value;
+    if (!mcc_game_speed_global(designator)) return;
+    global=datum_get(hs_global_data,designator+hs_external_global_count);
+    value.bits=global->value;
+    if (write) mcc_game_speed_set(value.number);
+    value.number=game_time_get_speed();
+    global->value=value.bits;
+}
+long hs_cast(long thread_index, short actual_type, short desired_type, long value);
+static void mcc_hs_release_thread(long thread_index);
+
+void mcc_script_finished_evaluate(short function, long thread_index, boolean initialize)
+{
+    long *args=hs_macro_function_evaluate(function,thread_index,initialize);
+    long target=NONE;
+    short script;
+    if (!args) return;
+    script=args[0] ? hs_find_script_by_name((char const *)args[0]) : NONE;
+    if (script!=NONE) target=hs_find_thread_by_script(script);
+    /* Dormant and sleep_forever threads use -2. Only -1 means that the
+     * native script thread has terminated; sleeping is not completion. */
+    hs_return(thread_index,target!=NONE && hs_thread_get(target)->sleep_until==NONE);
+}
+
+void mcc_sleep_forever_evaluate(short function, long thread_index, boolean initialize)
+{
+    struct hs_thread_datum *thread=hs_thread_get(thread_index);
+    long *script=hs_stack_allocate(thread_index,sizeof(long));
+    long target=thread_index;
+    (void)function;
+    if (!script) return;
+    if (initialize) {
+        struct hs_syntax_node *call=hs_syntax_get(thread->stack->expression_index);
+        struct hs_syntax_node *predicate=call ? hs_syntax_get(call->data) : NULL;
+        if (!predicate) { hs_syntax_error(thread_index); return; }
+        *script=NONE;
+        if (predicate->next_node_index!=NONE) {
+            hs_evaluate(thread_index,predicate->next_node_index,script);
+            return;
+        }
+    }
+    if ((short)*script!=NONE) target=hs_find_thread_by_script((short)*script);
+    if (target!=NONE) {
+        struct hs_thread_datum *sleeper=hs_thread_get(target);
+        if (target!=thread_index && !hs_scenario_script_disabled((short)*script)) {
+            /* MCC's named sleep_forever cancels this invocation. A later
+             * wake starts it again, including an already completed dormant
+             * script (Warthog Rally's race/setup reset sequence). Ordinary
+             * wake and the native sleep adapter retain their own semantics. */
+            mcc_hs_release_thread(target);
+            sleeper->stack=(struct hs_stack_frame *)sleeper->stack_data;
+            sleeper->stack->previous=NULL;
+            sleeper->stack->expression_index=NONE;
+            sleeper->stack->size=0;
+            sleeper->flags=0;
+            sleeper->previous_sleep_until=0;
+            sleeper->sleep_until=NONE-1;
+        } else if (target==thread_index && sleeper->sleep_until!=NONE) {
+            sleeper->sleep_until=NONE-1;
+        }
+    }
+    hs_return(thread_index,0);
+}
+
+struct mcc_hs_arguments {
+    unsigned long magic;
+    short script, count, next, phase;
+    unsigned long references;
+    long expression, result;
+    long values[1];
+};
+#define MCC_HS_ARGUMENT_MAGIC 0x5043434DUL
+
+static long mcc_hs_arguments_size(short count)
+{
+    return (long)offsetof(struct mcc_hs_arguments, values) + count * (long)sizeof(long);
+}
+
+static struct mcc_hs_arguments *mcc_hs_frame(struct hs_stack_frame *frame)
+{
+    struct hs_syntax_node *call;
+    struct mcc_hs_arguments *state;
+    struct mcc_script_signature const *signature;
+    if (!frame || frame->size < (long)offsetof(struct mcc_hs_arguments, values) ||
+        !(call = hs_syntax_get(frame->expression_index)) || (call->flags & 3) != 2 ||
+        !(signature = mcc_parameters_signature(call->script_index)) || !signature->count) return NULL;
+    state = (struct mcc_hs_arguments *)frame->data;
+    return frame->size >= mcc_hs_arguments_size(signature->count) &&
+        state->magic == MCC_HS_ARGUMENT_MAGIC && state->script == call->script_index &&
+        state->count == signature->count ? state : NULL;
+}
+
+static void mcc_hs_release_arguments(struct mcc_hs_arguments *state)
+{
+    short i;
+    for (i = 0; i < state->count; ++i)
+        if (state->references & (1u << i)) object_list_remove_reference(state->values[i]);
+    state->references = 0;
+}
+
+static void mcc_hs_release_thread(long thread_index)
+{
+    struct hs_thread_datum *thread = hs_thread_get(thread_index);
+    struct hs_stack_frame *frame;
+    if (!mcc_parameters_signature(0)) return;
+    for (frame = thread->stack; frame && frame != (struct hs_stack_frame *)thread->stack_data;
+        frame = frame->previous) {
+        struct mcc_hs_arguments *state = mcc_hs_frame(frame);
+        if (state) mcc_hs_release_arguments(state);
+    }
+}
+
+void mcc_executing_thread_evaluate(short function, long thread_index, boolean initialize)
+{
+    (void)function; (void)initialize;
+    if (mcc_cache_tags_loaded()) hs_return(thread_index, thread_index);
+}
+
+void mcc_kill_thread_evaluate(short function, long thread_index, boolean initialize)
+{
+    long *arguments, target;
+    struct hs_thread_datum *thread;
+    if (!mcc_cache_tags_loaded()) return;
+    arguments = hs_macro_function_evaluate(function, thread_index, initialize);
+    if (!arguments) return;
+    target = arguments[0];
+    /* Accept only salted live handles, not untrusted absolute slot indices.
+     * A deleted console thread's handle must not kill its replacement. */
+    thread = target != NONE && (unsigned long)target >> 16 && hs_thread_data && hs_thread_data->valid ?
+        datum_try_and_get(hs_thread_data, target) : NULL;
+    if (thread) {
+        mcc_hs_release_thread(target);
+        thread->stack = (struct hs_stack_frame *)thread->stack_data;
+        thread->stack->previous = NULL;
+        thread->stack->expression_index = NONE;
+        thread->stack->size = 0;
+        thread->flags = 0;
+        thread->previous_sleep_until = 0;
+        thread->sleep_until = thread->type == _hs_thread_type_script ? NONE : 0;
+        thread->result = 0;
+        /* Self-termination must not return through the frames just released.
+         * hs_thread_main owns deletion of its current console thread. */
+        if (thread == hs_thread_get(thread_index)) return;
+        if (thread->type == _hs_thread_type_console_command) hs_thread_delete(target);
+    }
+    hs_return(thread_index, 0);
+}
+
+static long *mcc_hs_parameter_address(long thread_index, struct hs_syntax_node *node, short *type)
+{
+    struct hs_thread_datum *thread = hs_thread_get(thread_index);
+    struct hs_stack_frame *frame;
+    short owner;
+    int value_type = mcc_parameter_type(node, &owner);
+    if (value_type < 0) return NULL;
+    *type = (short)value_type;
+    for (frame = thread->stack; frame && frame != (struct hs_stack_frame *)thread->stack_data;
+        frame = frame->previous) {
+        struct mcc_hs_arguments *state = mcc_hs_frame(frame);
+        /* A nested call still evaluating actual arguments is in its caller's
+         * lexical scope, even when it recursively names the same script. */
+        if (state && state->phase == 1) {
+            if (state->script != owner || node->data >= state->count) return NULL;
+            return &state->values[node->data];
+        }
+    }
+    return NULL;
+}
+
+static boolean mcc_hs_parameter_evaluate(long thread_index, struct hs_syntax_node *node, long *destination)
+{
+    long *value;
+    short type;
+    if (mcc_parameter_type(node, NULL) == -1) return FALSE;
+    value = mcc_hs_parameter_address(thread_index, node, &type);
+    if (!value) hs_syntax_error(thread_index);
+    /* The native cast table has no short-to-long entry. Widen MCC local
+     * parameters here, preserving the native table for Xbox and CE scripts. */
+    else if (type == _hs_type_short_integer && node->type == _hs_type_long_integer)
+        *destination = (short)*value;
+    else *destination = hs_cast(thread_index, type, node->type, *value);
+    return TRUE;
+}
+
+static boolean mcc_hs_script_evaluate(short script_index, long thread_index, boolean initialize)
+{
+    struct mcc_script_signature const *signature = mcc_parameters_signature(script_index);
+    struct hs_thread_datum *thread;
+    struct hs_script *script;
+    struct mcc_hs_arguments *state;
+    struct hs_syntax_node *argument;
+    if (!signature || !signature->count) return FALSE;
+    thread = hs_thread_get(thread_index);
+    script = TAG_BLOCK_GET_ELEMENT(&global_scenario_get()->hs_scripts, script_index, struct hs_script);
+    state = hs_stack_allocate(thread_index, mcc_hs_arguments_size(signature->count));
+    if (!state) return TRUE;
+    if (initialize) {
+        struct hs_syntax_node *call = hs_syntax_get(thread->stack->expression_index);
+        struct hs_syntax_node *predicate = call ? hs_syntax_get(call->data) : NULL;
+        if (!predicate) { hs_syntax_error(thread_index); return TRUE; }
+        csmemset(state, 0, mcc_hs_arguments_size(signature->count));
+        state->magic = MCC_HS_ARGUMENT_MAGIC; state->script = script_index;
+        state->count = signature->count; state->expression = predicate->next_node_index;
+        state->result = hs_type_default_value(script->return_type);
+    }
+    if (state->magic != MCC_HS_ARGUMENT_MAGIC || state->script != script_index ||
+        state->count != signature->count || state->next < 0 || state->next > state->count ||
+        state->phase < 0 || state->phase > 1) { hs_syntax_error(thread_index); return TRUE; }
+    if (!state->phase) {
+        if (state->next && signature->types[state->next - 1] == _hs_type_object_list &&
+            !(state->references & (1u << (state->next - 1)))) {
+            object_list_add_reference(state->values[state->next - 1]);
+            state->references |= 1u << (state->next - 1);
+        }
+        if (state->next < state->count) {
+            long expression = state->expression;
+            short slot = state->next++;
+            argument = hs_syntax_get(expression);
+            if (!argument || argument->type != signature->types[slot]) { hs_syntax_error(thread_index); return TRUE; }
+            state->expression = argument->next_node_index;
+            hs_evaluate(thread_index, expression, &state->values[slot]);
+            return TRUE;
+        }
+        if (state->expression != NONE) { hs_syntax_error(thread_index); return TRUE; }
+        state->phase = 1;
+        if (hs_scenario_script_disabled(script_index)) {
+            mcc_hs_release_arguments(state);
+            hs_return(thread_index, state->result);
+        } else hs_evaluate(thread_index, script->root_expression_index, &state->result);
+    } else {
+        long result = state->result;
+        mcc_hs_release_arguments(state);
+        hs_return(thread_index, result);
+    }
+    return TRUE;
+}
+
+static boolean mcc_hs_parameter_set(long thread_index, struct hs_syntax_node *variable, boolean initialize)
+{
+    short type;
+    long *destination, *value;
+    if (mcc_parameter_type(variable, NULL) == -1) return FALSE;
+    destination = mcc_hs_parameter_address(thread_index, variable, &type);
+    value = hs_stack_allocate(thread_index, sizeof(long));
+    if (!value) return TRUE;
+    if (!destination) { hs_syntax_error(thread_index); return TRUE; }
+    if (initialize) hs_evaluate(thread_index, variable->next_node_index, value);
+    else {
+        if (type == _hs_type_object_list) {
+            object_list_remove_reference(*destination);
+            object_list_add_reference(*value);
+        }
+        *destination = *value;
+        hs_return(thread_index, *value);
+    }
+    return TRUE;
+}

@@ -40,6 +40,9 @@ static struct sound_datum *checked_sound(long i) {
 #define channel_get_state(...) _sound_channel_playing
 #define channel_set_properties_hardware(...) ((void)property_writes++)
 #define channel_queue_sound(...) ((void)queues++)
+#define channel_queue_sound_from(...) ((void)queues++)
+/* coop_sound_sync.c's: no co-op client's sounds here */
+#define coop_sound_sync_take_offset(...) 0
 #define update_potentially_audible_looping_sound(...) (abort(), (long)NONE)
 #define sound_start_fade(...) abort()
 static void sound_stop(long i) {

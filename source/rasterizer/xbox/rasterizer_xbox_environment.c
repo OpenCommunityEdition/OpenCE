@@ -140,6 +140,7 @@ symbols in this file:
 
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "cseries.h"
+#include "mcc_environment_shader.h" /* port: port/linux/game/mcc_environment_shader.c */
 #include "bitmaps/bitmaps.h"
 #include "cseries/errors.h"
 #include "effects/decals.h"
@@ -1011,12 +1012,15 @@ void _rasterizer_environment_lightmap_draw(
 		}
 		rasterizer_set_pixel_shader(&pixel_shader);
 
+		/* port: scope MCC's tag-selected attenuation to this lightmap draw. */
+		mcc_environment_shader_begin(shader_environment->environment.flags);
 		rasterizer_draw_dynamic_triangles_static_vertices2(
 			dynamic_triangle_buffer_index,
 			first_triangle_index,
 			triangle_count,
 			vertex_buffer,
 			vertex_buffer + !rasterizer_environment_globals.lightmap_missing);
+		mcc_environment_shader_end(); /* port: no state inherited by later draws */
 		if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_enabled)
 		{
 			rasterizer_frame_statistics.lightmap_dynamic_draw_count++;

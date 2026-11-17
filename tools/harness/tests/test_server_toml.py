@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run  # noqa: E402
 
 CASES = ["example", "base-name", "sections", "values", "comments", "duplicates", "malformed", "size", "every-rule",
-         "name-valid"]
+         "name-valid", "riding-key"]
 
 FUNCTIONS = ("server_gametype_file_name_valid", "gametype_value_text", "gametype_error", "server_gametype_file_parse")
 
@@ -46,12 +46,17 @@ NEGATIVE_CONTROLS = {
                      "character == '_' || character == '-' || character == '.' || character == '/') ||"),
                     "server_gametype_file_name_valid", "name-valid"),
     "names-unbounded": (("|| index >= SERVER_GAMETYPE_SIZE - 6", ""), "server_gametype_file_name_valid", "name-valid"),
+    "riding-wrong-table": (('RULE_BOOLEAN("vehicle_riding", "riding", "universal",', 'RULE_BOOLEAN("vehicle_riding", "riding", "options",'),
+                           "server_rotation.c", "riding-key"),
     "empty-name": (("return index > 0;", "return 1;"), "server_gametype_file_name_valid", "name-valid"),
 }
 
 
 def generated(fault=None, faulty_function=None):
     source = read("port/linux/src/server_toml.c")
+    rotation = read("port/linux/src/server_rotation.c")
+    if fault and faulty_function == "server_rotation.c":
+        rotation = mutated(rotation, *fault)
     text = re.search(r"^static const char \*const engine_tables\[\] = \{[^;]*\};", source, re.M).group(0) + "\n"
     for name in FUNCTIONS:
         code = function(source, name)
@@ -61,7 +66,7 @@ def generated(fault=None, faulty_function=None):
     return (("tomlc17.h", read("port/third_party/tomlc17/tomlc17.h")),
             ("toml.inc", read("port/third_party/tomlc17/tomlc17.c")),
             ("server_rotation.h", read("port/linux/src/server_rotation.h")),
-            ("rotation.inc", read("port/linux/src/server_rotation.c")),
+            ("rotation.inc", rotation),
             ("server_toml.h", read("port/linux/src/server_toml.h")),
             ("under_test.inc", text))
 

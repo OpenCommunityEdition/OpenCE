@@ -92,7 +92,7 @@ def test_legacy_button_styles_toggle_and_dispose(tmp_path):
     start = source.index('/* Original Xbox controller faces')
     end = source.index('/* ---------- private code */', start)
     state = source[start:end]
-    names = ['hud_hires_button_draw']
+    names = ['hud_hires_button_bitmap', 'hud_hires_button_draw']
     routines = (ROOT/'port/linux/game/hud_button_layout.h').read_text() + '\n'.join(function(source, name) for name in names)
     tags = [a['tag'] for a in json.loads((ROOT/'port/assets/buttons/buttons.json').read_text())['assets']
             if a['name'] in ['a_butn__0','b_butn__0','x_butn__0','y_butn__0','black_butn__0','white_butn__0'] or 'classic' in a or 'source_png' in a]

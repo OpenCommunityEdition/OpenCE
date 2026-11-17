@@ -8,6 +8,9 @@
 #                                   publisher.key, server.env, logs/, saves/
 #
 # server.env holds the instance's settings as HALO_* variables, one a line.
+# Riding settings (both default false; set here only to pin them):
+#   HALO_NET_VEHICLE_RIDING=false
+#   HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE=false
 # A second instance on the machine needs its own ports, and its own loopback
 # address for system link:
 #

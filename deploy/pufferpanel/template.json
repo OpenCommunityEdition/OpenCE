@@ -30,6 +30,8 @@
       "HALO_SERVER_NAME": "${name}",
       "HALO_SERVER_ROTATION": "${rotation}",
       "HALO_SERVER_MAX_PLAYERS": "${max_players}",
+      "HALO_NET_VEHICLE_RIDING": "${vehicle_riding}",
+      "HALO_SERVER_VEHICLE_RIDING_OVERRIDE_GAMETYPE": "${vehicle_riding_override_gametype}",
       "HALO_SERVER_PUBLIC": "${public}",
       "HALO_SERVER_WEB_PORT": "${web_port}",
       "HALO_SERVER_LOG_FORMAT": "${log_format}",
@@ -80,6 +82,22 @@
       "desc": "2 to 127.",
       "required": true,
       "value": 16,
+      "userEdit": true
+    },
+    "vehicle_riding": {
+      "type": "boolean",
+      "display": "Vehicle riding base",
+      "desc": "The base setting (network.vehicle_riding); each gametype's riding rule overrides it in multiplayer, and a gametype without the rule is off. A co-op entry's +riding rule or a map's own choice takes precedence.",
+      "required": true,
+      "value": false,
+      "userEdit": true
+    },
+    "vehicle_riding_override_gametype": {
+      "type": "boolean",
+      "display": "Override gametype vehicle riding",
+      "desc": "True: turns the gametype's override off, so multiplayer uses network.vehicle_riding (server.vehicle_riding_override_gametype). A map's own choice still wins.",
+      "required": true,
+      "value": false,
       "userEdit": true
     },
     "public": {

@@ -28,6 +28,8 @@ enum
 	_game_variant_always_invisible_bit,
 	/* (the starting equipment: generic, else the map's) */
 	_game_variant_generic_starting_equipment_bit,
+	/* port: players standing on a vehicle are carried by it (the gametype's VEHICLE RIDING: vehicle_riding.c) */
+	_game_variant_vehicle_riding_bit,
 };
 
 enum game_engine_type

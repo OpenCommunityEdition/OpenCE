@@ -475,6 +475,7 @@ static void voice_fill_header(
 	header->type = type;
 	header->count = 1;
 	header->game_time = game_in_progress() ? game_time_get() : 0;
+	header->checkpoint_epoch = 0; /* Voice continues across checkpoint restores. */
 }
 
 /* ---------- the host */

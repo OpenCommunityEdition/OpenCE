@@ -27,6 +27,7 @@ from typing import Any
 
 from .embed_assets import hud_configure_inputs
 from .guest_build import (
+    MBEDTLS_DIR,
     MUSL_VERSION,
     GuestTarget,
     fetch_musl,
@@ -34,6 +35,7 @@ from .guest_build import (
     generate_guest,
     host_network_objects,
 )
+from .linux_build import ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES
 from .ninja_syntax import Writer
 
 PORT_DIR = Path("port/android")
@@ -198,20 +200,38 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     host_cflags = " ".join([
         "-O2", "-g", "-fPIC", "-Wall", "-Wno-unused-function", "-D_GNU_SOURCE",
         f"-I{GUEST_DIR}/include", f"-I{PORT_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
-        f"-I{TOML_DIR}",
+        f"-I{TOML_DIR}", f"-I{ZLIB_DIR}", f"-I{MBEDTLS_DIR / 'include'}",
+        # (Mbed TLS's settings, as the library is built with them below: its
+        # contexts are bigger with threading, and steam_crypto.c makes them)
+        "-DMBEDTLS_THREADING_C", "-DMBEDTLS_THREADING_PTHREAD",
     ])
     host_sources = [*sorted((PORT_DIR / "host").glob("*.c")),
         LINUX_DIR / "src" / "posix_files.c", LINUX_DIR / "src" / "posix_net.c",
+        LINUX_DIR / "src" / "posix_mcc_preview.c",
+        LINUX_DIR / "src" / "posix_mcc_share.c",
+        # Workshop items' authors, asked of Steam for the Steam Workshop screen and the guest's lobby
+        # (steam_downloads.c), with the JSON reader that reads Steam's answer
+        LINUX_DIR / "src" / "workshop_authors.c", LINUX_DIR / "src" / "server_json.c",
         # the app reads debug.sample_seconds from config.toml (host_main.c)
         TOML_DIR / "tomlc17.c",
     ]
     for source in host_sources:
         obj = host_obj_dir / (source.name + ".o")
-        n.build(outputs=obj, rule="android_host_cc", inputs=source, variables={"cflags": host_cflags})
+        # (the Steam client's chunk unpacker: the LZMA SDK's and Zstandard's
+        # decoders, whose warnings are not ours)
+        n.build(outputs=obj, rule="android_host_cc", inputs=source,
+                variables={"cflags": host_cflags + (" -w" if source.name == "steam_unpack.c" else "")})
         host_objects.append(obj)
     # internet play's UPnP (posix_upnp.c, with port/third_party/miniupnpc),
     # as the other posix_*.c in the host
     host_objects += host_network_objects(n, "android_host_cc", host_obj_dir, host_cflags)
+    # the port's zlib, its names z_ (zlib_prefixed.h), for the Steam client's zip chunks and checksums
+    # (steam_unpack.c, steam_cm.c), as the guest has its own
+    for name in ZLIB_SOURCES:
+        obj = host_obj_dir / ("zlib_" + name + ".o")
+        n.build(outputs=obj, rule="android_host_cc", inputs=ZLIB_DIR / name,
+                variables={"cflags": " ".join([host_cflags, *ZLIB_DEFINES, "-w"])})
+        host_objects.append(obj)
     table_obj = host_obj_dir / "host_import_table.c.o"
     n.build(outputs=table_obj, rule="android_host_cc", inputs=host_table_c, variables={"cflags": host_cflags})
     host_objects.append(table_obj)
@@ -235,7 +255,10 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     # config.toml (port/android/host/host_main.c)
     staged_brokers = assets_dir / "brokers.txt"
     n.build(outputs=staged_brokers, rule="android_copy", inputs=Path("port/assets/network/brokers.txt"))
-    n.build(outputs="android", rule="phony", inputs=[libmain, staged_sdl, staged_image, staged_brokers])
+    # Include MCC's decoder notice in the APK as well as the release archive.
+    staged_bcdec_license = assets_dir / "bcdec-LICENSE.txt"
+    n.build(outputs=staged_bcdec_license, rule="android_copy", inputs=Path("port/third_party/bcdec/LICENSE"))
+    n.build(outputs="android", rule="phony", inputs=[libmain, staged_sdl, staged_image, staged_brokers, staged_bcdec_license])
 
     apk = PORT_DIR / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
     sdl_android_mouse_listener = SDL_DIR / SDL_ANDROID_MOUSE_LISTENER

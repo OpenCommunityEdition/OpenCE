@@ -16,6 +16,7 @@ from typing import Any
 
 from .guest_build import (
     LINUX_DIR,
+    MBEDTLS_DIR,
     MUSL_VERSION,
     GuestTarget,
     fetch_musl,
@@ -23,6 +24,7 @@ from .guest_build import (
     generate_guest,
     host_network_objects,
 )
+from .linux_build import ZLIB_DEFINES, ZLIB_DIR, ZLIB_SOURCES
 from .ninja_syntax import Writer
 
 BUILD = Path("build/linux-arm64")
@@ -91,6 +93,12 @@ def linux_arm64_host_build(n: Writer, host_table_c: Path) -> None:
                 f"-I{GUEST_DIR}/include",
                 f"-I{ANDROID_HOST}",
                 f"-I{TOML_DIR}",
+                f"-I{ZLIB_DIR}",
+                f"-I{MBEDTLS_DIR / 'include'}",
+                # Mbed TLS's settings, as the library is built with them: its
+                # contexts are bigger with threading, and steam_crypto.c makes them
+                "-DMBEDTLS_THREADING_C",
+                "-DMBEDTLS_THREADING_PTHREAD",
                 "$$(pkg-config --cflags sdl3)",
             ]
         ),
@@ -120,6 +128,17 @@ def linux_arm64_host_build(n: Writer, host_table_c: Path) -> None:
                 "host_sdl.c",
                 "host_gl.c",
                 "host_https.c",
+                # MCC's address space and package fingerprints
+                "host_mcc_memory.c",
+                "host_mcc_hash.c",
+                # the Steam client behind the Workshop screen
+                "steam_cm.c",
+                "steam_crypto.c",
+                "steam_depot.c",
+                "steam_downloads.c",
+                "steam_net.c",
+                "steam_seal.c",
+                "steam_unpack.c",
             )
         ],
         host_table_c,
@@ -131,15 +150,39 @@ def linux_arm64_host_build(n: Writer, host_table_c: Path) -> None:
         *host_sources,
         *[
             LINUX_DIR / "src" / name
-            for name in ("posix_files.c", "posix_net.c", "xiso.c")
+            for name in (
+                "posix_files.c",
+                "posix_net.c",
+                "xiso.c",
+                "posix_mcc_preview.c",
+                "posix_mcc_share.c",
+                # Workshop items' authors, with the JSON reader of Steam's answer
+                "workshop_authors.c",
+                "server_json.c",
+            )
         ],
     ]:
         obj = obj_dir / (source.name + ".o")
+        # (the Steam client's chunk unpacker: the LZMA SDK's and Zstandard's
+        # decoders, whose warnings are not ours)
         n.build(
             outputs=obj,
             rule="linux_arm64_host_cc",
             inputs=source,
-            variables={"cflags": base_cflags},
+            variables={
+                "cflags": base_cflags + (" -w" if source.name == "steam_unpack.c" else "")
+            },
+        )
+        host_objects.append(obj)
+    # the port's zlib, its names z_ (zlib_prefixed.h), for the Steam client's
+    # zip chunks and checksums, as the Android host has
+    for name in ZLIB_SOURCES:
+        obj = obj_dir / ("zlib_" + name + ".o")
+        n.build(
+            outputs=obj,
+            rule="linux_arm64_host_cc",
+            inputs=ZLIB_DIR / name,
+            variables={"cflags": " ".join([base_cflags, *ZLIB_DEFINES, "-w"])},
         )
         host_objects.append(obj)
     # internet play's UPnP and DTLS (with port/third_party/miniupnpc and mbedtls)

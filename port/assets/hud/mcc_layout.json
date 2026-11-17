@@ -1,0 +1,90 @@
+{
+ "assets": [
+  {
+   "name": "mcc_rocket_reticle",
+   "tag": "mcc\\hud\\rocket_reticle",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "scale": 2,
+   "crc": 0,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      256,
+      256
+     ],
+     "source_png": "corrections/rocket.png",
+     "crop": [
+      92,
+      92,
+      1188,
+      1188
+     ],
+     "kind": "alpha"
+    }
+   ]
+  },
+  {
+   "name": "mcc_sniper_scope",
+   "tag": "mcc\\hud\\sniper_scope",
+   "bitmap": 0,
+   "width": 256,
+   "height": 256,
+   "scale": 2,
+   "crc": 0,
+   "cells": [
+    {
+     "xbox": [
+      4,
+      4,
+      100,
+      64
+     ],
+     "source_png": "corrections/scope.png",
+     "crop": [
+      50,
+      26,
+      188,
+      112
+     ],
+     "kind": "alpha"
+    },
+    {
+     "xbox": [
+      4,
+      76,
+      148,
+      140
+     ],
+     "source_png": "corrections/scope.png",
+     "crop": [
+      50,
+      168,
+      247,
+      253
+     ],
+     "kind": "alpha"
+    },
+    {
+     "xbox": [
+      110,
+      2,
+      150,
+      42
+     ],
+     "source_png": "corrections/scope.png",
+     "crop": [
+      241,
+      12,
+      301,
+      73
+     ],
+     "kind": "alpha"
+    }
+   ]
+  }
+ ]
+}

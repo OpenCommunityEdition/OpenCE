@@ -256,6 +256,14 @@ real periodic_function_evaluate(
 		time *= 25.6f;
 		fraction = (real)fmod((double)time, 1.0);
 		index = fast_ftol(time-fraction);
+		/* port: negative periods or phases can put time before zero. fmod
+		leaves a negative remainder; interpolate in the preceding interval
+		instead of extrapolating beyond the current sample. */
+		if (fraction < 0.0f)
+		{
+			fraction += 1.0f;
+			index--;
+		}
 		table = periodic_function_tables[function_type];
 		index &= PERIODIC_FUNCTION_TABLE_MASK;
 		first_value = table[index] * (1.0f/255.0f);

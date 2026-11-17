@@ -255,15 +255,23 @@ function describeEvent(event, players) {
 
 // ---------- the rotation's entries: map[:gametype[+rule=value…]]
 
+function entryText(value) {
+  const text = String(value || '').trim();
+  const colon = text.indexOf(':');
+  return colon < 0 ? text : text.slice(0, colon).trim() + ':' + text.slice(colon + 1).replace(/\s+/g, '');
+}
+
 function parseEntryText(text) {
-  const match = /^([^:+\s]+)(?::([^+\s]+)((?:\+[^+\s]+)*))?$/.exec(String(text).trim());
+  const match = /^([^:]+?)(?::([^+\s]+)((?:\+[^+\s]+)*))?$/.exec(entryText(text));
   if (!match) return null;
+  const map = match[1].trim();
+  if (!map || (/[\s+]/.test(map) && !/^mcc_maps[\\/]/i.test(map))) return null;
   const rules = {};
   for (const rule of (match[3] || '').split('+').filter(Boolean)) {
     const [key, value = ''] = rule.split('=');
     rules[key] = /^-?\d+$/.test(value) ? Number(value) : value === 'true' ? true : value === 'false' ? false : value;
   }
-  return { map: match[1], gametype: match[2] || '', rules };
+  return { map, gametype: match[2] || '', rules };
 }
 
 // "score=50 time=15" or "+score=50+time=15": an entry's rules
@@ -277,6 +285,8 @@ function rulesText(text) {
 // a map of /api/maps as the rotation names it
 function mapToken(map) {
   if (!map) return '';
+  if (map.kind === 'mcc') return map.level ||
+    (/^mcc_maps[\\/]/i.test(map.name) ? map.name : 'mcc_maps\\' + map.name);
   return map.kind === 'custom' && !/^custom_maps\\/.test(map.name) ? 'custom_maps\\' + map.name : map.name;
 }
 
@@ -288,9 +298,10 @@ const titleOf = (map) => String((map && (map.title || map.name)) || '');
 // entry's whole text when it has rules (sv_map takes a rotation entry,
 // map:gametype+rule=value, as its map)
 function playBody(entry) {
-  const text = String(entry.text || '').replace(/\s+/g, '');
+  const text = entryText(entry.text);
   if (entry.gametype && (text.includes('+') || Object.keys(entry.rules || {}).length)) return { map: text };
-  return entry.gametype ? { map: entry.map, gametype: entry.gametype } : { map: entry.map };
+  const map = (parseEntryText(text) || entry).map;
+  return entry.gametype ? { map, gametype: entry.gametype } : { map };
 }
 
 function makeEntry(map, gametype, rules) {
@@ -902,7 +913,8 @@ function startPage(root) {
     $('add-map').replaceChildren(...page.maps.slice().sort((a, b) => titleOf(a).localeCompare(titleOf(b)))
       .map((map) => option(mapToken(map), `${titleOf(map)} (${map.kind === 'custom' ? 'custom' : map.name})`)));
     $('add-gametype').replaceChildren(
-      h('optgroup', { attrs: { label: 'Built-in' } }, builtin.map((name) => option(name, name))),
+      // Co-op is a rotation mode, not a base for multiplayer gametype files.
+      h('optgroup', { attrs: { label: 'Built-in' } }, [...new Set([...builtin, 'coop'])].map((name) => option(name, name))),
       h('optgroup', { attrs: { label: 'Files' } }, (gametypes.files || []).map((file) => option(file.name, `${file.name} (${file.base})`))));
     $('new-base').replaceChildren(...builtin.map((name) => option(name, name)));
   }
