@@ -1,6 +1,6 @@
 /* Chip identity, not the phone brand or GPU family. In particular, Mali
 and PowerVR do not identify the SoC vendor. No device permissions needed. */
-#include "../include/android_render_policy.h"
+#include "../../guest/include/halo_render_policy.h"
 
 static int chip_lower(int c)
 {
@@ -57,9 +57,9 @@ static int chip_identity(const char *s)
 		chip_word(s, "qti") || chip_word(s, "snapdragon") ||
 		chip_number(s, "sm", 4) || chip_number(s, "sdm", 3) ||
 		chip_number(s, "msm", 4) || chip_number(s, "apq", 4))
-		return _android_chip_snapdragon;
+		return _halo_chip_snapdragon;
 	if (chip_word(s, "mediatek") || chip_number(s, "mt", 4))
-		return _android_chip_mediatek;
+		return _halo_chip_mediatek;
 	if (chip_word(s, "google") || chip_word(s, "tensor") ||
 		chip_word(s, "samsung") || chip_word(s, "exynos") ||
 		chip_word(s, "hisilicon") || chip_word(s, "kirin") ||
@@ -69,11 +69,11 @@ static int chip_identity(const char *s)
 		chip_word(s, "intel") || chip_word(s, "broadcom") ||
 		chip_number(s, "exynos", 4) || chip_number(s, "samsungexynos", 4) ||
 		chip_number(s, "gs", 3))
-		return _android_chip_other;
-	return _android_chip_unknown;
+		return _halo_chip_other;
+	return _halo_chip_unknown;
 }
 
-int android_chip_classify(const char *manufacturer, const char *model,
+int halo_chip_classify(const char *manufacturer, const char *model,
 	const char *hardware, const char *platform)
 {
 	int vendor = chip_identity(manufacturer);
@@ -82,12 +82,12 @@ int android_chip_classify(const char *manufacturer, const char *model,
 	/* Explicit SoC fields take precedence over older board properties.
 	Conflicting identities retain the conservative unknown policy. */
 	if (vendor && chip && vendor != chip)
-		return _android_chip_unknown;
+		return _halo_chip_unknown;
 	if (vendor || chip)
 		return vendor ? vendor : chip;
 	vendor = chip_identity(hardware);
 	chip = chip_identity(platform);
 	if (vendor && chip && vendor != chip)
-		return _android_chip_unknown;
+		return _halo_chip_unknown;
 	return vendor ? vendor : chip;
 }

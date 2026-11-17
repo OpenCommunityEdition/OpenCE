@@ -12,6 +12,10 @@ from types import SimpleNamespace
 
 from tools import ninja_syntax
 from tools.android_build import android_configure_inputs, generate_android_build
+from tools.linux_arm64_build import (
+    generate_linux_arm64_build,
+    linux_arm64_configure_inputs,
+)
 from tools.linux_build import check_profile_options, generate_linux_build, linux_configure_inputs
 from tools.web_build import generate_web_build, web_configure_inputs
 from tools.windows_build import generate_windows_build, windows_configure_inputs
@@ -85,9 +89,19 @@ parser.add_argument(
     help="Android NDK for `ninja android` (default: ANDROID_NDK_HOME, or the newest under the Android SDK)",
 )
 parser.add_argument(
+    "--guest-lld-bin",
+    type=str,
+    help="directory with ld.lld and llvm-ar; builds the guest ELF for native Linux arm64 with `ninja linux_arm64_guest`, no Android NDK",
+)
+parser.add_argument(
     "--android-guest-cc",
     type=str,
     help="clang with the arm64_32 target for the Android guest (default: clang)",
+)
+parser.add_argument(
+    "--guest-cc",
+    type=str,
+    help="clang for the native Linux arm64 guest (default: --android-guest-cc, else clang)",
 )
 parser.add_argument(
     "--web-emcc",
@@ -145,7 +159,9 @@ sln = SimpleNamespace(
     port_pgo_profile=args.pgo_profile,
     android_ndk=args.android_ndk,
     android_guest_cc=args.android_guest_cc,
+    guest_cc=args.guest_cc,
     web_emcc=args.web_emcc,
+    guest_lld_bin=args.guest_lld_bin,
 )
 if not is_windows():
     sln.windows_cc = args.windows_cc
@@ -171,6 +187,7 @@ n.newline()
 
 generate_linux_build(n, sln)
 generate_android_build(n, sln)
+generate_linux_arm64_build(n, sln)
 generate_windows_build(n, sln)
 generate_web_build(n, sln)
 
@@ -189,6 +206,7 @@ n.build(
         Path("tools/ninja_syntax.py"),
         *linux_configure_inputs(),
         *android_configure_inputs(),
+        *linux_arm64_configure_inputs(),
         *windows_configure_inputs(),
         *web_configure_inputs(),
     ],

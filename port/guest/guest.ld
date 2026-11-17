@@ -2,7 +2,7 @@
 GUEST.LD
 
 Layout of the Android guest image (tools/android_build.py): linked to run at
-HALO_GUEST_IMAGE_BASE (port/android/include/halo_android_abi.h), with the
+HALO_GUEST_IMAGE_BASE (port/guest/include/halo_guest_abi.h), with the
 image header first. The host copies the loadable segments to these
 addresses and makes the code read-only.
 */

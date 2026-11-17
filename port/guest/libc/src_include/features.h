@@ -2,7 +2,7 @@
 musl's internal features.h, with weak_alias spelled as assembler
 directives: the guest is compiled for a Darwin target, which rejects alias
 attributes, and its assembly is converted to ELF afterwards
-(tools/android_asm_convert.py), where the alias is ordinary.
+(tools/guest_asm_convert.py), where the alias is ordinary.
 */
 
 #ifndef GUEST_FEATURES_H

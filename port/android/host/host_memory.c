@@ -34,8 +34,10 @@ instead (host_watch_hash.c).
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#ifdef __ANDROID__
 #include <sys/prctl.h>
 #include <sys/system_properties.h>
+#endif
 #include <ucontext.h>
 #include <unistd.h>
 
@@ -43,18 +45,35 @@ instead (host_watch_hash.c).
 #define MAP_FIXED_NOREPLACE 0x100000
 #endif
 
-#define PAGE 0x1000ULL
+static uint64_t page_size = 0x1000;
+
+/* sets page_size from the kernel's page size; keeps 4096 if it is not
+reported (or not usable). Called by host_memory_reserve_early and
+host_memory_initialize; safe to call more than once. */
+void host_memory_page_size_init(void)
+{
+	long reported = sysconf(_SC_PAGESIZE);
+
+	if (reported > 0)
+		page_size = (uint64_t)reported;
+}
+
+uint64_t host_page_size(void)
+{
+	return page_size;
+}
+
 #define LOW_LIMIT 0x100000000ULL
 #define LOW_START 0x01000000ULL
 #define POOL_SIZE (256ULL * 1024 * 1024)
-#define POOL_PAGES (POOL_SIZE / PAGE)
+#define POOL_PAGES_MAX (POOL_SIZE / 4096)
 #define MAXIMUM_POOLS 12
 
 struct pool
 {
 	uint64_t base;
 	uint32_t free_pages;
-	uint8_t used[POOL_PAGES]; /* 1 for each page handed out */
+	uint8_t used[POOL_PAGES_MAX]; /* 1 for each page handed out */
 };
 
 static struct pool *pools[MAXIMUM_POOLS];
@@ -66,7 +85,7 @@ static uint64_t image_base, image_end;
 
 static uint64_t round_up(uint64_t value)
 {
-	return (value + PAGE - 1) & ~(PAGE - 1);
+	return (value + page_size - 1) & ~(page_size - 1);
 }
 
 static int in_range(uint64_t address, uint64_t size, uint64_t base, uint64_t end)
@@ -108,6 +127,7 @@ static uint64_t find_gap(uint64_t size, uint64_t minimum)
 	return result;
 }
 
+#ifdef __ANDROID__
 /* ART reserves its spaces at addresses chosen at zygote start, and on some
 devices one of them covers the fixed Xbox memory window. ART's heap
 (dalvik.vm.heapsize) decides how much of the low 4 GB its spaces take: on
@@ -133,6 +153,7 @@ enum
 	RANGE_IN_USE,
 	RANGE_UNKNOWN
 };
+#endif
 
 /* why the fixed ranges could not be had: each reason also goes to the
 log, and the report (host_memory_report_low_mappings) starts with them, so
@@ -153,6 +174,7 @@ static void finding(int priority, const char *format, ...)
 		snprintf(findings + used, sizeof(findings) - used, "%s\n", line);
 }
 
+#ifdef __ANDROID__
 struct range_usage
 {
 	uint64_t pages_in_use;
@@ -175,7 +197,7 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 {
 	int descriptor = simulated_no_pagemap ? -1 : open("/proc/self/pagemap", O_RDONLY | O_CLOEXEC);
 	uint64_t entries[512];
-	uint64_t page = from / PAGE;
+	uint64_t page = from / page_size;
 
 	if (simulated_no_pagemap)
 		errno = EACCES;
@@ -185,9 +207,9 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 		return RANGE_UNKNOWN;
 	}
 	usage->method = "pagemap";
-	while (page < to / PAGE)
+	while (page < to / page_size)
 	{
-		size_t wanted = (size_t)(to / PAGE - page);
+		size_t wanted = (size_t)(to / page_size - page);
 		ssize_t bytes;
 		size_t count, index;
 
@@ -197,7 +219,7 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 		if (bytes <= 0 || bytes % sizeof(entries[0]))
 		{
 			finding(HOST_LOG_WARN, "cannot read /proc/self/pagemap at %08llx (%s)",
-				(unsigned long long)(page * PAGE), bytes < 0 ? strerror(errno) : "short read");
+				(unsigned long long)(page * page_size), bytes < 0 ? strerror(errno) : "short read");
 			close(descriptor);
 			return RANGE_UNKNOWN;
 		}
@@ -205,7 +227,7 @@ static int range_usage_pagemap(uint64_t from, uint64_t to, struct range_usage *u
 		for (index = 0; index < count; index++)
 		{
 			if (entries[index] & (3ULL << 62))
-				note_in_use(usage, (page + index) * PAGE);
+				note_in_use(usage, (page + index) * page_size);
 		}
 		page += count;
 	}
@@ -322,9 +344,9 @@ static int range_usage_mincore(uint64_t mapping_start, uint64_t from, uint64_t t
 		{
 			/* (objects there, swapped out: which pages smaps does not say) */
 			usage->method = "the range's swap in smaps";
-			usage->pages_in_use = (uint64_t)range_swapped * 1024 / PAGE;
+			usage->pages_in_use = (uint64_t)range_swapped * 1024 / page_size;
 			usage->lowest_in_use = from;
-			usage->highest_in_use = to - PAGE;
+			usage->highest_in_use = to - page_size;
 			return RANGE_IN_USE;
 		}
 		finding(HOST_LOG_INFO, "ART's large object space at %08llx: %ld kB of it swapped out, none of %08llx-%08llx",
@@ -335,17 +357,17 @@ static int range_usage_mincore(uint64_t mapping_start, uint64_t from, uint64_t t
 		uint64_t length = to - address;
 		size_t index;
 
-		if (length > sizeof(residency) * PAGE)
-			length = sizeof(residency) * PAGE;
+		if (length > sizeof(residency) * page_size)
+			length = sizeof(residency) * page_size;
 		if (mincore((void *)address, length, residency) != 0)
 		{
 			finding(HOST_LOG_WARN, "mincore at %08llx failed (%s)", (unsigned long long)address, strerror(errno));
 			return RANGE_UNKNOWN;
 		}
-		for (index = 0; index < length / PAGE; index++)
+		for (index = 0; index < length / page_size; index++)
 		{
 			if (residency[index] & 1)
-				note_in_use(usage, address + index * PAGE);
+				note_in_use(usage, address + index * page_size);
 		}
 		address += length;
 	}
@@ -406,7 +428,7 @@ static int reclaim_art_overlap(uint64_t address, uint64_t size)
 				"(%llu pages in use, %08llx-%08llx, by %s); left alone",
 				lo, hi, (unsigned long long)from, (unsigned long long)to,
 				(unsigned long long)usage.pages_in_use, (unsigned long long)usage.lowest_in_use,
-				(unsigned long long)usage.highest_in_use + PAGE, usage.method);
+				(unsigned long long)usage.highest_in_use + page_size, usage.method);
 			continue;
 		case RANGE_UNKNOWN:
 			finding(HOST_LOG_ERROR,
@@ -425,6 +447,7 @@ static int reclaim_art_overlap(uint64_t address, uint64_t size)
 	fclose(maps);
 	return reclaimed;
 }
+#endif
 
 /* reclaim_art: the fixed ranges the guest was built for may take ART's
 idle large object space (reclaim_art_overlap); the pools, placed in free
@@ -443,6 +466,7 @@ static int reserve(uint64_t address, uint64_t size, int reclaim_art)
 		munmap(result, size);
 		errno = EEXIST;
 	}
+#ifdef __ANDROID__
 	if (reclaim_art && errno == EEXIST)
 	{
 		int error = errno;
@@ -464,6 +488,10 @@ static int reserve(uint64_t address, uint64_t size, int reclaim_art)
 			errno = EEXIST;
 		}
 	}
+#else
+	/* (on other systems nothing is reclaimed; a taken range fails as before) */
+	(void)reclaim_art;
+#endif
 	return -1;
 }
 
@@ -473,15 +501,21 @@ void host_memory_report_low_mappings(FILE *file)
 {
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
+#ifdef __ANDROID__
 	char model[PROP_VALUE_MAX] = "", heap[PROP_VALUE_MAX] = "", release[PROP_VALUE_MAX] = "";
 
 	__system_property_get("ro.product.model", model);
 	__system_property_get("dalvik.vm.heapsize", heap);
 	__system_property_get("ro.build.version.release", release);
+#endif
 	if (file)
 	{
+#ifdef __ANDROID__
 		fprintf(file, "device: %s, Android %s, Java heap %s\n", model[0] ? model : "unknown",
 			release[0] ? release : "unknown", heap[0] ? heap : "unknown");
+#else
+		fprintf(file, "device: not Android\n");
+#endif
 		fprintf(file, "why:\n%s\nmappings below 4 GB:\n", findings[0] ? findings : "(no reason recorded)\n");
 	}
 	if (!maps)
@@ -525,13 +559,13 @@ static struct pool *pool_new(void)
 		{
 			pool = calloc(1, sizeof(*pool));
 			pool->base = address;
-			pool->free_pages = POOL_PAGES;
+			pool->free_pages = (uint32_t)(POOL_SIZE / page_size);
 			pools[pool_count++] = pool;
 			host_logf(HOST_LOG_INFO, "guest memory pool %d at %08llx", pool_count - 1, (unsigned long long)address);
 			return pool;
 		}
 		/* raced with another mapping; look further up */
-		minimum = address + PAGE;
+		minimum = address + page_size;
 	}
 	return NULL;
 }
@@ -575,6 +609,7 @@ int host_memory_fixed_unavailable(void)
 	return !fixed_reserved && fixed_error != 0;
 }
 
+#ifdef __ANDROID__
 /* For testing the reclaim on any device: with the system property
 debug.halo.art_overlap set (adb shell setprop debug.halo.art_overlap idle,
 or busy), a mapping named as ART's large object space is put over the fixed
@@ -615,12 +650,12 @@ static void simulate_art_overlap(void)
 	}
 	prctl(PR_SET_VMA_, PR_SET_VMA_ANON_NAME_, space, SIMULATED_SPACE_SIZE, "dalvik-free list large object space");
 	/* objects at its bottom, as ART allocates them */
-	memset(space, 0x5a, 4 * PAGE);
+	memset(space, 0x5a, 4 * page_size);
 	if (busy)
-		memset(window_page, 0x5a, PAGE);
+		memset(window_page, 0x5a, page_size);
 	if (strstr(value, "-swapped"))
 	{
-		if (madvise(space, 4 * PAGE, MADV_PAGEOUT) != 0 || (busy && madvise(window_page, PAGE, MADV_PAGEOUT) != 0))
+		if (madvise(space, 4 * page_size, MADV_PAGEOUT) != 0 || (busy && madvise(window_page, page_size, MADV_PAGEOUT) != 0))
 			host_logf(HOST_LOG_WARN, "debug.halo.art_overlap: cannot page out the stand-in (%s)", strerror(errno));
 	}
 	simulated_no_pagemap = strstr(value, "-nopagemap") != NULL;
@@ -628,9 +663,15 @@ static void simulate_art_overlap(void)
 		"(%ld kB of it swapped out)", value, SIMULATED_SPACE_BASE, SIMULATED_SPACE_BASE + SIMULATED_SPACE_SIZE,
 		mapping_swap_kb(SIMULATED_SPACE_BASE));
 }
+#else
+static void simulate_art_overlap(void)
+{
+}
+#endif
 
 void host_memory_reserve_early(void)
 {
+	host_memory_page_size_init();
 	simulate_art_overlap();
 	if (reserve_fixed("at start-up (JNI_OnLoad)") == 0)
 		host_logf(HOST_LOG_INFO, "reserved the Xbox memory window and the image range at start-up");
@@ -638,6 +679,7 @@ void host_memory_reserve_early(void)
 
 int host_memory_initialize(uint32_t base, uint32_t size)
 {
+	host_memory_page_size_init();
 	if (base != HALO_GUEST_IMAGE_BASE || size > HALO_GUEST_IMAGE_RESERVE)
 	{
 		host_logf(HOST_LOG_ERROR, "the guest image (%08x, %u bytes) does not fit its range", base, size);
@@ -663,7 +705,7 @@ static void *pool_take(struct pool *pool, uint64_t pages)
 
 	if (pool->free_pages < pages)
 		return NULL;
-	for (page = 0; page < POOL_PAGES; page++)
+	for (page = 0; page < POOL_SIZE / page_size; page++)
 	{
 		if (pool->used[page])
 		{
@@ -676,7 +718,7 @@ static void *pool_take(struct pool *pool, uint64_t pages)
 
 			memset(&pool->used[first], 1, pages);
 			pool->free_pages -= pages;
-			return (void *)(pool->base + first * PAGE);
+			return (void *)(pool->base + first * page_size);
 		}
 	}
 	return NULL;
@@ -684,11 +726,11 @@ static void *pool_take(struct pool *pool, uint64_t pages)
 
 void *host_low_map(size_t size, int protection)
 {
-	uint64_t pages = round_up(size) / PAGE;
+	uint64_t pages = round_up(size) / page_size;
 	void *address = NULL;
 	int index;
 
-	if (!pages || pages > POOL_PAGES)
+	if (!pages || pages > POOL_SIZE / page_size)
 		return NULL;
 	pthread_mutex_lock(&memory_lock);
 	for (index = 0; index < pool_count && !address; index++)
@@ -703,9 +745,9 @@ void *host_low_map(size_t size, int protection)
 	pthread_mutex_unlock(&memory_lock);
 	if (!address)
 		return NULL;
-	if (mmap(address, pages * PAGE, protection, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) != address)
+	if (mmap(address, pages * page_size, protection, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) != address)
 	{
-		host_low_unmap(address, pages * PAGE);
+		host_low_unmap(address, pages * page_size);
 		return NULL;
 	}
 	return address;
@@ -725,7 +767,7 @@ static struct pool *pool_of(uint64_t address, uint64_t size)
 
 void host_low_unmap(void *address, size_t size)
 {
-	uint64_t start = (uint64_t)address & ~(PAGE - 1);
+	uint64_t start = (uint64_t)address & ~(page_size - 1);
 	uint64_t length = round_up((uint64_t)address + size) - start;
 	struct pool *pool;
 
@@ -733,7 +775,7 @@ void host_low_unmap(void *address, size_t size)
 	pool = pool_of(start, length);
 	if (pool)
 	{
-		uint64_t first = (start - pool->base) / PAGE, count = length / PAGE, page;
+		uint64_t first = (start - pool->base) / page_size, count = length / page_size, page;
 
 		/* give the memory back but keep the address space */
 		mmap((void *)start, length, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED, -1, 0);
@@ -832,24 +874,50 @@ long host_guest_mprotect(uint64_t address, uint64_t size, int protection)
 
 /* ---------- write tracking (port/linux/src/memory_watch.c) */
 
-#define WATCH_PAGE_COUNT (HALO_GUEST_WINDOW_SIZE / PAGE)
+/* the watch granularity is the host page; the arrays are sized for the
+smallest possible page, 4096 bytes */
+#define WATCH_PAGES_MAX (HALO_GUEST_WINDOW_SIZE / 4096)
+
+static uint64_t watch_page_count(void)
+{
+	return HALO_GUEST_WINDOW_SIZE / page_size;
+}
+
+/* the guest range [address, address + size) rounded outwards to whole
+host pages: from the page of the first byte to the page of the last */
+static void watch_range(uint64_t address, uint64_t size, uint64_t *first, uint64_t *last)
+{
+	uint64_t end = address + size;
+
+	*first = (address - HALO_GUEST_WINDOW_BASE) / page_size;
+	*last = (end - 1 - HALO_GUEST_WINDOW_BASE) / page_size;
+}
+
+/* the same range in 4 KB hash pages, the unit of the hash tracking */
+static void watch_hash_range(uint64_t address, uint64_t size, uint64_t *first, uint64_t *last)
+{
+	uint64_t end = address + size;
+
+	*first = (address - HALO_GUEST_WINDOW_BASE) / WATCH_HASH_PAGE_SIZE;
+	*last = (end - 1 - HALO_GUEST_WINDOW_BASE) / WATCH_HASH_PAGE_SIZE;
+}
 
 /* (each page: 0 not watched, 1 watched and read-only, 2 made writable by a
 watched write. A fault on a page at 2 is a write another thread made as
 this one was making the page writable, and is made again; one on a page at
 0, freed memory or none of the watch's, is a crash) */
-static uint8_t page_protected[WATCH_PAGE_COUNT];
-static uint32_t page_generation[WATCH_PAGE_COUNT];
+static uint8_t page_protected[WATCH_PAGES_MAX];
+static uint32_t page_generation[WATCH_PAGES_MAX];
 static volatile uint32_t current_generation = 1;
 static int watch_active;
 static int watch_hashing;
-static uint8_t page_hash_watched[WATCH_PAGE_COUNT];
-static uint64_t page_hash[WATCH_PAGE_COUNT];
-static uint32_t page_hashed_frame[WATCH_PAGE_COUNT];
+static uint8_t page_hash_watched[WATCH_PAGES_MAX];
+static uint64_t page_hash[WATCH_PAGES_MAX];
+static uint32_t page_hashed_frame[WATCH_PAGES_MAX];
 static struct watch_hash page_hashes =
 {
 	.base = (const uint8_t *)(uintptr_t)HALO_GUEST_WINDOW_BASE,
-	.page_count = WATCH_PAGE_COUNT,
+	.page_count = WATCH_PAGES_MAX,
 	.watched = page_hash_watched,
 	.hash = page_hash,
 	.hashed_frame = page_hashed_frame,
@@ -865,20 +933,21 @@ static int in_window(uint64_t address)
 
 static uint64_t watch_page(uint64_t address)
 {
-	return (address - HALO_GUEST_WINDOW_BASE) / PAGE;
+	return (address - HALO_GUEST_WINDOW_BASE) / page_size;
 }
 
 static void mark_written(uint64_t page)
 {
 	page_generation[page] = __sync_add_and_fetch(&current_generation, 1);
 	page_protected[page] = 2;
-	mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ | PROT_WRITE);
+	mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * page_size), page_size, PROT_READ | PROT_WRITE);
 }
 
 static struct sigaction previous_segv, previous_bus, previous_ill;
 
 static void report_crash(int signal_number, siginfo_t *information, void *context)
 {
+#if defined(__aarch64__)
 	ucontext_t *ucontext = context;
 	const struct sigcontext *registers = (const struct sigcontext *)&ucontext->uc_mcontext;
 	uint64_t pc = registers->pc, lr = registers->regs[30];
@@ -912,6 +981,10 @@ static void report_crash(int signal_number, siginfo_t *information, void *contex
 			fp = frame[0];
 		}
 	}
+#else
+	(void)context;
+	host_logf(HOST_LOG_ERROR, "signal %d at address %p", signal_number, information->si_addr);
+#endif
 }
 
 static void chain(struct sigaction *previous, int signal_number, siginfo_t *information, void *context)
@@ -996,21 +1069,21 @@ void host_memory_watch_protect(uint32_t address, uint32_t size)
 
 	if (!watch_active || !size || !in_window(address))
 		return;
-	first = watch_page(address);
-	last = watch_page((uint64_t)address + size - 1);
-	if (last >= WATCH_PAGE_COUNT)
-		last = WATCH_PAGE_COUNT - 1;
 	if (watch_hashing)
 	{
+		watch_hash_range(address, size, &first, &last);
 		watch_hash_protect(&page_hashes, (uint32_t)first, (uint32_t)last);
 		return;
 	}
+	watch_range(address, size, &first, &last);
+	if (last >= watch_page_count())
+		last = watch_page_count() - 1;
 	for (page = first; page <= last; page++)
 	{
 		if (page_protected[page] != 1)
 		{
 			page_protected[page] = 1;
-			mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ);
+			mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * page_size), page_size, PROT_READ);
 		}
 	}
 }
@@ -1029,12 +1102,14 @@ uint32_t host_memory_watch_generation(uint32_t address, uint32_t size)
 
 	if (!size || !in_window(address))
 		return 0;
-	first = watch_page(address);
-	last = watch_page((uint64_t)address + size - 1);
-	if (last >= WATCH_PAGE_COUNT)
-		last = WATCH_PAGE_COUNT - 1;
 	if (watch_hashing)
+	{
+		watch_hash_range(address, size, &first, &last);
 		return watch_hash_generation(&page_hashes, (uint32_t)first, (uint32_t)last);
+	}
+	watch_range(address, size, &first, &last);
+	if (last >= watch_page_count())
+		last = watch_page_count() - 1;
 	for (page = first; page <= last; page++)
 	{
 		if (page_generation[page] > newest)
@@ -1056,10 +1131,9 @@ void host_memory_watch_prepare_write(uint32_t address, uint32_t size)
 		return;
 	if (start < HALO_GUEST_WINDOW_BASE)
 		start = HALO_GUEST_WINDOW_BASE;
-	first = watch_page(start);
-	last = watch_page((uint64_t)address + size - 1);
-	if (last >= WATCH_PAGE_COUNT)
-		last = WATCH_PAGE_COUNT - 1;
+	watch_range(start, (uint64_t)address + size - start, &first, &last);
+	if (last >= watch_page_count())
+		last = watch_page_count() - 1;
 	for (page = first; page <= last; page++)
 	{
 		if (page_protected[page] == 1)
@@ -1075,15 +1149,15 @@ void host_memory_watch_forget(uint32_t address, uint32_t size)
 
 	if (!size || !in_window(address))
 		return;
-	first = watch_page(address);
-	last = watch_page((uint64_t)address + size - 1);
-	if (last >= WATCH_PAGE_COUNT)
-		last = WATCH_PAGE_COUNT - 1;
 	if (watch_hashing)
 	{
+		watch_hash_range(address, size, &first, &last);
 		watch_hash_forget(&page_hashes, (uint32_t)first, (uint32_t)last);
 		return;
 	}
+	watch_range(address, size, &first, &last);
+	if (last >= watch_page_count())
+		last = watch_page_count() - 1;
 	for (page = first; page <= last; page++)
 	{
 		page_protected[page] = 0;

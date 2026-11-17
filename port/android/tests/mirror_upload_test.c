@@ -140,9 +140,9 @@ static void host_gl_buffer_write(GLenum target, unsigned offset, unsigned size, 
 
 #ifdef HALO_ANDROID
 #ifdef TEST_ANDROID_NORMAL
-static int android_geometry_fixes = 0;
+static int halo_geometry_fixes = 0;
 #else
-static int android_geometry_fixes = 1;
+static int halo_geometry_fixes = 1;
 #endif
 #endif
 #include "mirror.inc"
