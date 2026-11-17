@@ -18,6 +18,7 @@ static struct { struct texture_entry *entry; } recent_textures[4];
 static Uint64 clock_ms;
 static Uint64 SDL_GetTicks(void) { return clock_ms; }
 static void glDeleteTextures(int count, const GLuint *texture) { }
+static void hud_hires_upscale_release(unsigned int texture) { (void)texture; }
 static void xgpu_gl_state_invalidate(void) { }
 /* the high-res HUD's settings never change here */
 static unsigned long hud_hires_settings_changed(void) { return 0; }

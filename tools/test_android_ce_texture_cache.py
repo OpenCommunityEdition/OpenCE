@@ -62,6 +62,7 @@ static void glDeleteTextures(int n,GLuint *t) {}
 static void xgpu_gl_state_invalidate(void) {}
 static long hud_hires_override_find(unsigned long a,unsigned long w,unsigned long h,unsigned long b) { return -1; }
 static GLuint hud_hires_override_texture(long i,unsigned long *l) { return 0; }
+static void hud_hires_upscale_release(unsigned int t) {}
 static BOOL platform_is_contiguous(void *p) { return TRUE; }
 static unsigned char custom_edition_texels_order(unsigned long a) { return 0; }
 static void xgpu_statistics_texture_upload(unsigned long s) {}

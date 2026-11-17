@@ -462,9 +462,11 @@ static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
  * same texture, so it is used again (the pixels compared whole), in this map
  * or a later one: the stock sheets are the same in every map. Up to
  * UPSCALE_CACHE_SIZE are kept; of those no texture uses, the
- * UPSCALE_CACHE_UNUSED last used stay (all go when the cache is full). */
+ * UPSCALE_CACHE_UNUSED last used stay while they hold no more than
+ * UPSCALE_CACHE_UNUSED_BYTES (all go when the cache is full). */
 #define UPSCALE_CACHE_SIZE 32
 #define UPSCALE_CACHE_UNUSED 8
+#define UPSCALE_CACHE_UNUSED_BYTES (16UL << 20)
 
 struct upscale_cached
 {
@@ -477,28 +479,33 @@ struct upscale_cached
 	unsigned long levels;
 	long users;
 	unsigned long last_used;
+	/* about what it holds: the texture (4 times as wide and high, RGBA,
+	a third more for its mip levels) and the sheet's pixels */
+	unsigned long bytes;
 };
 
 static struct upscale_cached upscale_cache[UPSCALE_CACHE_SIZE];
 static unsigned long upscale_cache_clock;
 
 /* the longest unused of the cached textures no texture uses, deleted, while
-more than keep are cached */
-static void upscale_cache_trim(long keep)
+more than keep of them are cached, or more than keep_bytes */
+static void upscale_cache_trim(long keep, unsigned long keep_bytes)
 {
 	for (;;)
 	{
 		long index, oldest = -1, unused = 0;
+		unsigned long unused_bytes = 0;
 
 		for (index = 0; index < UPSCALE_CACHE_SIZE; index++)
 		{
 			if (!upscale_cache[index].texture || upscale_cache[index].users > 0)
 				continue;
 			unused++;
+			unused_bytes += upscale_cache[index].bytes;
 			if (oldest < 0 || upscale_cache[index].last_used < upscale_cache[oldest].last_used)
 				oldest = index;
 		}
-		if (oldest < 0 || unused <= keep)
+		if (oldest < 0 || (unused <= keep && unused_bytes <= keep_bytes))
 			return;
 		glDeleteTextures(1, &upscale_cache[oldest].texture);
 		xgpu_gl_state_invalidate();
@@ -520,7 +527,7 @@ void hud_hires_upscale_release(unsigned int texture)
 			if (upscale_cache[index].users > 0)
 				upscale_cache[index].users--;
 			upscale_cache[index].last_used = ++upscale_cache_clock;
-			upscale_cache_trim(UPSCALE_CACHE_UNUSED);
+			upscale_cache_trim(UPSCALE_CACHE_UNUSED, UPSCALE_CACHE_UNUSED_BYTES);
 			return;
 		}
 	}
@@ -567,7 +574,7 @@ unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long 
 		return 0;
 	if (free_index < 0)
 	{
-		upscale_cache_trim(0);
+		upscale_cache_trim(0, 0);
 		for (index = 0; index < UPSCALE_CACHE_SIZE && free_index < 0; index++)
 		{
 			if (!upscale_cache[index].texture)
@@ -588,6 +595,7 @@ unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long 
 		cached->levels = *levels;
 		cached->users = 1;
 		cached->last_used = ++upscale_cache_clock;
+		cached->bytes = width * height * 4 * (16 * 4 / 3 + 1);
 	}
 	return texture;
 }
