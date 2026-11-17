@@ -108,9 +108,19 @@ def test_host_target_on_linux_arm64(tmp_path, monkeypatch, machine):
         "posix_files.c.o",
         "host_linux_data.c.o",
         "xiso.c.o",
+        # the host imports MCC and the Steam Workshop screen call
+        "host_mcc_memory.c.o",
+        "host_mcc_hash.c.o",
+        "steam_downloads.c.o",
+        "steam_seal.c.o",
+        "posix_mcc_share.c.o",
+        "workshop_authors.c.o",
+        "zlib_inflate.c.o",
     ):
         assert part in text
     assert "pkg-config --libs sdl3 glesv2 egl" in text
+    # steam_crypto.c's contexts are made with Mbed TLS's threading settings
+    assert "-DMBEDTLS_THREADING_PTHREAD" in text
 
 
 def test_ci_starts_the_arm64_host():
