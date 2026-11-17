@@ -2,7 +2,7 @@
 
 import re
 
-from harness import constant, enum_with, read, structure
+from harness import constant, enum_with, function, read, structure
 
 
 def class_table():
@@ -108,3 +108,15 @@ typedef struct _DSCAPS DSCAPS;
     for name in ["voice_packet", "sdl_stream"]:
         text += structure(backend, name) + "\n"
     return text
+
+
+def permutation_picker():
+    """sound_definitions.c's pick of a pitch range's next permutation (sound_definition_next_permutation)
+    with what it calls: the played bits of a range's permutations past 32 kept apart (OpenH1 issue 1170)"""
+    picker = read("source/sound/sound_definitions.c")
+    picker = picker[picker.index("/* ---------- constants */"):]
+    names = ["try_to_reset_permutations", "sound_pitch_range_played_beyond", "sound_pitch_range_permutation_played",
+             "sound_pitch_range_permutation_set_played", "try_to_reset_permutations_beyond",
+             "sound_definition_next_permutation"]
+    return "\n".join([enum_with(picker, "SOUND_PLAYED_BEYOND_LONGS"), structure(picker, "sound_played_beyond"),
+                      *(function(picker, name) for name in names)]) + "\n"

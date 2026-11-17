@@ -57,9 +57,6 @@ enum
 	_sound_compression_xbox_adpcm = 1,
 	/* (an xbox adpcm block, of each channel: sound_dsound_xbox.c) */
 	SOUND_COMPRESSED_BLOCK_SIZE = 36,
-	/* (a pitch range's played permutations are bits of a long:
-	sound_definitions.c, try_to_reset_permutations) */
-	MAXIMUM_PLAYED_PERMUTATIONS_PER_PITCH_RANGE = 32,
 	/* (the sound cache: sound_dsound_xbox.c's SOUND_CACHE_SIZE) */
 	SOUND_CACHE_SIZE = 0x400000,
 
@@ -975,6 +972,9 @@ game's) */
 static struct tag_schema_field const sound_pitch_range_fields[] =
 {
 	TAG_SCHEMA_STRING(struct sound_pitch_range, name),
+	/* (the played bits past played_permutation_mask's 32, reset with it:
+	sound_definitions.c) */
+	TAG_SCHEMA_RESET(struct sound_pitch_range, played_beyond_index, 0),
 	TAG_SCHEMA_RESET(struct sound_pitch_range, played_permutation_mask, 0),
 	TAG_SCHEMA_RESET(struct sound_pitch_range, previous_permutation_index, NONE),
 	TAG_SCHEMA_RESET(struct sound_pitch_range, forced_permutation_index, NONE),
@@ -2153,7 +2153,9 @@ static long tag_index_get(
 their samples as the tag's, and names it by them); samples of less than a
 block of each channel cannot be played (the first packet would end past
 them: sound_dsound_xbox.c, dsound_channel_queue_packet), nor can a pitch
-range choose from more permutations than its played bits hold; a promotion
+range choose from more permutations than it has (it may choose from all of
+them, past 32 too: sound_definitions.c keeps their played bits, OpenH1
+issue 1170); a promotion
 is counted in a long, and promotes for ever if the count never fills
 (sound_manager.c, sound_definition_promotion) */
 static boolean sound_check(
@@ -2178,10 +2180,10 @@ static boolean sound_check(
 	for (range_index = 0; range_index < definition->pitch_ranges.count; range_index++)
 	{
 		struct sound_pitch_range *range = (struct sound_pitch_range *)definition->pitch_ranges.address + range_index;
-		long most = MIN(range->permutations.count, MAXIMUM_PLAYED_PERMUTATIONS_PER_PITCH_RANGE);
+		long most = range->permutations.count;
 		long permutation_index;
 
-		if (range->permutations.count &&
+		if (most &&
 			(range->actual_permutation_count < 1 || range->actual_permutation_count > most))
 		{
 			tag_validate_correct(validation, "has pitch range %ld choosing from %d of %ld permutations",

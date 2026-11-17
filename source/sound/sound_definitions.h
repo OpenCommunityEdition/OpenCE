@@ -97,7 +97,10 @@ struct sound_pitch_range
 	real natural_pitch;
 	struct real_bounds bend_bounds;
 	short actual_permutation_count;
-	short unused;
+	/* port: its played bits past played_permutation_mask's 32 (OpenH1
+	issue 1170), the entry (one on) of sound_definitions.c's
+	sound_pitch_range_played_beyond; 0, as the validator resets it, for none */
+	short played_beyond_index;
 	real playback_rate;
 	unsigned long played_permutation_mask;
 	short previous_permutation_index;
