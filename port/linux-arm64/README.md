@@ -44,6 +44,13 @@ list are kept there too.
 A first start without a `maps/` folder asks for an Xbox disc image, the
 same flow as the x86 build.
 
+## Steam sign-in
+
+The host has no device key, so the Steam sign-in's sealing (`steam_seal.h`) is
+off: the device's secret is empty, `steam_seal` and `steam_unseal` return 0, and
+the refresh token is never written. The sign-in lasts one run; each start asks
+for the password and the Steam Guard code again. Nothing is stored in plain text.
+
 ## Tests
 
 Run these with pytest from the `tools` folder:
