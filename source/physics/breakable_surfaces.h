@@ -1,9 +1,3 @@
-/*
-BREAKABLE_SURFACES.H
-
-header included in hcex build.
-*/
-
 #ifndef __BREAKABLE_SURFACES_H
 #define __BREAKABLE_SURFACES_H
 #pragma once

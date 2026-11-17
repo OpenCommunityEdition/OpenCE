@@ -1,9 +1,3 @@
-/*
-PREDICTED_RESOURCES.H
-
-header included in hcex build.
-*/
-
 #ifndef __PREDICTED_RESOURCES_H
 #define __PREDICTED_RESOURCES_H
 #pragma once

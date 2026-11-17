@@ -1,7 +1,3 @@
-/*
-BITMAP_GROUP_RUNTIME.H
-*/
-
 #ifndef __BITMAP_GROUP_RUNTIME_H
 #define __BITMAP_GROUP_RUNTIME_H
 #pragma once

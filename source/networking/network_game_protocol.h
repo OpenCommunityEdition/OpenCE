@@ -1,6 +1,4 @@
 /*
-NETWORK_GAME_PROTOCOL.H
-
 Shared game-protocol constants for the connection and message consumers.
 */
 

@@ -1,6 +1,4 @@
 /*
-RASTERIZER_XBOX_MODELS.H
-
 Narrow interface owned by RASTERIZER_XBOX_MODELS.C for the model backends
 called by the public rasterizer wrappers.
 */

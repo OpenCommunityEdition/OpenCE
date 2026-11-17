@@ -1,9 +1,3 @@
-/*
-DAMAGE_RESISTANCES.H
-
-header included in hcex build.
-*/
-
 #ifndef __DAMAGE_RESISTANCES_H
 #define __DAMAGE_RESISTANCES_H
 #pragma once

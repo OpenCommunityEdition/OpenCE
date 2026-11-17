@@ -1,9 +1,3 @@
-/*
-RENDER_DEBUG.H
-
-header included in hcex build.
-*/
-
 #ifndef __RENDER_DEBUG_H
 #define __RENDER_DEBUG_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-BYTE_SWAPPING.H
-*/
-
 #ifndef __BYTE_SWAPPING_H
 #define __BYTE_SWAPPING_H
 #pragma once

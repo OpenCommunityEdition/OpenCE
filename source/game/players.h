@@ -1,9 +1,3 @@
-/*
-PLAYERS.H
-
-header included in hcex build.
-*/
-
 #ifndef __PLAYERS_H
 #define __PLAYERS_H
 #pragma once

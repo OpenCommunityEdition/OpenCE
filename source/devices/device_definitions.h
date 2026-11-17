@@ -1,9 +1,3 @@
-/*
-DEVICE_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __DEVICE_DEFINITIONS_H
 #define __DEVICE_DEFINITIONS_H
 #pragma once

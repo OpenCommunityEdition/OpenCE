@@ -1,6 +1,4 @@
 /*
-BITMAPS_INLINES.H
-
 file has inline function assertions.
 */
 

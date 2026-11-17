@@ -1,9 +1,3 @@
-/*
-BIPED_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __BIPED_DEFINITIONS_H
 #define __BIPED_DEFINITIONS_H
 #pragma once

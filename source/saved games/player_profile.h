@@ -1,9 +1,3 @@
-/*
-PLAYER_PROFILE.H
-
-header included in hcex build.
-*/
-
 #ifndef __PLAYER_PROFILE_H
 #define __PLAYER_PROFILE_H
 #pragma once

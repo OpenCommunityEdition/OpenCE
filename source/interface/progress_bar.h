@@ -1,9 +1,3 @@
-/*
-PROGRESS_BAR.H
-
-header included in hcex build.
-*/
-
 #ifndef __PROGRESS_BAR_H
 #define __PROGRESS_BAR_H
 #pragma once

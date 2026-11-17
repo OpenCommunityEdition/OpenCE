@@ -1,7 +1,3 @@
-/*
-MARKETING_AND_STRATEGIC_BUSINESS_DEVELOPMENT.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

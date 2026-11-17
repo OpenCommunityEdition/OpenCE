@@ -1,9 +1,3 @@
-/*
-STATIC_CAMERA.H
-
-header included in hcex build.
-*/
-
 #ifndef __STATIC_CAMERA_H
 #define __STATIC_CAMERA_H
 #pragma once

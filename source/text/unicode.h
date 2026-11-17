@@ -1,9 +1,3 @@
-/*
-UNICODE.H
-
-header included in hcex build.
-*/
-
 #ifndef __UNICODE_H
 #define __UNICODE_H
 #pragma once

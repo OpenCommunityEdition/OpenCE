@@ -1,6 +1,4 @@
 /*
-RENDER_DEBUG_GEOMETRY.H
-
 Narrow geometry interface owned by RENDER_DEBUG.C.
 */
 

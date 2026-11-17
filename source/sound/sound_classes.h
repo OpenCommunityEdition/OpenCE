@@ -1,6 +1,4 @@
 /*
-SOUND_CLASSES.H
-
 file has inline function assertions.
 */
 

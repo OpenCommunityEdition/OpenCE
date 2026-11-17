@@ -1,6 +1,4 @@
 /*
-GAME_STATISTICS_INTERNAL.H
-
 Narrow cross-translation-unit interface owned by GAME_STATISTICS.C.
 */
 

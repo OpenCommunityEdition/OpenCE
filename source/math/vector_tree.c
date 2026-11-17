@@ -1,19 +1,3 @@
-/*
-VECTOR_TREE.C
-
-symbols in this file:
-000FFF50 00d0:
-	_vector_tree_new (0000)
-00100020 0020:
-	_vector_tree_delete (0000)
-00100040 0040:
-	_code_00100040 (0000)
-00100080 0050:
-	_code_00100080 (0000)
-001000D0 0160:
-	_vector_tree_find (0000)
-*/
-
 #include "cseries/cseries.h"
 #include "memory/array.h"
 

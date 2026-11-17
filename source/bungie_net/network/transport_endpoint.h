@@ -1,7 +1,3 @@
-/*
-TRANSPORT_ENDPOINT.H
-*/
-
 #ifndef __TRANSPORT_ENDPOINT_H
 #define __TRANSPORT_ENDPOINT_H
 #pragma once

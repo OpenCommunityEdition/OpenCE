@@ -1,9 +1,3 @@
-/*
-FLAGS.H
-
-header included in hcex build.
-*/
-
 #ifndef __FLAGS_H
 #define __FLAGS_H
 #pragma once

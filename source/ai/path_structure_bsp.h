@@ -1,7 +1,3 @@
-/*
-PATH_STRUCTURE_BSP.H
-*/
-
 #ifndef __PATH_STRUCTURE_BSP_H
 #define __PATH_STRUCTURE_BSP_H
 #pragma once

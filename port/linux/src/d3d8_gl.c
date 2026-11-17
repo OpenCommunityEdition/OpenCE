@@ -1755,7 +1755,7 @@ static void vertical_blank_start(void)
 	pthread_mutex_unlock(&vertical_blank_lock);
 }
 
-/* replaces main/d3d_intimacy.cpp, which reads the counter out of the Xbox
+/* main/d3d_intimacy.h's flip counter, which the Xbox read out of its
 Direct3D runtime's private device structure */
 volatile unsigned int *d3d_find_flipcount(void)
 {

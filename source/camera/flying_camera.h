@@ -1,9 +1,3 @@
-/*
-FLYING_CAMERA.H
-
-header included in hcex build.
-*/
-
 #ifndef __FLYING_CAMERA_H
 #define __FLYING_CAMERA_H
 #pragma once

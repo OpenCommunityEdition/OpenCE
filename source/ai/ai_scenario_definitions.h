@@ -1,9 +1,3 @@
-/*
-AI_SCENARIO_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __AI_SCENARIO_DEFINITIONS_H
 #define __AI_SCENARIO_DEFINITIONS_H
 #pragma once

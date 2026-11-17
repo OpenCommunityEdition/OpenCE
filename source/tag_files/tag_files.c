@@ -1,7 +1,3 @@
-/*
-TAG_FILES.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

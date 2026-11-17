@@ -1,8 +1,8 @@
 /*
 TIFF_FILE.C
 
-port: the builds leave out source/bitmaps/tiff_file.c and the libtiff it
-writes with (port/linux/port.json). Its one function, tiff_export, is
+port: the Xbox's TIFF writer, source/bitmaps/tiff_file.c, and the libtiff
+it wrote with are not in this tree. Its one function, tiff_export, is
 called by main.c's screenshot_record: for the Xbox's movie recorder
 (main_movie_start, which nothing starts) and for the screenshot_count and
 screenshot_size globals (screenshot_render). Those read the back buffer's

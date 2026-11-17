@@ -1,9 +1,3 @@
-/*
-PROPS.H
-
-header included in hcex build.
-*/
-
 #ifndef __PROPS_H
 #define __PROPS_H
 #pragma once

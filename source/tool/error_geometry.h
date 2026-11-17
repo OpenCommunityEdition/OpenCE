@@ -1,9 +1,3 @@
-/*
-ERROR_GEOMETRY.H
-
-header included in hcex build.
-*/
-
 #ifndef __ERROR_GEOMETRY_H
 #define __ERROR_GEOMETRY_H
 #pragma once

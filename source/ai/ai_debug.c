@@ -1,7 +1,3 @@
-/*
-AI_DEBUG.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

@@ -1,7 +1,3 @@
-/*
-SHADER_TRANSPARENT_GENERIC_PREPROCESSOR.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"
