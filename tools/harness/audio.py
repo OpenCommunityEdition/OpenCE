@@ -1,6 +1,19 @@
 """Audio fixtures use the production structures, enums and capacities."""
 
+import re
+
 from harness import constant, enum_with, read, structure
+
+
+def class_table():
+    """The game's sound class table and names (sound_classes.c), with the class enum: a fixture's
+    sound_classes[] and sound_class_names[]."""
+    source = read("source/sound/sound_classes.c")
+    macro = re.search(r"^#define SOUND_CLASS_DEFINITION\(.*?[^\\]\n", source, re.M | re.S).group(0)
+    tables = [source[source.index(start):source.index("};", source.index(start)) + 2]
+              for start in ["struct sound_class_definition sound_classes[", "char const *sound_class_names["]]
+    return "\n".join([f"#define NUMBER_OF_SOUND_CLASSES {constant(source, 'NUMBER_OF_SOUND_CLASSES')}",
+                      enum_with(read("source/sound/sound_classes.h"), "_sound_class_music"), macro, *tables])
 
 
 def manager_types():

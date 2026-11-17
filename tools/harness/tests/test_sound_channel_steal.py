@@ -1,5 +1,4 @@
-"""Effects never take music's or speech's channel, and the stereo channel types are as large as the mono 3D type (#1125)."""
-import re
+"""Effects never take music's or speech's channel (#1125); the pools' sizes: test_sound_channel_pools."""
 import sys
 from pathlib import Path
 
@@ -49,11 +48,3 @@ def test_negative_control(control):
     status, output = run(build("sound_channel_steal", generated(fault)), case)
     assert status == CHECK_FAILED, f"{control} escaped {case}: {output}"
 
-
-def test_stereo_pools_match_mono_3d():
-    """sound_channel_type_flags: 2D mono, 3D mono, stereo 22 kHz, stereo 44 kHz; actual counts, then virtual."""
-    source = read("source/sound/sound_preferences.c")
-    body = source[source.index("default_sound_preferences ="):]
-    actual, virtual = ([int(n) for n in group.split(",")] for group in re.findall(r"\{([\d ,]+)\}", body)[:2])
-    for counts in (actual, virtual):
-        assert counts[2] >= counts[1] and counts[3] >= counts[1], counts

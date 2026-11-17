@@ -69,6 +69,21 @@ the Xbox's. */
 #define HALO_PORT_SOUND_CACHE_SIZE 0x1000000 /* (0x400000) */
 #endif
 
+/* Sound mods can put weapons, music and speech in the same stereo pool.
+The software mixer is not limited to the Xbox's hardware voices. Keep
+smaller pools on Android and the web, as with their sound cache above.
+Actual channels include sounds fading out and must total at most the
+256 streams in sound_dsound_xbox.c. OpenH1's mixer timings do not measure
+this backend; tools/harness/tests/test_sound_channel_pools.py checks
+contention and capacity, not runtime cost. */
+#if defined(HALO_ARM64_GUEST) || defined(HALO_WEB)
+#define HALO_PORT_SOUND_VIRTUAL_CHANNELS { 16, 72, 24, 40 } /* ({ 9, 46, 9, 9 }) */
+#define HALO_PORT_SOUND_ACTUAL_CHANNELS { 18, 78, 27, 44 } /* ({ 10, 51, 10, 10 }) */
+#else
+#define HALO_PORT_SOUND_VIRTUAL_CHANNELS { 24, 96, 32, 80 } /* ({ 9, 46, 9, 9 }) */
+#define HALO_PORT_SOUND_ACTUAL_CHANNELS { 26, 104, 36, 86 } /* ({ 10, 51, 10, 10 }) */
+#endif
+
 /* ---------- particles and lights a frame draws
 
 What one view draws in a frame, past which the rest is not drawn: the runs

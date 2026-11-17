@@ -25,17 +25,16 @@ symbols in this file:
 
 /* ---------- globals */
 
-/* port: the stereo types (22 and 44 kHz) have as many channels as the mono
-3D type, not the Xbox's 9 voices. The port mixes in software, with no
-hardware voice limit, and a sound mod may make any class stereo (the
-Uncompressed Audio mod's weapons, reloads and engines are stereo 44 kHz),
-which then shared the music's 9 channels and took them (#1125). A channel no
-sound plays in costs nothing to mix. */
+/* port: the native builds' channels of each type, well past the Xbox's
+hardware voices (halo_port_capacity.h: what they cost the software mixer).
+A sound mod may make any class stereo (the Uncompressed Audio mod's weapons,
+reloads and engines are stereo 44 kHz), which then shared the music's 9
+channels and took them (#1125). */
 static struct sound_preferences default_sound_preferences =
 {
 	0,
-	{ 10, 51, 51, 51 },
-	{ 9, 46, 46, 46 },
+	HALO_PORT_SOUND_ACTUAL_CHANNELS,
+	HALO_PORT_SOUND_VIRTUAL_CHANNELS,
 	0,
 };
 
