@@ -102,9 +102,14 @@ real contrail_fade(
 	if (fade_mode)
 	{
 		real_vector3d to_camera;
+		real distance;
 
 		vector_from_points3d(world_point, &render.camera.position, &to_camera);
-		result = fabs(dot_product3d(world_normal, &to_camera) / magnitude3d(&to_camera));
+		distance = magnitude3d(&to_camera);
+		/* port: a point at the camera (a player's own projectile starts at
+		their eye) has no direction to fade by: unfaded, not 0/0, whose NaN
+		was the point's alpha */
+		result = distance > _real_epsilon ? fabs(dot_product3d(world_normal, &to_camera) / distance) : 1.f;
 
 		if (definition->flags & (1 << _contrail_fades_slowly_bit))
 			result = transition_function_evaluate(2, result);
