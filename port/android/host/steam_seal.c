@@ -198,8 +198,9 @@ void steam_seal_forget(void)
 
 #else
 
-/* ---------- elsewhere (tools/test_steam_client.py's native build): a key
-of a secret of the device's own, the test's */
+/* ---------- elsewhere (Linux arm64, and tools/test_steam_client.py's native
+build): no device key on this host, so sealing is off: device_secret finds none,
+steam_seal and steam_unseal return 0, and the sign-in lasts one run */
 
 void steam_seal_folder(char const *root, char *folder, size_t size)
 {

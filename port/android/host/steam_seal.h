@@ -10,6 +10,10 @@ as good as the account to whoever has it, until it is revoked):
   storage access can read), sealed with an AES-GCM key of the Android
   Keystore that never leaves it (HaloActivity.steamSeal): a copy of the file
   opens on no other phone, nor on this one once the app is uninstalled;
+- Linux arm64 (and any host without a device key): sealing is off, as the
+  device's secret is empty (steam_seal.c). steam_seal and steam_unseal return 0,
+  so the token is never written: the sign-in lasts one run, and the next start
+  asks for the password and the Steam Guard code again;
 - when there is no key to be had, the token is not written at all: the
   sign-in lasts until the app closes, and the log says so.
 

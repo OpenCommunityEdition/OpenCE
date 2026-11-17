@@ -91,6 +91,10 @@ Keystore that never leaves it (`HaloActivity.steamSeal`).
   player logs out, because the key is deleted.
 - **Without a key:** if the Keystore can't seal the token, it isn't written
   at all. The sign-in lasts until the app closes, and the log says so.
+- **On Linux arm64:** there is no device key, so sealing is off (the device's
+  secret is empty). The token is never written, the sign-in lasts one run, and
+  each start asks for the password and the Steam Guard code again. The session
+  file keeps only the account name and the seed.
 - **How the file is written:** to a `.part` file with mode 0600 (where the file
   system has modes), then renamed over the old one.
 - **The token stays in the host:**
