@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, mutated, read, structure, run  # noqa: E402
 from harness.audio import pcm_permutation_rate, permutation_picker  # noqa: E402
 
-CASES = ["forty", "same-as-old", "pieces", "reloaded"]
+CASES = ["forty", "same-as-old", "pieces", "reloaded", "map-after-map"]
 NEGATIVE_CONTROLS = {
     # the old clamp: a range picks from its first 32 permutations only
     "old-clamp": (("\t\tbeyond = sound_pitch_range_played_beyond(range);\n",
@@ -21,7 +21,9 @@ NEGATIVE_CONTROLS = {
                        "forty"),
     # the bits past 32 of a range whose map loaded again kept, not reset with its played mask
     "stale-bits": (("\tfor (word = 0; word < SOUND_PLAYED_BEYOND_LONGS; word++)\n"
-                    "\t\tplayed[index].bits[word] = 0;\n", ""), "reloaded"),
+                    "\t\ttable->entries[index].bits[word] = 0;\n", ""), "reloaded"),
+    # the entries not let go as a new map starts: map after map they run out
+    "no-clear": (("\tsound_played_beyond_table.count = 0;\n", ""), "map-after-map"),
     # a range of 32 or fewer reset otherwise than the game did: its picks differ
     "small-reset-changed": (("\t\t\trange->played_permutation_mask = FLAG(range->previous_permutation_index);\n",
                              "\t\t\trange->played_permutation_mask = 0;\n"), "same-as-old"),

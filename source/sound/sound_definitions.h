@@ -224,5 +224,9 @@ short sound_definition_next_permutation(
 	struct sound_definition *definition,
 	short pitch_range_index,
 	short permutation_index);
+/* port: the played bits past 32 of the last map's pitch ranges let go
+(OpenH1 issue 1170: sound_initialize_for_new_map) */
+void sound_definitions_played_beyond_clear(
+	void);
 
 #endif // __SOUND_DEFINITIONS_H

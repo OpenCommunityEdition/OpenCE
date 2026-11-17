@@ -5,7 +5,8 @@ The real sound_definitions.c picking a pitch range's next permutation
 (sound_definition_next_permutation_from_seed, OpenH1 issue 1170): a range
 that chooses from more than 32 permutations (a Custom Edition sound's) plays
 every one of them before any repeats, its played bits past 32 kept apart
-from the map's structure and reset with it as a map loads; a range of 32 or
+from the map's structure and reset with it as a map loads, the entries only
+ever the current map's (map after map, none shares one); a range of 32 or
 fewer picks as the game did, draw for draw (the same picks and the same
 seed after each, against the code before, copied here); and the pieces of a
 long permutation split at load (issue 1167) are never picked to start a
@@ -247,17 +248,50 @@ int main(int argc, char **argv)
 	else if (!strcmp(name, "reloaded"))
 	{
 		/* a range whose map loads again (the validator resets its played mask
-		and index) starts with none played, past 32 too */
+		and index, then sound_initialize_for_new_map) starts with none
+		played, past 32 too */
 		unsigned long seed = 5;
 		int index;
 
+		sound_definitions_played_beyond_clear();
 		sound_make(&sound, 40, 40, 0.f);
 		for (index = 0; index < 25; index++)
 			pick(&sound, &seed);
 		sound.range.played_permutation_mask = 0;
 		sound.range.played_beyond_index = 0;
 		sound.range.previous_permutation_index = NONE;
+		sound_definitions_played_beyond_clear();
 		picks_distinct(&sound, &seed, 40, NONE);
+	}
+	else if (!strcmp(name, "map-after-map"))
+	{
+		/* map after map, more than the indices a range has (a short): each
+		map's two ranges of 40, at addresses earlier maps' had, have
+		indices of their own, each its own entry, and each plays all 40
+		before any repeats */
+		static struct test_sound sounds[8];
+		unsigned long seed = 11;
+		long map;
+
+		for (map = 0; map < 3L * MAXIMUM_SOUND_PLAYED_BEYOND; map++)
+		{
+			struct test_sound *first = &sounds[map % 8];
+			struct test_sound *second = &sounds[(map + 3) % 8];
+
+			sound_make(first, 40, 40, 0.f);
+			sound_make(second, 40, 40, 0.f);
+			sound_definitions_played_beyond_clear();
+			picks_distinct(first, &seed, 40, NONE);
+			picks_distinct(second, &seed, 40, NONE);
+			CHECK(first->range.played_beyond_index > 0 && second->range.played_beyond_index > 0 &&
+				first->range.played_beyond_index != second->range.played_beyond_index,
+				"map %ld: its ranges have indices %d and %d", map, first->range.played_beyond_index,
+				second->range.played_beyond_index);
+			CHECK(sound_played_beyond_table.count == 2 &&
+				sound_played_beyond_table.entries[first->range.played_beyond_index - 1].range == &first->range &&
+				sound_played_beyond_table.entries[second->range.played_beyond_index - 1].range == &second->range,
+				"map %ld: %ld entries, not its two ranges'", map, sound_played_beyond_table.count);
+		}
 	}
 	else
 	{
