@@ -1,7 +1,7 @@
 """A pitch range that chooses from more than 32 permutations (a Custom Edition sound's, OpenH1 issue 1170) plays every
 one of them before any repeats: the real sound_definitions.c keeps the played bits past its 32-bit mask apart from the
 map's structure, reset with it as a map loads. A range of 32 or fewer picks as the game did, draw for draw, and the
-pieces of a split permutation (issue 1167) never start a sound."""
+continuations of a linked permutation never start a sound."""
 import sys
 from pathlib import Path
 
@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, mutated, read, structure, run  # noqa: E402
-from harness.audio import pcm_permutation_rate, permutation_picker  # noqa: E402
+from harness.audio import permutation_picker  # noqa: E402
 
 CASES = ["forty", "same-as-old", "pieces", "reloaded", "map-after-map"]
 NEGATIVE_CONTROLS = {
@@ -38,7 +38,6 @@ def generated(fault=None):
                      ["real_bounds", "sound_permutation", "sound_pitch_range", "sound_definition"])
     most = constant(definitions, "MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE")
     types += f"#define MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE {most}\n"
-    types += pcm_permutation_rate()
     code = permutation_picker()
     if fault:
         code = mutated(code, *fault)

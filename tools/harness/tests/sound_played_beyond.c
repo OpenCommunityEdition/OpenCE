@@ -2,14 +2,14 @@
 SOUND_PLAYED_BEYOND.C (test)
 
 The real sound_definitions.c picking a pitch range's next permutation
-(sound_definition_next_permutation_from_seed, OpenH1 issue 1170): a range
+(sound_definition_next_permutation, OpenH1 issue 1170): a range
 that chooses from more than 32 permutations (a Custom Edition sound's) plays
 every one of them before any repeats, its played bits past 32 kept apart
 from the map's structure and reset with it as a map loads, the entries only
 ever the current map's (map after map, none shares one); a range of 32 or
 fewer picks as the game did, draw for draw (the same picks and the same
 seed after each, against the code before, copied here); and the pieces of a
-long permutation split at load (issue 1167) are never picked to start a
+linked permutation are never picked to start a
 sound. test_sound_played_beyond.py takes the code (under_test.inc) and the
 game's structures (types.inc).
 */
@@ -40,6 +40,9 @@ static real real_seed_random(unsigned long *seed)
 	*seed = *seed * 1664525UL + 1013904223UL;
 	return (real)((*seed >> 16) & 0xFFFF) / 65536.f;
 }
+
+static unsigned long *current_seed;
+static unsigned long *get_global_local_random_seed_address(void) { return current_seed; }
 
 #include "under_test.inc"
 
@@ -101,7 +104,7 @@ struct test_sound
 };
 
 /* a sound of one range choosing from `actual` of `count` permutations (those
-past `actual` the pieces of a long one, 16-bit PCM at 22.05 kHz), as the
+past `actual` the continuations of a linked one), as the
 validator leaves it */
 static void sound_make(struct test_sound *sound, short actual, short count, real skip_step)
 {
@@ -123,17 +126,10 @@ static void sound_make(struct test_sound *sound, short actual, short count, real
 
 		permutation->next_permutation_index = NONE;
 		permutation->skip_fraction = skip_step * (real)(index % 4);
-		if (index >= actual)
-		{
-			permutation->compression = 0;
-			permutation->sample_buffer_size = 22050;
-		}
 	}
 	/* (each piece follows the one before it, from the last actual one) */
 	if (count > actual)
 	{
-		sound->permutations[actual - 1].compression = 0;
-		sound->permutations[actual - 1].sample_buffer_size = 22050;
 		for (index = actual - 1; index < count - 1; index++)
 			sound->permutations[index].next_permutation_index = (short)(index + 1);
 	}
@@ -141,7 +137,8 @@ static void sound_make(struct test_sound *sound, short actual, short count, real
 
 static short pick(struct test_sound *sound, unsigned long *seed)
 {
-	return sound_definition_next_permutation_from_seed(&sound->definition, 0, NONE, seed, FALSE);
+	current_seed = seed;
+	return sound_definition_next_permutation(&sound->definition, 0, NONE);
 }
 
 /* `count` picks of `sound`, each a different one of its `actual` permutations
@@ -241,8 +238,8 @@ int main(int argc, char **argv)
 				CHECK(VALID_INDEX(picked, actuals[which]), "%d of %d picks a piece: %d", index, actuals[which], picked);
 			}
 			/* (and a piece is followed by the next piece, as before) */
-			CHECK(sound_definition_next_permutation_from_seed(&sound.definition, 0, (short)(actuals[which] - 1),
-				&seed, FALSE) == actuals[which], "the last actual one is not followed by its first piece");
+			sound.definition.flags |= FLAG(1);
+			CHECK(sound_definition_next_permutation(&sound.definition, 0, (short)(actuals[which] - 1)) == actuals[which], "the last actual one is not followed by its first piece");
 		}
 	}
 	else if (!strcmp(name, "reloaded"))
