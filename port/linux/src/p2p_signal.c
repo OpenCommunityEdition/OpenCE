@@ -72,6 +72,7 @@ answered it in a while.
 #include "posix.h"
 #include "port_config.h"
 #include "p2p_internal.h"
+#include "p2p_matchmaking.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -107,6 +108,8 @@ enum
 	PROOF_SIZE = NONCE_SIZE + TAG_SIZE,
 	BUFFER_SIZE = 4096,
 	MAXIMUM_MESSAGE_SIZE = 512,
+	MAXIMUM_PUBLISH_SIZE = MM_MAXIMUM_RECORD_SIZE > MAXIMUM_MESSAGE_SIZE + P2P_SEAL_OVERHEAD ?
+		MM_MAXIMUM_RECORD_SIZE : MAXIMUM_MESSAGE_SIZE + P2P_SEAL_OVERHEAD,
 	/* a listing's most (p2p_lobby.c's MAXIMUM_LISTING_SIZE, 268 with a
 	password's sealed token, and some) */
 	MAXIMUM_LISTING_SIZE = 320,
@@ -177,7 +180,8 @@ enum
 	_topic_own_slot,
 	_topic_query,
 	_topic_slots,
-	_topic_probe,
+	_topic_mm,
+	_topic_probe = _topic_mm + P2P_MM_MAXIMUM_TOPICS,
 	/* the topics a broker is subscribed to */
 	NUMBER_OF_TOPICS = _topic_probe + P2P_MAXIMUM_PROBES,
 };
@@ -377,6 +381,9 @@ static struct
 
 	/* the server browser's probes (p2p_signal_probe) */
 	struct probe probes[P2P_MAXIMUM_PROBES];
+
+	char mm_topics[P2P_MM_MAXIMUM_TOPICS][P2P_MM_TOPIC_SIZE];
+	int mm_topic_count;
 } signalling;
 
 static int elapsed(unsigned long since, unsigned long time)
@@ -601,7 +608,7 @@ static void broker_topic(struct broker *broker, const char *topic, int subscribe
 /* a publish at most once, not retained: signalling's, and queries */
 static void broker_publish(struct broker *broker, const char *topic, const unsigned char *payload, int payload_size)
 {
-	unsigned char body[3 + TOPIC_SIZE + MAXIMUM_MESSAGE_SIZE + P2P_SEAL_OVERHEAD];
+	unsigned char body[3 + TOPIC_SIZE + MAXIMUM_PUBLISH_SIZE];
 	int size = put_string(body, topic);
 
 	if (broker->protocol == 5)
@@ -700,6 +707,8 @@ static void broker_sync_topics(struct broker *broker)
 	wanted[_topic_own_slot] = lobby && signalling.lobby_listed ? signalling.own_slot : "";
 	wanted[_topic_query] = lobby && signalling.lobby_listed ? P2P_LOBBY_QUERY_TOPIC : "";
 	wanted[_topic_slots] = lobby && signalling.lobby_browsing ? P2P_LOBBY_SLOT_PREFIX "+" : "";
+	for (index = 0; index < P2P_MM_MAXIMUM_TOPICS; index++)
+		wanted[_topic_mm + index] = index < signalling.mm_topic_count ? signalling.mm_topics[index] : "";
 	for (index = 0; index < P2P_MAXIMUM_PROBES; index++)
 		wanted[_topic_probe + index] = signalling.probes[index].join.active ? signalling.probes[index].topic : "";
 	for (index = 0; index < NUMBER_OF_TOPICS; index++)
@@ -708,7 +717,8 @@ static void broker_sync_topics(struct broker *broker)
 
 		if (!strcmp(wanted[index], had))
 			continue;
-		if (had[0])
+		/* (a topic moved to another slot stays subscribed) */
+		if (had[0] && !mm_topic_listed(wanted, NUMBER_OF_TOPICS, had))
 			broker_topic(broker, had, 0, 0);
 		if (wanted[index][0])
 			broker_topic(broker, wanted[index], 1, index == _topic_own_slot);
@@ -1465,7 +1475,17 @@ static void publish_received(struct broker *broker, const char *topic, const uns
 {
 	unsigned char message[MAXIMUM_MESSAGE_SIZE];
 	int message_size;
+	int index;
 
+	for (index = 0; index < signalling.mm_topic_count; index++)
+	{
+		if (!strcmp(topic, signalling.mm_topics[index]))
+		{
+			if (size <= MM_MAXIMUM_RECORD_SIZE)
+				p2p_mm_heard(payload, size);
+			return;
+		}
+	}
 	if (size > MAXIMUM_MESSAGE_SIZE + P2P_SEAL_OVERHEAD)
 		return;
 	if (!strncmp(topic, P2P_LOBBY_SLOT_PREFIX, sizeof(P2P_LOBBY_SLOT_PREFIX) - 1))
@@ -2006,6 +2026,23 @@ static void sync_all_topics(void)
 
 	for (index = 0; index < signalling.broker_count; index++)
 		broker_sync_topics(&signalling.brokers[index]);
+}
+
+void p2p_signal_mm_topics(const char topics[][P2P_MM_TOPIC_SIZE], int count)
+{
+	if (count < 0)
+		count = 0;
+	if (count > P2P_MM_MAXIMUM_TOPICS)
+		count = P2P_MM_MAXIMUM_TOPICS;
+	memcpy(signalling.mm_topics, topics, (size_t)count * P2P_MM_TOPIC_SIZE);
+	signalling.mm_topic_count = count;
+	sync_all_topics();
+}
+
+void p2p_signal_mm_publish(const char *topic, const unsigned char *payload, int size)
+{
+	if (size <= MAXIMUM_PUBLISH_SIZE)
+		publish_everywhere(topic, payload, size);
 }
 
 void p2p_signal_host(const unsigned char *token)
