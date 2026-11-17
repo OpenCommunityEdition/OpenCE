@@ -621,6 +621,12 @@ void scenario_tags_unload(
 
 		longsword_exhaust_tags_unloaded();
 	}
+	/* port: the Pelican's light shaders forgotten (port/linux/game/pelican_lights.c) */
+	{
+		extern void pelican_lights_tags_unloaded(void);
+
+		pelican_lights_tags_unloaded();
+	}
 	sound_cache_close();
 	texture_cache_close();
 	/* port: the mods' tags go, after the sound and texture caches that held
@@ -1435,6 +1441,13 @@ long scenario_tags_load(
 				extern void longsword_exhaust_tags_loaded(void);
 
 				longsword_exhaust_tags_loaded();
+			}
+			/* port: the Pelican's running lights drawn whole over its hull, as
+			its decals (port/linux/game/pelican_lights.c) */
+			{
+				extern short pelican_lights_tags_loaded(void);
+
+				pelican_lights_tags_loaded();
 			}
 			/* port: the menus' tags, added to the map's (port/linux/game/menu_tags.c) */
 			{
