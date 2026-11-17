@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <filter id="g1" filterUnits="userSpaceOnUse" x="0" y="0" width="256" height="256"><feGaussianBlur stdDeviation="1.82"/></filter>
+    <filter id="g2" filterUnits="userSpaceOnUse" x="0" y="0" width="256" height="256"><feGaussianBlur stdDeviation="6.46"/></filter>
+    <path id="outer_hex" d="M128,39 L176,66 L176,122 L128,160 L80,122 L80,66 Z"/>
+    <path id="inner_hex" d="M128,46 L168,70 L168,118 L128,150.5 L88,118 L88,70 Z"/>
+    <clipPath id="inner_clip"><use href="#inner_hex"/></clipPath>
+    <path id="hammer" d="M106,62 L146,62 L150,68 L142,71 L139,69 L134,72 L134,106 L122,106 L122,72 L106,72 Z"/>
+    <path id="anvil" d="M100,108 L156,108 L149,118 L140,118 L144,130 L112,130 L116,118 L107,118 Z"/>
+  </defs>
+  <use href="#outer_hex" fill="none" stroke="#2895ff" stroke-width="6.2" stroke-linejoin="round" opacity="0.75" filter="url(#g2)"/>
+  <use href="#outer_hex" fill="none" stroke="#2895ff" stroke-width="2.5" stroke-linejoin="round" opacity="0.9" filter="url(#g1)"/>
+  <use href="#outer_hex" fill="#000000" stroke="#2896ff" stroke-width="2" stroke-linejoin="round"/>
+  <use href="#inner_hex" fill="#0c2c55" fill-opacity="0.98"/>
+  <g clip-path="url(#inner_clip)">
+    <line x1="88" y1="50" x2="168" y2="50" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="56" x2="168" y2="56" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="62" x2="168" y2="62" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="68" x2="168" y2="68" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="74" x2="168" y2="74" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="80" x2="168" y2="80" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="86" x2="168" y2="86" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="92" x2="168" y2="92" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="98" x2="168" y2="98" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="104" x2="168" y2="104" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="110" x2="168" y2="110" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="116" x2="168" y2="116" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="122" x2="168" y2="122" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="128" x2="168" y2="128" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="134" x2="168" y2="134" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="140" x2="168" y2="140" stroke="#0f3b6d" stroke-width="0.75"/>
+    <line x1="88" y1="146" x2="168" y2="146" stroke="#0f3b6d" stroke-width="0.75"/>
+  </g>
+  <use href="#inner_hex" fill="none" stroke="#2896ff" stroke-width="1.5" stroke-linejoin="round"/>
+  <use href="#hammer" fill="#000000" stroke="#2896ff" stroke-width="1.5" stroke-linejoin="round"/>
+  <use href="#anvil" fill="#000000" stroke="#2896ff" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

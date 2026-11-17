@@ -187,6 +187,17 @@ Mods go in a `mods` folder next to `maps`. Each mod is a folder of Halo PC tag f
 
 Refer to [docs/mods.md](docs/mods.md) to make your own.
 
+## Forge
+
+Multiplayer > **Forge** opens the in-game 3D map editor on any Xbox, Custom Edition or MCC multiplayer map, alone or together over system link, internet play and dedicated servers.
+
+- **Switch between Play and Monitor mode** (`F1`, or D-Pad Up on a controller) to fly as 343 Guilty Spark and grab, move, rotate (`15°` / `45°` / `90°`), weld (`Ctrl+G`) or delete objects.
+- **Spawn Palette & Object Properties** (`F2` and `X`): place weapons, vehicles, equipment, scenery, barriers, dynamic lights, teleporters, spawn points, objectives and AI squads, and set physics mode (`Normal`, `Fixed`, `Phased`), respawn timers, team alignment and gametype filters.
+- **Tag Options**: browse and preview 3D models from the installed retail Xbox maps (`maps/`) and the active map (`[MAP]`), and add them to the spawn palette.
+- **Save & play in Standard multiplayer** (`F5`): maps save as lightweight `.txt` sidecar files in `custom_maps/` without modifying any `.map` files on disk, and appear under **Forge Maps** in both **Forge** and **Standard** multiplayer.
+
+Refer to [docs/forge.md](docs/forge.md).
+
 
 ## Graphics
 

@@ -2652,6 +2652,7 @@ static void distributed_client_create(
 	distributed_client_apply_change(object_index, change);
 }
 
+#define network_objects_handle_changes orig_network_objects_handle_changes
 void network_objects_handle_changes(
 	void const *entries,
 	short count)
@@ -2682,6 +2683,7 @@ void network_objects_handle_changes(
 		}
 	}
 }
+#undef network_objects_handle_changes
 
 void network_objects_handle_synchronized(
 	void)
