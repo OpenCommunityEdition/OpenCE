@@ -829,6 +829,12 @@ static boolean render_object_shadow_begin(
 	shadow_color.green = shadow_color.green * shadow_intensity + (1.f - shadow_intensity);
 	shadow_color.blue = shadow_color.blue * shadow_intensity + (1.f - shadow_intensity);
 
+	/* port: the shadow begin sets this only when it draws a shadow, but it
+	returns TRUE either way and the end reads the value. Unset, it was what the
+	stack held: a negative number on 32-bit ARM, which
+	structure_clusters_in_sphere asserts on. */
+	data->shadow_bounding_radius = radius;
+
 	return rasterizer_environment_shadow_begin(
 		data->object_index,
 		&data->shadow_matrix,

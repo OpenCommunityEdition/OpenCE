@@ -47,7 +47,7 @@ struct xgpu_capabilities
 
 extern struct xgpu_capabilities xgpu_capabilities;
 
-/* port/android/guest/runtime/guest_host.h */
+/* port/guest/runtime/guest_host.h */
 int host_gl_has_extension(const char *name);
 void host_gl_read_buffer(unsigned int buffer, unsigned int offset, unsigned int size, void *data);
 void host_gl_buffer_write(unsigned int target, unsigned int offset, unsigned int size, const void *data);

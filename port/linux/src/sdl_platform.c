@@ -2816,7 +2816,7 @@ guest's SDL has no atomics: the compiler's.) */
 static int screen_keyboard_wanted;
 static int screen_keyboard_requests;
 
-/* port/android/guest/runtime/guest_host.h: SDL's text input for the window,
+/* port/guest/runtime/guest_host.h: SDL's text input for the window,
 started as the SDL_TextInputType given (one line, no autocorrection) or
 stopped (-1); whether it runs */
 int host_sdl_text_input(unsigned int window, int type);

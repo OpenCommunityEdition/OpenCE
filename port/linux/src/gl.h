@@ -26,7 +26,7 @@ Windows it is __stdcall too, and SDL would include windows.h without it) */
 #pragma pop_macro("APIENTRY")
 
 #ifdef HALO_GLES
-/* OpenGL ES 3.2 (port/android/README.md); tools/android_gl_stubs.py reads
+/* OpenGL ES 3.2 (port/android/README.md); tools/guest_gl_stubs.py reads
 this list to generate the guest's entry points */
 /* ANDROID_GL_FUNCTIONS_BEGIN */
 #define GL_FUNCTIONS(X) \

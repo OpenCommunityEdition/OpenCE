@@ -13,7 +13,7 @@ addresses (32-bit numbers, which are the host's).
 const char *platform_data_root(void);
 
 #if defined(HALO_ANDROID)
-/* the host's (port/android/guest/runtime/guest_host.h) */
+/* the host's (port/guest/runtime/guest_host.h) */
 void host_steam_open(unsigned int data_root);
 void host_steam_close(void);
 int host_steam_poll(void);
