@@ -476,9 +476,15 @@ collision:
 	return TRUE;
 }
 
-/* port: collision_port_test_vector_blocked's test, which ends at its first
-hit */
-static boolean collision_port_any_hit = FALSE;
+/* port: collision_test_vector, and when any_hit is set
+collision_port_test_vector_blocked's test, which ends at its first hit */
+static boolean collision_port_test_vector(
+	unsigned long flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	long ignore_object_index,
+	struct collision_result *collision,
+	boolean any_hit);
 
 /* port: whether anything the flags test for is in the vector's way:
 collision_test_vector's answer, from a test that ends at the first hit it
@@ -494,13 +500,7 @@ boolean collision_port_test_vector_blocked(
 	long ignore_object_index,
 	struct collision_result *collision)
 {
-	boolean hit;
-
-	collision_port_any_hit = TRUE;
-	hit = collision_test_vector(flags, point, vector, ignore_object_index, collision);
-	collision_port_any_hit = FALSE;
-
-	return hit;
+	return collision_port_test_vector(flags, point, vector, ignore_object_index, collision, TRUE);
 }
 
 boolean collision_test_vector(
@@ -509,6 +509,17 @@ boolean collision_test_vector(
 	real_vector3d const *vector,
 	long ignore_object_index,
 	struct collision_result *collision)
+{
+	return collision_port_test_vector(flags, point, vector, ignore_object_index, collision, FALSE);
+}
+
+static boolean collision_port_test_vector(
+	unsigned long flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	long ignore_object_index,
+	struct collision_result *collision,
+	boolean any_hit)
 {
 	boolean hit = FALSE;
 	boolean test_environment = TEST_FLAG(flags, _collision_test_structure_bit) ||
@@ -609,14 +620,14 @@ boolean collision_test_vector(
 
 		/* port: (collision_port_test_vector_blocked: blocked by the
 		structure, nothing further tested) */
-		if (hit && collision_port_any_hit)
+		if (hit && any_hit)
 		{
 			test_objects = FALSE;
 		}
 
 		if (TEST_FLAG(flags, _collision_test_media_bit) &&
 			collision->location.cluster_index != NONE &&
-			!(hit && collision_port_any_hit))
+			!(hit && any_hit))
 		{
 			struct structure_fog_plane const *fog_plane;
 			struct fog_definition const *fog;
@@ -690,7 +701,7 @@ boolean collision_test_vector(
 			object_marker_begin();
 			/* port: (collision_port_test_vector_blocked: to the first
 			object that blocks) */
-			for (leaf_index = 0; leaf_index < bsp_result.leaf_count && !(hit && collision_port_any_hit); leaf_index++)
+			for (leaf_index = 0; leaf_index < bsp_result.leaf_count && !(hit && any_hit); leaf_index++)
 			{
 				long leaf = bsp_result.leaf_indices[leaf_index];
 				/* port: (collision_cluster_index_from_leaf) */
@@ -702,7 +713,7 @@ boolean collision_test_vector(
 					long object_index;
 
 					for (object_index = cluster_get_first_collideable_object(&reference_index, cluster_index);
-						object_index != NONE && !(hit && collision_port_any_hit);
+						object_index != NONE && !(hit && any_hit);
 						object_index = cluster_get_next_collideable_object(&reference_index))
 					{
 						/* port: (the ones the vector misses passed over on a
