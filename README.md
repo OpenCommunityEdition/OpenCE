@@ -9,6 +9,7 @@
   <a href="https://github.com/OpenCommunityEdition/OpenCE/releases/latest"><img src="https://img.shields.io/github/v/release/OpenCommunityEdition/OpenCE?label=Download&style=for-the-badge" alt="Download"></a>
   <a href="https://halocombatevolved.com/"><img src="https://img.shields.io/badge/Play-in_browser-blue?style=for-the-badge" alt="Play in browser"></a>
   <a href="https://discord.gg/9gqcHyr5km"><img src="https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://zenith.hosting/host/opence"><img src="https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg" alt="Deploy with Zenith" height="28"></a>
 </p>
 
 **OpenCE** (Open Community Edition) is an open source port of the Halo: Combat Evolved decompilation (Halo CE) based on an early Xbox development build (2342) and forked from
@@ -91,6 +92,9 @@ The Arch-based distribution release is available on the [AUR](https://aur.archli
 - **Moderation:** the host can kick and ban players from the scoreboard menu or the `kick` and `ban` console commands. Players can vote to kick. 
 - **Scrollable Scoreboard:** the mouse wheel or PageUp / PageDown scrolls through list of players in large multiplayer lobbies. 
 - **A new netcode:** each machine moves its own player at once, and the host makes the decision for the game. Refer to [port/linux/NETCODE.md](port/linux/NETCODE.md).
+- **Official dedicated server hosting:** [Zenith Hosting](https://zenith.hosting/host/opence) is the official host for OpenCE Fleet. Get your own dedicated servers in one click, managed from one dashboard.
+
+[![Deploy with Zenith](https://cdn.zenith.hosting/buttons/deploy-with-zenith.svg)](https://zenith.hosting/host/opence)
 
 ## Custom Edition Maps
 
@@ -106,6 +110,76 @@ Maps that require OpenSauce are not compatible.
 Both the server browser and the LAN browser support automatic map downloads - when you join a game it will download the custom maps from other players, with any of `bitmaps.map`, `sounds.map` and `loc.map` you are missing. This works on a LAN and on the
 Internet, when the host has map sharing enabled (on by default).
 Refer to [docs/custom_edition_caches.md](docs/custom_edition_caches.md).
+
+## MCC maps
+
+OpenCE supports Halo 1 MCC maps through Steam discovery on Windows/Linux,
+package imports on Android, and local installation. You still need the
+[Xbox game data](#a-copy-of-halo-combat-evolved-is-required) to run OpenCE.
+Obtain required MCC resources from your own installed copy of Halo 1 in MCC.
+
+### Windows and Linux
+
+Subscribe to a Halo 1 MCC Workshop mod and let Steam finish downloading it.
+OpenCE reads the installed package directly; Steam can be closed while playing.
+Steam discovery, campaign mission ordering and package collections are enabled
+by default. Their controls are under **Settings > Network Setup > Map Sharing >
+MCC Packages**. Reopen the map list after changing them or restart OpenCE after
+installing a new package.
+
+If your Steam library is not detected, set `steam = 'C:\Steam'` under `[paths]`
+in `config.toml` to point to your Steam installation or library.
+
+### Local installation
+
+Copy the complete folder from `steamapps/workshop/content/976730/<workshop ID>`
+into `mcc_maps`, beside `maps` and `custom_maps`. Keep its maps, JSON files,
+resources and artwork together. OpenCE reads the mod's name and supported PNG
+previews from its metadata, even with Steam discovery disabled.
+
+You can also make your own folder, such as `mcc_maps/MyMod`, and place `.map`
+files directly inside it. Keep package-supplied `bitmaps.map` and `sounds.map`
+with that package; do not mix resources from different mods. Metadata is
+optional for map-only installs, but needed for authored titles, previews and
+campaign ordering. See the [package layout guide](docs/mcc_maps.md#installation-and-menus).
+
+### Android
+
+Copy the complete Workshop folder or a ZIP of it to your phone. Quit OpenCE,
+long-press its launcher icon, choose **Import MCC maps > Workshop package**,
+and select the folder or ZIP. Import required shared resources separately.
+See the [Android import guide](port/android/README.md#importing-mcc-packages).
+
+### Shared MCC resources
+
+With Steam discovery enabled, desktop builds can read required base resources
+from your installed Halo 1 MCC files. They are not copied into the mod. For
+manual setup, or when that installation is unavailable, use these locations:
+
+| File in your MCC installation | Destination in OpenCE |
+| --- | --- |
+| `halo1/maps/bitmaps.map` | `mcc_maps/_shared/singleplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/bitmaps.map` | `mcc_maps/_shared/multiplayer/bitmaps.map` |
+| `halo1/maps/custom_edition/sounds.map` | `mcc_maps/_shared/multiplayer/sounds.map` |
+
+Use MCC's files, not standalone Custom Edition resources. Package-supplied
+resources take priority. On Android, use the shared-resource import options.
+Self-contained maps need no shared files; missing or incompatible resources
+produce a diagnostic.
+
+### Hosting and sharing
+
+**Share Maps** in **Server Setup > Map Sharing** covers CE maps and eligible
+MCC packages automatically. MCC downloads ask for the joining player's consent
+and install separately, preserving their existing copy. Actual base resources
+are never sent: each player must provide matching local copies when required.
+A Workshop link opens Steam on desktop, with an explicit browser fallback.
+OpenCE does not update manually installed or host-downloaded packages for you.
+
+Dedicated servers use the same sharing setting and can host MCC multiplayer
+maps and co-op campaigns. See the [dedicated-server guide](docs/dedicated_server.md#mcc-maps).
+MCC loading remains separate from Xbox and Custom Edition loading; see
+[MCC support and limits](docs/mcc_maps.md) for details.
 
 ## Mods
 

@@ -43,6 +43,7 @@ an AI unit the same way it kills a player's.
 #include "units/unit_control_data.h"
 #include "network_coop.h"
 #include "network_distributed.h"
+#include "vehicle_riding.h"
 
 #include <math.h>
 
@@ -538,7 +539,7 @@ static boolean actor_state_apply(
 
 		if (dx * dx + dy * dy + dz * dz > REMOTE_CORRECTION_TOLERANCE * REMOTE_CORRECTION_TOLERANCE &&
 			network_objects_reconcile(state->unit_index, &state->position, &forward, &up, &velocity, NULL,
-				REMOTE_BLEND_DISTANCE))
+				REMOTE_BLEND_DISTANCE, _network_vehicle_write_state))
 		{
 			distributed_count_correction();
 		}
@@ -724,8 +725,8 @@ Units near the client's players go every tick, others less often. A unit
 with a fresh impulse, action, speech or animation goes to everyone in each
 of the next IMPULSE_REPEAT_TICKS ticks, and one starting a one-tick action
 goes that tick. A unit no actor drove this tick is dropped from the table,
-unless it is fleeing: a unit running blindly moves by itself, without its
-actor's control, and dropped it stood running in place on the clients. */
+unless it is fleeing or seated: fleeing units move without their actor's
+control, and an idle seated actor still needs its seat sent to the clients. */
 void network_actors_host_tick(
 	void)
 {
@@ -745,7 +746,9 @@ void network_actors_host_tick(
 		struct host_actor *actor = &host_actors[index];
 
 		if (!actor_unit_valid(actor->unit_index) ||
-			(!actor->noted && !TEST_FLAG(unit_get(actor->unit_index)->unit.flags, _unit_running_blindly_bit)))
+			(!actor->noted && !TEST_FLAG(unit_get(actor->unit_index)->unit.flags, _unit_running_blindly_bit) &&
+			(!vehicle_riding_enabled() || unit_get(actor->unit_index)->object.parent_object_index == NONE ||
+			unit_get(actor->unit_index)->unit.parent_seat_index == NONE)))
 		{
 			host_actors[index--] = host_actors[--host_actor_count];
 			continue;

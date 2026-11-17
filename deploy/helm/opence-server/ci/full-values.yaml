@@ -22,6 +22,7 @@ server:
   instance: eu-1
   region: eu
   masterPublish: true
+  vehicleRidingOverrideGametype: false
   password:
     existingSecret: halo-join
     key: password
@@ -34,6 +35,7 @@ web:
   key: admin
   moderatorKey: moderator
 network:
+  vehicleRiding: false
   tunnelPort: 2303
   publicAddress: halo.example.com:2303
 extraEnv:

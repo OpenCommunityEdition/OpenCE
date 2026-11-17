@@ -694,6 +694,47 @@ void effect_delete(
 	return;
 }
 
+/* port: a client checkpoint boundary retires delayed damage and object
+creation from its discarded prediction. Use the same validated part classes
+as effect_generate_part; the deterministic flag also covers harmless lights. */
+void effects_discard_gameplay(void)
+{
+	long effect_index;
+
+	if (!effect_data || !effect_data->valid)
+		return;
+	for (effect_index = data_next_index(effect_data, NONE);
+		effect_index != NONE;
+		effect_index = data_next_index(effect_data, effect_index))
+	{
+		struct effect_definition *definition = effect_definition_get(effect_get(effect_index)->definition_index);
+		boolean gameplay = FALSE;
+		short event_index;
+
+		for (event_index = 0; event_index < definition->events.count && !gameplay; event_index++)
+		{
+			struct effect_event_definition *event = TAG_BLOCK_GET_ELEMENT(
+				&definition->events, event_index, struct effect_event_definition);
+			short part_index;
+
+			for (part_index = 0; part_index < event->parts.count; part_index++)
+			{
+				struct effect_part_definition *part = TAG_BLOCK_GET_ELEMENT(
+					&event->parts, part_index, struct effect_part_definition);
+
+				if (part->reference.index != NONE && (part->runtime_base_class_tag == OBJECT_DEFINITION_TAG ||
+					part->runtime_base_class_tag == DAMAGE_EFFECT_DEFINITION_TAG))
+				{
+					gameplay = TRUE;
+					break;
+				}
+			}
+		}
+		if (gameplay)
+			effect_delete(effect_index);
+	}
+}
+
 long effect_new_attached_from_markers(
 	long definition_index,
 	long owner_object_index,

@@ -105,6 +105,8 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries/cseries.h"
+#include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
+#include "mcc_player.h" /* port: port/linux/game/mcc_player.h */
 #include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #include "game/game.h"
@@ -776,6 +778,8 @@ boolean update_client_dequeue(
 				"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 				0x1C9,
 				(NONE == queue->desired_weapon_index) || (queue->desired_weapon_index>=0 && queue->desired_weapon_index<MAXIMUM_WEAPONS_PER_UNIT));
+			/* port: MCC's grenade types go beyond the legacy table's */
+			if (!mcc_player_choice_supported(queue->desired_grenade_index))
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 				0x1CA,
@@ -802,6 +806,8 @@ boolean update_client_dequeue(
 			"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 			0x1E6,
 			(NONE == actions[queue_index].desired_weapon_index) || (actions[queue_index].desired_weapon_index>=0 && actions[queue_index].desired_weapon_index<MAXIMUM_WEAPONS_PER_UNIT));
+		/* port: MCC's grenade types go beyond the legacy table's */
+		if (!mcc_player_choice_supported(actions[queue_index].desired_grenade_index))
 		match_assert(
 			"c:\\halo\\SOURCE\\game\\player_queues_new.c",
 			0x1E7,
@@ -1082,6 +1088,9 @@ static void update_server_take_local_actions(
 static boolean distributed_action_valid(
 	struct player_action const *action)
 {
+	/* port: an MCC map's actions are checked against its own grenade types */
+	if (mcc_grenades_active())
+		return mcc_player_action_valid(action);
 	return valid_real(action->desired_facing.yaw) && valid_real(action->desired_facing.pitch) &&
 		valid_real(action->throttle.i) && valid_real(action->throttle.j) && valid_real(action->primary_trigger) &&
 		(action->desired_weapon_index == NONE ||

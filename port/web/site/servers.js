@@ -40,6 +40,8 @@ seconds while the page shows, and joined with Play here (the page's ?join=).
   // master_list.c's master_list_read_defaults)
   const DEFAULT_MASTERS = [
     { url: 'https://master.opencommunityedition.com', key: 'ed25519:89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa' },
+    { url: 'https://ocemaster.halobase.net', key: 'ed25519:1d018c4d1e182585948cd807f19133122c1a1484a74dcffa7792d18012573459' },
+    { url: 'https://masterce.unicade.io', key: 'ed25519:22aa04b7cf041af39c2e9765b5da10989254ed49fa23b730cd90e6d36a0a411a' },
   ];
   const LISTING_LABEL = 'hceu-lobby-1';
   // a listing (p2p_lobby.c listing_make): HL, format 1, network version, flags,

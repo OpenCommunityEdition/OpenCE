@@ -41,6 +41,11 @@ long dsound_obstruction_from_obstruction(
 	real obstruction);
 struct IDirectSound *dsound_get(
 	void);
+/* port: a sound queued to an idle channel from byte_offset into its samples */
+void dsound_port_queue_sound_from(
+	short virtual_channel_index,
+	struct sound_permutation *sound,
+	long byte_offset);
 
 /* ---------- globals */
 

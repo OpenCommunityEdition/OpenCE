@@ -144,7 +144,8 @@ def test_texture_dispatch_boundaries(tmp_path, enabled, ce, cached, valid, loads
 #define _bitmap_cached_bit 0
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 struct bitmap_data { int flags, pixels_size; };
-static int ce, valid, android_texture_fixes, loads, legacy;
+static int ce, mcc, valid, android_texture_fixes, loads, legacy;
+static int mcc_cache_tags_loaded(void) { return mcc; }
 static int custom_edition_cache_tags_loaded(void) { return ce; }
 static int texture_cache_bitmap_valid(struct bitmap_data *b) { return valid; }
 static int rasterizer_xbox_bitmap_get_pixel_data_size(struct bitmap_data *b) { return 1024; }
