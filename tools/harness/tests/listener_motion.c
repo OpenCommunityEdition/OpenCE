@@ -8,6 +8,9 @@ static long now, owner = 42;
 static real_vector3d zero;
 static real_vector3d *global_zero_vector3d = &zero;
 static long game_time_get(void) { return now; }
+/* The variation table is exercised by sound_played_beyond; observe its map reset here. */
+static int variation_resets;
+static void sound_definitions_played_beyond_clear(void) { variation_resets++; }
 static long local_player_get_player_index(short player) { return owner + player; }
 static void vector_from_points3d(const real_point3d *a, const real_point3d *b, real_vector3d *v)
 { v->i = b->x - a->x; v->j = b->y - a->y; v->k = b->z - a->z; }
@@ -151,6 +154,7 @@ int main(int argc, char **argv)
 		for (player = 0; player < 4; player++)
 			listener_measure_velocity(player, &p, &v);
 		sound_initialize_for_new_map();
+		CHECK(variation_resets == 1, "map reset did not clear sound variation state");
 		p.x = 6;
 		for (player = 0; player < 4; player++)
 		{
