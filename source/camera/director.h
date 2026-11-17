@@ -1,9 +1,3 @@
-/*
-DIRECTOR.H
-
-header included in hcex build.
-*/
-
 #ifndef __DIRECTOR_H
 #define __DIRECTOR_H
 #pragma once

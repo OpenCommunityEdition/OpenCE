@@ -1,35 +1,3 @@
-/*
-SOUND_AIFF.C
-
-symbols in this file:
-001B6370 0080:
-	_sound_file_is_aiff (0000)
-001B63F0 0220:
-	_sound_file_aiff_info_get (0000)
-001B6610 00d0:
-	_sound_file_aiff_raw_data_get (0000)
-001B66E0 0010:
-	_sound_file_aiff_format (0000)
-002AA8A8 0014:
-	??_C@_0BE@PMHCOHBH@aiff?5format?5info?5p1?$AA@ (0000)
-002AA8BC 000b:
-	??_C@_0L@GBBDAFEP@aiff?5chunk?$AA@ (0000)
-002AA8C8 0015:
-	??_C@_0BF@EADPPKIJ@aiff?5container?5chunk?$AA@ (0000)
-00316944 0018:
-	_aiff_container_chunk_bs_codes (0000)
-0031695C 0014:
-	_aiff_container_chunk_bs_definition (0000)
-00316970 0014:
-	_aiff_chunk_bs_codes (0000)
-00316984 0014:
-	_aiff_chunk_bs_definition (0000)
-00316998 0020:
-	_aiff_format_info_bs_codes (0000)
-003169B8 0014:
-	_aiff_format_info_bs_definition (0000)
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

@@ -1,7 +1,3 @@
-/*
-SHELL.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

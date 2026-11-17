@@ -1,7 +1,3 @@
-/*
-RASTERIZER_COMMON.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

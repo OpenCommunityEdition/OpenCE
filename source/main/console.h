@@ -1,9 +1,3 @@
-/*
-CONSOLE.H
-
-header included in hcex build.
-*/
-
 #ifndef __CONSOLE_H
 #define __CONSOLE_H
 #pragma once

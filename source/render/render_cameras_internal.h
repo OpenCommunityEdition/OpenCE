@@ -1,6 +1,4 @@
 /*
-RENDER_CAMERAS_INTERNAL.H
-
 Narrow cross-translation-unit interface owned by RENDER_CAMERAS.C.
 */
 

@@ -1,9 +1,3 @@
-/*
-PHYSICS_VARIABLES.H
-
-header included in hcex build.
-*/
-
 #ifndef __PHYSICS_VARIABLES_H
 #define __PHYSICS_VARIABLES_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-DEVICE_MACHINES.H
-*/
-
 #ifndef __DEVICE_MACHINES_H
 #define __DEVICE_MACHINES_H
 #pragma once

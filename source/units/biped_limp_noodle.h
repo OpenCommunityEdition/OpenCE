@@ -1,9 +1,3 @@
-/*
-BIPED_LIMP_NOODLE.H
-
-header included in hcex build.
-*/
-
 #ifndef __BIPED_LIMP_NOODLE_H
 #define __BIPED_LIMP_NOODLE_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-DEVICE_CONTROLS.H
-*/
-
 #ifndef __DEVICE_CONTROLS_H
 #define __DEVICE_CONTROLS_H
 #pragma once

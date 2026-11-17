@@ -1,9 +1,3 @@
-/*
-GEOMETRY.H
-
-header included in hcex build.
-*/
-
 #ifndef __GEOMETRY_H
 #define __GEOMETRY_H
 #pragma once

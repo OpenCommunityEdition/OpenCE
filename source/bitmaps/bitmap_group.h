@@ -1,9 +1,3 @@
-/*
-BITMAP_GROUP.H
-
-header included in hcex build.
-*/
-
 #ifndef __BITMAP_GROUP_H
 #define __BITMAP_GROUP_H
 #pragma once

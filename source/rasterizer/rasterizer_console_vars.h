@@ -1,6 +1,4 @@
 /*
-RASTERIZER_CONSOLE_VARS.H
-
 Rasterizer debug options (the rasterizer_* script and console globals).
 
 Header ownership is INFERRED: every HCEX (2011) compiland that corresponds to a

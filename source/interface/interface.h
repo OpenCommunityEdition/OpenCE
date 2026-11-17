@@ -1,9 +1,3 @@
-/*
-INTERFACE.H
-
-header included in hcex build.
-*/
-
 #ifndef __INTERFACE_H
 #define __INTERFACE_H
 #pragma once

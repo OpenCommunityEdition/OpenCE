@@ -1,9 +1,3 @@
-/*
-SAVED_GAME_FILES.H
-
-header included in hcex build.
-*/
-
 #ifndef __SAVED_GAME_FILES_H
 #define __SAVED_GAME_FILES_H
 #pragma once

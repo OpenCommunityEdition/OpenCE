@@ -1,6 +1,4 @@
 /*
-PROFILE_RASTERIZER.H
-
 Narrow rasterizer statistics interface owned by PROFILE.C.
 */
 

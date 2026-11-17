@@ -1,6 +1,4 @@
 /*
-HUD_DRAW.H
-
 Narrow cross-translation-unit interface owned by HUD_DRAW.C.
 */
 

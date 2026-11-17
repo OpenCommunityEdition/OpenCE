@@ -1,7 +1,3 @@
-/*
-WEAPON_DATUM_FLAGS.H
-*/
-
 #ifndef __WEAPON_DATUM_FLAGS_H
 #define __WEAPON_DATUM_FLAGS_H
 #pragma once

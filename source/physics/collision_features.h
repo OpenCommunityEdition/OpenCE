@@ -1,9 +1,3 @@
-/*
-COLLISION_FEATURES.H
-
-header included in hcex build.
-*/
-
 #ifndef __COLLISION_FEATURES_H
 #define __COLLISION_FEATURES_H
 #pragma once

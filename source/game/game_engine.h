@@ -1,9 +1,3 @@
-/*
-GAME_ENGINE.H
-
-header included in hcex build.
-*/
-
 #ifndef __GAME_ENGINE_H
 #define __GAME_ENGINE_H
 #pragma once

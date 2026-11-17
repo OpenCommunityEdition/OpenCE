@@ -1,9 +1,3 @@
-/*
-GARBAGE.H
-
-header included in hcex build.
-*/
-
 #ifndef __GARBAGE_H
 #define __GARBAGE_H
 #pragma once

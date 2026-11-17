@@ -1,7 +1,3 @@
-/*
-RASTERIZER_TEXT.H
-*/
-
 #ifndef __RASTERIZER_TEXT_H
 #define __RASTERIZER_TEXT_H
 #pragma once

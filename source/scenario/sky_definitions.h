@@ -1,9 +1,3 @@
-/*
-SKY_DEFINITIONS.H
-
-header included in hcex build.
-*/
-
 #ifndef __SKY_DEFINITIONS_H
 #define __SKY_DEFINITIONS_H
 #pragma once

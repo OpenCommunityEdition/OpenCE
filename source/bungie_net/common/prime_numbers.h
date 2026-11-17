@@ -1,9 +1,3 @@
-/*
-PRIME_NUMBERS.H
-
-header included in hcex build.
-*/
-
 #ifndef __PRIME_NUMBERS_H
 #define __PRIME_NUMBERS_H
 #pragma once

@@ -1,6 +1,4 @@
 /*
-BITMAPS_SAMPLING.H
-
 Narrow cross-translation-unit sampling interface owned by BITMAPS.C.
 */
 

@@ -1,7 +1,3 @@
-/*
-CSERIES.H
-*/
-
 #ifndef __CSERIES_H
 #define __CSERIES_H
 #pragma once

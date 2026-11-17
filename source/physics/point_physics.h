@@ -1,9 +1,3 @@
-/*
-POINT_PHYSICS.H
-
-header included in hcex build.
-*/
-
 #ifndef __POINT_PHYSICS_H
 #define __POINT_PHYSICS_H
 #pragma once

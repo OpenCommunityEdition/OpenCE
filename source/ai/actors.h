@@ -1,9 +1,3 @@
-/*
-ACTORS.H
-
-header included in hcex build.
-*/
-
 #ifndef __ACTORS_H
 #define __ACTORS_H
 #pragma once

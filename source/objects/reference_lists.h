@@ -1,6 +1,4 @@
 /*
-REFERENCE_LISTS.H
-
 file has inline function assertions.
 */
 

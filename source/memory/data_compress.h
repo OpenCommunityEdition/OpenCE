@@ -1,7 +1,3 @@
-/*
-DATA_COMPRESS.H
-*/
-
 #ifndef __DATA_COMPRESS_H
 #define __DATA_COMPRESS_H
 #pragma once

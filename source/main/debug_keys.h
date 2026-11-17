@@ -1,9 +1,3 @@
-/*
-DEBUG_KEYS.H
-
-header included in hcex build.
-*/
-
 #ifndef __DEBUG_KEYS_H
 #define __DEBUG_KEYS_H
 #pragma once

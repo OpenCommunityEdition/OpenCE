@@ -1,9 +1,3 @@
-/*
-LRAR_CACHE.H
-
-header included in hcex build.
-*/
-
 #ifndef __LRAR_CACHE_H
 #define __LRAR_CACHE_H
 #pragma once
