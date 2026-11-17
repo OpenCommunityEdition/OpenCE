@@ -6,9 +6,10 @@ _postprocess_node_matrices (crewman_hands.c): a crewman's arm held with a
 fingertip 0.01 into a console (a plane here; the line from the shoulder to
 each vertex crossing it is the collision) has its elbow bent until every
 vertex is out by the clearance, the elbow staying where it is and the upper
-arm not moved; an arm out of everything, or one past something thin, is
-not bent; no elbow bends more than 30 degrees; and only a crewman playing
-a scripted animation or seated is measured.
+arm not moved; one with its forearm in it, beside the elbow, is raised at
+the shoulder instead, the shoulder staying where it is; an arm out of
+everything, or one past something thin, is not bent; no joint bends more
+than 30 degrees; and only a seated crewman is measured.
 test_crewman_hands.py takes the code from the sources (under_test.inc).
 */
 
@@ -18,6 +19,8 @@ test_crewman_hands.py takes the code from the sources (under_test.inc).
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define square_root(x) ((real)sqrt(x))
+#define sine(x) ((real)sin(x))
+#define cosine(x) ((real)cos(x))
 
 typedef struct { real_vector3d n; real d; } real_plane3d;
 typedef struct real_matrix4x3
@@ -66,7 +69,6 @@ static long test_ignored = NONE;
 static struct object_datum test_crewman;
 static struct object_definition test_definition;
 static boolean test_is_unit = TRUE;
-static boolean test_custom_animation = FALSE;
 
 static real_point3d *matrix4x3_transform_point(real_matrix4x3 const *m, real_point3d const *p, real_point3d *r)
 {
@@ -111,7 +113,6 @@ static void *object_try_and_get_and_verify_type(long object_index, long mask)
 	(void)object_index; (void)mask;
 	return test_is_unit ? &test_crewman : NULL;
 }
-static boolean unit_is_playing_custom_animation(long unit_index) { (void)unit_index; return test_custom_animation; }
 
 #include "under_test.inc"
 
@@ -242,7 +243,28 @@ int main(int argc, char **argv)
 		CHECK(!memcmp(before, test_nodes, sizeof(before)), "moved for a vertex 0.05 past the surface");
 		return 0;
 	}
-	/* a vertex nearly under the elbow, 0.029 in: no more than 30 degrees */
+	/* the forearm in the console beside the elbow: raised at the shoulder */
+	CASE("shoulder")
+	{
+		real_point3d shoulder;
+		real_point3d elbow;
+		real bent;
+
+		test_arm(TRUE);
+		crewman_hands_vertex_counts[0] = 0;
+		test_vertex(1, 0.01f, 0.f, -0.01f);
+		shoulder = test_nodes[0].position;
+		elbow = test_nodes[1].position;
+		bent = crewman_hands_arm_lift(5, test_nodes, 0);
+		CHECK(bent > 0.f && bent < 0.2f, "bent %f", bent);
+		CHECK(test_lowest() >= 0.75f * CREWMAN_HANDS_CLEARANCE, "lowest %f", test_lowest());
+		CHECK(test_nodes[0].position.x == shoulder.x && test_nodes[0].position.y == shoulder.y &&
+			test_nodes[0].position.z == shoulder.z, "the shoulder moved");
+		CHECK(test_nodes[0].forward.i != 1.f || test_nodes[0].forward.k != 0.f, "the upper arm not turned");
+		CHECK(test_nodes[1].position.z > elbow.z, "the elbow not raised (%f)", test_nodes[1].position.z);
+		return 0;
+	}
+	/* a hand's vertex nearly under the elbow, 0.029 in: no more than 30 degrees */
 	CASE("capped")
 	{
 		real_vector3d forward;
@@ -251,7 +273,7 @@ int main(int argc, char **argv)
 
 		test_arm(TRUE);
 		crewman_hands_vertex_counts[0] = 0;
-		test_vertex(1, 0.02f, 0.f, -0.13f);
+		test_vertex(2, -0.05f, 0.f, -0.01f);
 		test_nodes[1].position.z = 0.12f;
 		test_console.d = 0.019f;
 		forward = test_nodes[1].forward;
@@ -262,7 +284,7 @@ int main(int argc, char **argv)
 		CHECK(angle <= CREWMAN_HANDS_MAXIMUM_ANGLE + 1e-4f, "the forearm turned %f", angle);
 		return 0;
 	}
-	/* a crewman playing a scripted animation or seated, nothing else */
+	/* a seated crewman, nothing else (not one standing, scripted or not) */
 	CASE("who")
 	{
 		real_matrix4x3 before[3];
@@ -272,13 +294,8 @@ int main(int argc, char **argv)
 		crewman_hands_model_index = 7;
 		test_definition.object.model.index = 7;
 		test_crewman.object.parent_object_index = NONE;
-		test_custom_animation = FALSE;
-		CHECK(crewman_hands_postprocess_node_matrices(5, test_nodes) == 0, "an idle crewman bent");
-		CHECK(!memcmp(before, test_nodes, sizeof(before)), "an idle crewman moved");
-		test_custom_animation = TRUE;
-		CHECK(crewman_hands_postprocess_node_matrices(5, test_nodes) == 1, "a scripted crewman not bent");
-		memcpy(test_nodes, before, sizeof(before));
-		test_custom_animation = FALSE;
+		CHECK(crewman_hands_postprocess_node_matrices(5, test_nodes) == 0, "a standing crewman bent");
+		CHECK(!memcmp(before, test_nodes, sizeof(before)), "a standing crewman moved");
 		test_crewman.object.parent_object_index = 9;
 		CHECK(crewman_hands_postprocess_node_matrices(5, test_nodes) == 1, "a seated crewman not bent");
 		memcpy(test_nodes, before, sizeof(before));

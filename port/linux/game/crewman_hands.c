@@ -1,34 +1,37 @@
 /*
 CREWMAN_HANDS.C
 
-The crewmen's hands drawn on what they work, not in it. Their poses were
-made against nothing: in a10's cryo bay the assistant rests his right hand
-4 cm (0.013 units) into the console beside the technician, and both type
-with their fingers 1 cm into the keys in the close shot of the keyboard;
-on the bridge the two pilots hold their hands 5 to 6 cm into their chairs'
-consoles. The crewman has no finger nodes: each hand is one node, its
-fingers rigid with it.
+The seated crewmen's hands drawn on the desks they work, not in them. Their
+poses were made against nothing: on a10's bridge, as the level plays, the
+two crewmen at the middle desks hold their forearms 3 to 5 cm (0.026 to
+0.046 units) and their hands up to 23 cm (0.075) inside the keyboard tray,
+the others sit with a hand 4 cm in for a moment at a time, and the two
+pilots hold their hands 5 to 6 cm inside their chairs' consoles, in the
+opening cinematic too. The crewman has no finger nodes: each hand is one
+node, its fingers rigid with it.
 
-When a crewman's node matrices are made each tick (objects.c,
-object_postprocess_node_matrices, after the unit's own hand placing), one
-playing a scripted animation or seated has each arm measured: a line from
-the shoulder (its upper arm's node) to each vertex the forearm or hand
-holds, as the model has them, tested against the level and the objects
-before him (not other bipeds). A vertex past a surface the line crosses is
-in it by how far it is behind that surface's plane. The deepest one is
-lifted out by bending the elbow: the forearm and hand are turned about the
-forearm's node, across the line from the elbow to that vertex and the
-surface's facing, by as much as moves the vertex
-CREWMAN_HANDS_CLEARANCE past the surface. That is measured and done again
-up to CREWMAN_HANDS_PASSES times, and no arm is bent more than
-CREWMAN_HANDS_MAXIMUM_ANGLE. A vertex more than CREWMAN_HANDS_MAXIMUM_DEPTH
-behind the surface its line crosses is past something thin, not in it,
-and is left alone.
+When a seated crewman's node matrices are made each tick (objects.c,
+object_postprocess_node_matrices, after the unit's own hand placing), each
+arm is measured: a line from the shoulder (its upper arm's node) to each
+vertex the forearm or hand holds, as the model has them, tested against
+the level and the objects before him (not other bipeds). A vertex past a
+surface the line crosses is in it by how far it is behind that surface's
+plane. The deepest one is lifted out: one of the hand by bending the elbow
+(the forearm and hand turned about the forearm's node), one of the forearm,
+which the elbow cannot lift, by raising the arm at the shoulder (the upper
+arm, forearm and hand turned about the upper arm's node), across the line
+from that joint to the vertex and the surface's facing, by as much as
+moves the vertex CREWMAN_HANDS_CLEARANCE past the surface. That is
+measured and done again up to CREWMAN_HANDS_PASSES times, and no joint is
+bent more than CREWMAN_HANDS_MAXIMUM_ANGLE. A vertex more than
+CREWMAN_HANDS_MAXIMUM_DEPTH behind the surface its line crosses is past
+something thin, not in it, and is left alone.
 
-A crewman walking, running or standing idle is not measured, and one
-with nothing in his hands' way is not changed. The animations and the
-model are not changed; only the arm's nodes are, for every machine alike,
-as they come from the same pose and the same level.
+A crewman standing, walking or running (a10's cryo bay crewmen too) is not
+measured, and a seated one with nothing in his hands' way is not changed.
+The animations and the model are not changed; only the arm's nodes are,
+for every machine alike, as they come from the same pose and the same
+level.
 */
 
 /* ---------- headers */
@@ -43,7 +46,6 @@ as they come from the same pose and the same level.
 #include "rasterizer/rasterizer_geometry.h"
 #include "rasterizer/rasterizer_model_types.h"
 #include "tag_files/tag_groups.h"
-#include "units/units.h"
 
 #include <xtl.h>
 
@@ -60,10 +62,10 @@ most, before those in the same place are taken once) */
 #define CREWMAN_HANDS_CLEARANCE 0.0005f
 /* deeper than this (9 cm) a vertex is past something thin, not in it */
 #define CREWMAN_HANDS_MAXIMUM_DEPTH 0.03f
-/* the most an elbow is bent (30 degrees) */
+/* the most an elbow, or a shoulder, is bent (30 degrees) */
 #define CREWMAN_HANDS_MAXIMUM_ANGLE 0.5235988f
 /* how many times an arm is measured and bent */
-#define CREWMAN_HANDS_PASSES 3
+#define CREWMAN_HANDS_PASSES 4
 /* nearer than this (3 mm) across the elbow's turn, a vertex is not moved by it */
 #define CREWMAN_HANDS_MINIMUM_REACH 0.001f
 
@@ -307,13 +309,15 @@ static void crewman_hands_node_turn(
 }
 
 /* how deep the arm's deepest vertex is in what is before it, and where it
-is and that surface's facing; 0 when none is in anything */
+is, that surface's facing and the vertex's node; 0 when none is in
+anything */
 static real crewman_hands_deepest(
 	long object_index,
 	real_matrix4x3 const *node_matrices,
 	short arm_index,
 	real_point3d *deepest_point,
-	real_vector3d *deepest_normal)
+	real_vector3d *deepest_normal,
+	short *deepest_node_index)
 {
 	struct crewman_hands_arm const *arm = &crewman_hands_arms[arm_index];
 	real_point3d const *shoulder = &node_matrices[arm->upper_arm_node_index].position;
@@ -341,6 +345,7 @@ static real crewman_hands_deepest(
 				deepest = depth;
 				*deepest_point = point;
 				*deepest_normal = collision.plane.n;
+				*deepest_node_index = vertex->node_index;
 			}
 		}
 	}
@@ -348,42 +353,50 @@ static real crewman_hands_deepest(
 	return deepest;
 }
 
-/* the arm's elbow bent until its forearm and hand are out of what is
-before them, or as far as it bends; how far it was bent */
+/* the arm bent until its forearm and hand are out of what is before them,
+or as far as it bends: a vertex of the hand lifted by bending the elbow,
+one of the forearm (the elbow cannot lift what is beside it) by raising
+the arm at the shoulder; how far it was bent */
 static real crewman_hands_arm_lift(
 	long object_index,
 	real_matrix4x3 *node_matrices,
 	short arm_index)
 {
 	struct crewman_hands_arm const *arm = &crewman_hands_arms[arm_index];
-	real bent = 0.f;
+	real elbow_bent = 0.f;
+	real shoulder_bent = 0.f;
 	short pass;
 
-	for (pass = 0; pass < CREWMAN_HANDS_PASSES && bent < CREWMAN_HANDS_MAXIMUM_ANGLE; pass++)
+	for (pass = 0; pass < CREWMAN_HANDS_PASSES; pass++)
 	{
 		real_point3d point;
-		real_point3d elbow;
+		real_point3d pivot;
 		real_vector3d normal;
-		real_vector3d from_elbow;
+		real_vector3d from_pivot;
 		real_vector3d axis;
-		real depth = crewman_hands_deepest(object_index, node_matrices, arm_index, &point, &normal);
+		short node_index = NONE;
+		real depth = crewman_hands_deepest(object_index, node_matrices, arm_index, &point, &normal, &node_index);
+		boolean at_shoulder = node_index == arm->forearm_node_index;
+		real bendable = CREWMAN_HANDS_MAXIMUM_ANGLE - (at_shoulder ? shoulder_bent : elbow_bent);
 		real reach;
 		real angle;
+		real sine_value;
+		real cosine_value;
 
-		if (depth <= 0.f)
+		if (depth <= 0.f || bendable <= 0.f)
 		{
 			break;
 		}
 
-		/* across the line from the elbow and the surface's facing, the
+		/* across the line from the joint and the surface's facing, the
 		vertex moves out along the facing by the angle times its reach */
-		elbow = node_matrices[arm->forearm_node_index].position;
-		from_elbow.i = point.x - elbow.x;
-		from_elbow.j = point.y - elbow.y;
-		from_elbow.k = point.z - elbow.z;
-		axis.i = from_elbow.j * normal.k - from_elbow.k * normal.j;
-		axis.j = from_elbow.k * normal.i - from_elbow.i * normal.k;
-		axis.k = from_elbow.i * normal.j - from_elbow.j * normal.i;
+		pivot = node_matrices[at_shoulder ? arm->upper_arm_node_index : arm->forearm_node_index].position;
+		from_pivot.i = point.x - pivot.x;
+		from_pivot.j = point.y - pivot.y;
+		from_pivot.k = point.z - pivot.z;
+		axis.i = from_pivot.j * normal.k - from_pivot.k * normal.j;
+		axis.j = from_pivot.k * normal.i - from_pivot.i * normal.k;
+		axis.k = from_pivot.i * normal.j - from_pivot.j * normal.i;
 		reach = square_root(axis.i * axis.i + axis.j * axis.j + axis.k * axis.k);
 		if (reach < CREWMAN_HANDS_MINIMUM_REACH)
 		{
@@ -392,14 +405,24 @@ static real crewman_hands_arm_lift(
 		axis.i /= reach;
 		axis.j /= reach;
 		axis.k /= reach;
-		angle = MIN((depth + CREWMAN_HANDS_CLEARANCE) / reach, CREWMAN_HANDS_MAXIMUM_ANGLE - bent);
+		angle = MIN((depth + CREWMAN_HANDS_CLEARANCE) / reach, bendable);
+		sine_value = sine(angle);
+		cosine_value = cosine(angle);
 
-		crewman_hands_node_turn(&node_matrices[arm->forearm_node_index], &elbow, &axis, (real)sin(angle), (real)cos(angle));
-		crewman_hands_node_turn(&node_matrices[arm->hand_node_index], &elbow, &axis, (real)sin(angle), (real)cos(angle));
-		bent += angle;
+		if (at_shoulder)
+		{
+			crewman_hands_node_turn(&node_matrices[arm->upper_arm_node_index], &pivot, &axis, sine_value, cosine_value);
+			shoulder_bent += angle;
+		}
+		else
+		{
+			elbow_bent += angle;
+		}
+		crewman_hands_node_turn(&node_matrices[arm->forearm_node_index], &pivot, &axis, sine_value, cosine_value);
+		crewman_hands_node_turn(&node_matrices[arm->hand_node_index], &pivot, &axis, sine_value, cosine_value);
 	}
 
-	return bent;
+	return elbow_bent + shoulder_bent;
 }
 
 /* ---------- public code */
@@ -491,7 +514,7 @@ short crewman_hands_postprocess_node_matrices(
 	if (crewman_hands_model_index == NONE ||
 		object_definition_get(object->definition_index)->object.model.index != crewman_hands_model_index ||
 		!object_try_and_get_and_verify_type(object_index, _object_mask_unit) ||
-		(object->object.parent_object_index == NONE && !unit_is_playing_custom_animation(object_index)))
+		object->object.parent_object_index == NONE)
 	{
 		return 0;
 	}

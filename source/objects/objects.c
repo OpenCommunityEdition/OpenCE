@@ -3148,8 +3148,8 @@ static void object_postprocess_node_matrices(
 				object_index,
 				&object->object.node_matrices);
 		object_type_postprocess_node_matrices(object_index, matrices);
-		/* port: a crewman's hands kept out of what he works, his elbows bent
-		(port/linux/game/crewman_hands.c) */
+		/* port: a seated crewman's hands kept out of the desk he works, his
+		arms bent (port/linux/game/crewman_hands.c) */
 		crewman_hands_postprocess_node_matrices(object_index, matrices);
 	}
 

@@ -1,8 +1,8 @@
 """The real crewman_hands_turn, _node_turn, _deepest, _arm_lift and _postprocess_node_matrices (crewman_hands.c):
-a crewman playing a scripted animation or seated (a10's cryo technician and assistant, the bridge's pilots) had his
-hands in the console he works, as his poses were made; each tick his elbow is bent until his forearm's and hand's
-vertices are out of what the line from his shoulder to them crosses, by a clearance, no more than 30 degrees, and
-not for a vertex past something thin."""
+a seated crewman (a10's bridge crew at their desks, its pilots) had his forearms and hands in the desk he works, as
+his poses were made; each tick his elbow is bent, or for a forearm his arm raised at the shoulder, until his
+forearm's and hand's vertices are out of what the line from his shoulder to them crosses, by a clearance, no more
+than 30 degrees a joint, and not for a vertex past something thin."""
 
 import re
 import sys
@@ -13,26 +13,28 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["lifted", "untouched", "capped", "who"]
+CASES = ["lifted", "untouched", "shoulder", "capped", "who"]
 
 SOURCE = "port/linux/game/crewman_hands.c"
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
     # the hand left where it was
-    "hand-left": (("\t\tcrewman_hands_node_turn(&node_matrices[arm->hand_node_index], &elbow, &axis, "
-                   "(real)sin(angle), (real)cos(angle));\n", ""), "lifted"),
+    "hand-left": (("\t\tcrewman_hands_node_turn(&node_matrices[arm->hand_node_index], &pivot, &axis, "
+                   "sine_value, cosine_value);\n", ""), "lifted"),
     # bent the wrong way
     "wrong-way": (("\t\tangle = MIN(", "\t\tangle = -MIN("), "lifted"),
     # no clearance
     "touching": (("(depth + CREWMAN_HANDS_CLEARANCE) / reach", "depth / reach"), "lifted"),
     # a vertex past something thin taken as in it
     "any-depth": ((" && depth < CREWMAN_HANDS_MAXIMUM_DEPTH", ""), "untouched"),
-    # no most an elbow bends
-    "uncapped": (("CREWMAN_HANDS_MAXIMUM_ANGLE - bent)", "1000.f)"), "capped"),
-    # every crewman measured
-    "anyone": (("(object->object.parent_object_index == NONE && !unit_is_playing_custom_animation(object_index))",
-                "FALSE"), "who"),
+    # no most a joint bends
+    "uncapped": (("real bendable = CREWMAN_HANDS_MAXIMUM_ANGLE - ", "real bendable = 1000.f - "), "capped"),
+    # the forearm lifted by the elbow too
+    "elbow-only": (("boolean at_shoulder = node_index == arm->forearm_node_index;",
+                    "boolean at_shoulder = FALSE;"), "shoulder"),
+    # every crewman measured, standing too
+    "anyone": (("		object->object.parent_object_index == NONE)", "		FALSE)"), "who"),
 }
 
 

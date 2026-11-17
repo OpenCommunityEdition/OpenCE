@@ -1,7 +1,8 @@
 /*
 CREWMAN_HANDS.H
 
-The crewmen's hands drawn on what they work, not in it (crewman_hands.c).
+The seated crewmen's hands drawn on the desks they work, not in them
+(crewman_hands.c).
 */
 
 #ifndef __CREWMAN_HANDS_H
@@ -19,9 +20,9 @@ void crewman_hands_tags_loaded(
 void crewman_hands_tags_unloaded(
 	void);
 /* a unit's node matrices, made for the tick (objects.c,
-object_postprocess_node_matrices): a crewman's, playing a scripted animation
-or seated, with each arm's elbow bent until his forearm and hand are out of
-what is before them; how many arms were bent */
+object_postprocess_node_matrices): a seated crewman's, each arm bent at the
+elbow or raised at the shoulder until his forearm and hand are out of what
+is before them; how many arms were bent */
 short crewman_hands_postprocess_node_matrices(
 	long object_index,
 	struct real_matrix4x3 *node_matrices);
