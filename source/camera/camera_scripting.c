@@ -264,6 +264,24 @@ void scripted_camera_set_dead(
 	return;
 }
 
+/* port: where the scripted camera looks from, when it is on and set to a
+point of its own, not one relative to an object (a network co-op client's
+is set by its position, not its index); FALSE otherwise
+(port/linux/game/cinematic_framing.c) */
+boolean scripted_camera_point_position(
+	real_point3d *position)
+{
+	if (!camera_script_globals.enabled ||
+		camera_script_globals.mode != _camera_script_mode_point ||
+		camera_script_globals.relative_object_index != NONE)
+	{
+		return FALSE;
+	}
+	*position = camera_script_globals.point;
+
+	return TRUE;
+}
+
 boolean scripted_camera_object_is_first_person_camera(
 	long object_index)
 {

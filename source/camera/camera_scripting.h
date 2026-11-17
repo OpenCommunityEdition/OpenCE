@@ -37,6 +37,10 @@ void scripted_camera_set_dead(
 	long object_index);
 boolean scripted_camera_object_is_first_person_camera(
 	long object_index);
+/* port: where the scripted camera looks from, when set to a point of its
+own (camera_scripting.c) */
+boolean scripted_camera_point_position(
+	union real_point3d *position);
 void scripted_camera_set(
 	short camera_point_index,
 	word transition_time,
