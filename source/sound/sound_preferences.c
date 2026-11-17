@@ -25,8 +25,8 @@ symbols in this file:
 
 /* ---------- globals */
 
-/* port: the native builds' channels of each type, well past the Xbox's
-hardware voices (halo_port_capacity.h: what they cost the software mixer).
+/* port: the port's channels of each type, past the Xbox's hardware voices
+(halo_port_capacity.h: the platform budgets).
 A sound mod may make any class stereo (the Uncompressed Audio mod's weapons,
 reloads and engines are stereo 44 kHz), which then shared the music's 9
 channels and took them (#1125). */

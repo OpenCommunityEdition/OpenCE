@@ -41,6 +41,12 @@ static real real_seed_random(unsigned long *seed)
 	return (real)((*seed >> 16) & 0xFFFF) / 65536.f;
 }
 
+static boolean fail_allocation;
+static void *test_realloc(void *pointer, size_t size)
+{
+    return fail_allocation ? NULL : realloc(pointer, size);
+}
+#define realloc test_realloc
 static unsigned long *current_seed;
 static unsigned long *get_global_local_random_seed_address(void) { return current_seed; }
 
@@ -168,13 +174,14 @@ int main(int argc, char **argv)
 	{
 		/* every one of 40 before any repeats, round after round; the first
 		of a round is never the last of the one before */
-		unsigned long seed;
+		unsigned long seed, initial_seed;
 
-		for (seed = 1; seed <= 64; seed++)
+		for (initial_seed = 1; initial_seed <= 64; initial_seed++)
 		{
 			short last;
 			short round;
 
+			seed = initial_seed;
 			sound_make(&sound, 40, 40, 0.f);
 			last = picks_distinct(&sound, &seed, 40, NONE);
 			for (round = 0; round < 4; round++)
@@ -290,6 +297,35 @@ int main(int argc, char **argv)
 				"map %ld: %ld entries, not its two ranges'", map, sound_played_beyond_table.count);
 		}
 	}
+    else if (!strcmp(name, "allocation-failure"))
+    {
+        unsigned long seed = 17;
+        sound_make(&sound, 40, 40, 0.f);
+        fail_allocation = TRUE;
+        picks_distinct(&sound, &seed, 32, NONE);
+        CHECK(sound.range.actual_permutation_count == 32 && sound.range.played_beyond_index == 0,
+            "allocation failure must use only the original mask");
+        CHECK(sound_played_beyond_table.count == 0, "failed allocation retained an entry");
+    }
+    else if (!strcmp(name, "table-full"))
+    {
+        struct sound_pitch_range *ranges = calloc(MAXIMUM_SOUND_PLAYED_BEYOND, sizeof(*ranges));
+        unsigned long seed = 19;
+        long index;
+        CHECK(ranges, "no memory for ranges");
+        for (index = 0; index < MAXIMUM_SOUND_PLAYED_BEYOND; index++)
+            CHECK(sound_pitch_range_played_beyond(&ranges[index]), "entry %ld was refused", index);
+        CHECK(ranges[MAXIMUM_SOUND_PLAYED_BEYOND - 1].played_beyond_index == MAXIMUM_SOUND_PLAYED_BEYOND,
+            "last index wrapped");
+        sound_make(&sound, 40, 40, 0.f);
+        picks_distinct(&sound, &seed, 32, NONE);
+        CHECK(sound.range.actual_permutation_count == 32, "full table did not fall back");
+        CHECK(sound_pitch_range_played_beyond(&ranges[0]) == sound_played_beyond_table.entries[0].bits,
+            "full table lost an existing range");
+        sound_definitions_played_beyond_clear();
+        free(ranges);
+    }
+
 	else
 	{
 		CHECK(FALSE, "no case %s", name);

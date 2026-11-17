@@ -6,22 +6,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run
-from harness.audio import manager_types
+from harness.audio import class_table, manager_types
 
 CASES = ["music-kept", "speech-kept", "music-takes-effects-channel", "effects-as-before"]
 NEGATIVE_CONTROLS = {
     # the class priorities alone, as before the fix: a weapon (4) takes music's (2) channel
     "priorities-alone": (("if (challenger_kept != sound_class_is_music_or_speech(", "if (FALSE && ("), "music-kept"),
 }
-
-
-def classes():
-    source = read("source/sound/sound_classes.c")
-    macro = re.search(r"^#define SOUND_CLASS_DEFINITION\(.*?[^\\]\n", source, re.M | re.S).group(0)
-    tables = [source[source.index(start):source.index("};", source.index(start)) + 2]
-              for start in ["struct sound_class_definition sound_classes[", "char const *sound_class_names["]]
-    return "\n".join([f"#define NUMBER_OF_SOUND_CLASSES {constant(source, 'NUMBER_OF_SOUND_CLASSES')}",
-                      enum_with(read("source/sound/sound_classes.h"), "_sound_class_music"), macro, *tables])
 
 
 def generated(fault=None):
@@ -33,7 +24,7 @@ def generated(fault=None):
         code = mutated(code, *fault)
     types = manager_types() + enum_with(manager[manager.index("/* ---------- constants */"):],
                                         "_sound_channel_3d_bit") + "\n"
-    return (("types.inc", types), ("classes.inc", classes()), ("under_test.inc", code))
+    return (("types.inc", types), ("classes.inc", class_table()), ("under_test.inc", code))
 
 
 @pytest.mark.parametrize("case", CASES)

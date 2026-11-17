@@ -1,5 +1,4 @@
 """Mod sound files with more than 32 variations load and play each variation before repeating."""
-import re
 import sys
 from pathlib import Path
 
@@ -10,7 +9,7 @@ from harness import (CHECK_FAILED, build, constant, enum_with, function, mutated
                      run, structure)
 from harness.audio import permutation_picker  # noqa: E402
 
-CASES = ["forty-variations"]
+CASES = ["forty-variations", "thirty-two", "maximum"]
 NEGATIVE_CONTROLS = {
     # the old refusal (#1170): a mod's sound picking from more than 32 permutations left out
     "refuse-past-32": (("\t\t\t\trange->actual_permutation_count < 1 ||\n",
@@ -27,7 +26,6 @@ def generated(fault=None):
     definitions = read("source/sound/sound_definitions.h")
     tags = read("source/tag_files/tag_groups.h")
     mods_header = read("port/linux/game/mods.h")
-    capacity = read("port/linux/include/halo_port_capacity.h")
     types = "".join(structure(tags, name) + "\n" for name in ["tag_block", "tag_reference", "tag_data"])
     types += "".join(structure(definitions, name) + "\n" for name in
                      ["real_bounds", "sound_permutation", "sound_pitch_range", "sound_definition"])

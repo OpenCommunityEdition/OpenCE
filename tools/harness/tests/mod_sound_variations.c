@@ -137,7 +137,7 @@ struct source
 	short next;
 };
 
-static byte file_bytes[0x100000];
+static byte file_bytes[0x200000];
 static unsigned long file_size;
 
 static void put_be16(unsigned long at, unsigned value) { file_bytes[at] = (byte)(value >> 8); file_bytes[at + 1] = (byte)value; }
@@ -262,38 +262,41 @@ static struct sound_permutation *permutation_get(struct mod_sound *sound, short 
 	return TAG_BLOCK_GET_ELEMENT(&range->permutations, index, struct sound_permutation);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
 	{
 		/* a mod's sound of 40 short permutations, not linked (OpenH1 issue 1170): kept, all 40 picked from, and
 		each played once before any repeats, round after round (sound_definitions.c's played bits past 32) */
-		struct source sources[40];
+		short variations = argc > 1 && !strcmp(argv[1], "thirty-two") ? 32 :
+            argc > 1 && !strcmp(argv[1], "maximum") ? MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE : 40;
+        struct source sources[MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE];
 		short *samples = sweep_make(2205, 1);
 		struct mod_sound *sound;
-		current_seed = 3;
 		short index, round, last = NONE;
 
-		for (index = 0; index < 40; index++)
+		current_seed = 3;
+
+		for (index = 0; index < variations; index++)
 		{
 			struct source source = { samples, 2205, 1, 22050, NONE };
 
 			sources[index] = source;
 		}
-		file_make(MONO, RATE_22, PCM, FALSE, 40, sources, 40);
+		file_make(MONO, RATE_22, PCM, FALSE, variations, sources, variations);
 		sound = sound_load();
-		CHECK(the_range(sound)->actual_permutation_count == 40, "%d picked from",
+		CHECK(the_range(sound)->actual_permutation_count == variations, "%d picked from",
 			the_range(sound)->actual_permutation_count);
 		sound_definitions_played_beyond_clear();
 		for (round = 0; round < 4; round++)
 		{
-			boolean seen[40] = { 0 };
-			short count = round ? 39 : 40;
+			boolean seen[MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE] = { 0 };
+			short count = round ? variations - 1 : variations;
 
 			for (index = 0; index < count; index++)
 			{
 				short pick = sound_definition_next_permutation(&sound->definition, 0, NONE);
 
-				CHECK(VALID_INDEX(pick, 40) && !seen[pick] && pick != last,
+				CHECK(VALID_INDEX(pick, variations) && !seen[pick] && pick != last,
 					"round %d, pick %d: permutation %d again", round, index, pick);
 				seen[pick] = TRUE;
 				last = pick;

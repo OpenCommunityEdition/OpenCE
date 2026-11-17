@@ -70,3 +70,24 @@ def test_actual_channels_fit():
     for pool in pools():
         assert all(actual > virtual for actual, virtual in zip(pool["actual"], pool["virtual"])), pool
         assert sum(pool["actual"]) <= most and sum(pool["virtual"]) <= most, pool
+
+
+@pytest.mark.parametrize("platform,defines,expected", [
+    ("desktop", "", ((24, 96, 32, 80), (26, 104, 36, 86))),
+    ("android", "#define HALO_ANDROID 1\n#define HALO_ARM64_GUEST 1\n", ((16, 72, 24, 40), (18, 78, 27, 44))),
+    ("web", "#define HALO_WEB 1\n#define HALO_GLES 1\n", ((16, 72, 24, 40), (18, 78, 27, 44))),
+])
+def test_platform_selection(platform, defines, expected):
+    # Compile the real conditionals and preferences, rather than parsing both
+    # branches: OpenH1's HALO_GUEST would silently select desktop on Android.
+    from harness import structure
+    preferences = read("source/sound/sound_preferences.c")
+    start = preferences.index("static struct sound_preferences default_sound_preferences")
+    initializer = preferences[start:preferences.index("};", start) + 2]
+    code = defines + read(CAPACITY) + "\n"
+    code += structure(read("source/sound/sound_preferences.h"), "sound_preferences") + "\n" + initializer
+    virtual, actual = expected
+    code += "\nstatic short expected_virtual[] = {" + ",".join(map(str, virtual)) + "};\n"
+    code += "static short expected_actual[] = {" + ",".join(map(str, actual)) + "};\n"
+    status, output = run(build("sound_channel_capacity", (("under_test.inc", code),)), platform)
+    assert status == 0, output
