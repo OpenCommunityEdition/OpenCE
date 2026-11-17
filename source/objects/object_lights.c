@@ -184,6 +184,7 @@ symbols in this file:
 #include "tag_files/tag_groups.h"
 #include "units/units.h"
 #include "cache/cache_files.h" /* port: (tag_iterator: light_port_glow_definition_get) */
+#include "light_scale.h" /* port: port/linux/game/light_scale.c */
 void shield_glow_update(void); /* port: port/linux/game/shield_glow.c */
 
 /* port: port/linux/src (halo.log) */
@@ -1155,6 +1156,10 @@ void lights_preprocess_scene(
 				/* port: a glow's radius is as set (light_port_glow_set) */
 				if (TEST_FLAG(light->flags, _point_light_port_glow_bit))
 					light->radius = light->intensity_scale;
+				/* port: with per-pixel lighting, a scaled object's light
+				reaches as far as the object is scaled (light_scale.c) */
+				else
+					light->radius = light_scale_radius(light->object_index, light->radius);
 				lights_port.radius_writes++;
 				if (light->radius != 0.0f)
 				{
