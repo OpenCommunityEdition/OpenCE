@@ -280,18 +280,33 @@ BOOL WINAPI VirtualProtect(LPVOID address, SIZE_T size, DWORD new_protect, PDWOR
 {
 	unsigned long start = (unsigned long)address & ~(PAGE_SIZE_BYTES - 1);
 	unsigned long end = ((unsigned long)address + size + PAGE_SIZE_BYTES - 1) & ~(PAGE_SIZE_BYTES - 1);
+	int writable;
 
 	if (old_protect)
 		*old_protect = platform_is_contiguous(address) ?
 			page_protection[(start - PLATFORM_CONTIGUOUS_BASE) / PAGE_SIZE_BYTES] : PAGE_READWRITE;
-	memory_watch_forget((void *)start, end - start);
+	/* Made writable, the pages are given their protection before the write
+	watch forgets them: a write another thread makes to a watched page in
+	between (the cache file thread reading a texture, as the texture cache is
+	given back whole: texture_cache_return_memory) is then either a watched
+	write the watch's handler lets through, or no fault. Forgotten first, it
+	faulted on a page the handler no longer knew, and the game crashed (the
+	end of the campaign, when the credits movie could not be opened). Made
+	read-only, they are forgotten first, as before. */
+	writable = (protection_to_host(new_protect) & PROT_WRITE) != 0;
+	if (!writable)
+		memory_watch_forget((void *)start, end - start);
 #ifndef HALO_WEB
 	if (mprotect((void *)start, end - start, protection_to_host(new_protect)) != 0)
 	{
+		if (writable)
+			memory_watch_forget((void *)start, end - start);
 		platform_set_last_error_from_errno(errno);
 		return FALSE;
 	}
 #endif
+	if (writable)
+		memory_watch_forget((void *)start, end - start);
 	if (platform_is_contiguous((void *)start))
 	{
 		unsigned long page;
