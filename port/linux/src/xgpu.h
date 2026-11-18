@@ -373,5 +373,16 @@ nits), or only the ring ring[0], ring[1] (its centre in the window), from
 radius ring[3] to ring[2]; ring[2] 0 for the whole rectangle. FALSE if its
 program does not build. */
 BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ring[4]);
+#ifndef HALO_GLES
+/* blurs a shadow map scale (2 to 8) times the Xbox's 128 texels each way,
+width by height pixels, from source_texture into destination_texture's
+framebuffer destination, as the game's passes do (rasterizer_xbox_shadows.c),
+in two passes: across into a texture of its own, then down. A source
+source_width across, twice the width, is averaged down into the destination
+first, and blurred there. Its color only; FALSE if its program does not
+build. */
+BOOL xgpu_post_shadow_blur(GLuint source_texture, unsigned long source_width, GLuint destination_texture,
+	GLuint destination, unsigned long width, unsigned long height, long scale);
+#endif
 
 #endif

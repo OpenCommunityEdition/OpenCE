@@ -380,6 +380,46 @@ real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const 
 /* port: port/linux/game/overshield_effect.c */
 real const *overshield_effect_values(long unit_index, real const *values);
 
+/* port: the shadows drawn in batches, each batch's maps one after another
+and then their projections onto the level (rasterizer_xbox_shadows.c): the
+GPU goes back to the screen once a batch, not after each shadow's map. The
+batch's shadows whose maps are drawn and blurred, projections to draw: */
+static struct rasterizer_shadow_port_saved shadow_port_batch[RASTERIZER_SHADOW_PORT_BATCH];
+static long shadow_port_batch_count = 0;
+
+static void render_object_shadows_port_project(
+	void)
+{
+	struct object_render_data data;
+	long index;
+
+	for (index = 0; index < shadow_port_batch_count; index++)
+	{
+		rasterizer_environment_shadow_port_project_begin(&shadow_port_batch[index]);
+		data.shadow_matrix = shadow_port_batch[index].matrix;
+		data.shadow_bounding_radius = shadow_port_batch[index].radius;
+		render_object_shadow_end(&data);
+	}
+	shadow_port_batch_count = 0;
+
+	return;
+}
+
+/* the shadow begun's map drawn: blurred into its slot of the batch, which is
+projected when full */
+static void render_object_shadow_port_map_done(
+	void)
+{
+	rasterizer_environment_shadow_port_map_done(shadow_port_batch_count, &shadow_port_batch[shadow_port_batch_count]);
+	shadow_port_batch_count++;
+	if (shadow_port_batch_count >= rasterizer_environment_shadow_port_batch_size())
+	{
+		render_object_shadows_port_project();
+	}
+
+	return;
+}
+
 void render_object_shadows(
 	void)
 {
@@ -392,7 +432,10 @@ void render_object_shadows(
 		rasterizer_environment_shadows_begin();
 
 		data.shadow = TRUE;
+		shadow_port_batch_count = 0;
 		process_rendered_objects(&data);
+		render_object_shadows_port_project();
+		rasterizer_environment_shadow_port_batches_end();
 
 		rasterizer_environment_shadows_end();
 	}
@@ -1182,10 +1225,15 @@ static void render_object(
 				size_fraction = PIN(size_fraction, 0.f, 1.f);
 				darkness_fraction = PIN(darkness_fraction, 0.f, 1.f);
 
+				/* port: the shadow's maps drawn at the size its object is
+				drawn at on the screen (halo_shadow_map_size,
+				port/linux/src/d3d8_gl.c), up to display.shadow_resolution */
+				halo_shadow_map_size(level_of_detail_pixels);
 				if (render_object_shadow_begin(data, darkness_fraction * size_fraction))
 				{
 					render_object_list(data, NULL, data->object_index);
-					render_object_shadow_end(data);
+					/* port: projected with its batch (render_object_shadows) */
+					render_object_shadow_port_map_done();
 				}
 			}
 		}

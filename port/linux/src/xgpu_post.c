@@ -62,6 +62,7 @@ enum
 	_post_program_tone_map,
 	_post_program_present,
 	_post_program_fill,
+	_post_program_shadow_blur,
 	NUMBER_OF_POST_PROGRAMS
 };
 
@@ -72,6 +73,7 @@ enum
 	_post_set_smaa,
 	_post_set_hdr,
 	_post_set_fill,
+	_post_set_shadow_blur,
 	NUMBER_OF_POST_SETS
 };
 
@@ -86,6 +88,8 @@ static struct
 	GLint bounds;
 	GLint tone, rectangle, scale;
 	GLint fill_color, fill_ring;
+	/* the shadow blur's direction and scale (xgpu_post_shadow_blur) */
+	GLint shadow_blur;
 	/* each set's programs or textures could not be made */
 	BOOL failed[NUMBER_OF_POST_SETS];
 	/* the size of the textures below, and color's internal format */
@@ -97,6 +101,12 @@ static struct
 	GLuint color_framebuffer, edges_framebuffer, weights_framebuffer;
 	/* SMAA's lookup textures */
 	GLuint area, search;
+	/* the shadow blur's: a texture after the first pass, for each scale
+(1, 2, 4, 8: by its log2), its framebuffer, and its width; a sampler, linear
+and black past the map's edges, as the game's blur reads */
+	GLuint shadow_textures[4], shadow_framebuffers[4];
+	unsigned long shadow_widths[4];
+	GLuint shadow_sampler;
 	/* linear and clamped, as FXAA and SMAA sample */
 	GLuint sampler;
 	/* no attributes: the triangle comes from gl_VertexID */
@@ -407,6 +417,41 @@ static const char fill_source[] =
 	"\tresult = vec4(color.rgb, 1.0);\n"
 	"}\n";
 
+/* the blur of a shadow map scale times the Xbox's 128 texels each way
+(rasterizer_xbox_shadows.c), along blur.xy (a texel's step): the game's
+passes weigh the texels 2 * scale - |d| for |d| up to 2 * scale - 1 texels
+away each way, which this takes along one way at a time. Each tap averages
+two texels by the linear filter, at the point between them where their
+weights put it; past the map's edges it reads black, as the game's taps
+read its border. */
+static const char shadow_blur_source[] =
+	"uniform sampler2D color_texture;\n"
+	"uniform vec4 metrics;\n"
+	"/* the step to the next texel, and the scale */\n"
+	"uniform vec4 blur;\n"
+	"out vec4 result;\n"
+	"\n"
+	"void main()\n"
+	"{\n"
+	"\tvec2 texcoord = gl_FragCoord.xy * metrics.xy;\n"
+	"\tfloat width = 2.0 * blur.z;\n"
+	"\tvec3 sum = texture(color_texture, texcoord).rgb * width;\n"
+	"\tint pair;\n"
+	"\n"
+	"\tfor (pair = 0; pair < int(blur.z); pair++)\n"
+	"\t{\n"
+	"\t\tfloat step1 = float(2 * pair + 1);\n"
+	"\t\tfloat weight1 = width - step1;\n"
+	"\t\tfloat weight2 = max(width - step1 - 1.0, 0.0);\n"
+	"\t\tfloat weight = weight1 + weight2;\n"
+	"\t\tvec2 offset = blur.xy * (step1 + weight2 / weight);\n"
+	"\n"
+	"\t\tsum += (texture(color_texture, texcoord + offset).rgb +\n"
+	"\t\t\ttexture(color_texture, texcoord - offset).rgb) * weight;\n"
+	"\t}\n"
+	"\tresult = vec4(sum / (width * width), 1.0);\n"
+	"}\n";
+
 #ifndef HALO_GLES
 /* the main functions of SMAA's passes, after SMAA.hlsl; its vertex
 functions' offsets are found for each pixel */
@@ -460,7 +505,7 @@ static GLuint program_build(int which)
 	static const char *const names[NUMBER_OF_POST_PROGRAMS] =
 	{
 		"FXAA", "SMAA edge detection", "SMAA blending weight", "SMAA neighborhood blending",
-		"HDR tone mapping", "HDR presentation", "HDR calibration"
+		"HDR tone mapping", "HDR presentation", "HDR calibration", "shadow blur"
 	};
 	static const struct
 	{
@@ -498,6 +543,10 @@ static GLuint program_build(int which)
 	else if (which == _post_program_fill)
 	{
 		xgpu_text_append(&text, "%s", fill_source);
+	}
+	else if (which == _post_program_shadow_blur)
+	{
+		xgpu_text_append(&text, "%s", shadow_blur_source);
 	}
 #ifndef HALO_GLES
 	else if (xgpu_smaa_shader_size)
@@ -545,6 +594,10 @@ static GLuint program_build(int which)
 	{
 		post.fill_color = glGetUniformLocation(program, "color");
 		post.fill_ring = glGetUniformLocation(program, "ring");
+	}
+	else if (which == _post_program_shadow_blur)
+	{
+		post.shadow_blur = glGetUniformLocation(program, "blur");
 	}
 	return program;
 }
@@ -873,3 +926,89 @@ BOOL xgpu_post_fill(const GLint corners[4], const float color[3], const float ri
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	return TRUE;
 }
+
+#ifndef HALO_GLES
+BOOL xgpu_post_shadow_blur(GLuint source_texture, unsigned long source_width, GLuint destination_texture,
+	GLuint destination, unsigned long width, unsigned long height, long scale)
+{
+	static const float border[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+	float metrics[4];
+	float blur[4];
+	int slot = 0;
+
+	if (scale < 2 || scale > 8 || (source_width != width && source_width != 2 * width) ||
+		!programs_prepare(_post_set_shadow_blur, _post_program_shadow_blur, _post_program_shadow_blur))
+	{
+		return FALSE;
+	}
+	while ((1L << slot) < scale)
+		slot++;
+	if (!post.shadow_sampler)
+	{
+		glGenSamplers(1, &post.shadow_sampler);
+		glSamplerParameteri(post.shadow_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glSamplerParameteri(post.shadow_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glSamplerParameteri(post.shadow_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		glSamplerParameteri(post.shadow_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+		glSamplerParameterfv(post.shadow_sampler, GL_TEXTURE_BORDER_COLOR, border);
+	}
+	if (post.shadow_widths[slot] != width)
+	{
+		glDeleteFramebuffers(1, &post.shadow_framebuffers[slot]);
+		glDeleteTextures(1, &post.shadow_textures[slot]);
+		post.shadow_textures[slot] = texture_new(GL_RGBA8, width, height, GL_RGBA, NULL);
+		post.shadow_framebuffers[slot] = framebuffer_new(post.shadow_textures[slot]);
+		post.shadow_widths[slot] = width;
+	}
+	pass_state();
+	/* (the maps' alpha is left as it is, as the game's blur leaves it) */
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
+	glUseProgram(post.programs[_post_program_shadow_blur]);
+	metrics[0] = 1.0f / (float)width;
+	metrics[1] = 1.0f / (float)height;
+	metrics[2] = (float)width;
+	metrics[3] = (float)height;
+	glUniform4fv(post.metrics[_post_program_shadow_blur], 1, metrics);
+	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+	glActiveTexture(GL_TEXTURE0);
+	glBindSampler(0, post.shadow_sampler);
+
+	/* a source twice the size averaged down into the destination: a scale
+	of a half is the one tap, at each destination texel's middle, between
+	four of the source's, which the linear filter averages */
+	if (source_width != width)
+	{
+		blur[0] = 0.0f;
+		blur[1] = 0.0f;
+		blur[2] = 0.5f;
+		blur[3] = 0.0f;
+		glUniform4fv(post.shadow_blur, 1, blur);
+		glBindTexture(GL_TEXTURE_2D, source_texture);
+		glBindFramebuffer(GL_FRAMEBUFFER, destination);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		source_texture = destination_texture;
+	}
+
+	/* across, into the pass's texture */
+	blur[0] = metrics[0];
+	blur[1] = 0.0f;
+	blur[2] = (float)scale;
+	blur[3] = 0.0f;
+	glUniform4fv(post.shadow_blur, 1, blur);
+	glBindTexture(GL_TEXTURE_2D, source_texture);
+	glBindFramebuffer(GL_FRAMEBUFFER, post.shadow_framebuffers[slot]);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	/* down, into the destination */
+	blur[0] = 0.0f;
+	blur[1] = metrics[1];
+	glUniform4fv(post.shadow_blur, 1, blur);
+	glBindTexture(GL_TEXTURE_2D, post.shadow_textures[slot]);
+	glBindFramebuffer(GL_FRAMEBUFFER, destination);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	glBindSampler(0, 0);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	return TRUE;
+}
+#endif

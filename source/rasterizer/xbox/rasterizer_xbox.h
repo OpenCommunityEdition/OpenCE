@@ -93,6 +93,10 @@ void rasterizer_set_target_as_texture(
 	short stage,
 	short target,
 	short maximum_mipmap_level);
+/* port: the shadow maps' surfaces (rasterizer_xbox_shadows.c's blur) */
+void rasterizer_shadow_surfaces(
+	D3DSurface **primary,
+	D3DSurface **secondary);
 void SetRenderStateSmart(
 	D3DRENDERSTATETYPE state,
 	unsigned long value);

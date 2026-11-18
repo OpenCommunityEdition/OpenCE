@@ -596,6 +596,30 @@ void rasterizer_environment_shadow_draw(
 	struct vertex_buffer const *vertex_buffer);
 void rasterizer_environment_shadows_end(
 	void);
+
+/* port: object shadows drawn in batches, each batch's maps and then their
+projections (rasterizer_xbox_shadows.c, render_objects.c): at most this
+many, their blurred maps' slots past the first in at most this much of the
+GPU's memory */
+#define RASTERIZER_SHADOW_PORT_BATCH 32
+#define RASTERIZER_SHADOW_PORT_BATCH_BYTES (32UL << 20)
+struct rasterizer_shadow_port_saved
+{
+	real_matrix4x3 matrix;
+	real_rgb_color color;
+	real radius;
+	long scale;
+	long slot;
+};
+long rasterizer_environment_shadow_port_batch_size(
+	void);
+void rasterizer_environment_shadow_port_map_done(
+	long slot,
+	struct rasterizer_shadow_port_saved *saved);
+void rasterizer_environment_shadow_port_project_begin(
+	struct rasterizer_shadow_port_saved const *saved);
+void rasterizer_environment_shadow_port_batches_end(
+	void);
 void rasterizer_environment_diffuse_textures_end(
 	void);
 void rasterizer_environment_diffuse_texture_draw(
