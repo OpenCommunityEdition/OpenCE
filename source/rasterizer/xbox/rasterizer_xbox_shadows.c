@@ -194,6 +194,9 @@ static real_matrix4x3 local_shadow_matrix = { 0 };
 static struct rasterizer_model_begin_parameters const *local_parameters = NULL;
 static boolean shadow_setup = FALSE;
 static boolean shadow_used = FALSE;
+/* port: the shadow being projected had its map blurred into its slot
+already (rasterizer_environment_shadow_port_map_done) */
+static boolean shadow_port_batched = FALSE;
 
 /* ---------- public code */
 
@@ -322,6 +325,7 @@ boolean _rasterizer_environment_shadow_begin(
 		shadow_setup = FALSE;
 		shadow_used = FALSE;
 		shadow_restored = FALSE;
+		shadow_port_batched = FALSE;
 
 		if (rasterizer_debug_options.statistics_mode ==
 			_rasterizer_statistics_mode_enabled)
@@ -580,7 +584,7 @@ void _rasterizer_environment_shadow_draw(
 	{
 		if (!shadow_setup)
 		{
-			if (rasterizer_debug_options.shadow_convolution_enabled)
+			if (rasterizer_debug_options.shadow_convolution_enabled && !shadow_port_batched)
 			{
 				rasterizer_shadow_convolve();
 			}
@@ -839,6 +843,99 @@ void _rasterizer_environment_shadow_draw(
 	return;
 }
 
+/* port: the shadows drawn in batches (render_objects.c): a batch's maps
+drawn one after another, each blurred into its own slot of the secondary
+map's textures (halo_shadow_map_select, port/linux/src/d3d8_gl.c), then the
+batch's projections onto the level, one after another. The GPU goes back to
+the screen once a batch, not after each shadow's map, and a shadow's
+projection cost half as much. Without the blur, the projections read the
+primary map, which each shadow draws over: a batch of one. The slots past the
+first are kept in the GPU's memory, as many as fit in
+RASTERIZER_SHADOW_PORT_BATCH_BYTES at display.shadow_resolution
+(halo_shadow_map_slots): 32 up to 512 on desktop OpenGL, fewer at 1024
+and on OpenGL ES. */
+long rasterizer_environment_shadow_port_batch_size(
+	void)
+{
+	long size;
+
+	if (!rasterizer_debug_options.shadow_convolution_enabled)
+	{
+		return 1;
+	}
+	size = 1 + halo_shadow_map_slots(RASTERIZER_SHADOW_PORT_BATCH_BYTES);
+
+	return size < RASTERIZER_SHADOW_PORT_BATCH ? size : RASTERIZER_SHADOW_PORT_BATCH;
+}
+
+/* the shadow begun's map drawn: blurred into this slot, and what its
+projection needs kept */
+void rasterizer_environment_shadow_port_map_done(
+	long slot,
+	struct rasterizer_shadow_port_saved *saved)
+{
+	D3DSurface *primary_surface;
+	D3DSurface *secondary_surface;
+	long scale = halo_shadow_map_scale();
+
+	saved->matrix = local_shadow_matrix;
+	saved->color = local_shadow_color;
+	saved->radius = local_object_bounding_radius;
+	saved->scale = scale;
+	saved->slot = slot;
+	if (global_window_parameters.rasterizer_target ==
+			_rasterizer_target_render_primary &&
+		rasterizer_debug_options.draw_environment_shadows)
+	{
+		if (!shadow_used)
+		{
+			error(
+				_error_silent,
+				"### WARNING empty shadow has been cast");
+		}
+		rasterizer_shadow_surfaces(&primary_surface, &secondary_surface);
+		halo_shadow_map_select(scale, slot, secondary_surface);
+		if (rasterizer_debug_options.shadow_convolution_enabled)
+		{
+			rasterizer_shadow_convolve();
+		}
+	}
+
+	return;
+}
+
+/* a shadow of the batch projected next (structure_render_shadow, then
+rasterizer_environment_shadow_end), from its slot's blurred map */
+void rasterizer_environment_shadow_port_project_begin(
+	struct rasterizer_shadow_port_saved const *saved)
+{
+	D3DSurface *primary_surface;
+	D3DSurface *secondary_surface;
+
+	rasterizer_shadow_surfaces(&primary_surface, &secondary_surface);
+	halo_shadow_map_select(saved->scale, saved->slot, secondary_surface);
+	local_shadow_matrix = saved->matrix;
+	local_shadow_color = saved->color;
+	local_object_bounding_radius = saved->radius;
+	local_parameters = 0;
+	shadow_setup = FALSE;
+	shadow_used = TRUE;
+	shadow_restored = FALSE;
+	shadow_port_batched = TRUE;
+
+	return;
+}
+
+/* the batches done: the maps' first slot again */
+void rasterizer_environment_shadow_port_batches_end(
+	void)
+{
+	halo_shadow_map_select(0, 0, NULL);
+	shadow_port_batched = FALSE;
+
+	return;
+}
+
 void _rasterizer_environment_shadows_end(
 	void)
 {
@@ -866,6 +963,19 @@ static void rasterizer_shadow_convolve(
 	if (rasterizer_debug_options.draw_environment_shadows &&
 		rasterizer_debug_options.shadow_convolution_enabled)
 	{
+		D3DSurface *primary_surface;
+		D3DSurface *secondary_surface;
+
+		/* port: a larger map's blur in two passes of the port's, across
+		and down (halo_shadow_map_blur, port/linux/src/d3d8_gl.c), for this
+		pass and the two for each doubling below: the same weights, drawn
+		into the secondary as these are */
+		rasterizer_shadow_surfaces(&primary_surface, &secondary_surface);
+		if (scale > 1 && halo_shadow_map_blur(primary_surface, secondary_surface))
+		{
+			return;
+		}
+
 		for (stage = 0; stage < 4; stage++)
 		{
 			rasterizer_set_target_as_texture(stage, 2, FALSE);

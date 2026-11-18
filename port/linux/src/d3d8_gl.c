@@ -423,13 +423,46 @@ targets (rasterizer_xbox.c), can be drawn larger as the screen's targets are
 scale up with them. The scale is a power of two up to 8 (1024x1024), which
 the blur needs to cover the same part of the map as the Xbox's
 (rasterizer_shadow_convolve); 1, the default, draws them as the Xbox did. It
-changes only between frames (halo_screen_commit). */
+changes only between frames (halo_screen_commit). It is the most a shadow
+is drawn at: each shadow's maps are drawn at the scale its object's size on
+the screen needs (halo_shadow_map_size), each scale's maps their own
+textures. */
 #define SHADOW_MAP_SIZE 128
 #define SHADOW_MAP_MAXIMUM_SCALE 8
+/* a shadow's maps get this many texels for each pixel its object covers
+on the screen, across: one each, as many as the screen shows of it (the blur
+covers some three of the Xbox's texels whatever the size) */
+#define SHADOW_MAP_TEXELS_PER_PIXEL 1.0f
+/* the blurred maps (the slotted surface's, halo_shadow_map_select) have half
+the texels of the maps drawn, each way, from this scale up: the blur keeps
+no detail finer than some three of the Xbox's texels, so from 512x512 the
+maps are drawn at the full size, their edges smooth, then averaged down and
+blurred at half the size (halo_shadow_map_blur), a quarter of the pixels with
+half the taps. The blur covers the same part of the map at every size, so
+the blurred maps keep the same proportion of the maps drawn at every
+display.shadow_resolution: 512 blurred at 256, 1024 at 512. Below it the
+blur is too narrow to lose nothing at half the size. */
+#define SHADOW_MAP_BLUR_HALVED_FROM 4
 
 /* 0 until first asked */
 static long shadow_scale;
 static unsigned long shadow_scale_read_at;
+/* the scale of the shadow being drawn (halo_shadow_map_size); 0 for
+shadow_scale */
+static long shadow_scale_current;
+/* the blurred map's slot of the shadow being drawn, and the surface whose
+textures have slots (halo_shadow_map_select): the shadows drawn in batches,
+each batch's maps first, then their projections (render_objects.c), each
+batch's blurred maps are kept side by side */
+static long shadow_slot_current;
+static unsigned long shadow_slot_data;
+/* the slots past the first are freed (render_targets_evict): how many fit
+in their budget changed (halo_shadow_map_slots), or display.shadow_map_reuse;
+and how many times they were */
+static BOOL shadow_slots_evicted;
+static unsigned long shadow_slots_freed;
+/* display.shadow_map_reuse, read with display.shadow_resolution */
+static BOOL shadow_reuse;
 
 static long shadow_scale_choose(void)
 {
@@ -441,16 +474,106 @@ static long shadow_scale_choose(void)
 	return scale;
 }
 
-/* the shadow maps' pixels for each of their 128 texels each way */
-long halo_shadow_map_scale(void)
+/* the most pixels the shadow maps have for each of their 128 texels each
+way (display.shadow_resolution) */
+static long shadow_scale_maximum(void)
 {
 	if (!shadow_scale)
 	{
 		shadow_scale_read_at = config_changes();
+		shadow_reuse = config_boolean("display.shadow_map_reuse");
 		shadow_scale = shadow_scale_choose();
 		platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow_scale, SHADOW_MAP_SIZE * shadow_scale);
 	}
 	return shadow_scale;
+}
+
+/* the shadow maps' pixels for each of their 128 texels each way: the
+shadow being drawn's (halo_shadow_map_size) */
+long halo_shadow_map_scale(void)
+{
+	long maximum = shadow_scale_maximum();
+
+	return shadow_scale_current && shadow_scale_current < maximum ? shadow_scale_current : maximum;
+}
+
+/* the next shadow's maps sized for its object, diameter pixels across in
+the game's 480-line screen (render_objects.c): the smallest scale, up to
+display.shadow_resolution's, whose maps have SHADOW_MAP_TEXELS_PER_PIXEL
+texels for each of its pixels on the screen. A larger map would show no
+more, its blur covering the same part of it: a far object's shadow is drawn
+at 128x128, with the Xbox's one pass of the blur, not at 512x512 with five. */
+void halo_shadow_map_size(float diameter)
+{
+	long maximum = shadow_scale_maximum();
+	float needed = diameter * screen_scale[1] * SHADOW_MAP_TEXELS_PER_PIXEL;
+	long scale = 1;
+
+	while (scale < maximum && (float)(SHADOW_MAP_SIZE * scale) < needed)
+		scale *= 2;
+	shadow_scale_current = scale;
+}
+
+/* the shadow whose maps are drawn or read next: its scale (as
+halo_shadow_map_scale gave), and its slot of the batch's maps of the surface
+slotted (the blurred map, rasterizer_xbox_shadows.c) */
+void halo_shadow_map_select(long scale, long slot, const void *slotted)
+{
+	shadow_scale_current = scale;
+	shadow_slot_current = slot;
+	shadow_slot_data = slotted ? ((const D3DSurface *)slotted)->Data : 0;
+}
+
+/* the scale of this surface's shadow map texture to draw or read: the
+blurred maps' half the scale drawn at, from SHADOW_MAP_BLUR_HALVED_FROM */
+static long shadow_scale_of(unsigned long data)
+{
+	long scale = halo_shadow_map_scale();
+
+#ifndef HALO_GLES
+	if (data && data == shadow_slot_data && scale >= SHADOW_MAP_BLUR_HALVED_FROM)
+		scale /= 2;
+#endif
+	return scale;
+}
+
+/* the slot of this surface's shadow map texture to draw or read */
+static long shadow_slot_of(unsigned long data)
+{
+	return data && data == shadow_slot_data ? shadow_slot_current : 0;
+}
+
+/* how many slots of the blurred map past the first fit in bytes of the
+GPU's memory: a slot keeps a texture (RGBA8) for each scale its shadows were
+drawn at, up to display.shadow_resolution's (render_targets_evict frees the
+larger ones when it goes down) */
+long halo_shadow_map_slots(unsigned long bytes)
+{
+	unsigned long slot_bytes = 0;
+	long scale;
+
+	for (scale = 1; scale <= shadow_scale_maximum(); scale *= 2)
+	{
+		unsigned long side = SHADOW_MAP_SIZE * (unsigned long)scale;
+
+#ifndef HALO_GLES
+		if (scale >= SHADOW_MAP_BLUR_HALVED_FROM)
+			side /= 2;
+#endif
+		slot_bytes += side * side * 4;
+	}
+	return (long)(bytes / slot_bytes);
+}
+
+int halo_shadow_map_reuse(void)
+{
+	shadow_scale_maximum();
+	return shadow_reuse;
+}
+
+unsigned long halo_shadow_map_slots_freed(void)
+{
+	return shadow_slots_freed;
 }
 
 /* display.hdr (xgpu_post.c): the back buffer in GL_RGBA16F, which keeps
@@ -969,6 +1092,10 @@ struct render_target_entry
 	multisampled with multisampling (render_target_multisample) */
 	BOOL screen_buffer;
 	enum render_target_kind kind;
+	/* a shadow map's slot (halo_shadow_map_select) */
+	long slot;
+	/* kept in shadow_slot_table, not in a bucket */
+	BOOL in_slot_table;
 };
 
 /* every draw looks up its targets and whether its textures are render
@@ -980,6 +1107,25 @@ static struct render_target_entry *render_target_buckets[RENDER_TARGET_BUCKET_CO
 static struct render_target_entry **render_target_bucket(unsigned long data)
 {
 	return &render_target_buckets[((data >> 12) ^ (data >> 20)) % RENDER_TARGET_BUCKET_COUNT];
+}
+
+/* the shadow maps' textures of the slots past the first (the blurred map's,
+halo_shadow_map_select), by scale and slot, kept out of the buckets: every
+texture a draw binds looks through its address's bucket, and a batch's
+slots at each scale (render_objects.c) all have the blurred map's address */
+#define SHADOW_SLOT_TABLE_SCALES 4
+#define SHADOW_SLOT_TABLE_SLOTS 256
+
+static struct render_target_entry *shadow_slot_table[SHADOW_SLOT_TABLE_SCALES][SHADOW_SLOT_TABLE_SLOTS];
+
+/* a scale's and slot's place in the table, or NULL (the slot is not kept there) */
+static struct render_target_entry **shadow_slot_table_link(float scale, long slot)
+{
+	int index = scale >= 8.0f ? 3 : scale >= 4.0f ? 2 : scale >= 2.0f ? 1 : 0;
+
+	if (slot <= 0 || slot >= SHADOW_SLOT_TABLE_SLOTS)
+		return NULL;
+	return &shadow_slot_table[index][slot];
 }
 
 struct framebuffer_entry
@@ -1922,11 +2068,13 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	long screen;
 	BOOL depth;
 	GLint previous_texture;
+	struct render_target_entry **table_link = NULL;
 
 	if (!surface || !surface->Data)
 		return NULL;
 	float scale[2] = { 1.0f, 1.0f };
 	enum render_target_kind kind = _render_target_plain;
+	long shadow_slot = 0;
 
 	/* (an entry lives until its scale no longer fits: render_targets_evict) */
 	screen = halo_screen_width();
@@ -1935,7 +2083,10 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 		if (recent_render_targets[slot].entry && recent_render_targets[slot].data == surface->Data &&
 			recent_render_targets[slot].format == surface->Format && recent_render_targets[slot].size == surface->Size &&
 			recent_render_targets[slot].screen_width == screen && recent_render_targets[slot].scale[0] == screen_scale[0] &&
-			recent_render_targets[slot].scale[1] == screen_scale[1])
+			recent_render_targets[slot].scale[1] == screen_scale[1] &&
+			(recent_render_targets[slot].entry->kind != _render_target_shadow_map ||
+				(recent_render_targets[slot].entry->target.scale[0] == (float)shadow_scale_of(surface->Data) &&
+					recent_render_targets[slot].entry->slot == shadow_slot_of(surface->Data))))
 		{
 			return recent_render_targets[slot].entry;
 		}
@@ -1955,15 +2106,27 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	}
 	else if (!depth && surface_is_shadow_map(surface))
 	{
-		scale[0] = (float)halo_shadow_map_scale();
+		scale[0] = (float)shadow_scale_of(surface->Data);
 		scale[1] = scale[0];
 		kind = _render_target_shadow_map;
+		shadow_slot = shadow_slot_of(surface->Data);
 	}
-	for (entry = *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
+	if (kind == _render_target_shadow_map && (table_link = shadow_slot_table_link(scale[0], shadow_slot)) != NULL)
+	{
+		entry = *table_link;
+		if (entry && entry->target.data == surface->Data && entry->target.width == width &&
+			entry->target.height == height && entry->target.depth == depth &&
+			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
+		{
+			return render_target_remember(surface, screen, entry);
+		}
+	}
+	for (entry = table_link ? NULL : *render_target_bucket(surface->Data); entry; entry = entry->next_in_bucket)
 	{
 		if (entry->target.data == surface->Data && entry->target.width == width &&
 			entry->target.height == height && entry->target.depth == depth &&
-			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1])
+			entry->target.scale[0] == scale[0] && entry->target.scale[1] == scale[1] &&
+			entry->slot == shadow_slot)
 		{
 			return render_target_remember(surface, screen, entry);
 		}
@@ -1976,6 +2139,7 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	entry->target.scale[0] = scale[0];
 	entry->target.scale[1] = scale[1];
 	entry->kind = kind;
+	entry->slot = shadow_slot;
 	entry->target.gl_width = (unsigned long)(width * scale[0] + 0.5f);
 	entry->target.gl_height = (unsigned long)(height * scale[1] + 0.5f);
 	entry->screen_buffer = surface->Data == (depth ? device.depth_buffer.Data : device.back_buffer.Data);
@@ -1992,6 +2156,17 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	xgpu_gl_state_invalidate();
 	entry->next = render_targets;
 	render_targets = entry;
+	/* (one the table had for another address stays in render_targets,
+	freed with the rest: render_targets_evict) */
+	if (table_link)
+	{
+		if (*table_link)
+			(*table_link)->in_slot_table = FALSE;
+		*table_link = entry;
+		entry->in_slot_table = TRUE;
+		entry->next_in_bucket = NULL;
+		return entry;
+	}
 	entry->next_in_bucket = *render_target_bucket(entry->target.data);
 	*render_target_bucket(entry->target.data) = entry;
 	return entry;
@@ -2000,9 +2175,26 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 struct xgpu_render_target *xgpu_render_target_find(unsigned long data)
 {
 	struct render_target_entry *entry, *best = NULL;
+	struct render_target_entry **table_link;
+
+	/* (a shadow map's slot past the first: shadow_slot_table) */
+	if (data && data == shadow_slot_data && shadow_slot_current > 0)
+	{
+		table_link = shadow_slot_table_link((float)shadow_scale_of(data), shadow_slot_current);
+		if (table_link && *table_link && (*table_link)->target.data == data)
+			return &(*table_link)->target;
+	}
 
 	for (entry = *render_target_bucket(data); entry; entry = entry->next_in_bucket)
 	{
+		/* (a shadow map: the texture of the shadow being drawn's scale,
+		halo_shadow_map_size, and slot, halo_shadow_map_select; each scale's
+		and slot's were drawn into this frame) */
+		if (entry->target.data == data && !entry->target.depth && entry->kind == _render_target_shadow_map &&
+			entry->target.scale[0] == (float)shadow_scale_of(data) && entry->slot == shadow_slot_of(data))
+		{
+			return &entry->target;
+		}
 		if (entry->target.data == data && !entry->target.depth && (!best || entry->last_rendered > best->last_rendered))
 			best = entry;
 	}
@@ -2974,13 +3166,20 @@ long halo_screen_commit(void)
 	if (shadow_scale && shadow_scale_read_at != config_changes())
 	{
 		long shadow = shadow_scale_choose();
+		BOOL reuse = config_boolean("display.shadow_map_reuse");
 
 		shadow_scale_read_at = config_changes();
-		if (shadow != shadow_scale)
+		if (shadow != shadow_scale || reuse != shadow_reuse)
 		{
-			platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow, SHADOW_MAP_SIZE * shadow);
+			if (shadow != shadow_scale)
+				platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow, SHADOW_MAP_SIZE * shadow);
 			shadow_scale = shadow;
+			shadow_reuse = reuse;
+			shadow_scale_current = 0;
+			shadow_slots_evicted = TRUE;
 			render_targets_evict();
+			shadow_slots_evicted = FALSE;
+			shadow_slots_freed++;
 		}
 	}
 	if (!screen_width)
@@ -4273,8 +4472,9 @@ struct mip_composite
 static struct mip_composite *mip_composites;
 
 /* an entry render_target_get no longer finds: the screen's targets at
-another scale or screen width than now, the shadow maps at another
-display.shadow_resolution */
+another scale or screen width than now, the shadow maps at a scale above
+display.shadow_resolution's, and its slots past the first when it changed
+(as many as fit in their budget changed: halo_shadow_map_slots) */
 static BOOL render_target_stale(const struct render_target_entry *entry)
 {
 	switch (entry->kind)
@@ -4283,7 +4483,7 @@ static BOOL render_target_stale(const struct render_target_entry *entry)
 		return entry->target.scale[0] != screen_scale[0] || entry->target.scale[1] != screen_scale[1] ||
 			(entry->target.height == SCREEN_HEIGHT && entry->target.width != (unsigned long)halo_screen_width());
 	case _render_target_shadow_map:
-		return entry->target.scale[0] != (float)halo_shadow_map_scale();
+		return entry->target.scale[0] > (float)shadow_scale_maximum() || (shadow_slots_evicted && entry->slot > 0);
 	default:
 		return FALSE;
 	}
@@ -4317,9 +4517,18 @@ static void render_target_delete(struct render_target_entry *entry)
 	struct render_target_entry **link;
 	struct mip_composite *composite;
 
-	for (link = render_target_bucket(entry->target.data); *link != entry; link = &(*link)->next_in_bucket)
-		;
-	*link = entry->next_in_bucket;
+	if (entry->in_slot_table)
+	{
+		link = shadow_slot_table_link(entry->target.scale[0], entry->slot);
+		if (link && *link == entry)
+			*link = NULL;
+	}
+	else if (entry->kind != _render_target_shadow_map || !shadow_slot_table_link(entry->target.scale[0], entry->slot))
+	{
+		for (link = render_target_bucket(entry->target.data); *link != entry; link = &(*link)->next_in_bucket)
+			;
+		*link = entry->next_in_bucket;
+	}
 	framebuffers_forget(entry->target.texture, FALSE);
 	if (entry->target.multisample)
 	{
@@ -7352,6 +7561,47 @@ void halo_screen_tone_map(short x0, short y0, short x1, short y1)
 	}
 	glBindVertexArray(device.vertex_array);
 	xgpu_gl_state_invalidate();
+}
+
+/* the blur of a shadow map larger than the Xbox's (rasterizer_shadow_convolve):
+source's map blurred into destination's, at the shadow being drawn's scale,
+in two passes of the port's (xgpu_post_shadow_blur) for the game's three
+or more; from SHADOW_MAP_BLUR_HALVED_FROM, averaged down to the destination's
+half size first, and blurred at that size. FALSE where it is not drawn so:
+the game's passes draw it. */
+int halo_shadow_map_blur(const void *source, const void *destination)
+{
+#ifdef HALO_GLES
+	(void)source;
+	(void)destination;
+	return FALSE;
+#else
+	struct render_target_entry *from, *to;
+	BOOL blurred;
+
+	if (!device.gl_ready)
+		return FALSE;
+	from = render_target_get((const D3DSurface *)source);
+	to = render_target_get((const D3DSurface *)destination);
+	if (!from || !to || from->kind != _render_target_shadow_map || to->kind != _render_target_shadow_map ||
+		(from->target.gl_width != to->target.gl_width && from->target.gl_width != 2 * to->target.gl_width) ||
+		from->target.gl_width * to->target.gl_height != from->target.gl_height * to->target.gl_width)
+	{
+		return FALSE;
+	}
+	/* (the blur's width in the destination's texels: its scale's) */
+	blurred = xgpu_post_shadow_blur(from->target.texture, from->target.gl_width, to->target.texture,
+		framebuffer_get(to->target.texture, 0), to->target.gl_width, to->target.gl_height,
+		(long)to->target.scale[0]);
+	if (blurred)
+	{
+		to->last_rendered = device.frame + 1;
+		to->target.written = ++render_target_write_serial;
+	}
+	glBindVertexArray(device.vertex_array);
+	xgpu_gl_state_invalidate();
+	return blurred;
+#endif
 }
 
 /* ---------- presentation */

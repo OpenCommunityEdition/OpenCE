@@ -1411,6 +1411,18 @@ boolean rasterizer_set_texture_non_blocking(
 	return FALSE;
 }
 
+/* port: the shadow maps' surfaces, which the port's blur of a larger map
+draws from and into (rasterizer_shadow_convolve) */
+void rasterizer_shadow_surfaces(
+	D3DSurface **primary,
+	D3DSurface **secondary)
+{
+	*primary = global_d3d_surface_shadow_primary;
+	*secondary = global_d3d_surface_shadow_secondary;
+
+	return;
+}
+
 void rasterizer_set_target_as_texture(
 	short stage,
 	short target,

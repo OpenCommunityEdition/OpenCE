@@ -80,6 +80,23 @@ long halo_screen_commit(void);
 /* the shadow maps' pixels for each of their 128 texels each way, a power of
 two (display.shadow_resolution) */
 long halo_shadow_map_scale(void);
+/* the next shadow's maps sized for its object, diameter pixels across in
+the 480-line screen (render_objects.c), up to display.shadow_resolution */
+void halo_shadow_map_size(float diameter);
+/* a larger shadow map's blur from the primary map's surface into the
+secondary's (rasterizer_xbox_shadows.c): FALSE where the game's passes
+must draw it */
+int halo_shadow_map_blur(const void *source, const void *destination);
+/* the shadow whose maps are drawn or read next: its scale, and its slot of
+a batch's maps of the slotted surface (rasterizer_xbox_shadows.c) */
+void halo_shadow_map_select(long scale, long slot, const void *slotted);
+/* how many slots of the blurred map past the first fit in bytes of the GPU's
+memory, at display.shadow_resolution (rasterizer_xbox_shadows.c) */
+long halo_shadow_map_slots(unsigned long bytes);
+/* display.shadow_map_reuse: small shadows' kept maps reused (render_objects.c) */
+int halo_shadow_map_reuse(void);
+/* how many times the slots past the first were freed, with what they held */
+unsigned long halo_shadow_map_slots_freed(void);
 /* how many times a model's size in the 480-line screen's pixels to measure
 it at (display.model_detail, source/models/models.c): level nonzero, to
 choose its level of detail, otherwise whether it is drawn */
