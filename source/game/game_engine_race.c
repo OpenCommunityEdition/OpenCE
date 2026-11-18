@@ -438,9 +438,13 @@ void race_flags_make_unique(
 				{
 					if (!TEST_FLAG(used_flags, free_index))
 					{
-						/* BUG (original): the flag that was already in use is
-						   marked again rather than the newly assigned index. */
-						SET_FLAG(used_flags, flag->team_index, TRUE);
+						/* port: the index the flag is given marked used, so that
+						no later flag has it too. The original marked the flag's
+						own index, used already, again: a later flag of the index
+						given (the next of a track numbered on, a third of one
+						index) shared it, a lap had fewer flags than the map, and
+						flag rally could never choose some of them. */
+						SET_FLAG(used_flags, free_index, TRUE);
 						break;
 					}
 				}
