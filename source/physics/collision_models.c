@@ -166,6 +166,35 @@ boolean collision_model_test_point(
 
 static LARGE_INTEGER collision_model_test_vector_time;
 
+/* port: (object_bounds_cache.c) */
+boolean collision_bsp_bounds_cache_sphere(struct collision_bsp const *bsp, real_point3d *center, real *radius);
+
+/* port: whether the segment from point along vector up to maximum_t comes
+within radius of center (FALSE only when it surely does not) */
+static boolean collision_model_port_vector_near_sphere(
+	real_point3d const *point,
+	real_vector3d const *vector,
+	real maximum_t,
+	real_point3d const *center,
+	real radius)
+{
+	real dx = center->x - point->x;
+	real dy = center->y - point->y;
+	real dz = center->z - point->z;
+	real length_squared = vector->i * vector->i + vector->j * vector->j + vector->k * vector->k;
+	real s = 0.f;
+
+	if (length_squared > 0.f)
+	{
+		s = (dx * vector->i + dy * vector->j + dz * vector->k) / length_squared;
+		s = s < 0.f ? 0.f : s > maximum_t ? maximum_t : s;
+	}
+	dx -= s * vector->i;
+	dy -= s * vector->j;
+	dz -= s * vector->k;
+	return !(dx * dx + dy * dy + dz * dz > radius * radius);
+}
+
 boolean collision_model_test_vector(
 		struct collision_model_instance const *instance,
 		unsigned long flags,
@@ -203,6 +232,27 @@ boolean collision_model_test_vector(
 					real_matrix4x3 inverted_matrix;
 					real_point3d transformed_point;
 					real_vector3d transformed_vector;
+					real_point3d sphere_center, world_center;
+					real sphere_radius;
+					real reach = result->bsp_result.t;
+
+					/* port: a node whose bsp the vector does not come near
+					cannot be hit: its surfaces are inside the sphere around
+					its vertices (object_bounds_cache.c). Its test would only
+					have set the t it was given, which is left as it was. */
+					reach = reach < 0.f ? 0.f : reach > 1.f ? 1.f : reach;
+					if (instance->matrices[node_index].scale > 0.f &&
+						collision_bsp_bounds_cache_sphere(collision_bsp, &sphere_center, &sphere_radius))
+					{
+						matrix4x3_transform_point(&instance->matrices[node_index], &sphere_center, &world_center);
+						if (!collision_model_port_vector_near_sphere(point, vector, reach, &world_center,
+							sphere_radius * instance->matrices[node_index].scale))
+						{
+							if (result->bsp_result.t < 0.f)
+								result->bsp_result.t = 0.f;
+							continue;
+						}
+					}
 
 					matrix4x3_inverse(&instance->matrices[node_index], &inverted_matrix);
 					matrix4x3_transform_point(&inverted_matrix, point, &transformed_point);

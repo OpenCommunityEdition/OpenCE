@@ -8,11 +8,20 @@ their only writer (object_compute_node_matrices); an entry counts only for its
 datum index and until the game state is next replaced (game_state.c). The
 same tests on the same values: what the loops find does not change. (Kept out
 of the game state, whose layout the saved games share.)
+
+And each collision model bsp's bounding sphere (its vertices'), for
+collision_model_test_vector to pass over the nodes of a model a vector does
+not come near: a weapon falling among a pile of dead bodies tested each of
+their nodes' bsps. Counts until the next map or game state, like the rest.
 */
 
 #include "cseries.h"
 #include "math/real_math.h"
 #include "objects/objects.h"
+#include "physics/collision_bsp_definitions.h"
+#include "tag_files/tag_groups.h"
+
+#include <math.h>
 
 struct object_bounds
 {
@@ -68,4 +77,88 @@ boolean object_bounds_cache_missed_by_vector(
 
 	return bounds->object_index == object_index && bounds->epoch == object_bounds_epoch &&
 		!fast_vector_intersects_sphere(point, vector, &bounds->center, bounds->radius);
+}
+
+#define COLLISION_BSP_BOUNDS_COUNT 8192
+#define COLLISION_BSP_BOUNDS_PROBES 16
+
+struct collision_bsp_bounds
+{
+	struct collision_bsp const *bsp;
+	long epoch;
+	real_point3d center;
+	real radius;
+};
+
+static struct collision_bsp_bounds collision_bsp_bounds[COLLISION_BSP_BOUNDS_COUNT];
+
+/* a sphere around all of the bsp's vertices (so around each of its surfaces),
+with a margin for the bsp's own tolerances; FALSE when there is none to use */
+boolean collision_bsp_bounds_cache_sphere(
+	struct collision_bsp const *bsp,
+	real_point3d *center,
+	real *radius)
+{
+	unsigned long hash = ((unsigned long)bsp >> 4) * 2654435761UL;
+	long probe;
+
+	for (probe = 0; probe < COLLISION_BSP_BOUNDS_PROBES; probe++)
+	{
+		struct collision_bsp_bounds *entry =
+			&collision_bsp_bounds[(hash + probe) % COLLISION_BSP_BOUNDS_COUNT];
+
+		if (entry->epoch == object_bounds_epoch && entry->bsp == bsp)
+		{
+			if (entry->radius < 0.f)
+				return FALSE;
+			*center = entry->center;
+			*radius = entry->radius;
+			return TRUE;
+		}
+		if (entry->epoch != object_bounds_epoch)
+		{
+			long count = bsp->vertices.count;
+			long i;
+			real_point3d low, high;
+			real largest = 0.f;
+
+			entry->bsp = bsp;
+			entry->epoch = object_bounds_epoch;
+			entry->radius = -1.f;
+			if (count <= 0)
+				return FALSE;
+			low = high = TAG_BLOCK_GET_ELEMENT(&bsp->vertices, 0, struct collision_vertex)->point;
+			for (i = 1; i < count; i++)
+			{
+				real_point3d const *point = &TAG_BLOCK_GET_ELEMENT(&bsp->vertices, i, struct collision_vertex)->point;
+
+				low.x = point->x < low.x ? point->x : low.x;
+				low.y = point->y < low.y ? point->y : low.y;
+				low.z = point->z < low.z ? point->z : low.z;
+				high.x = point->x > high.x ? point->x : high.x;
+				high.y = point->y > high.y ? point->y : high.y;
+				high.z = point->z > high.z ? point->z : high.z;
+			}
+			entry->center.x = 0.5f * (low.x + high.x);
+			entry->center.y = 0.5f * (low.y + high.y);
+			entry->center.z = 0.5f * (low.z + high.z);
+			for (i = 0; i < count; i++)
+			{
+				real_point3d const *point = &TAG_BLOCK_GET_ELEMENT(&bsp->vertices, i, struct collision_vertex)->point;
+				real dx = point->x - entry->center.x;
+				real dy = point->y - entry->center.y;
+				real dz = point->z - entry->center.z;
+				real distance_squared = dx * dx + dy * dy + dz * dz;
+
+				largest = distance_squared > largest ? distance_squared : largest;
+			}
+			if (!(largest >= 0.f && largest < 1.0e12f))
+				return FALSE;
+			entry->radius = 1.001f * (real)sqrt(largest) + 0.01f;
+			*center = entry->center;
+			*radius = entry->radius;
+			return TRUE;
+		}
+	}
+	return FALSE;
 }
