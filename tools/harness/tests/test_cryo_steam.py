@@ -1,6 +1,9 @@
-"""The real cryo_steam_wake_without_steam (cryo_steam.c): the short cryo scene that stands for a10's tutorial
-(fast_setup) made the tube's steam as the tube opened, one vent left on for the rest of the level. fast_setup's steam
-is not made. Scenes laid out otherwise, or already changed, are left as they are."""
+"""The real cryo_steam_vents_with_tube and cryo_steam_wake_without_steam (cryo_steam.c): a10's opening cinematic made
+its cryo tube's four vents 90 ticks into the tube's shot and destroyed them after its fade to white, so that their steam
+rose from nothing in the shot and drifted into the next scene; and the short cryo scene that stands for the tutorial
+(fast_setup) made the tube's steam as the tube opened, one vent left on for the rest of the level. The vents are made
+with the tube and destroyed as the fade begins, the white held 45 ticks; fast_setup's steam is not made. Scenes laid out
+otherwise, or already changed, are left as they are."""
 
 import re
 import sys
@@ -11,14 +14,24 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["wake", "wake once", "other wakes"]
+CASES = ["vents", "vents once", "other scenes", "wake", "wake once", "other wakes"]
 
 FUNCTIONS = ["script_node_get", "script_string_get", "script_call_name_node", "script_node_calls",
-             "script_call_argument", "script_begin_name_node", "cryo_steam_name_index",
-             "cryo_steam_cooperative_create", "cryo_steam_wake_without_steam"]
+             "script_call_argument", "script_sleep_ticks", "script_begin_name_node", "cryo_steam_name_index",
+             "cryo_steam_cooperative_create", "cryo_steam_vents_with_tube", "cryo_steam_wake_without_steam"]
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
+    # the vents left where they were
+    "vents-kept": (("\tscript_node_get(syntax, expressions[tube])->next_node_index = expressions[vents];\n", ""),
+                   "vents"),
+    # the white held as it was
+    "white-kept": (("\twhite->short_value = CRYO_STEAM_WHITE_TICKS;\n", ""), "vents"),
+    # the vents' end left after the fade
+    "end-kept": (("\tscript_node_get(syntax, expressions[fade - 1])->next_node_index = expressions[vents_end];\n", ""),
+                 "vents"),
+    # any white changed
+    "any-white": (("!white || white->short_value != CRYO_STEAM_MAP_WHITE_TICKS", "!white"), "other scenes"),
     # the steam taken out of a scene without all four
     "any-count": (("\t\tif (!first_tube_found[name_index] || !second_tube_found[name_index])\n",
                    "\t\tif (0)\n"), "other wakes"),
@@ -43,8 +56,7 @@ def generated(fault=None):
 
 
 def test_scripts_change_them():
-    """a10's scripts, as they are made ready and checked, have the short cryo scene's steam taken out, after the
-    climb's foley."""
+    """a10's scripts, as they are made ready and checked, have the cryo bay's steam changed, after the climb's foley."""
     hs = read("source/hs/hs.c").replace("\r\n", "\n")
     postprocess = function(hs, "hs_scenario_postprocess")
     foley = postprocess.index("cryo_exit_foley_scripts_loaded(scenario, hs_syntax_data);")
@@ -52,8 +64,10 @@ def test_scripts_change_them():
     source = read("port/linux/game/cryo_steam.c").replace("\r\n", "\n")
     loaded = function(source, "cryo_steam_scripts_loaded")
     assert '#define A10_SCENARIO_NAME "levels\\\\a10\\\\a10"' in source
+    assert '#define CRYO_SCRIPT_NAME "cryo"' in source
     assert '#define FAST_SETUP_SCRIPT_NAME "fast_setup"' in source
     assert "csstrcmp(scenario_name, A10_SCENARIO_NAME)" in loaded
+    assert loaded.index("CRYO_SCRIPT_NAME") < loaded.index("cryo_steam_vents_with_tube(")
     assert loaded.index("FAST_SETUP_SCRIPT_NAME") < loaded.index("cryo_steam_wake_without_steam(")
 
 

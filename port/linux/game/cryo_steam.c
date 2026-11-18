@@ -1,27 +1,45 @@
 /*
 CRYO_STEAM.C
 
-a10 opens in its cryo bay. Off Normal, and in co-op, a short scene stands
-for the cryo technicians' tutorial (fast_setup). It made the Master Chief's
-tube's steam (cryotube_1_steam_1 and 2, and in co-op the second tube's) as
-the tube opened, and destroyed it after the climb out, but an if around the
-wrong line left cryotube_1_steam_2 venting for the rest of the level in a
-game of one player, on the Xbox too. The tube now opens without steam:
-fast_setup's object_creates of it are taken out (its object_destroys of it
-then destroy nothing).
+a10 opens in its cryo bay, and the Master Chief's tube vents steam twice:
+
+- The opening cinematic (x10) ends there (cryo): the tube's four vents
+  (x10_cryo_steam_1a, 1b, 2a and 2b) are made 90 ticks into the shot of
+  the tube (tube_1a to tube_1b), so their steam rose from nothing as the
+  shot showed it, from one side of the tube at first, and was never full
+  before the scene faded out. They are made with the tube instead (its
+  object_create_anew, at the shot of the technician's keyboard, several
+  seconds before), so that all four vent in full from the shot's first
+  frame. They were destroyed once the scene had faded out to white (15
+  ticks), and a destroyed object's steam lives out its last particles
+  (some 40 ticks: they are orphaned, attachments_delete), so it drifted
+  through the first second of the scene that follows, the Chief's waking.
+  They are destroyed as the fade out begins instead, and the white is held
+  CRYO_STEAM_WHITE_TICKS ticks, not 15, so that their steam is gone before
+  the next scene is seen.
+- Off Normal, and in co-op, a short scene stands for the cryo technicians'
+  tutorial (fast_setup). It made the tube's steam (cryotube_1_steam_1 and
+  2, and in co-op the second tube's) as the tube opened, and destroyed it
+  after the climb out, but an if around the wrong line left
+  cryotube_1_steam_2 venting for the rest of the level in a game of one
+  player. The tube now opens without steam: fast_setup's object_creates of
+  it are taken out (its object_destroys of it then destroy nothing).
 
 The tutorial (tutorial_setup, on Normal in a game of one player) keeps its
 steam, made as the Chief wakes and destroyed as its fade lifts.
 
 As a10's scripts are made ready (hs_scenario_postprocess), after the climb's
-foley is moved (cryo_exit_foley.c), fast_setup is changed only when it is as
-the map has it: the two vents' object_creates of the first tube and the
-second tube's in an if of (game_is_cooperative) each, all four. So a map
-whose scripts differ, or one already changed (the postprocess runs again on
-a revert), is left as it is. The expressions are taken out by their begin's
-links alone. The scripts run on the host alone, which sends what they make
-and destroy to the clients (network_coop.c), so nothing the machines send or
-agree on changes.
+foley is moved (cryo_exit_foley.c), each begin is changed only when it is
+as the map has it: in cryo, the vents' object_create_anew_containing after
+the tube's object_create_anew, a fade_out after them followed by a (sleep
+15), and the vents' object_destroy_containing after it; in fast_setup, the
+two vents' object_creates of the first tube and the second tube's in an if
+of (game_is_cooperative) each, all four. So a map whose scripts differ, or
+one already changed (the postprocess runs again on a revert), is left as it
+is. The expressions are moved and taken out by their begin's links alone,
+each still named by one link or none. The scripts run on the host alone,
+which sends what they make and destroy to the clients (network_coop.c), so
+nothing the machines send or agree on changes.
 */
 
 /* ---------- headers */
@@ -41,7 +59,17 @@ agree on changes.
 /* ---------- constants */
 
 #define A10_SCENARIO_NAME "levels\\a10\\a10"
+#define CRYO_SCRIPT_NAME "cryo"
 #define FAST_SETUP_SCRIPT_NAME "fast_setup"
+#define CRYO_TUBE_NAME "x10_tube"
+#define CRYO_VENTS_NAME "x10_cryo_steam"
+/* the most expressions of the cinematic's begin looked through (cryo has 60) */
+#define CRYO_STEAM_MAXIMUM_EXPRESSIONS 256
+/* the white the cinematic's fade out is held for, as the map has it (the
+fade's own ticks), and so that the vents' steam is gone by its end: their
+particles' life, some 40 ticks, and a few more */
+#define CRYO_STEAM_MAP_WHITE_TICKS 15
+#define CRYO_STEAM_WHITE_TICKS 45
 
 /* a syntax node's flags, as hs_runtime.c names them */
 enum
@@ -161,6 +189,31 @@ static char const *script_call_argument(
 		NULL;
 }
 
+/* a (sleep <ticks>) call's ticks, a constant: its node, or NULL if the node
+is no such call */
+static struct hs_syntax_node *script_sleep_ticks(
+	struct data_array *syntax,
+	char const *strings,
+	long string_bytes,
+	struct hs_syntax_node const *node)
+{
+	struct hs_syntax_node *ticks;
+
+	if (!script_node_calls(syntax, strings, string_bytes, node, "sleep"))
+	{
+		return NULL;
+	}
+	ticks = script_node_get(syntax, script_call_name_node(syntax, node)->next_node_index);
+
+	return ticks &&
+		TEST_FLAG(ticks->flags, _hs_syntax_node_primitive_bit) &&
+		!TEST_FLAG(ticks->flags, _hs_syntax_node_variable_bit) &&
+		ticks->type == _hs_type_short_integer &&
+		ticks->next_node_index == NONE ?
+		ticks :
+		NULL;
+}
+
 /* the name node of the begin at the root, or NULL if the root is no begin */
 static struct hs_syntax_node *script_begin_name_node(
 	struct data_array *syntax,
@@ -233,6 +286,94 @@ static short cryo_steam_cooperative_create(
 }
 
 /* ---------- public code */
+
+boolean cryo_steam_vents_with_tube(
+	struct data_array *syntax,
+	char const *strings,
+	long string_bytes,
+	long root_expression_index)
+{
+	struct hs_syntax_node *name = script_begin_name_node(syntax, strings, string_bytes, root_expression_index);
+	/* the begin's expressions, in order, and the place of each one looked for */
+	long expressions[CRYO_STEAM_MAXIMUM_EXPRESSIONS];
+	short expression_count = 0;
+	short tube = NONE;
+	short vents = NONE;
+	short fade = NONE;
+	short vents_end = NONE;
+	short expression_index;
+	struct hs_syntax_node *white;
+	long index;
+
+	if (!name)
+	{
+		return FALSE;
+	}
+
+	/* (no more of them than there is room for, should the links loop) */
+	for (index = name->next_node_index; index != NONE; index = script_node_get(syntax, index)->next_node_index)
+	{
+		struct hs_syntax_node const *expression = script_node_get(syntax, index);
+		char const *made;
+
+		if (!expression || expression_count >= CRYO_STEAM_MAXIMUM_EXPRESSIONS)
+		{
+			return FALSE;
+		}
+		expression_index = expression_count;
+		expressions[expression_count++] = index;
+		made = script_call_argument(syntax, strings, string_bytes, expression, "object_create_anew");
+		if (made && !strcmp(made, CRYO_TUBE_NAME) && tube == NONE)
+		{
+			tube = expression_index;
+		}
+		made = script_call_argument(syntax, strings, string_bytes, expression, "object_create_anew_containing");
+		if (made && !strcmp(made, CRYO_VENTS_NAME) && vents == NONE)
+		{
+			vents = expression_index;
+		}
+		if (script_node_calls(syntax, strings, string_bytes, expression, "fade_out") && vents_end == NONE)
+		{
+			fade = expression_index;
+		}
+		made = script_call_argument(syntax, strings, string_bytes, expression, "object_destroy_containing");
+		if (made && !strcmp(made, CRYO_VENTS_NAME) && vents_end == NONE)
+		{
+			vents_end = expression_index;
+		}
+	}
+	/* the tube, the vents after it, then a fade out, the white held, and
+	the vents' end after them; not already moved (the vents' end before the
+	fade, and the white held longer) */
+	if (tube == NONE || vents == NONE || fade == NONE || vents_end == NONE ||
+		!(tube < vents && vents < fade && fade + 1 < vents_end))
+	{
+		return FALSE;
+	}
+	white = script_sleep_ticks(syntax, strings, string_bytes, script_node_get(syntax, expressions[fade + 1]));
+	if (!white || white->short_value != CRYO_STEAM_MAP_WHITE_TICKS)
+	{
+		return FALSE;
+	}
+
+	/* the vents' end taken out of its place and put right before the fade,
+	then the vents out of theirs and put right after the tube: the later
+	first, as the node before the fade may be the vents' (each move is by
+	the links of the expressions before the one moved and before its new
+	place) */
+	script_node_get(syntax, expressions[vents_end - 1])->next_node_index =
+		script_node_get(syntax, expressions[vents_end])->next_node_index;
+	script_node_get(syntax, expressions[vents_end])->next_node_index = expressions[fade];
+	script_node_get(syntax, expressions[fade - 1])->next_node_index = expressions[vents_end];
+	script_node_get(syntax, expressions[vents - 1])->next_node_index =
+		script_node_get(syntax, expressions[vents])->next_node_index;
+	script_node_get(syntax, expressions[vents])->next_node_index =
+		script_node_get(syntax, expressions[tube])->next_node_index;
+	script_node_get(syntax, expressions[tube])->next_node_index = expressions[vents];
+	white->short_value = CRYO_STEAM_WHITE_TICKS;
+
+	return TRUE;
+}
 
 boolean cryo_steam_wake_without_steam(
 	struct data_array *syntax,
@@ -331,7 +472,15 @@ void cryo_steam_scripts_loaded(
 	{
 		struct hs_script const *script = TAG_BLOCK_GET_ELEMENT(&scenario->hs_scripts, index, struct hs_script);
 
-		if (!csstrcmp(script->name, FAST_SETUP_SCRIPT_NAME))
+		if (!csstrcmp(script->name, CRYO_SCRIPT_NAME))
+		{
+			cryo_steam_vents_with_tube(
+				syntax,
+				(char const *)scenario->hs_string_constants.address,
+				scenario->hs_string_constants.size,
+				script->root_expression_index);
+		}
+		else if (!csstrcmp(script->name, FAST_SETUP_SCRIPT_NAME))
 		{
 			cryo_steam_wake_without_steam(
 				syntax,

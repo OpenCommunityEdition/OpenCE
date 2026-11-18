@@ -15551,7 +15551,8 @@ boolean hs_scenario_postprocess(
 		foley of the Master Chief climbing out of his tube as far into his
 		climb as the tutorial on Normal does (cryo_exit_foley.c) */
 		cryo_exit_foley_scripts_loaded(scenario, hs_syntax_data);
-		/* port: a10's cryo tube opens without steam in the short cryo
+		/* port: a10's cryo tube vents in full through the opening
+		cinematic's shot of it, and opens without steam in the short cryo
 		scene (cryo_steam.c) */
 		cryo_steam_scripts_loaded(scenario, hs_syntax_data);
 		if (scenario->hs_string_constants.size<0x400)
