@@ -1008,6 +1008,29 @@ extern char const *base_seat_labels[NUMBER_OF_UNIT_BASE_SEATS];
 
 short magic_base_animation_seat_index = NONE;
 
+/* port: unit_can_use_weapon's seat and weapon label tests, remembered for
+the map. Each deleted object makes every unit without a weapon in hand pick
+the next one it can use (unit_handle_deleted_object), and each pick tests its
+weapons' labels against its animation graph's seats by name: in 32x co-op the
+b30 cutscene's start deletes ~600 weapons with ~660 units about, 400,000
+tests by name in one tick (~50 ms). A test's answer depends only on the
+animation graph and the two labels, which are the map's tag data (the labels
+are kept by pointer: unit_get_seat_label's and weapon_get_label's both point
+into it, or at a constant), so it is the same answer each time. */
+#define UNIT_PORT_LABEL_TEST_COUNT 1024
+#define UNIT_PORT_LABEL_TEST_PROBES 8
+
+struct unit_port_label_test
+{
+	long animation_graph_index;
+	char const *seat_label;
+	char const *weapon_label;
+	boolean used;
+	boolean result;
+};
+
+static struct unit_port_label_test unit_port_label_tests[UNIT_PORT_LABEL_TEST_COUNT];
+
 static struct unit_globals *unit_globals;
 
 static struct profile_section unit_update_section = {"unit_update", NONE, TRUE};
@@ -1038,6 +1061,8 @@ void units_initialize_for_new_map(
 	/* port: MCC's expanded grenade inventory starts empty on each map */
 	if (mcc_grenades_active()) mcc_grenades_reset();
 	memset(unit_globals, 0, offsetof(struct unit_globals, used_time));
+	/* port: another map's tags (unit_port_label_tests) */
+	memset(unit_port_label_tests, 0, sizeof(unit_port_label_tests));
 
 	return;
 }
@@ -2448,11 +2473,51 @@ boolean unit_can_use_weapon(
 	seat_label = unit_get_seat_label(unit_index);
 	weapon_label = weapon_get_label(weapon_index);
 
-	can_use_weapon = unit_set_or_test_seat_and_weapon_label(
-		unit_index,
-		seat_label,
-		weapon_label,
-		FALSE);
+	/* port: the test remembered (unit_port_label_tests) */
+	{
+		struct unit_datum *unit = unit_get(unit_index);
+		long animation_graph_index = unit_definition_get(unit->definition_index)->object.animation_graph.index;
+		unsigned long hash = (unsigned long)animation_graph_index * 2654435761UL ^
+			(unsigned long)(size_t)seat_label * 40503UL ^ (unsigned long)(size_t)weapon_label * 69069UL;
+		struct unit_port_label_test *test = NULL;
+		short probe;
+
+		hash ^= hash >> 15;
+		for (probe = 0; probe < UNIT_PORT_LABEL_TEST_PROBES; probe++)
+		{
+			struct unit_port_label_test *entry = &unit_port_label_tests[(hash + probe) % UNIT_PORT_LABEL_TEST_COUNT];
+
+			if (!entry->used ||
+				(entry->animation_graph_index == animation_graph_index &&
+				entry->seat_label == seat_label &&
+				entry->weapon_label == weapon_label))
+			{
+				test = entry;
+				break;
+			}
+		}
+		if (test && test->used)
+		{
+			can_use_weapon = test->result;
+		}
+		else
+		{
+			can_use_weapon = unit_set_or_test_seat_and_weapon_label(
+				unit_index,
+				seat_label,
+				weapon_label,
+				FALSE);
+			if (!test)
+			{
+				test = &unit_port_label_tests[hash % UNIT_PORT_LABEL_TEST_COUNT];
+			}
+			test->animation_graph_index = animation_graph_index;
+			test->seat_label = seat_label;
+			test->weapon_label = weapon_label;
+			test->used = TRUE;
+			test->result = can_use_weapon;
+		}
+	}
 
 	if (can_use_weapon)
 	{
