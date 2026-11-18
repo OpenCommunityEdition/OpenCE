@@ -167,6 +167,12 @@ static const struct config_setting config_settings[] =
 		"The first-person weapon's and hands' field of view, in degrees across\n"
 		"at 16:9 (20 to 150); 0 keeps the weapon's stock view, also when\n"
 		"display.fov widens the world." },
+	{ "display.cinematic_framing", _config_boolean, "false", "HALO_CINEMATIC_FRAMING", _environment_value, _platform_all,
+		"Cutscenes with the letterbox as the Xbox showed them: the picture\n"
+		"between its bars (16:9, the Xbox's width) across the screen, with bars\n"
+		"only as thick as keep that shape: none at 16:9 or wider, thinner at\n"
+		"16:10, the Xbox's own at 4:3. false: the stock bars, an eighth of the\n"
+		"height each, over a picture as wide as the screen." },
 	{ "display.viewmodel_visible", _config_boolean, "true", "HALO_VIEWMODEL_VISIBLE", _environment_value, _platform_all,
 		"Draw the first-person weapon, hands and what is attached to them.\n"
 		"Off, they are not drawn; firing, animation, sound and lights go on." },

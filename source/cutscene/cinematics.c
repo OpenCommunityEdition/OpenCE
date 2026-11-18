@@ -75,6 +75,7 @@ symbols in this file:
 #include "text/draw_string.h"
 #include "text/text_group.h"
 #include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
+#include "cinematic_letterbox.h" /* port: port/linux/game/cinematic_letterbox.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
@@ -352,13 +353,18 @@ void cinematic_render(
 
 		cinematic_globals->letterbox_amount = letterbox_amount;
 
-		if (cinematic_globals->letterbox_amount > 0.0f)
+		/* port: the bars' full height is an eighth of the window's, or with
+		display.cinematic_framing as much as keeps the Xbox's picture between
+		them, none on a window 16:9 or wider (cinematic_letterbox.c) */
+		if (cinematic_globals->letterbox_amount > 0.0f &&
+			cinematic_letterbox_bar_height(&render.camera.viewport_bounds) > 0.0f)
 		{
 			rectangle2d bar;
 			real bar_height;
 			real viewport_height;
 
-			bar_height = cinematic_globals->letterbox_amount * 0.125f;
+			bar_height = cinematic_globals->letterbox_amount *
+				cinematic_letterbox_bar_height(&render.camera.viewport_bounds);
 			viewport_height = (real)(
 				render.camera.viewport_bounds.y1 -
 				render.camera.viewport_bounds.y0);

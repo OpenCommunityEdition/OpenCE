@@ -380,6 +380,9 @@ SCREENS["video_settings/fov_viewmodels"] = {
          "Your legs in first person, seen looking down,\nmoving as you run. Your body as others see it.", None),
         ("SHIELD COLOR:", "display.shield_color", [("DEFAULT", "default")] + [(c.upper(), c) for c in SHIELD_COLORS],
          "Your shield's flare in an armor color, whatever\nyour armor. Only you see it. Default: its own.", None),
+        # (port/linux/game/cinematic_letterbox.c)
+        ("XBOX CUTSCENES:", "display.cinematic_framing", ON_OFF,
+         "Cutscenes framed as on the Xbox: no black bars\non 16:9, thinner ones on 16:10.", None),
     ],
 }
 

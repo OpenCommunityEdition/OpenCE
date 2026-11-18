@@ -409,6 +409,7 @@ symbols in this file:
 #include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
 #include "mcc_main.h" /* port: port/linux/game/mcc_main.h */
 #include "custom_edition_maps.h" /* port: main_script_map_name, a Custom Edition campaign's maps */
+#include "cinematic_letterbox.h" /* port: port/linux/game/cinematic_letterbox.c */
 #include "view_fov.h" /* port: display.fov, before the projection and culling */
 
 #if defined(HALO_WINDOWS) || defined(HALO_ANDROID) || defined(__linux__)
@@ -1247,12 +1248,16 @@ void set_window_camera_values(
 		window->rasterizer_camera.position = observer->position;
 		window->rasterizer_camera.forward = observer->forward;
 		window->rasterizer_camera.up = observer->up;
-		/* port: display.fov's view, the local render view only (view_fov.c) */
+		/* port: display.fov's view, the local render view only (view_fov.c);
+		with display.cinematic_framing, a cutscene's shot with the letterbox
+		as the Xbox framed it (cinematic_letterbox.c) */
 		window->rasterizer_camera.vertical_field_of_view =
-			render_fov_vertical(window->local_player_index, 2.0f * arctangent(
-				0.75f * render_camera_get_adjusted_field_of_view_tangent(
-					observer->field_of_view),
-				1.0f));
+			cinematic_letterbox_vertical_field_of_view(
+				&window->rasterizer_camera.viewport_bounds,
+				render_fov_vertical(window->local_player_index, 2.0f * arctangent(
+					0.75f * render_camera_get_adjusted_field_of_view_tangent(
+						observer->field_of_view),
+					1.0f)));
 
 		if (window->local_player_index != NONE &&
 			!console_is_active() &&
