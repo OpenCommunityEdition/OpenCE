@@ -6,9 +6,9 @@ some Custom Edition maps show their name for the whole game: drawn in the game,
 not over a menu (the screen's overlays are drawn after the players' menus), and
 its time going on under one. On a screen wider than 640 columns, the edge the
 title is justified to (its middle, if centered) keeps its place relative to the
-screen's sides, as on the Xbox's 4:3 screen. The letterbox's bars are drawn at the
-moment the frame draws the world, between the last two ticks, not stepped a
-tick at a time. test_cinematic_titles.py takes the
+screen's sides, as on the Xbox's 4:3 screen. The letterbox's bars and a title's
+fade are drawn at the moment the frame draws the world, between the last two
+ticks, not stepped a tick at a time. test_cinematic_titles.py takes the
 structures, the slots' count (config.inc) and the code (under_test.inc).
 */
 
@@ -37,12 +37,13 @@ static boolean menu_up;
 static boolean ui_widgets_active(void) { return menu_up; }
 
 /* the game's clock: one tick a frame, unless a case draws frames between
-ticks (how far into the next tick it is drawn) */
+ticks (the ticks a frame ran, and how far into the next tick it is drawn) */
 static long ticks;
+static long elapsed = 1;
 static float fraction = 1.0f;
 #define game_time_get() (ticks)
 #define game_time_get_paused() FALSE
-#define game_time_get_elapsed() 1
+#define game_time_get_elapsed() (elapsed)
 static float render_interpolation_fraction(void) { return fraction; }
 #define game_in_editor() FALSE
 
@@ -273,6 +274,38 @@ int main(int argc, char **argv)
 					"the top bar %d rows tall at tick %ld, %d/4 into it, not %.1f", top_bar.y1, index, quarter, expected);
 				CHECK(top_bar.y1 > last, "the top bar did not grow between frames (%d after %ld)", top_bar.y1, last);
 				last = top_bar.y1;
+			}
+		}
+		return 0;
+	}
+	/* a title fading in over 10 ticks, two frames a tick: as far in as the
+	moment each frame draws */
+	CASE("title-fades-between-ticks")
+	{
+		real last = -1.0f;
+
+		queue_title(100.0f, 1.0f);
+		titles[0].fade_in_time = 10.0f;
+		for (index = 1; index <= 8; index++)
+		{
+			short quarter;
+
+			ticks++;
+			for (quarter = 1; quarter <= 3; quarter += 2)
+			{
+				real expected = ((real)index - 2.0f + 0.25f * quarter) / 10.0f;
+
+				fraction = 0.25f * quarter;
+				elapsed = quarter == 1 ? 1 : 0;
+				draws = 0;
+				cinematic_render();
+				if (expected <= 0.0f)
+					continue;
+				CHECK(draws == 1, "the title was not drawn at tick %ld", index);
+				CHECK(fabsf(drawn_alpha - expected) <= 0.01f, "the title's alpha %f at tick %ld, %d/4 into it, not %f",
+					drawn_alpha, index, quarter, expected);
+				CHECK(drawn_alpha > last, "the title did not brighten between frames (%f after %f)", drawn_alpha, last);
+				last = drawn_alpha;
 			}
 		}
 		return 0;

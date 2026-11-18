@@ -1,6 +1,6 @@
 """The real cinematic_render (cinematics.c) over a fake scenario: a scenario's title is drawn in the game, not over a
 menu, and its time goes on under one; on a wide screen, the edge it is justified to keeps its place. The letterbox's
-bars are drawn at the moment the frame draws the world, between the last two ticks."""
+bars and a title's fade are drawn at the moment the frame draws the world, between the last two ticks."""
 
 import sys
 from pathlib import Path
@@ -12,7 +12,7 @@ from harness import CHECK_FAILED, build, constant, function, mutated, read, run,
 
 CASES = ["drawn-in-the-game", "not-over-a-menu", "time-goes-on-under-a-menu", "right-justified-on-a-wide-screen",
          "left-justified-on-a-wide-screen", "centered-on-a-wide-screen", "unmoved-on-640-columns",
-         "bars-between-ticks"]
+         "bars-between-ticks", "title-fades-between-ticks"]
 
 # a fault in cinematic_render and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -30,6 +30,9 @@ NEGATIVE_CONTROLS = {
     # the bars where the last tick left them, stepping 30 times a second
     "bars-by-ticks": (("(cinematic_globals->letterbox_amount - letterbox_amount_before) * render_interpolation_fraction();",
                        "(cinematic_globals->letterbox_amount - letterbox_amount_before);"), "bars-between-ticks"),
+    # the title's fade where the last tick left it
+    "title-by-ticks": (("-\n\t\t\t\t\t2.0f + render_interpolation_fraction();", "-\n\t\t\t\t\t1.0f;"),
+                       "title-fades-between-ticks"),
 }
 
 

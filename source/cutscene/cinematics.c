@@ -454,7 +454,17 @@ void cinematic_render(
 
 			if (!game_in_editor())
 			{
-				real title_time = (real)active_title->time;
+				/* port: at the moment the frame draws the world, between
+				the last two ticks (render_interpolation.c), not at the last
+				tick: the title faded 30 times a second. Its time counts the
+				ticks before this frame's (they are added after it is drawn);
+				with this frame's, less one for the world drawn a tick back
+				and one for the tick the title was always drawn behind, plus
+				how far into the next: the time it had, outside a frame's
+				drawing (one tick a frame) */
+				real title_time = (real)active_title->time +
+					(real)(game_time_get_paused() ? 0 : game_time_get_elapsed()) -
+					2.0f + render_interpolation_fraction();
 
 				if (title_time < title->fade_in_time)
 				{

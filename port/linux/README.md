@@ -811,10 +811,11 @@ Each frame shows the world between the last two ticks
   last tick only, as the objects do.
 - In cinematics, a camera that moves with an object (the lifepod in a30,
   a Pelican) moves with the object as it is drawn.
-- A screen fade (a cinematic's fade to or from black or white) and the
-  cinematic bars sliding in and out are drawn as far along as they are at
-  the moment the frame draws the world, not as the last tick left them:
-  they faded and slid 30 times a second while the shot moved every frame.
+- A screen fade (a cinematic's fade to or from black or white), the
+  cinematic bars sliding in and out and a cinematic's titles fading are
+  drawn as far along as they are at the moment the frame draws the world,
+  not as the last tick left them: they faded and slid 30 times a second
+  while the shot moved every frame.
 
 Thus the frames are one tick (33 ms) after the calculation. The calculation
 does not change.
@@ -2009,7 +2010,7 @@ Other changes:
 | `interface/hud.c` | In multiplayer, players' names are drawn above their heads (`display.player_names`, `display.player_name_scale`). |
 | `interface/hud.c` | On a map whose globals have no multiplayer HUD bitmap (some Custom Edition campaign maps), no teammate marker is drawn. `hud_draw_player_name` already skips the player's name there. |
 | `text/draw_string.c`, `interface/terminal.c`, `interface/virtual_keyboard.c` | Streamer mode's words are hidden in every string drawn or measured (`game/text_filter.c`), but in the console's line and the virtual keyboard's text being typed. |
-| `effects/player_effects.c`, `cutscene/cinematics.c` | A screen fade (`fade_in`, `fade_out`) and the cinematic bars are drawn at the moment the frame draws the world, between the last two ticks (`display.interpolation`, `render_interpolation_fraction`): the fade's progress from the tick before the last plus the frame's part of a tick, the bars between their amounts at the last two ticks. Each stepped 30 times a second, as on the Xbox, which drew a frame a tick, while everything else moved every frame (a frame-by-frame check of b30's fade from white at 120 frames a second: the same brightness for four frames, then a step). Drawn a frame a tick, each is as before. |
+| `effects/player_effects.c`, `cutscene/cinematics.c` | A screen fade (`fade_in`, `fade_out`), the cinematic bars and a cinematic's titles are drawn at the moment the frame draws the world, between the last two ticks (`display.interpolation`, `render_interpolation_fraction`): the fade's progress from the tick before the last plus the frame's part of a tick, the bars between their amounts at the last two ticks, a title's time with the ticks of the frame it is drawn in. Each stepped 30 times a second, as on the Xbox, which drew a frame a tick, while everything else moved every frame (a frame-by-frame check of b30's fade from white at 120 frames a second: the same brightness for four frames, then a step). Drawn a frame a tick, each is as before. |
 | `objects/widgets/lightning.c` | A lightning's bolt keeps its shape through the frames of a tick and takes a new one with the next, as on the Xbox, which drew a frame a tick: its random offsets (its markers', its points' jitter, its texture's) were drawn each frame, so at high frame rates it took a new shape every frame and flickered several times as fast (the light bridges' lightning in Assault on the Control Room, 343 Guilty Spark's tendrils). The later frames of a tick draw it from the local random seed the tick's first started from, in each window of a split screen, and leave the seed as they found it. |
 | `objects/widgets/flags.c` | A flag's cloth steps a tick at a time, as on the Xbox, not every frame (eight steps a tick at 240 frames a second held it eight times as stiff), and is drawn as far from where the frame that stepped it hung it as its first attachment marker has moved since, so that it stays on a running carrier's pole. |
 | `rasterizer/rasterizer_text.c`, `text/draw_string.c` | Text is drawn from an atlas of the fonts' glyphs, rasterized at the resolution the game draws at (`src/text_hires.c`), when the font has every character of the string. Text can be drawn scaled about a point (`rasterizer_text_set_scale`), as the players' names are. Each glyph's advance is centred on the font tag character's, so the layout is the same, and a glyph is cut at a text box only where the font tag's character visibly was. |
