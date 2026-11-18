@@ -849,11 +849,23 @@ map's textures (halo_shadow_map_select, port/linux/src/d3d8_gl.c), then the
 batch's projections onto the level, one after another. The GPU goes back to
 the screen once a batch, not after each shadow's map, and a shadow's
 projection cost half as much. Without the blur, the projections read the
-primary map, which each shadow draws over: a batch of one. */
+primary map, which each shadow draws over: a batch of one. The slots past the
+first are kept in the GPU's memory, as many as fit in
+RASTERIZER_SHADOW_PORT_BATCH_BYTES at display.shadow_resolution
+(halo_shadow_map_slots): 32 up to 512 on desktop OpenGL, fewer at 1024
+and on OpenGL ES. */
 long rasterizer_environment_shadow_port_batch_size(
 	void)
 {
-	return rasterizer_debug_options.shadow_convolution_enabled ? RASTERIZER_SHADOW_PORT_BATCH : 1;
+	long size;
+
+	if (!rasterizer_debug_options.shadow_convolution_enabled)
+	{
+		return 1;
+	}
+	size = 1 + halo_shadow_map_slots(RASTERIZER_SHADOW_PORT_BATCH_BYTES);
+
+	return size < RASTERIZER_SHADOW_PORT_BATCH ? size : RASTERIZER_SHADOW_PORT_BATCH;
 }
 
 /* the shadow begun's map drawn: blurred into this slot, and what its

@@ -227,11 +227,6 @@ static void interpolate_normal(
 static boolean render_object_shadow_begin(
 	struct object_render_data *data,
 	real level_of_detail);
-static void render_object_shadow_port_setup(
-	struct object_render_data *data,
-	real level_of_detail,
-	union real_rgb_color *shadow_color_out,
-	real *radius_out);
 static void shadow_volume_plane_pair(
 	real_vector3d const *normal,
 	real_point3d const *point,
@@ -392,30 +387,6 @@ batch's shadows whose maps are drawn and blurred, projections to draw: */
 static struct rasterizer_shadow_port_saved shadow_port_batch[RASTERIZER_SHADOW_PORT_BATCH];
 static long shadow_port_batch_count = 0;
 
-/* port: each object's blurred shadow map kept, in a slot of its own of the
-secondary map's textures (after the batch's), and reused the next frame
-where a new one would look the same: the blur leaves only a soft outline,
-which changes little from one frame to the next, and the projection, drawn
-each frame, follows the object to where it is now. A shadow smaller than
-SHADOW_PORT_REDRAW_PIXELS on the screen has its map drawn every other frame,
-the objects taking turns, half of them each frame; a larger one's each
-frame. A map is drawn again too when its size, the light's direction or the
-object's size changed, or the object was not drawn the frame before. */
-#define SHADOW_PORT_CACHE_SIZE 128
-#define SHADOW_PORT_REDRAW_PIXELS 160.f
-struct shadow_port_cached
-{
-	boolean used;
-	long object_index;
-	/* the frames (render.frame_index) its map was drawn and last projected */
-	long drawn;
-	long seen;
-	struct rasterizer_shadow_port_saved saved;
-};
-static struct shadow_port_cached shadow_port_cache[SHADOW_PORT_CACHE_SIZE];
-/* the cache entry the map being drawn goes into, or NONE */
-static long shadow_port_drawing = NONE;
-
 static void render_object_shadows_port_project(
 	void)
 {
@@ -434,127 +405,12 @@ static void render_object_shadows_port_project(
 	return;
 }
 
-/* the cache entry of an object's shadow, or one to keep it in (not used
-this frame or the one before; found FALSE), or NONE */
-static long shadow_port_cache_find(
-	long object_index,
-	boolean *found)
-{
-	long index;
-	long free_index = NONE;
-
-	*found = FALSE;
-	for (index = 0; index < SHADOW_PORT_CACHE_SIZE; index++)
-	{
-		struct shadow_port_cached *cached = &shadow_port_cache[index];
-
-		if (cached->used && cached->object_index == object_index)
-		{
-			*found = TRUE;
-			return index;
-		}
-		if (!cached->used)
-		{
-			if (free_index == NONE || shadow_port_cache[free_index].used)
-			{
-				free_index = index;
-			}
-		}
-		else if (cached->seen < render.frame_index - 1 &&
-			(free_index == NONE ||
-				(shadow_port_cache[free_index].used && cached->seen < shadow_port_cache[free_index].seen)))
-		{
-			free_index = index;
-		}
-	}
-
-	return free_index;
-}
-
-/* the object's shadow projected from its kept map, into the batch: FALSE
-where its map is drawn instead (shadow_port_drawing its cache entry) */
-static boolean render_object_shadow_port_reuse(
-	struct object_render_data *data,
-	real level_of_detail_pixels,
-	real level_of_detail)
-{
-	struct shadow_port_cached *cached;
-	struct rasterizer_shadow_port_saved *saved;
-	union real_rgb_color shadow_color;
-	real radius;
-	long index;
-	long frames;
-	long age;
-	boolean found;
-
-	shadow_port_drawing = NONE;
-	/* (without the blur, a batch of one, projected from the map drawn) */
-	if (rasterizer_environment_shadow_port_batch_size() < 2)
-	{
-		return FALSE;
-	}
-	index = shadow_port_cache_find(data->object_index, &found);
-	if (index == NONE)
-	{
-		return FALSE;
-	}
-	shadow_port_drawing = index;
-	if (!found)
-	{
-		return FALSE;
-	}
-	cached = &shadow_port_cache[index];
-	frames = level_of_detail_pixels >= SHADOW_PORT_REDRAW_PIXELS ? 1 : 2;
-	age = render.frame_index - cached->drawn;
-	/* (drawn on its turn, (frame + index) a multiple of frames, or once
-	frames old; this frame's again for another view) */
-	if (cached->seen < render.frame_index - 1 || cached->saved.scale != halo_shadow_map_scale() ||
-		age >= frames || age < 0 || (age > 0 && (render.frame_index + index) % frames == 0))
-	{
-		return FALSE;
-	}
-	render_object_shadow_port_setup(data, level_of_detail, &shadow_color, &radius);
-	if (dot_product3d(&data->shadow_matrix.up, &cached->saved.matrix.up) < 0.9995f ||
-		dot_product3d(&data->shadow_matrix.forward, &cached->saved.matrix.forward) < 0.9995f ||
-		radius > cached->saved.radius * 1.02f || radius < cached->saved.radius * 0.98f)
-	{
-		return FALSE;
-	}
-
-	cached->seen = render.frame_index;
-	saved = &shadow_port_batch[shadow_port_batch_count];
-	*saved = cached->saved;
-	saved->matrix.position = data->shadow_matrix.position;
-	saved->color = shadow_color;
-	shadow_port_batch_count++;
-	if (shadow_port_batch_count >= rasterizer_environment_shadow_port_batch_size())
-	{
-		render_object_shadows_port_project();
-	}
-
-	return TRUE;
-}
-
-/* the shadow begun's map drawn: into the batch, which is projected when full,
-and kept for the frames after (render_object_shadow_port_reuse) */
+/* the shadow begun's map drawn: blurred into its slot of the batch, which is
+projected when full */
 static void render_object_shadow_port_map_done(
-	long object_index)
+	void)
 {
-	struct shadow_port_cached *cached;
-
-	rasterizer_environment_shadow_port_map_done(
-		shadow_port_drawing != NONE ? RASTERIZER_SHADOW_PORT_BATCH + shadow_port_drawing : shadow_port_batch_count,
-		&shadow_port_batch[shadow_port_batch_count]);
-	if (shadow_port_drawing != NONE)
-	{
-		cached = &shadow_port_cache[shadow_port_drawing];
-		cached->used = TRUE;
-		cached->object_index = object_index;
-		cached->drawn = render.frame_index;
-		cached->seen = render.frame_index;
-		cached->saved = shadow_port_batch[shadow_port_batch_count];
-		shadow_port_drawing = NONE;
-	}
+	rasterizer_environment_shadow_port_map_done(shadow_port_batch_count, &shadow_port_batch[shadow_port_batch_count]);
 	shadow_port_batch_count++;
 	if (shadow_port_batch_count >= rasterizer_environment_shadow_port_batch_size())
 	{
@@ -971,14 +827,9 @@ static void interpolate_normal(
 	return;
 }
 
-/* port: the shadow's matrix (into data), its color and its object's radius,
-for its map drawn (render_object_shadow_begin) or reused
-(render_object_shadow_port_reuse) */
-static void render_object_shadow_port_setup(
+static boolean render_object_shadow_begin(
 	struct object_render_data *data,
-	real level_of_detail,
-	union real_rgb_color *shadow_color_out,
-	real *radius_out)
+	real level_of_detail)
 {
 	real_point3d center;
 	real radius;
@@ -1020,21 +871,6 @@ static void render_object_shadow_port_setup(
 	shadow_color.red = shadow_color.red * shadow_intensity + (1.f - shadow_intensity);
 	shadow_color.green = shadow_color.green * shadow_intensity + (1.f - shadow_intensity);
 	shadow_color.blue = shadow_color.blue * shadow_intensity + (1.f - shadow_intensity);
-
-	*shadow_color_out = shadow_color;
-	*radius_out = radius;
-
-	return;
-}
-
-static boolean render_object_shadow_begin(
-	struct object_render_data *data,
-	real level_of_detail)
-{
-	union real_rgb_color shadow_color;
-	real radius;
-
-	render_object_shadow_port_setup(data, level_of_detail, &shadow_color, &radius);
 
 	return rasterizer_environment_shadow_begin(
 		data->object_index,
@@ -1393,15 +1229,11 @@ static void render_object(
 				drawn at on the screen (halo_shadow_map_size,
 				port/linux/src/d3d8_gl.c), up to display.shadow_resolution */
 				halo_shadow_map_size(level_of_detail_pixels);
-				/* port: or projected from its map of the frame before
-				(render_object_shadow_port_reuse) */
-				if (!render_object_shadow_port_reuse(data, level_of_detail_pixels,
-					darkness_fraction * size_fraction) &&
-					render_object_shadow_begin(data, darkness_fraction * size_fraction))
+				if (render_object_shadow_begin(data, darkness_fraction * size_fraction))
 				{
 					render_object_list(data, NULL, data->object_index);
 					/* port: projected with its batch (render_object_shadows) */
-					render_object_shadow_port_map_done(data->object_index);
+					render_object_shadow_port_map_done();
 				}
 			}
 		}

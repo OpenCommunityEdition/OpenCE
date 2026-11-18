@@ -456,6 +456,9 @@ each batch's maps first, then their projections (render_objects.c), each
 batch's blurred maps are kept side by side */
 static long shadow_slot_current;
 static unsigned long shadow_slot_data;
+/* the slots past the first are freed (render_targets_evict): how many fit
+in their budget changed (halo_shadow_map_slots) */
+static BOOL shadow_slots_evicted;
 
 static long shadow_scale_choose(void)
 {
@@ -533,6 +536,28 @@ static long shadow_scale_of(unsigned long data)
 static long shadow_slot_of(unsigned long data)
 {
 	return data && data == shadow_slot_data ? shadow_slot_current : 0;
+}
+
+/* how many slots of the blurred map past the first fit in bytes of the
+GPU's memory: a slot keeps a texture (RGBA8) for each scale its shadows were
+drawn at, up to display.shadow_resolution's (render_targets_evict frees the
+larger ones when it goes down) */
+long halo_shadow_map_slots(unsigned long bytes)
+{
+	unsigned long slot_bytes = 0;
+	long scale;
+
+	for (scale = 1; scale <= shadow_scale_maximum(); scale *= 2)
+	{
+		unsigned long side = SHADOW_MAP_SIZE * (unsigned long)scale;
+
+#ifndef HALO_GLES
+		if (scale >= SHADOW_MAP_BLUR_HALVED_FROM)
+			side /= 2;
+#endif
+		slot_bytes += side * side * 4;
+	}
+	return (long)(bytes / slot_bytes);
 }
 
 /* display.hdr (xgpu_post.c): the back buffer in GL_RGBA16F, which keeps
@@ -1070,8 +1095,8 @@ static struct render_target_entry **render_target_bucket(unsigned long data)
 
 /* the shadow maps' textures of the slots past the first (the blurred map's,
 halo_shadow_map_select), by scale and slot, kept out of the buckets: every
-texture a draw binds looks through its address's bucket, and with a crowd's
-shadows kept (render_objects.c) the blurred map has hundreds */
+texture a draw binds looks through its address's bucket, and a batch's
+slots at each scale (render_objects.c) all have the blurred map's address */
 #define SHADOW_SLOT_TABLE_SCALES 4
 #define SHADOW_SLOT_TABLE_SLOTS 256
 
@@ -3132,7 +3157,9 @@ long halo_screen_commit(void)
 			platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow, SHADOW_MAP_SIZE * shadow);
 			shadow_scale = shadow;
 			shadow_scale_current = 0;
+			shadow_slots_evicted = TRUE;
 			render_targets_evict();
+			shadow_slots_evicted = FALSE;
 		}
 	}
 	if (!screen_width)
@@ -4426,7 +4453,8 @@ static struct mip_composite *mip_composites;
 
 /* an entry render_target_get no longer finds: the screen's targets at
 another scale or screen width than now, the shadow maps at a scale above
-display.shadow_resolution's */
+display.shadow_resolution's, and its slots past the first when it changed
+(as many as fit in their budget changed: halo_shadow_map_slots) */
 static BOOL render_target_stale(const struct render_target_entry *entry)
 {
 	switch (entry->kind)
@@ -4435,7 +4463,7 @@ static BOOL render_target_stale(const struct render_target_entry *entry)
 		return entry->target.scale[0] != screen_scale[0] || entry->target.scale[1] != screen_scale[1] ||
 			(entry->target.height == SCREEN_HEIGHT && entry->target.width != (unsigned long)halo_screen_width());
 	case _render_target_shadow_map:
-		return entry->target.scale[0] > (float)shadow_scale_maximum();
+		return entry->target.scale[0] > (float)shadow_scale_maximum() || (shadow_slots_evicted && entry->slot > 0);
 	default:
 		return FALSE;
 	}
