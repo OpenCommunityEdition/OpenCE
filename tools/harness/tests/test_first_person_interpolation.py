@@ -1,5 +1,6 @@
 """The first-person weapon drawn between ticks: its own animations blended however far they move in a tick (a
-rocket launcher's melee), another weapon's or skeleton's pose never blended to, and a node's half turn snapped."""
+rocket launcher's melee), another weapon's or skeleton's pose never blended to, a node's half turn snapped, and
+the nodes of an overlay that shows a count (a shotgun's shells) not blended from one of its frames to the next."""
 import re
 import sys
 from pathlib import Path
@@ -9,7 +10,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure
 
-CASES = ['melee', 'weapon', 'graph', 'within a tick', 'gap', 'not a number', 'half turn', 'large turn']
+CASES = ['melee', 'weapon', 'graph', 'within a tick', 'gap', 'not a number', 'half turn', 'large turn', 'count',
+         'count kept', 'count loose', 'no count']
 CONTROLS = [
     # the distance limit the weapon's identity replaced
     ('<= REAL_MAX))', '<= 0.25f * 0.25f))', 'melee'),
@@ -23,6 +25,26 @@ CONTROLS = [
     ('first_person->has_previous = first_person->tick == interpolation_tick - 1 &&',
      'first_person->has_previous = ', 'gap'),
     ('< FIRST_PERSON_HALF_TURN_COSINE)', '< 0.0f)', 'half turn'),
+    # the count's nodes blended through the gun as the count changes (before fix-first-person-count-snap)
+    ('count_changed = node_parents &&', 'count_changed = FALSE &&', 'count'),
+    # every node placed as the count changes, not the count's alone
+    ('placed[node_index] = !count_changed || !BIT_VECTOR_TEST_FLAG(first_person->count_nodes, node_index);',
+     'placed[node_index] = !count_changed;', 'count'),
+    # the count's nodes placed every tick, its frame unchanged
+    ('first_person->count_frame != first_person->previous_count_frame;', 'TRUE;', 'count kept'),
+    # the count's nodes snapped to the tick's pose, ahead of the hand
+    ('matrix4x3_multiply(&drawn[parent], &local, &drawn[node_index]);',
+     'drawn[node_index] = first_person->latest[node_index];', 'count'),
+    # their new place on the hand taken a tick early
+    ('matrix4x3_inverse(&first_person->previous[parent], &inverse_parent);\n'
+     '\t\t\t\tmatrix4x3_multiply(&inverse_parent, &first_person->previous[node_index], &local);',
+     'matrix4x3_inverse(&first_person->latest[parent], &inverse_parent);\n'
+     '\t\t\t\tmatrix4x3_multiply(&inverse_parent, &first_person->latest[node_index], &local);', 'count'),
+    # a count's node without a parent at the tick's pose
+    ('\t\t\t\tdrawn[node_index] = first_person->previous[node_index];',
+     '\t\t\t\tdrawn[node_index] = first_person->latest[node_index];', 'count loose'),
+    # the frame before not kept with the pose before
+    ('\t\tfirst_person->previous_count_frame = first_person->count_frame;\n', '', 'count'),
 ]
 
 
@@ -30,8 +52,13 @@ def generated(fault=None):
     source = read('port/linux/game/render_interpolation.c')
     maths = read('source/math/real_math.h')
     matrices = read('source/math/matrix_math.c')
+    cseries = read('source/cseries/cseries.h')
     config = '\n'.join([
         '#define MAXIMUM_LOCAL_PLAYERS 4',
+        'enum { ' + ', '.join(re.search(r'^\t(%s = \d+),' % name, cseries, re.M).group(1)
+                             for name in ['LONG_BITS', 'LONG_BITS_BITS']) + ' };',
+        re.search(r'^#define BIT_VECTOR_SIZE_IN_LONGS\(.*', cseries, re.M).group(),
+        re.search(r'^#define BIT_VECTOR_TEST_FLAG\(.*', cseries, re.M).group(),
         re.search(r'^#define MAXIMUM_INTERPOLATED_NODES .*', source, re.M).group(),
         re.search(r'^#define FIRST_PERSON_HALF_TURN_COSINE .*', source, re.M).group(),
         re.search(r'^#define REAL_MAX .*', maths, re.M).group(),

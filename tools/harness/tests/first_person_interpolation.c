@@ -56,7 +56,29 @@ static void frame(long tick, real fraction, long weapon, long graph, real x)
 	interpolation_fraction = fraction;
 	pose(0, x, 0.0f);
 	pose(1, x, 0.0f);
-	render_interpolation_first_person(0, weapon, graph, nodes, NODES, &camera);
+	render_interpolation_first_person(0, weapon, graph, nodes, NODES, &camera, NONE, NULL, NULL);
+}
+
+/* a frame drawn with the ammunition's overlay showing a count, by its frame:
+node 1 is the one it moves (a shell), held by node 0, one it does not (the
+hand), so far along x; the shell so much further along x than the hand */
+static short const held_shell[NODES] = { NONE, 0 };
+static short const loose_shell[NODES] = { NONE, NONE };
+static void counted(long tick, real fraction, short count, real hand, real shell_on_hand, short const *parents)
+{
+	static unsigned long const count_nodes[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_INTERPOLATED_NODES)] = { 1UL << 1 };
+
+	interpolation_tick = tick;
+	interpolation_fraction = fraction;
+	pose(0, hand, 0.0f);
+	pose(1, hand + shell_on_hand, 0.0f);
+	render_interpolation_first_person(0, WEAPON, GRAPH, nodes, NODES, &camera, count, count_nodes, parents);
+}
+
+static void expect_each(real hand, real shell)
+{
+	CHECK(fabs(nodes[0].position.x - hand) < 1e-4f && fabs(nodes[1].position.x - shell) < 1e-4f,
+		"drawn at %f and %f, not %f and %f", nodes[0].position.x, nodes[1].position.x, hand, shell);
 }
 
 static void expect(real x)
@@ -118,7 +140,7 @@ int main(int argc, char **argv)
 		pose(0, 0.4f, 0.0f);
 		pose(1, 0.4f, 0.0f);
 		nodes[1].position.y = NAN;
-		render_interpolation_first_person(0, WEAPON, GRAPH, nodes, NODES, &camera);
+		render_interpolation_first_person(0, WEAPON, GRAPH, nodes, NODES, &camera, NONE, NULL, NULL);
 		CHECK(nodes[0].position.x == 0.4f, "a pose with a node not a number blended");
 	}
 	/* a node set back by half a turn snaps; the other still blends */
@@ -128,7 +150,7 @@ int main(int argc, char **argv)
 		interpolation_fraction = 0.5f;
 		pose(0, 0.4f, 0.0f);
 		pose(1, 0.0f, PI);
-		render_interpolation_first_person(0, WEAPON, GRAPH, nodes, NODES, &camera);
+		render_interpolation_first_person(0, WEAPON, GRAPH, nodes, NODES, &camera, NONE, NULL, NULL);
 		CHECK(fabs(nodes[0].position.x - 0.2f) < 1e-4f, "the other node not blended");
 		CHECK(nodes[1].forward.i < -0.999f, "half a turn blended: forward (%f, %f)",
 			nodes[1].forward.i, nodes[1].forward.j);
@@ -140,9 +162,45 @@ int main(int argc, char **argv)
 		interpolation_fraction = 0.5f;
 		pose(0, 0.0f, 0.0f);
 		pose(1, 0.0f, 170.0f * PI / 180.0f);
-		render_interpolation_first_person(0, WEAPON, GRAPH, nodes, NODES, &camera);
+		render_interpolation_first_person(0, WEAPON, GRAPH, nodes, NODES, &camera, NONE, NULL, NULL);
 		CHECK(fabs(atan2(nodes[1].forward.j, nodes[1].forward.i) - 85.0f * PI / 180.0f) < 1e-3f,
 			"170 degrees not blended halfway: forward (%f, %f)", nodes[1].forward.i, nodes[1].forward.j);
+	}
+	/* a shell loaded: the count's frame changes and the shell moves from 0.1
+	along the hand to 0.3 in the tick. Through the tick it stays at 0.1 on the
+	hand as the hand blends (not through the gun, nor at 0.3 ahead of the
+	hand), and takes its new place as the blend reaches the tick that loaded
+	it; the next tick, the count unchanged, it blends again */
+	CASE("count")
+	{
+		counted(10, 1.0f, 3, 0.0f, 0.1f, held_shell);
+		counted(11, 0.5f, 4, 0.8f, 0.3f, held_shell);
+		expect_each(0.4f, 0.5f);
+		counted(11, 0.75f, 4, 0.8f, 0.3f, held_shell);
+		expect_each(0.6f, 0.7f);
+		counted(12, 0.5f, 4, 1.6f, 0.4f, held_shell);
+		expect_each(1.2f, 1.55f);
+	}
+	/* the count unchanged: its nodes blend as the others do */
+	CASE("count kept")
+	{
+		counted(10, 1.0f, 3, 0.0f, 0.1f, held_shell);
+		counted(11, 0.5f, 3, 0.8f, 0.2f, held_shell);
+		expect_each(0.4f, 0.55f);
+	}
+	/* a node the count moves that has no parent: where the tick before had it */
+	CASE("count loose")
+	{
+		counted(10, 1.0f, 3, 0.0f, 0.1f, loose_shell);
+		counted(11, 0.5f, 4, 0.8f, 0.3f, loose_shell);
+		expect_each(0.4f, 0.1f);
+	}
+	/* no count shown (a needler's needles settling as its reload ends): nothing snaps */
+	CASE("no count")
+	{
+		counted(10, 1.0f, 3, 0.0f, 0.0f, held_shell);
+		frame(11, 0.5f, WEAPON, GRAPH, 0.8f);
+		expect(0.4f);
 	}
 	return 0;
 }

@@ -148,6 +148,12 @@ struct interpolated_first_person
 	long animation_graph_index;
 	short node_count;
 	boolean has_previous;
+	/* the frame of the overlay that shows a count (the ammunition's: the
+	rounds loaded) the latest pose and the one before it were drawn with
+	(NONE: none), and the nodes it moves, with their children */
+	short count_frame;
+	short previous_count_frame;
+	unsigned long count_nodes[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_INTERPOLATED_NODES)];
 	real_matrix4x3 previous[MAXIMUM_INTERPOLATED_NODES];
 	real_matrix4x3 latest[MAXIMUM_INTERPOLATED_NODES];
 };
@@ -914,20 +920,32 @@ static struct observer_result const *render_interpolation_blended_camera(
 
 /* The first-person weapon and hands are posed in world space from the drawn
 camera each frame, from animation state that changes once a tick: blend the
-pose relative to the camera. */
+pose relative to the camera. count_frame is the frame of the overlay that
+shows a count (the ammunition's: a shotgun's shells), NONE for none,
+count_nodes (a bit vector) the nodes it moves, with their children, and
+node_parents each node's parent (NONE for none): when the count changes,
+those nodes go from one of its frames to the next in a tick, as on the Xbox,
+not through the gun between them. */
 void render_interpolation_first_person(
 	short local_player_index,
 	long weapon_index,
 	long animation_graph_index,
 	real_matrix4x3 *node_matrices,
 	short node_count,
-	struct render_camera const *camera)
+	struct render_camera const *camera,
+	short count_frame,
+	unsigned long const *count_nodes,
+	short const *node_parents)
 {
 	struct interpolated_first_person *first_person;
 	real_matrix4x3 camera_matrix;
 	real_matrix4x3 inverse_camera;
 	struct interpolation_rotation previous_rotations[MAXIMUM_INTERPOLATED_NODES];
 	struct interpolation_rotation latest_rotations[MAXIMUM_INTERPOLATED_NODES];
+	real_matrix4x3 drawn[MAXIMUM_INTERPOLATED_NODES];
+	boolean placed[MAXIMUM_INTERPOLATED_NODES];
+	boolean count_changed;
+	boolean placing;
 	short node_index;
 
 	if (!interpolation_rendering ||
@@ -952,6 +970,7 @@ void render_interpolation_first_person(
 			first_person->weapon_index == weapon_index &&
 			first_person->animation_graph_index == animation_graph_index;
 		memcpy(first_person->previous, first_person->latest, sizeof(first_person->previous));
+		first_person->previous_count_frame = first_person->count_frame;
 		first_person->tick = interpolation_tick;
 		first_person->weapon_index = weapon_index;
 		first_person->animation_graph_index = animation_graph_index;
@@ -959,6 +978,11 @@ void render_interpolation_first_person(
 	for (node_index = 0; node_index < node_count; node_index++)
 		matrix4x3_multiply(&inverse_camera, &node_matrices[node_index], &first_person->latest[node_index]);
 	first_person->node_count = node_count;
+	first_person->count_frame = count_nodes ? count_frame : NONE;
+	if (count_nodes)
+		memcpy(first_person->count_nodes, count_nodes, sizeof(first_person->count_nodes));
+	else
+		memset(first_person->count_nodes, 0, sizeof(first_person->count_nodes));
 	if (!first_person->has_previous)
 		return;
 	/* a node's move is not limited: one weapon's own animations, a melee
@@ -974,20 +998,28 @@ void render_interpolation_first_person(
 		rotation_from_matrix(previous, &previous_rotations[node_index]);
 		rotation_from_matrix(latest, &latest_rotations[node_index]);
 	}
+	count_changed = node_parents &&
+		first_person->count_frame != NONE &&
+		first_person->count_frame != first_person->previous_count_frame;
 	for (node_index = 0; node_index < node_count; node_index++)
 	{
 		struct interpolation_rotation const *previous_rotation = &previous_rotations[node_index];
 		struct interpolation_rotation const *latest_rotation = &latest_rotations[node_index];
-		real_matrix4x3 blended;
+		real_matrix4x3 *blended = &drawn[node_index];
 
-		if (previous_rotation->is_rotation && latest_rotation->is_rotation &&
+		placed[node_index] = !count_changed || !BIT_VECTOR_TEST_FLAG(first_person->count_nodes, node_index);
+		if (!placed[node_index])
+		{
+			/* (placed below, on its parent) */
+		}
+		else if (previous_rotation->is_rotation && latest_rotation->is_rotation &&
 			fabs(previous_rotation->quaternion.i * latest_rotation->quaternion.i +
 				previous_rotation->quaternion.j * latest_rotation->quaternion.j +
 				previous_rotation->quaternion.k * latest_rotation->quaternion.k +
 				previous_rotation->quaternion.w * latest_rotation->quaternion.w) < FIRST_PERSON_HALF_TURN_COSINE)
 		{
 			/* half a turn: this node snaps, the others still blend */
-			blended = first_person->latest[node_index];
+			*blended = first_person->latest[node_index];
 		}
 		else
 		{
@@ -997,9 +1029,50 @@ void render_interpolation_first_person(
 				previous_rotation,
 				latest_rotation,
 				interpolation_fraction,
-				&blended);
+				blended);
 		}
-		matrix4x3_multiply(&camera_matrix, &blended, &node_matrices[node_index]);
+	}
+	/* the count changed: a node it moves (a shell, and what it holds) stays
+	where the tick before had it on its parent, as the parent is drawn, and
+	takes its new place as the blend reaches the tick that moved it, as the
+	frame was drawn with the hand there: not through the gun to it, and not
+	ahead of the hand. A parent first, wherever it comes; without a parent
+	(or one scaled to nothing), as the tick before had it. */
+	placing = count_changed;
+	while (placing)
+	{
+		placing = FALSE;
+		for (node_index = 0; node_index < node_count; node_index++)
+		{
+			short parent = node_parents[node_index];
+
+			if (placed[node_index])
+				continue;
+			if (parent >= 0 && parent < node_count && first_person->previous[parent].scale != 0.0f)
+			{
+				real_matrix4x3 inverse_parent;
+				real_matrix4x3 local;
+
+				if (!placed[parent])
+					continue;
+				matrix4x3_inverse(&first_person->previous[parent], &inverse_parent);
+				matrix4x3_multiply(&inverse_parent, &first_person->previous[node_index], &local);
+				matrix4x3_multiply(&drawn[parent], &local, &drawn[node_index]);
+			}
+			else
+			{
+				drawn[node_index] = first_person->previous[node_index];
+			}
+			placed[node_index] = TRUE;
+			placing = TRUE;
+		}
+	}
+	for (node_index = 0; node_index < node_count; node_index++)
+	{
+		/* (parents that are each other's: as the tick before had them) */
+		if (!placed[node_index])
+			drawn[node_index] = first_person->previous[node_index];
+		matrix4x3_multiply(&camera_matrix, &drawn[node_index], &node_matrices[node_index]);
 	}
 }
 

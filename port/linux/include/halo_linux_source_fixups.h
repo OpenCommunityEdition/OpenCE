@@ -33,7 +33,8 @@ void render_interpolation_object_point(long object_index, union real_point3d *po
 struct observer_result const *render_interpolation_camera(short local_player_index,
 	struct observer_result const *observer);
 void render_interpolation_first_person(short local_player_index, long weapon_index, long animation_graph_index,
-	struct real_matrix4x3 *node_matrices, short node_count, struct render_camera const *camera);
+	struct real_matrix4x3 *node_matrices, short node_count, struct render_camera const *camera,
+	short count_frame, unsigned long const *count_nodes, short const *node_parents);
 float render_interpolation_game_time_sec(long ticks);
 
 /* whether the map being loaded, by the name it was loaded by, is a
