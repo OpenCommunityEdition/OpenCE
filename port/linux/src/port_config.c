@@ -256,6 +256,29 @@ static const struct config_setting config_settings[] =
 		_environment_value, _platform_all,
 		"The scoreboard panel's colour: \"red, green, blue, alpha\", each 0 to 255\n"
 		"(alpha 0 is see-through, 255 solid)." },
+	{ "display.geometry_cache", _config_string, "\"auto\"", "HALO_GEOMETRY_CACHE", _environment_value, _platform_all,
+		"Whether vertices and indices are kept in persistent GL buffers, by\n"
+		"address, or uploaded as they are drawn: \"auto\" keeps them on the desktop\n"
+		"builds and bypasses them on Android, whose drivers have handed back stale\n"
+		"or corrupted data (stretched models, missing surfaces, worsening over a\n"
+		"session); \"on\" and \"off\" force either. Bypassing uploads more: the\n"
+		"renderer is correct but may draw slower." },
+	{ "display.driver", _config_string, "\"native\"", "HALO_GPU_DRIVER", _environment_value, _platform_all,
+		"Which GL implementation the loader opens, where this build's own can be\n"
+		"swapped for another: \"native\" leaves it alone; a Mesa driver's name\n"
+		"(\"zink\" for OpenGL on Vulkan, \"llvmpipe\" for the processor, \"iris\",\n"
+		"\"radeonsi\", \"d3d12\") is set in MESA_LOADER_DRIVER_OVERRIDE before SDL\n"
+		"starts; \"angle\" asks ANGLE's Vulkan platform, whose GLES libraries must be\n"
+		"beside the game (the APK's lib folder on Android). The log says which was\n"
+		"asked for and the GPU profile says which one ran." },
+	{ "display.gpu_profile", _config_string, "\"auto\"", "HALO_GPU_PROFILE", _environment_value, _platform_all,
+		"Which GPU and driver the renderer tunes itself for: \"auto\" reads the\n"
+		"driver's own name (GL_VENDOR/GL_RENDERER) and the log says which one it\n"
+		"chose; \"intel\", \"amd\", \"nvidia\", \"adreno\", \"mali\", \"powervr\",\n"
+		"\"angle\" or \"software\" force one, for a driver that lies about itself\n"
+		"or to try another's settings. The profile only picks the workarounds the\n"
+		"renderer already has (a pipeline flush every so many draws, and reading\n"
+		"the visibility tests' results on the CPU)." },
 	{ "display.anisotropic_filtering", _config_integer, "0", "HALO_ANISOTROPIC_FILTERING", _environment_value,
 		_platform_all,
 		"Sharpen textures seen at a grazing angle (floors, walls, terrain), which\n"
