@@ -498,6 +498,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.direct_camera` | `true` | `HALO_DIRECT_CAMERA` | `true`: in first person, on foot, the view points where the player aims in each frame, not where the last tick left it. Refer to "Frame rate". |
 | `display.fov` | `0.0` | `HALO_FOV` | The first-person view's field of view on foot, in degrees across at 16:9, from 20 to 150. `0`: the stock view. Refer to "Field of view". |
 | `display.viewmodel_fov` | `0.0` | `HALO_VIEWMODEL_FOV` | The first-person weapon's and hands' field of view, in degrees across at 16:9, from 20 to 150. `0`: the weapon's stock view, also when `display.fov` widens the world. Refer to "Field of view". |
+| `display.cinematic_framing` | `false` | `HALO_CINEMATIC_FRAMING` | `true`: a cutscene's shots with the letterbox are drawn as the Xbox showed them, the picture between its bars across the screen: the Xbox's 4:3 width, 16:9 tall, with bars only as thick as keep that shape (none at 16:9 or wider, a twentieth of the height each at 16:10, the Xbox's eighth at 4:3). `false`: the stock bars, an eighth of the height each whatever the screen's shape, over a picture as wide as the screen. XBOX CUTSCENES on Video Setup's FOV AND VIEWMODELS screen sets it. Refer to "Field of view". |
 | `display.viewmodel_visible` | `true` | `HALO_VIEWMODEL_VISIBLE` | `true`: the first-person weapon, hands and what is attached to them are drawn. `false`: they are not; firing, animation, sound and lights go on, and other players' models are drawn. |
 | `display.passenger_third_person` | `false` | `HALO_PASSENGER_THIRD_PERSON` | Third-person view for the Warthog's passenger and the Scorpion's four passengers. Uses the gunner's camera on the Warthog and the driver's on the Scorpion, within the passenger's firing arc. Smooth entry and exit; weapon zoom is disabled while riding. The reticle follows the shot's centre ray. Local view only. In the campaign and co-op only: not in multiplayer, where seeing around the vehicle would be an advantage. |
 | `display.viewmodel_shield` | `false` | `HALO_VIEWMODEL_SHIELD` | `true`: the energy shield's flare (its hits, its charging, its fall) is drawn on the first-person arms too, as on the body, with the unit's own shield shader, with its final displacement limited by the arms' distance and the viewmodel field of view. The stock game draws it on the body only. |
@@ -877,6 +878,29 @@ set back behind the eye as far as keeps the open waist below the view
 the further down you look. It is drawn with the world's camera, so it keeps
 its place and size at any field of view. Hit boxes, markers and everything
 the game does with the body are unchanged.
+
+XBOX CUTSCENES (`display.cinematic_framing`, off by default) draws a
+cutscene as the Xbox showed it. The Xbox drew a 4:3 picture and covered
+an eighth of its height with each of the letterbox's bars, which left a
+16:9 picture between them; the stock port keeps a shot's angle up and down
+and widens it to the screen, so on a 16:9 screen it showed a third more
+across than the Xbox did, under the same bars. With the setting, while the
+scripted camera shows a shot with the letterbox, the shot is the Xbox's
+width, and the bars are only as thick as keep the picture 16:9, as
+Bungie's later games set their bars by the screen's shape:
+
+- 16:9: no bars, and the Xbox's picture across the whole screen.
+- 16:10: bars of a twentieth of the height each.
+- 4:3: the Xbox's own bars and picture.
+- Wider than 16:9: no bars; the picture keeps the Xbox's height and shows
+  more at the sides, as play does.
+
+The view changes with the cut to the cutscene's first shot (the maps'
+cutscenes start the cinematic and take the camera in the same tick) and
+back with the cut to the player. The player's own view under the bars (a
+chapter's title during play) keeps its width, without bars at 16:9. When
+the bars go while a shot is still on the screen, the shot widens as they
+go.
 
 Only this machine's view changes. Nothing the machines send each other
 changes, so players with different settings play together.
@@ -2022,6 +2046,7 @@ Other changes:
 | `objects/object_lights.c` | A flashlight not on a first-person weapon (your own with no weapon in hand, as another player's in a match) shines from the marker on the pose the frame draws (`render_interpolation.c`), not from where the tick left it, which stepped at 30 a second. |
 | `structures/structure_render.c` | The structure's visible surfaces are put in order by a radix sort, not `qsort_4byte`: the same order. |
 | `cache/cache_files.c`, `networking/network_client_manager.c`, `networking/network_server_manager.c`, `networking/network_server_message_handler.c`, `main/main.c`, `interface/interface.c` | Map sharing (`game/map_share.c`): a client that does not have the game's Custom Edition map asks the host for it instead of leaving, is not given time to precache it until it has it, and adds its players to a game in progress only then; the host gives the game's map its own name and its version (its hash's start), takes the requests from any machine in the game, lobby too, and does not drop a machine that downloads; the transfers run each frame, and their progress is drawn over the screen. |
+| `main/main.c`, `cutscene/cinematics.c` | With `display.cinematic_framing` (`cinematic_letterbox.c`), while the scripted camera shows a shot with the letterbox up or coming up (or going, as far as it still is), the window's vertical angle shows the Xbox's picture between the bars across the window (a 4:3 window's width on a window 16:9 or narrower, the picture's height on a wider one), and the bars are as high as keep that picture 16:9 (none on a window 16:9 or wider, and not drawn then); without it, an eighth of the window's, as the Xbox's. |
 | `cutscene/cinematics.c` | A scenario's titles (some Custom Edition maps show their name for the whole game) are not drawn over a menu, as the letterbox is not: the screen's overlays are drawn after the players' menus. On a screen wider than 640 columns, a title is moved so the edge it is justified to (its middle, if centered) keeps its place relative to the screen's sides, as on the Xbox's 4:3 screen: a right-justified chapter title ends near the right side, not short of it. |
 | `tag_files/tag_groups.h` | `TAG_BLOCK_GET_ELEMENT` returns an element in the block without a call, and calls `tag_block_get_element_with_size` for anything else. |
 | `cseries/cseries.h` | `DATUM_INDEX_TO_ABSOLUTE_INDEX` is cast to `long`, 4 bytes as on the Xbox. `UNSIGNED_LONG_MAX` does not fit in an `int`, so clang and gcc make every constant of cseries.h's enum of integer limits `long long`, `UNSIGNED_SHORT_MAX` too. Without the cast, the index takes 8 bytes in a printf-style call and shifts the arguments after it. |

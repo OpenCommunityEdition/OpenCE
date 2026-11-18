@@ -52,6 +52,8 @@ def test_wired():
     main = read("source/main/main.c").replace("\r\n", "\n")
     camera = function(main, "set_window_camera_values")
     assert "cinematic_framing_vertical_field_of_view(\n\t\t\t\t&window->rasterizer_camera.viewport_bounds," in camera
+    # with display.cinematic_framing (cinematic_letterbox.c) the narrower of the two, not one narrowed by the other
+    assert "framing < field_of_view ? MIN(framing, letterbox) : letterbox;" in camera
     scripting = read("source/camera/camera_scripting.c").replace("\r\n", "\n")
     position = function(scripting, "scripted_camera_point_position")
     assert "camera_script_globals.mode != _camera_script_mode_point" in position

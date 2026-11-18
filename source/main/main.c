@@ -409,6 +409,7 @@ symbols in this file:
 #include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
 #include "mcc_main.h" /* port: port/linux/game/mcc_main.h */
 #include "custom_edition_maps.h" /* port: main_script_map_name, a Custom Edition campaign's maps */
+#include "cinematic_letterbox.h" /* port: port/linux/game/cinematic_letterbox.c */
 #include "view_fov.h" /* port: display.fov, before the projection and culling */
 #include "cinematic_framing.h" /* port: port/linux/game/cinematic_framing.c */
 
@@ -1249,15 +1250,25 @@ void set_window_camera_values(
 		window->rasterizer_camera.forward = observer->forward;
 		window->rasterizer_camera.up = observer->up;
 		/* port: display.fov's view, the local render view only (view_fov.c);
-		a cinematic shot that keeps the Xbox's width narrowed to it
-		(cinematic_framing.c) */
-		window->rasterizer_camera.vertical_field_of_view =
-			cinematic_framing_vertical_field_of_view(
+		with display.cinematic_framing, a cutscene's shot with the letterbox
+		as the Xbox framed it (cinematic_letterbox.c); a cinematic shot that
+		keeps the Xbox's width narrowed to it (cinematic_framing.c). Each alone
+		shows the Xbox's width, so with both the narrower is taken, not both */
+		{
+			real field_of_view = render_fov_vertical(window->local_player_index, 2.0f * arctangent(
+				0.75f * render_camera_get_adjusted_field_of_view_tangent(
+					observer->field_of_view),
+				1.0f));
+			real letterbox = cinematic_letterbox_vertical_field_of_view(
 				&window->rasterizer_camera.viewport_bounds,
-				render_fov_vertical(window->local_player_index, 2.0f * arctangent(
-					0.75f * render_camera_get_adjusted_field_of_view_tangent(
-						observer->field_of_view),
-					1.0f)));
+				field_of_view);
+			real framing = cinematic_framing_vertical_field_of_view(
+				&window->rasterizer_camera.viewport_bounds,
+				field_of_view);
+
+			window->rasterizer_camera.vertical_field_of_view =
+				framing < field_of_view ? MIN(framing, letterbox) : letterbox;
+		}
 
 		if (window->local_player_index != NONE &&
 			!console_is_active() &&
