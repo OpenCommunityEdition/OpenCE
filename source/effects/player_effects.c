@@ -770,10 +770,18 @@ void player_effect_get_screen_flash(
 			screen_flash->type = _render_screen_flash_type_lighten;
 			screen_flash->color.rgb = player_effect_globals->screen_fade.color;
 			screen_flash->color.alpha = 1.0f;
+			/* port: how far the fade is at the moment the frame draws the
+			world, between the last two ticks (render_interpolation.c), not
+			at the last tick: the native builds draw several frames a tick,
+			and the fade stepped 30 times a second while what it covered
+			moved every frame. The whole tick outside a frame's drawing */
+			real fade_ticks = (real)(game_time_get() - player_effect_globals->screen_fade.start_time) -
+				1.0f + render_interpolation_fraction();
+
 			screen_flash->intensity = player_effect_globals->screen_fade.ticks > 0
 				? transition_function_evaluate(
 					_transition_function_cosine,
-					PIN((real)(game_time_get() - player_effect_globals->screen_fade.start_time) / player_effect_globals->screen_fade.ticks, 0.0f, 1.0f))
+					PIN(fade_ticks / player_effect_globals->screen_fade.ticks, 0.0f, 1.0f))
 				: 1.0f;
 
 			if (!player_effect_globals->screen_fade.fading_out)
