@@ -6,7 +6,9 @@ some Custom Edition maps show their name for the whole game: drawn in the game,
 not over a menu (the screen's overlays are drawn after the players' menus), and
 its time going on under one. On a screen wider than 640 columns, the edge the
 title is justified to (its middle, if centered) keeps its place relative to the
-screen's sides, as on the Xbox's 4:3 screen. test_cinematic_titles.py takes the
+screen's sides, as on the Xbox's 4:3 screen. The letterbox's bars are drawn at the
+moment the frame draws the world, between the last two ticks, not stepped a
+tick at a time. test_cinematic_titles.py takes the
 structures, the slots' count (config.inc) and the code (under_test.inc).
 */
 
@@ -34,17 +36,25 @@ static struct cinematic_global_data *cinematic_globals = &globals_data;
 static boolean menu_up;
 static boolean ui_widgets_active(void) { return menu_up; }
 
-/* the game's clock: one tick a frame */
+/* the game's clock: one tick a frame, unless a case draws frames between
+ticks (how far into the next tick it is drawn) */
 static long ticks;
+static float fraction = 1.0f;
 #define game_time_get() (ticks)
 #define game_time_get_paused() FALSE
 #define game_time_get_elapsed() 1
+static float render_interpolation_fraction(void) { return fraction; }
 #define game_in_editor() FALSE
 
 /* the letterbox's camera and bars */
 static struct { struct { rectangle2d viewport_bounds; } camera; } render;
 static long quads;
-static void draw_quad(rectangle2d const *bounds, pixel32 color) { quads++; }
+static rectangle2d top_bar;
+static void draw_quad(rectangle2d const *bounds, pixel32 color)
+{
+	if (!quads++)
+		top_bar = *bounds;
+}
 
 /* the HUD's font and the scenario's one title, its text in the ingame help text */
 static struct
@@ -232,6 +242,39 @@ int main(int argc, char **argv)
 		CHECK(frame() == 1, "the title was not drawn");
 		CHECK(drawn_bounds.x0 == 10 && drawn_bounds.x1 == 600, "the title's box is %d to %d on 640 columns, not 10 to 600",
 			drawn_bounds.x0, drawn_bounds.x1);
+		return 0;
+	}
+	/* the bars sliding in, two frames a tick (a quarter and three quarters
+	into it): each drawn where they are at that moment, 20 rows a tick on a
+	4800-row view (an eighth of it in a second) */
+	CASE("bars-between-ticks")
+	{
+		long last = -1;
+
+		render.camera.viewport_bounds.y1 = 4800;
+		render.camera.viewport_bounds.x1 = 640;
+		globals_data.show_letterbox = TRUE;
+		globals_data.letterbox_amount = 0.0f;
+		globals_data.letterbox_last_game_time = ticks;
+		for (index = 1; index <= 20; index++)
+		{
+			short quarter;
+
+			ticks++;
+			for (quarter = 1; quarter <= 3; quarter += 2)
+			{
+				real expected = ((real)index - 1.0f + 0.25f * quarter) * 20.0f;
+
+				fraction = 0.25f * quarter;
+				quads = 0;
+				cinematic_render();
+				CHECK(quads == 2, "%ld bars at tick %ld", quads, index);
+				CHECK(fabsf((real)top_bar.y1 - expected) <= 1.0f,
+					"the top bar %d rows tall at tick %ld, %d/4 into it, not %.1f", top_bar.y1, index, quarter, expected);
+				CHECK(top_bar.y1 > last, "the top bar did not grow between frames (%d after %ld)", top_bar.y1, last);
+				last = top_bar.y1;
+			}
+		}
 		return 0;
 	}
 	fprintf(stderr, "unknown case: %s\n", case_name);

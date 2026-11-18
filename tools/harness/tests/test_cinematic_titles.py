@@ -1,5 +1,6 @@
 """The real cinematic_render (cinematics.c) over a fake scenario: a scenario's title is drawn in the game, not over a
-menu, and its time goes on under one; on a wide screen, the edge it is justified to keeps its place."""
+menu, and its time goes on under one; on a wide screen, the edge it is justified to keeps its place. The letterbox's
+bars are drawn at the moment the frame draws the world, between the last two ticks."""
 
 import sys
 from pathlib import Path
@@ -10,7 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, function, mutated, read, run, structure  # noqa: E402
 
 CASES = ["drawn-in-the-game", "not-over-a-menu", "time-goes-on-under-a-menu", "right-justified-on-a-wide-screen",
-         "left-justified-on-a-wide-screen", "centered-on-a-wide-screen", "unmoved-on-640-columns"]
+         "left-justified-on-a-wide-screen", "centered-on-a-wide-screen", "unmoved-on-640-columns",
+         "bars-between-ticks"]
 
 # a fault in cinematic_render and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -25,6 +27,9 @@ NEGATIVE_CONTROLS = {
     "left-justified-moved-by-its-middle": (("anchor = title_bounds->x0;",
                                             "anchor = (short)((title_bounds->x0 + title_bounds->x1) / 2);"),
                                            "left-justified-on-a-wide-screen"),
+    # the bars where the last tick left them, stepping 30 times a second
+    "bars-by-ticks": (("(cinematic_globals->letterbox_amount - letterbox_amount_before) * render_interpolation_fraction();",
+                       "(cinematic_globals->letterbox_amount - letterbox_amount_before);"), "bars-between-ticks"),
 }
 
 

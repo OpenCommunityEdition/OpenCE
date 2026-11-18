@@ -329,6 +329,10 @@ void cinematic_render(
 		long game_time;
 		long elapsed_ticks;
 		real letterbox_amount;
+		/* port: the bars' amount at the tick before the last, and drawn */
+		static real letterbox_amount_before;
+		real letterbox_amount_before_tick = cinematic_globals->letterbox_amount;
+		real letterbox_drawn_amount;
 
 		game_time = game_time_get();
 		elapsed_ticks =
@@ -352,13 +356,30 @@ void cinematic_render(
 
 		cinematic_globals->letterbox_amount = letterbox_amount;
 
+		/* port: the bars drawn where they are at the moment the frame
+		draws the world, between the last two ticks (render_interpolation.c):
+		the native builds draw several frames a tick, and the bars slid in
+		and out 30 times a second while the shot moved every frame. From the
+		amount a tick before, or, after a frame that ran more ticks (a
+		long frame, a saved game loaded), from where they are */
+		if (elapsed_ticks == 1)
+		{
+			letterbox_amount_before = letterbox_amount_before_tick;
+		}
+		else if (elapsed_ticks != 0)
+		{
+			letterbox_amount_before = cinematic_globals->letterbox_amount;
+		}
+		letterbox_drawn_amount = letterbox_amount_before +
+			(cinematic_globals->letterbox_amount - letterbox_amount_before) * render_interpolation_fraction();
+
 		if (cinematic_globals->letterbox_amount > 0.0f)
 		{
 			rectangle2d bar;
 			real bar_height;
 			real viewport_height;
 
-			bar_height = cinematic_globals->letterbox_amount * 0.125f;
+			bar_height = letterbox_drawn_amount * 0.125f;
 			viewport_height = (real)(
 				render.camera.viewport_bounds.y1 -
 				render.camera.viewport_bounds.y0);
