@@ -106,6 +106,9 @@ enum { justified_left, justified_right, justified_center };
 
 /* MCC title adaptation is inactive for these Xbox/CE cases. */
 static boolean mcc_cache_tags_loaded(void) { return FALSE; }
+/* the bars' full height with display.cinematic_framing off
+(cinematic_letterbox.c, #745): the stock eighth of the window */
+static real cinematic_letterbox_bar_height(rectangle2d const *viewport_bounds) { return 0.125f; }
 static void mcc_hud_title_bounds(rectangle2d *bounds, short justification, unsigned long flags) { }
 #include "under_test.inc"
 
