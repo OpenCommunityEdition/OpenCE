@@ -364,7 +364,13 @@ changed:
   so every call and every engine global is found again by name with the
   game's own `hs_find_function_by_name` and `hs_find_global_by_name`
   (`custom_edition_scripts.c`); one this build does not have does nothing
-  and is logged by name (Limits, below). The value types are numbered
+  and is logged by name (Limits, below). Halo PC calls this build's
+  `player_effect_set_max_rumble` `player_effect_set_max_vibrate`, with the
+  same arguments, and a call of it is given this build's function and, in
+  the string data, its name, by which the game finds a map's calls as it
+  loads them (`hs_compile.c`). The compiler keeps each text once, so when a
+  string constant or another name has the same text, the name is not
+  changed and the call does nothing, as before. The value types are numbered
   alike in both builds.
 - **Multiplayer vehicle placement.** This build places a multiplayer game's
   vehicles by type: only the first three of the globals' multiplayer

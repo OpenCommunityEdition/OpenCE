@@ -60,13 +60,22 @@ designator (hs_find_global_by_name) */
 /* missing names are logged up to this many times */
 #define MAXIMUM_MISSING_NAME_MESSAGES 8
 
+/* Halo PC's names for this build's functions: the same function, with the
+same parameters. A call's name in the string data is given this build's
+(which must be no longer: it is written in its place), as the game finds a
+map's calls by their names when it loads them (hs_compile.c). */
+static char const *const halo_pc_function_names[][2] =
+{
+	{ "player_effect_set_max_vibrate", "player_effect_set_max_rumble" },
+};
+
 /* ---------- structures */
 
 struct scripts_conversion
 {
 	struct hs_syntax_node *nodes;
 	long node_count;
-	char const *strings;
+	char *strings;
 	unsigned long string_bytes;
 	/* where the empty string at the end of the string data is (an Xbox
 	address, as a string constant's value is), or 0 */
@@ -166,6 +175,62 @@ static boolean engine_global_missing(
 	return designator == NONE || !TEST_FLAG(designator, HS_EXTERNAL_GLOBAL_DESIGNATOR_BIT);
 }
 
+/* this build's function by its name, or by the name Halo PC gives it (then
+*build_name is this build's name for it, else NULL) */
+static short function_find_by_name(
+	char const *name,
+	char const **build_name)
+{
+	short function_index = hs_find_function_by_name(name);
+	long name_index;
+
+	*build_name = NULL;
+	for (name_index = 0; function_index == NONE && name_index < (long)NUMBEROF(halo_pc_function_names); name_index++)
+	{
+		/* (any case, as hs_find_function_by_name; this build's name written
+		in the place of Halo PC's) */
+		if (!csstrcasecmp(name, halo_pc_function_names[name_index][0]) &&
+			strlen(halo_pc_function_names[name_index][1]) <= strlen(name))
+		{
+			function_index = hs_find_function_by_name(halo_pc_function_names[name_index][1]);
+			if (function_index != NONE)
+				*build_name = halo_pc_function_names[name_index][1];
+		}
+	}
+
+	return function_index;
+}
+
+/* whether a node other than a function's name reads the string data from
+`offset` to `offset + length`: the compiler keeps each text once
+(hs_concatenate_string_constant), so a string constant, a variable or a
+name found by its text (an object's, an AI's, a tag's) of the same text as a
+function's name has its bytes, and is read again as the map loads
+(hs_compile.c) */
+static boolean script_string_shared(
+	struct scripts_conversion const *conversion,
+	long offset,
+	long length)
+{
+	long node_index;
+
+	for (node_index = 0; node_index < conversion->node_count; node_index++)
+	{
+		struct hs_syntax_node const *node = &conversion->nodes[node_index];
+
+		if (node->datum_header && TEST_FLAG(node->flags, _hs_syntax_node_primitive_bit) &&
+			(node->type == _hs_function_name || node->type >= _hs_type_string ||
+				TEST_FLAG(node->flags, _hs_syntax_node_global_bit)) &&
+			node->string_offset >= offset && node->string_offset < offset + length &&
+			(node->type != _hs_function_name || node->string_offset != offset))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 /* A call names its function with its first child, which has the function's
 index too; FALSE when the call is not laid out so. */
 static boolean function_call_convert(
@@ -175,6 +240,7 @@ static boolean function_call_convert(
 	long name_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(call->data);
 	struct hs_syntax_node *name_node;
 	char const *name;
+	char const *build_name;
 	short function_index;
 
 	if (name_index >= conversion->node_count)
@@ -187,7 +253,24 @@ static boolean function_call_convert(
 	{
 		return FALSE;
 	}
-	function_index = hs_find_function_by_name(name);
+	function_index = function_find_by_name(name, &build_name);
+	/* (Halo PC's name: this build's in its place, no longer than it, which
+	every call that shares the string then finds; not when another value has
+	the same text, which would change too, and the call does nothing) */
+	if (build_name && script_string_shared(conversion, name_node->string_offset, (long)strlen(name)))
+	{
+		if (conversion->made_inert < MAXIMUM_MISSING_NAME_MESSAGES)
+		{
+			error(_error_silent, "custom edition: the scripts' function name '%s' is also another value's text: it is not renamed",
+				name);
+		}
+		function_index = NONE;
+	}
+	else if (build_name)
+	{
+		strcpy(conversion->strings + name_node->string_offset, build_name);
+		name = build_name;
+	}
 	if (function_index == NONE)
 	{
 		node_make_inert(conversion, call, "function", name);
