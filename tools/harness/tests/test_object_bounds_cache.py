@@ -12,7 +12,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, inline, mutated, read, run  # noqa: E402
 
-CASES = ["identical", "moving", "detects-stale", "invalidated", "far-unread", "vector-misses"]
+CASES = ["identical", "moving", "detects-stale", "invalidated", "far-unread", "vector-misses",
+         "cluster-lists", "cluster-lists-deleted", "cluster-lists-invalidated", "cluster-lists-detect-stale"]
 
 # a fault in the cache, and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -21,6 +22,9 @@ NEGATIVE_CONTROLS = {
     "drops-the-query-radius": (("bounds->radius + radius", "bounds->radius"), "identical"),
     "narrows-the-sphere-for-vectors": (("&bounds->center, bounds->radius)", "&bounds->center, 0.5f * bounds->radius)"),
                                        "vector-misses"),
+    "lists-ignore-changes": (("entry->changes != changes || ", ""), "cluster-lists"),
+    "lists-ignore-invalidation": (("entry->epoch != object_bounds_epoch || ", ""), "cluster-lists-invalidated"),
+    "lists-ignore-types": (("entry->types != types || ", ""), "cluster-lists"),
 }
 
 
@@ -35,6 +39,8 @@ ENUMS = [("source/objects/object_types.h", "_object_type_biped"), ("source/objec
 def under_test(fault=None):
     enums = "\n".join(enum_with(read(header), member) for header, member in ENUMS)
     enums += f"\n#define MAXIMUM_OBJECTS_PER_MAP {constant(read('source/objects/objects.h'), 'MAXIMUM_OBJECTS_PER_MAP')}\n"
+    enums += ("#define MAXIMUM_CLUSTERS_PER_STRUCTURE "
+              f"{constant(read('source/structures/structures.h'), 'MAXIMUM_CLUSTERS_PER_STRUCTURE')}\n")
     real_math = read("source/math/real_math.h")
     text = "".join(inline(real_math, helper) + "\n"
                    for helper in ("vector_from_points3d", "magnitude_squared3d", "distance_squared3d", "point_in_sphere"))

@@ -61,7 +61,7 @@ OBJECTS.C
 #include "units/units.h"
 #include "units/bipeds.h" /* port: vehicle riding */
 /* port: object_bounds_cache.c's */
-void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
+void object_bounds_cache_update(long object_index, short type, real_point3d const *center, real radius);
 /* port: port/linux/game/first_person_legs.c's */
 void first_person_legs_reset(void);
 
@@ -289,6 +289,13 @@ long cluster_get_next_collideable_object(
 	return cluster_partition_get_next_datum(
 		&collideable_object_cluster_partition,
 		reference_index);
+}
+
+/* port: (object_bounds_cache.c's lists of a cluster's objects) */
+unsigned long cluster_port_collideable_object_changes(
+	short cluster_index)
+{
+	return cluster_partition_port_cluster_changes(&collideable_object_cluster_partition, cluster_index);
 }
 
 short object_get_next_cluster(
@@ -3124,7 +3131,7 @@ void object_compute_node_matrices(
 		object->object.bounding_sphere_radius *= object->object.scale;
 	}
 	/* port: (and in the packed copy collision reads: object_bounds_cache.c) */
-	object_bounds_cache_update(object_index, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius);
+	object_bounds_cache_update(object_index, object->object.type, &object->object.bounding_sphere_center, object->object.bounding_sphere_radius);
 
 	return;
 }

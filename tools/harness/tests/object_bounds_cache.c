@@ -33,7 +33,9 @@ static struct object_datum objects[OBJECTS];
 
 /* the world: a 4x4 grid of 10-unit clusters, each its own BSP leaf; an object is in every cluster its sphere touches */
 enum { GRID = 4, CLUSTERS = GRID * GRID };
-static long cluster_objects[CLUSTERS][OBJECTS], cluster_counts[CLUSTERS];
+static long world_objects[CLUSTERS][OBJECTS], world_counts[CLUSTERS];
+/* each cluster's list's changes, as the cluster partition counts them */
+static unsigned long world_changes[CLUSTERS];
 static int clusters_touched(real_point3d const *center, real radius, long *clusters)
 {
 	int x, y, count = 0;
@@ -48,14 +50,18 @@ static int clusters_touched(real_point3d const *center, real radius, long *clust
 static long cluster_get_first_collideable_object(long *reference, short cluster)
 {
 	*reference = cluster * OBJECTS;
-	return cluster_counts[cluster] ? cluster_objects[cluster][0] : NONE;
+	return world_counts[cluster] ? world_objects[cluster][0] : NONE;
 }
 static long cluster_get_next_collideable_object(long *reference)
 {
 	long cluster = *reference / OBJECTS, place = *reference % OBJECTS + 1;
 
 	*reference = cluster * OBJECTS + place;
-	return place < cluster_counts[cluster] ? cluster_objects[cluster][place] : NONE;
+	return place < world_counts[cluster] ? world_objects[cluster][place] : NONE;
+}
+static unsigned long cluster_port_collideable_object_changes(short cluster)
+{
+	return world_changes[cluster];
 }
 struct structure_bsp;
 struct collision_bsp;
@@ -163,13 +169,18 @@ static real random_real(real low, real high)
 	return low + (high - low) * (real)((seed >> 8) & 0xFFFF) / 65535.0f;
 }
 
-/* the clusters' lists from where the objects are (a child is reached through its parent) */
-static void place_objects(void)
+/* the clusters' lists from where the objects are (a child is reached through
+its parent); counted: each list that changed counts a change, as the cluster
+partition counts a reconnect or disconnect */
+static void place_objects_counted(boolean counted)
 {
+	static long before[CLUSTERS][OBJECTS], before_counts[CLUSTERS];
 	long index, clusters[CLUSTERS];
 	int count;
 
-	memset(cluster_counts, 0, sizeof(cluster_counts));
+	memcpy(before, world_objects, sizeof(before));
+	memcpy(before_counts, world_counts, sizeof(before_counts));
+	memset(world_counts, 0, sizeof(world_counts));
 	for (index = 0; index < OBJECTS; index++)
 	{
 		struct object_datum *object = &objects[index];
@@ -178,9 +189,16 @@ static void place_objects(void)
 			continue;
 		for (count = clusters_touched(&object->object.bounding_sphere_center, object->object.bounding_sphere_radius, clusters);
 			count--;)
-			cluster_objects[clusters[count]][cluster_counts[clusters[count]]++] = OBJECT_INDEX(index);
+			world_objects[clusters[count]][world_counts[clusters[count]]++] = OBJECT_INDEX(index);
+	}
+	for (index = 0; counted && index < CLUSTERS; index++)
+	{
+		if (world_counts[index] != before_counts[index] ||
+			memcmp(world_objects[index], before[index], world_counts[index] * sizeof(long)))
+			world_changes[index]++;
 	}
 }
+#define place_objects() place_objects_counted(TRUE)
 
 /* the crowd: three objects in four packed into one cluster, as a carrier swarm is; bipeds, scenery and vehicles, some
 invisible, without collisions, dead, passing through bipeds or a player's; every 13th carries a child (a weapon) */
@@ -269,7 +287,8 @@ static void tell_cache(void)
 	long index;
 
 	for (index = 0; index < OBJECTS; index++)
-		object_bounds_cache_update(OBJECT_INDEX(index), &objects[index].object.bounding_sphere_center,
+		object_bounds_cache_update(OBJECT_INDEX(index), objects[index].object.type,
+			&objects[index].object.bounding_sphere_center,
 			objects[index].object.bounding_sphere_radius);
 }
 
@@ -294,6 +313,63 @@ static boolean same_features(void)
 	unsigned long with = run_queries();
 
 	return with == run_queries_without_cache();
+}
+
+/* every third object moves, the lists changing with no change counted */
+static void move_some_uncounted(void)
+{
+	long index;
+
+	for (index = 0; index < OBJECTS; index += 3)
+	{
+		objects[index].object.bounding_sphere_center.x += random_real(-1.5f, 1.5f);
+		objects[index].object.bounding_sphere_center.y += random_real(-1.5f, 1.5f);
+	}
+	place_objects_counted(FALSE);
+}
+
+/* each cluster's list from the cache against its objects of the types asked
+for, bipeds not, in order: for three sets of types in turn (a cluster keeps
+two: the lists remade), or two (kept), and none when bipeds are tested */
+static long listed;
+static boolean cluster_lists_match(int sets)
+{
+	static unsigned long const type_sets[] = {
+		FLAG(_collision_test_objects_scenery_bit) | FLAG(_collision_test_objects_machines_bit),
+		FLAG(_collision_test_objects_vehicles_bit) | FLAG(_collision_test_objects_scenery_bit) |
+			FLAG(_collision_test_objects_machines_bit),
+		_collision_test_objects_all_types_flags & ~FLAG(_collision_test_objects_bipeds_bit),
+	};
+	int set, cluster;
+
+	for (set = 0; set < sets * 2; set++)
+	{
+		unsigned long flags = FLAG(_collision_test_objects_bit) | type_sets[set % sets];
+
+		for (cluster = 0; cluster < CLUSTERS; cluster++)
+		{
+			long count = -1, expected = 0, place;
+			long const *list = object_bounds_cache_cluster_objects((short)cluster, flags, &count);
+
+			CHECK(!object_bounds_cache_cluster_objects((short)cluster, flags | FLAG(_collision_test_objects_bipeds_bit),
+				&count), "a list for a vector that tests for bipeds");
+			CHECK(list, "no list for cluster %d", cluster);
+			for (place = 0; place < world_counts[cluster]; place++)
+			{
+				short type = object_get(world_objects[cluster][place])->object.type;
+
+				if (type == _object_type_biped || !TEST_FLAG(flags, type + _collision_test_objects_first_type_bit))
+					continue;
+				if (expected >= count || list[expected] != world_objects[cluster][place])
+					return FALSE;
+				expected++;
+			}
+			if (expected != count)
+				return FALSE;
+			listed += count;
+		}
+	}
+	return TRUE;
 }
 
 static double seconds(unsigned long (*queries)(void))
@@ -376,21 +452,97 @@ int main(int argc, char **argv)
 			vector.i = random_real(-8.0f, 8.0f);
 			vector.j = random_real(-8.0f, 8.0f);
 			vector.k = random_real(-1.0f, 1.0f);
+			/* (as collision_test_vector gives the loop its flags: every
+			type when none is named; half the queries leave out bipeds and
+			vehicles) */
+			unsigned long flags = queries[query].flags;
+
+			if (!(flags & _collision_test_objects_all_types_flags))
+				flags |= _collision_test_objects_all_types_flags;
+			if (query % 2)
+				flags &= ~(FLAG(_collision_test_objects_bipeds_bit) | FLAG(_collision_test_objects_vehicles_bit));
 			for (index = 0; index < OBJECTS; index++)
 			{
 				struct collision_result collision;
 
 				if (objects[index].object.parent_object_index != NONE ||
-					!object_bounds_cache_missed_by_vector(OBJECT_INDEX(index), &queries[query].point, &vector))
+					!object_bounds_cache_missed_by_vector(OBJECT_INDEX(index), flags, &queries[query].point, &vector))
 					continue;
 				missed++;
 				collision.t = 1.0f;
-				CHECK(!object_test_vector(OBJECT_INDEX(index), queries[query].flags | _collision_test_objects_all_types_flags,
+				CHECK(!object_test_vector(OBJECT_INDEX(index), flags,
 					0, &queries[query].point, &vector, NONE, &collision),
 					"query %ld hits object %ld, which the cache says the vector misses", query, index);
 			}
 		}
 		CHECK(missed > (long)QUERIES * OBJECTS / 2, "the cache says only %ld vectors miss: too few to compare", missed);
+		return 0;
+	}
+	/* a cluster's list for a vector that tests for no bipeds: its objects of the
+	types tested, in the cluster's order, as objects move between clusters,
+	as the types asked for change (more sets than a cluster keeps), and none
+	for a vector that tests for bipeds */
+	CASE("cluster-lists")
+	{
+		int round;
+
+		tell_cache();
+		for (round = 0; round < 6; round++)
+		{
+			CHECK(cluster_lists_match(round % 2 ? 2 : 3), "round %d: a cluster's list differs from its objects", round);
+			move_some(TRUE);
+		}
+		CHECK(listed > 4000, "only %ld objects listed: too few to compare", listed);
+		return 0;
+	}
+	/* objects deleted, and their datums reused by objects of another type */
+	CASE("cluster-lists-deleted")
+	{
+		long index;
+
+		tell_cache();
+		CHECK(cluster_lists_match(2), "before");
+		for (index = 0; index < OBJECTS; index += 7)
+		{
+			if (objects[index].object.parent_object_index == NONE && objects[index].object.first_child_object_index == NONE)
+				objects[index].object.bounding_sphere_center.x = 1000.0f;
+		}
+		place_objects();
+		CHECK(cluster_lists_match(3), "after deletions");
+		for (index = 0; index < OBJECTS; index += 7)
+		{
+			if (objects[index].object.bounding_sphere_center.x == 1000.0f)
+			{
+				objects[index].object.bounding_sphere_center.x = random_real(12.0f, 18.0f);
+				objects[index].object.type = objects[index].object.type == _object_type_scenery ?
+					_object_type_machine : _object_type_scenery;
+			}
+		}
+		place_objects();
+		tell_cache();
+		CHECK(cluster_lists_match(2), "after the datums were reused");
+		return 0;
+	}
+	/* the lists changed with no change counted (a game state loaded): the
+	cache's invalidation makes them again */
+	CASE("cluster-lists-invalidated")
+	{
+		tell_cache();
+		CHECK(cluster_lists_match(2), "before");
+		move_some_uncounted();
+		object_bounds_cache_invalidate();
+		tell_cache();
+		CHECK(cluster_lists_match(2), "after the cache was invalidated");
+		return 0;
+	}
+	/* the comparison can fail: lists changed with nothing told */
+	CASE("cluster-lists-detect-stale")
+	{
+		tell_cache();
+		CHECK(cluster_lists_match(2), "before");
+		move_some_uncounted();
+		tell_cache();
+		CHECK(!cluster_lists_match(2), "stale lists matched: the comparison sees nothing");
 		return 0;
 	}
 	/* not a check: how long the queries take without and with the cache */

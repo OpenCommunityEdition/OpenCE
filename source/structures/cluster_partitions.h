@@ -35,6 +35,10 @@ struct cluster_partition
 	of them), for what is kept of them while they don't change
 	(object_lights.c's lights_port_cluster) */
 	unsigned long port_modification_count;
+	/* port: the same for each cluster's list of data, by cluster index
+	(object_bounds_cache.c's lists of a cluster's objects). Not in the game
+	state. */
+	unsigned long *port_cluster_modification_counts;
 };
 
 /* ---------- prototypes/CLUSTER_PARTITIONS.C */
@@ -66,6 +70,11 @@ void cluster_partition_disconnect(
 	struct cluster_partition *partition,
 	long datum_index,
 	long *first_cluster_reference);
+/* port: the changes to the cluster's list of data so far
+(port_cluster_modification_counts); 0 for a cluster index out of range */
+unsigned long cluster_partition_port_cluster_changes(
+	struct cluster_partition const *partition,
+	short cluster_index);
 long cluster_partition_get_first_datum(
 	struct cluster_partition const *partition,
 	long *reference_index,
