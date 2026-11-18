@@ -1871,7 +1871,11 @@ motion sensor also draws its blips into before laying them over its disc, 84
 of the game's 480 lines across: kept at 64 pixels, each texel covered some 3
 pixels of a 1080-line screen, and the blips were soft octagons. They are
 drawn at twice the screen's scale. The sun glow's blur steps by the texture's
-own measure (0 to 1 across), so it blurs as far as before. */
+own measure (0 to 1 across), so it blurs as far as before. Only a texture's
+top level: the water's ripples (128x128 A8R8G8B8, four levels) draw their
+second level, 64x64 too, into its place in their texture, which the water
+reads as it lies farther off; drawn apart, that level kept nothing, and the
+water far off sparkled. */
 #define SUN_GLOW_TARGET_SIZE 64
 
 static BOOL surface_is_sun_glow(const D3DSurface *surface)
@@ -1880,7 +1884,8 @@ static BOOL surface_is_sun_glow(const D3DSurface *surface)
 
 	xgpu_texture_describe(surface->Format, surface->Size, &description);
 	return description.format == D3DFMT_A8R8G8B8 && description.width == SUN_GLOW_TARGET_SIZE &&
-		description.height == SUN_GLOW_TARGET_SIZE;
+		description.height == SUN_GLOW_TARGET_SIZE &&
+		(!surface->Parent || surface->Data == surface->Parent->Data);
 }
 
 /* the secondary render target, the size of the Xbox's (rasterizer_xbox.c) */
