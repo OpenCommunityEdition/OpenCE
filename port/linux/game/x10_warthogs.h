@@ -2,10 +2,11 @@
 X10_WARTHOGS.H
 
 a10's opening cinematic ends in the hangar with Sergeant Johnson's speech:
-its warthog drives behind him on Legendary too, is destroyed out of sight
-before it crashes into the hangar's far wall, no warthog on the hangar's
-upper deck vanishes from the scorpions' shot, and neither of the scene's
-warthog drivers is another Johnson (x10_warthogs.c).
+its warthog drives behind him on Legendary too, it and the one behind his
+last lines are destroyed out of sight before they crash into the hangar's
+walls, no warthog on the hangar's upper deck vanishes from the scorpions'
+shot, and neither of the scene's warthog drivers is another Johnson
+(x10_warthogs.c).
 */
 
 #ifndef __X10_WARTHOGS_H
@@ -27,14 +28,16 @@ boolean x10_warthogs_wake_once(
 	long root_expression_index);
 
 /* the begin whose root expression is root_expression_index: the sleep for
-the rest of x10_warthog_2's recording, after its recording_play, made a
-sleep of 120 ticks. TRUE if it was; FALSE, and nothing changed, if the
-begin is not laid out so */
+the rest of the recording of the vehicle of that name, after its
+recording_play, made a sleep of run_ticks. TRUE if it was; FALSE, and
+nothing changed, if the begin is not laid out so */
 boolean x10_warthogs_run_shortened(
 	struct data_array *syntax,
 	char const *strings,
 	long string_bytes,
-	long root_expression_index);
+	long root_expression_index,
+	char const *vehicle_name,
+	short run_ticks);
 
 /* whether the object of that name, in the scenario of that name, is the
 warthog a10's hangar dressing names but must not place again

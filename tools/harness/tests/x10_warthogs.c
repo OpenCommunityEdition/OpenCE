@@ -7,11 +7,12 @@ x10_warthogs_dressing_driven and x10_warthogs_driver_placed
 Johnson's speech, woke its warthog's script (x10_hog_4) on Legendary twice,
 the second wake ending the script's sleep, so the warthog was destroyed
 before it was seen; the script slept for the warthog's whole run, which
-ends in a crash into the hangar's far wall; the hangar's dressing placed
-x10_warthog_2 again on the upper deck, for x10_hog_2 to destroy it two
-seconds into the shot; and the scene's two warthog drivers were placed with
-Johnson's variant. Legendary's own wake is taken out, the sleep made one of
-120 ticks, the dressing's x10_warthog_2 not placed again, and the drivers
+ends in a crash into the hangar's far wall, as x10_hog_5's does after
+Johnson's last line; the hangar's dressing placed x10_warthog_2 again on
+the upper deck, for x10_hog_2 to destroy it two seconds into the shot; and
+the scene's two warthog drivers were placed with Johnson's variant.
+Legendary's own wake is taken out, the sleeps made ones of 120 and 170
+ticks, the dressing's x10_warthog_2 not placed again, and the drivers
 placed with no variant. The nodes are laid out as a10's are, in a data array of script
 nodes: a call (permanent) names its function with its first child (a
 primitive of the function name type), which its arguments follow.
@@ -278,7 +279,7 @@ static boolean wake_once(long root)
 
 static boolean run_shortened(long root)
 {
-	return x10_warthogs_run_shortened(syntax, strings, string_bytes, root);
+	return x10_warthogs_run_shortened(syntax, strings, string_bytes, root, HOG_VEHICLE_NAME, X10_HOG_RUN_TICKS);
 }
 
 static struct scenario_object_datum placed(short variant)
@@ -398,8 +399,29 @@ int main(int argc, char **argv)
 		CHECK(!run_shortened(wait_first), "a wait before the run changed");
 		CHECK(!run_shortened(constant), "a constant sleep changed");
 		CHECK(!run_shortened(NONE), "no root changed");
-		CHECK(!x10_warthogs_run_shortened(syntax, NULL, string_bytes, other_run), "no strings changed");
+		CHECK(!x10_warthogs_run_shortened(syntax, NULL, string_bytes, other_run, HOG_VEHICLE_NAME, X10_HOG_RUN_TICKS),
+			"no strings changed");
 		CHECK(nodes_unchanged(), "changed");
+		return 0;
+	}
+	/* x10_hog_5's run, for x10_warthog_3: its sleep one of 170 ticks; a run
+	for x10_warthog_2 is no run of its */
+	CASE("lucky run")
+	{
+		long lucky = hog_new("x10_warthog_3", "x10_warthog_3");
+		long hog = hog_new("x10_warthog_2", "x10_warthog_2");
+		struct hs_syntax_node *ticks;
+
+		nodes_keep();
+		CHECK(!x10_warthogs_run_shortened(syntax, strings, string_bytes, hog, LUCKY_HOG_VEHICLE_NAME,
+			X10_LUCKY_HOG_RUN_TICKS), "x10_warthog_2's run changed");
+		CHECK(nodes_unchanged(), "changed");
+		CHECK(x10_warthogs_run_shortened(syntax, strings, string_bytes, lucky, LUCKY_HOG_VEHICLE_NAME,
+			X10_LUCKY_HOG_RUN_TICKS), "not changed");
+		CHECK(!strcmp(begin_order(lucky), "object_create_anew object_create_anew vehicle_load_magic object_teleport "
+			"recording_play sleep:170 object_destroy object_destroy"), "the run %s", begin_order(lucky));
+		ticks = hog_ticks(lucky);
+		CHECK(TEST_FLAG(ticks->flags, 0) && ticks->constant_type == _hs_type_short_integer, "flags %#x", ticks->flags);
 		return 0;
 	}
 	/* a10's dressing places x10_warthog_2 no more; its parked warthogs

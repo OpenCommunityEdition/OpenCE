@@ -1,11 +1,12 @@
 """The real x10_warthogs_wake_once, x10_warthogs_run_shortened, x10_warthogs_dressing_driven and
 x10_warthogs_driver_placed (x10_warthogs.c): a10's hangar scene, Sergeant Johnson's speech, woke its warthog's script
 (x10_hog_4) on Legendary twice, the second wake ending the script's sleep, so the warthog was destroyed before it was
-seen; the script slept for the warthog's whole run, which ends in a crash into the hangar's far wall; the hangar's
-dressing placed x10_warthog_2 again on the upper deck, for x10_hog_2 to destroy it two seconds into the scorpions'
-shot; and the scene's two warthog drivers were placed with Johnson's variant. Legendary's own wake is taken out, the
-sleep made one of 120 ticks, the dressing's x10_warthog_2 not placed again, and the drivers placed with no variant;
-scripts laid out otherwise, already changed, and other placements are left as they are."""
+seen; the script slept for the warthog's whole run, which ends in a crash into the hangar's far wall, as x10_hog_5's does
+after Johnson's last line; the hangar's dressing placed x10_warthog_2 again on the upper deck, for x10_hog_2 to destroy
+it two seconds into the scorpions' shot; and the scene's two warthog drivers were placed with Johnson's variant.
+Legendary's own wake is taken out, the sleeps made ones of 120 and 170 ticks, the dressing's x10_warthog_2 not placed
+again, and the drivers placed with no variant; scripts laid out otherwise, already changed, and other placements are
+left as they are."""
 
 import re
 import sys
@@ -16,7 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["legendary", "woken once", "other wakes", "run", "shortened once", "other runs", "dressing",
+CASES = ["legendary", "woken once", "other wakes", "run", "shortened once", "other runs", "lucky run", "dressing",
          "drivers"]
 
 FUNCTIONS = ["script_node_get", "script_string_get", "script_call_name_node", "script_node_calls",
@@ -34,14 +35,17 @@ NEGATIVE_CONTROLS = {
     "any-wake": (('script_node_calls_with(syntax, strings, string_bytes, inner, "wake", HOG_SCRIPT_NAME)',
                   'script_node_calls(syntax, strings, string_bytes, inner, "wake")'), "other wakes"),
     # the sleep's ticks left at none
-    "no-ticks": (("\t\t\tticks->short_value = X10_HOG_RUN_TICKS;\n", ""), "run"),
+    "no-ticks": (("\t\t\tticks->short_value = run_ticks;\n", ""), "run"),
     # the call's node left a call (its name read as ticks)
     "still-a-call": (("\t\t\tSET_FLAG(ticks->flags, _hs_syntax_node_primitive_bit, TRUE);\n", ""), "run"),
     # a wait before the run changed
     "before-play": (("else if (played && script_node_calls(", "else if ((played || TRUE) && script_node_calls("), "other runs"),
     # a wait for any vehicle's recording changed
-    "any-vehicle": (('script_node_calls_with(syntax, strings, string_bytes, ticks, "recording_time", HOG_VEHICLE_NAME)',
+    "any-vehicle": (('script_node_calls_with(syntax, strings, string_bytes, ticks, "recording_time", vehicle_name)',
                      'script_node_calls(syntax, strings, string_bytes, ticks, "recording_time")'), "other runs"),
+    # the run's vehicle taken for x10_warthog_2's whatever it was asked for
+    "one-vehicle": (('expression, "recording_play", vehicle_name)', 'expression, "recording_play", HOG_VEHICLE_NAME)'),
+                    "lucky run"),
     # the dressing's x10_warthog_2 kept in any map
     "dressing-any-map": (("!csstrcmp(scenario_name, A10_SCENARIO_NAME) &&", ""), "dressing"),
     # ... or every warthog of the dressing's name
@@ -59,7 +63,7 @@ def generated(fault=None):
     hs = read("source/hs/hs.h").replace("\r\n", "\n")
     definitions = read("source/hs/hs_scenario_definitions.h").replace("\r\n", "\n")
     scenario = read("source/scenario/scenario_definitions.h").replace("\r\n", "\n")
-    defines = "\n".join(re.findall(r"^#define (?:A10_SCENARIO_NAME|HOG_\w+|X10_HOG_RUN_TICKS|JOHNSON_VARIANT) .*$", source, re.M))
+    defines = "\n".join(re.findall(r"^#define (?:A10_SCENARIO_NAME|HOG_\w+|LUCKY_HOG_\w+|X10_\w*RUN_TICKS|JOHNSON_VARIANT) .*$", source, re.M))
     names = re.search(r"^static char const \*const x10_warthog_driver_names\[\] =\n\{.*?^\};", source, re.M | re.S)
     code = "\n\n".join([enum_with(hs, "_hs_function_name"), structure(definitions, "hs_syntax_node"),
                         structure(scenario, "scenario_object_datum"),
@@ -83,10 +87,16 @@ def test_scripts_change_them():
     assert '#define HOG_SCRIPT_NAME "x10_hog_4"' in source
     assert '#define HOG_VEHICLE_NAME "x10_warthog_2"' in source
     assert "#define X10_HOG_RUN_TICKS 120" in source
+    assert '#define LUCKY_HOG_SCRIPT_NAME "x10_hog_5"' in source
+    assert '#define LUCKY_HOG_VEHICLE_NAME "x10_warthog_3"' in source
+    assert "#define X10_LUCKY_HOG_RUN_TICKS 170" in source
     assert "#define JOHNSON_VARIANT 100" in source
     assert "csstrcmp(scenario_name, A10_SCENARIO_NAME)" in loaded
     assert loaded.index("HANGAR_SCRIPT_NAME") < loaded.index("x10_warthogs_wake_once(")
     assert loaded.index("HOG_SCRIPT_NAME") < loaded.index("x10_warthogs_run_shortened(")
+    assert "HOG_VEHICLE_NAME,\n\t\t\t\t\tX10_HOG_RUN_TICKS);" in loaded
+    lucky = loaded.index("LUCKY_HOG_SCRIPT_NAME")
+    assert loaded.index("LUCKY_HOG_VEHICLE_NAME,\n\t\t\t\t\tX10_LUCKY_HOG_RUN_TICKS);", lucky) > lucky
     assert "scenario_get_object_type_scenario_datums(scenario, _object_type_biped, &element_size)" in loaded
     assert "x10_warthogs_driver_placed(" in loaded
 

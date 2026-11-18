@@ -6,8 +6,10 @@ speech to his marines (hangar_2). Its words depend on the difficulty: four
 ifs, one for each, end with his "Am I right, marines?". After them, as the
 marines answer, hangar_2 wakes x10_hog_4, whose warthog (x10_warthog_2,
 hog_2_driver at the wheel) drives along the hangar's north side, behind him
-as he says "Damn right I am!". Four things were wrong with the hangar, on
-the Xbox too:
+as he says "Damn right I am!". At his last lines ("Today's your lucky day")
+hangar_2 wakes x10_hog_5, whose warthog (x10_warthog_3, hog_3_driver at the
+wheel) drives behind him. Five things were wrong with the hangar, on the
+Xbox too:
 
 - Legendary's if wakes x10_hog_4 as well, before Johnson's last line on
   that difficulty. The wake after the ifs then ends the script's sleep (a
@@ -20,6 +22,10 @@ the Xbox too:
   south there and runs on into the far wall at full speed, where its crash
   sound plays (create_crashing_effects, vehicles.c) while Johnson walks
   among his marines; only at the run's end did the script destroy it.
+- x10_hog_5's run (x10_hog_5_run) ends in a wall as well: the warthog
+  leaves the shot some 140 ticks in and crashes some 190 ticks in, as the
+  screen fades out after Johnson's last line, so the crash was heard at the
+  scene's end, on every difficulty.
 - The shot before the scorpions' (hangar_1) dresses the hangar for theirs
   (dressing_2), and its (object_create_anew_containing "x10_warthog_2")
   names x10_warthog_2 too, the warthog x10_hog_2 is still driving: made
@@ -38,9 +44,10 @@ wake of x10_hog_4 is taken out of its if's begin, so the script is woken
 once, after the ifs, as on every other difficulty; x10_hog_4's sleep for
 the rest of the run, (sleep (recording_time x10_warthog_2)), becomes a
 sleep of X10_HOG_RUN_TICKS, so the warthog and its driver are destroyed out
-of every shot and short of the hangar's west end; the dressing's
-x10_warthog_2 is destroyed, as made anew, and not placed again
-(x10_warthogs_dressing_driven, as the dressing names it:
+of every shot and short of the hangar's west end, and x10_hog_5's, for
+x10_warthog_3, one of X10_LUCKY_HOG_RUN_TICKS, out of the shot and short of
+its wall; the dressing's x10_warthog_2 is destroyed, as made anew, and not
+placed again (x10_warthogs_dressing_driven, as the dressing names it:
 hs_object_create_anew_containing), so the deck stays as it is once the
 shot has run two seconds, as it was for the rest of it; and the two drivers are
 placed with no variant, so each gets a marine's head and arms at random, as
@@ -76,11 +83,16 @@ clients (network_coop.c), so nothing the machines send or agree on changes.
 #define HANGAR_SCRIPT_NAME "hangar_2"
 #define HOG_SCRIPT_NAME "x10_hog_4"
 #define HOG_VEHICLE_NAME "x10_warthog_2"
+#define LUCKY_HOG_SCRIPT_NAME "x10_hog_5"
+#define LUCKY_HOG_VEHICLE_NAME "x10_warthog_3"
 
 /* the ticks into its run that the warthog is destroyed: past the shot it
 crosses (it leaves it some 90 ticks in), short of the hangar's west end
 (some 150 ticks in) */
 #define X10_HOG_RUN_TICKS 120
+/* ... and x10_hog_5's: past the shot (it leaves it some 140 ticks in, at a
+widescreen's width), short of the wall it crashes into (some 190 ticks in) */
+#define X10_LUCKY_HOG_RUN_TICKS 170
 
 /* the marine model's variant for Sergeant Johnson's head and arms (its
 sgt_johnson-100 permutations) */
@@ -279,7 +291,9 @@ boolean x10_warthogs_run_shortened(
 	struct data_array *syntax,
 	char const *strings,
 	long string_bytes,
-	long root_expression_index)
+	long root_expression_index,
+	char const *vehicle_name,
+	short run_ticks)
 {
 	struct hs_syntax_node *name = script_begin_name_node(syntax, strings, string_bytes, root_expression_index);
 	struct hs_syntax_node *expression;
@@ -296,7 +310,7 @@ boolean x10_warthogs_run_shortened(
 	expression = script_node_get(syntax, name->next_node_index);
 	for (walked = 0; expression && walked < syntax->count; walked++)
 	{
-		if (script_node_calls_with(syntax, strings, string_bytes, expression, "recording_play", HOG_VEHICLE_NAME))
+		if (script_node_calls_with(syntax, strings, string_bytes, expression, "recording_play", vehicle_name))
 		{
 			played = TRUE;
 		}
@@ -305,7 +319,7 @@ boolean x10_warthogs_run_shortened(
 			struct hs_syntax_node *ticks = script_node_get(syntax,
 				script_call_name_node(syntax, expression)->next_node_index);
 
-			if (!script_node_calls_with(syntax, strings, string_bytes, ticks, "recording_time", HOG_VEHICLE_NAME) ||
+			if (!script_node_calls_with(syntax, strings, string_bytes, ticks, "recording_time", vehicle_name) ||
 				ticks->type != _hs_type_short_integer ||
 				ticks->next_node_index != NONE)
 			{
@@ -315,7 +329,7 @@ boolean x10_warthogs_run_shortened(
 			ticks->constant_type = _hs_type_short_integer;
 			SET_FLAG(ticks->flags, _hs_syntax_node_primitive_bit, TRUE);
 			ticks->data = 0;
-			ticks->short_value = X10_HOG_RUN_TICKS;
+			ticks->short_value = run_ticks;
 			return TRUE;
 		}
 		expression = script_node_get(syntax, expression->next_node_index);
@@ -390,7 +404,19 @@ void x10_warthogs_scripts_loaded(
 					syntax,
 					(char const *)scenario->hs_string_constants.address,
 					scenario->hs_string_constants.size,
-					script->root_expression_index);
+					script->root_expression_index,
+					HOG_VEHICLE_NAME,
+					X10_HOG_RUN_TICKS);
+			}
+			else if (!csstrcmp(script->name, LUCKY_HOG_SCRIPT_NAME))
+			{
+				x10_warthogs_run_shortened(
+					syntax,
+					(char const *)scenario->hs_string_constants.address,
+					scenario->hs_string_constants.size,
+					script->root_expression_index,
+					LUCKY_HOG_VEHICLE_NAME,
+					X10_LUCKY_HOG_RUN_TICKS);
 			}
 		}
 	}
