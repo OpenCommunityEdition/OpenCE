@@ -756,8 +756,8 @@ Steam is asked once a run, without signing in, so the name shows a moment
 after the map is shown, and not at all offline or in the web build (Steam
 does not answer a web page's requests).
 
-All map families use network version 44 (camera mode 32745); older peers
-cannot join, including OpenCE protocol 43 peers. MCC content identity, sharing
+All map families use network version 45; older peers
+cannot join, including OpenCE protocol 44 peers. MCC content identity, sharing
 consent and load-progress checks remain separate from the existing Xbox/CE paths;
 see [the network agreement](NETCODE.md#opence-network-agreement).
 
@@ -1366,7 +1366,7 @@ The host's limit is `network.map_share_upload` (default 1024 KiB/s); clients do
 not seed MCC downloads. Android requires no Steam for these files, but device
 runtime validation remains a separate requirement. Browser imports and host downloads use origin-private storage with
 transaction recovery and cross-tab locking. See [NETCODE.md](NETCODE.md#mcc-package-sharing)
-for bounds, lifecycle and network version **44**.
+for bounds, lifecycle and network version **45**.
 
 ### Map sharing
 
