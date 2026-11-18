@@ -1186,6 +1186,19 @@ void program_cache_map_loaded(const char *map_name)
 		(double)(SDL_GetPerformanceCounter() - start) * 1000.0 / (double)SDL_GetPerformanceFrequency());
 }
 
+/* port: no map's list open until the next map loads
+(program_cache_map_loaded), and a new map number, so what is drawn before
+it is listed for it */
+void program_cache_map_unloaded(void)
+{
+	if (!program_cache.enabled)
+		return;
+	if (program_cache.map_file)
+		fclose(program_cache.map_file);
+	program_cache.map_file = NULL;
+	program_cache.map++;
+}
+
 /* a linked program's binary, written after the file's last whole entry */
 static void program_cache_store(GLuint program, unsigned long long vertex_hash, unsigned long long fragment_hash)
 {
@@ -1247,6 +1260,10 @@ static void program_cache_store(GLuint program, unsigned long long vertex_hash, 
 void program_cache_map_loaded(const char *map_name)
 {
 	(void)map_name;
+}
+
+void program_cache_map_unloaded(void)
+{
 }
 
 static void program_map_drawn(struct program_entry *entry)

@@ -204,8 +204,10 @@ program, which can stop the game for a frame of 30 to 90 ms (more on
 integrated graphics); after that the program is loaded from this file in
 under 2 ms, in that game and the next. Loading one from the file took up to
 20 ms, a stalled frame each time a level showed something new, so each map
-has a list beside the file (`<driver>-<map>.list`) of the programs it drew
-with, and they are loaded as the map loads, ahead of its first frame (the
+has a list beside the file (`<driver>-<map>.list`; a Custom Edition map's is
+`<driver>-custom_maps_<map>.list`, an MCC map's
+`<driver>-mcc_maps_<package>_<map>.list`) of the
+programs it drew with, and they are loaded as the map loads, ahead of its first frame (the
 Maw's 41 in 16 ms); a program not on the list yet is loaded when first drawn
 with, and added. A map with no list yet, in its first game, loads the
 programs that two or more other maps' lists have (most of a map's are);
