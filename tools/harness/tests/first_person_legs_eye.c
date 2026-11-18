@@ -55,9 +55,11 @@ static struct object_mesh_vertex vertices[64];
 static struct object_mesh mesh;
 static real_matrix4x3 nodes[NODE_COUNT];
 
-/* the window: the eye and the near clip plane */
-static struct { struct { real_point3d position; } camera; struct { real z_near; } frustum; } global_window_parameters =
-	{ { { 0.f, 0.f, 0.f } }, { 0.0625f } };
+/* the view: the eye and the near clip plane (all the code reads of them) */
+struct render_camera { real_point3d position; };
+struct render_frustum { real z_near; };
+static struct render_camera camera = { { 0.f, 0.f, 0.f } };
+static struct render_frustum frustum = { 0.0625f };
 
 #include "under_test.inc"
 
@@ -116,7 +118,7 @@ int main(int argc, char **argv)
 	{
 		reset();
 		vertex(0.02f, 0.f, -0.03f, LEFT_CALF, LEFT_CALF, 32767);
-		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &back, 0.04f);
+		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &camera, &frustum, &back, 0.04f);
 		CHECK(set_back > 0.04f, "the knee at the eye was not cleared (set back %f)", set_back);
 		CHECK(fabsf(nearest(set_back) - CLEAR) < 1e-4f, "the knee is %f from the eye, not %f", nearest(set_back), CLEAR);
 		return 0;
@@ -127,7 +129,7 @@ int main(int argc, char **argv)
 		reset();
 		vertex(0.05f, 0.f, -0.30f, LEFT_THIGH, LEFT_THIGH, 32767);
 		vertex(0.10f, 0.02f, -0.50f, LEFT_FOOT, LEFT_CALF, 20000);
-		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &back, 0.04f);
+		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &camera, &frustum, &back, 0.04f);
 		CHECK(set_back == 0.04f, "legs far from the eye moved the set back to %f", set_back);
 		return 0;
 	}
@@ -137,10 +139,10 @@ int main(int argc, char **argv)
 	{
 		reset();
 		vertex(0.30f, 0.f, -0.05f, LEFT_CALF, LEFT_CALF, 32767);
-		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &back, 0.04f);
+		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &camera, &frustum, &back, 0.04f);
 		CHECK(set_back == 0.04f, "a knee well ahead of the eye moved the set back to %f", set_back);
 		/* (but a set back that would bring it to the eye goes past it) */
-		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &back, 0.30f);
+		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &camera, &frustum, &back, 0.30f);
 		CHECK(nearest(set_back) >= CLEAR - 1e-4f, "set back %f leaves the knee %f from the eye", set_back,
 			nearest(set_back));
 		return 0;
@@ -152,7 +154,7 @@ int main(int argc, char **argv)
 		reset();
 		vertex(0.01f, 0.f, -0.02f, HEAD, HEAD, 32767);
 		vertex(0.01f, 0.f, -0.02f, PELVIS, SPINE, 16000);
-		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &back, 0.04f);
+		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &camera, &frustum, &back, 0.04f);
 		CHECK(set_back == 0.04f, "the upper body moved the set back to %f", set_back);
 		return 0;
 	}
@@ -162,7 +164,7 @@ int main(int argc, char **argv)
 		reset();
 		vertex(0.00f, 0.f, -0.02f, LEFT_CALF, LEFT_CALF, 32767);
 		vertex(0.15f, 0.f, -0.02f, LEFT_THIGH, LEFT_CALF, 30000);
-		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &back, 0.04f);
+		set_back = first_person_legs_clear_of_eye(&mesh, &model, nodes, &camera, &frustum, &back, 0.04f);
 		CHECK(nearest(set_back) >= CLEAR - 1e-4f, "set back %f leaves a knee %f from the eye", set_back,
 			nearest(set_back));
 		return 0;

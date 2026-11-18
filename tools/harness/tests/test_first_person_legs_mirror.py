@@ -12,13 +12,11 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["meets", "carried", "carried alone", "perspective", "as is"]
+CASES = ["meets", "knee at the eye", "carried", "carried alone", "perspective", "as is"]
 FUNCTIONS = ("first_person_legs_enabled", "first_person_legs_wanted", "first_person_legs_name_has",
              "first_person_legs_node", "first_person_legs_waist", "first_person_legs_clear_of_eye",
              "first_person_legs_pose", "first_person_legs_node_matrices", "first_person_legs_mirror_view",
              "first_person_legs_mirror_body", "first_person_legs_mirror_node_matrices")
-# (the legs kept clear of the eye, where the sources have it: fix-first-person-legs-knees)
-OPTIONAL = ("first_person_legs_clear_of_eye",)
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -28,6 +26,11 @@ NEGATIVE_CONTROLS = {
     # set back as the mirror's own camera would set it back
     "mirror-camera": (("&first_person_legs_mirror_camera,\n\t\t\t&first_person_legs_mirror_frustum, FALSE,",
                        "&global_window_parameters.camera,\n\t\t\t&global_window_parameters.frustum, FALSE,"), "meets"),
+    # the legs kept clear of the mirror's own eye, not the window's
+    "mirror-eye": (("real clearance = frustum->z_near + FIRST_PERSON_LEGS_CLEARANCE;\n"
+                    "\treal_point3d const *eye = &camera->position;",
+                    "real clearance = global_window_parameters.frustum.z_near + FIRST_PERSON_LEGS_CLEARANCE;\n"
+                    "\treal_point3d const *eye = &global_window_parameters.camera.position;"), "knee at the eye"),
     # the upper body folded away in the mirror too
     "folded": (("&first_person_legs_mirror_frustum, FALSE,", "&first_person_legs_mirror_frustum, TRUE,"), "meets"),
     # what it carries left where it was
@@ -50,8 +53,7 @@ def generated(fault=None):
     mesh = "\n".join([enum_with(header, "OBJECT_MESH_MAXIMUM_NODES"), structure(header, "object_mesh_vertex"),
                       structure(header, "object_mesh")]) + "\n"
     state = "\n".join(re.findall(r"^static [^(\n]*;$", source, re.M))
-    names = [name for name in FUNCTIONS if name not in OPTIONAL or f"{name}(\n" in source]
-    code = state + "\n\n" + "\n\n".join(function(source, name) for name in names) + "\n"
+    code = state + "\n\n" + "\n\n".join(function(source, name) for name in FUNCTIONS) + "\n"
     if fault:
         code = mutated(code, *fault)
     return (("config.inc", config), ("mesh.inc", mesh), ("under_test.inc", code))

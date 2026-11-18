@@ -104,7 +104,7 @@ static struct object_definition *object_definition_get(long index) { CHECK(index
 
 /* the mesh: the hips' rim (on a triangle that runs up into the spine) */
 #include "mesh.inc"
-static struct object_mesh_vertex vertices[3];
+static struct object_mesh_vertex vertices[4];
 static unsigned short triangles[1][3] = { { 0, 1, 2 } };
 static struct object_mesh mesh;
 static struct object_mesh const *object_mesh_get(long object_index) { return object_index == 1 || object_index == 3 ? &mesh : NULL; }
@@ -286,6 +286,26 @@ int main(int argc, char **argv)
 			"the legs meet their reflection");
 		first_person_legs_mirror_view(NONE, NULL, NULL);
 		CHECK(first_person_legs_mirror_node_matrices(1, nodes) == nodes, "the mirror done, the body is as it is");
+	}
+	/* a knee raised to the eye of the window's own view (a crouched walk): the legs set back past it, and the
+	body in the mirror, whose own camera is far from the knee, set back as far, by the window's eye */
+	CASE("knee at the eye")
+	{
+		real_vector3d plain;
+
+		reset();
+		legs_drawn(&plain);
+		reset();
+		mesh.vertex_count = 4;
+		vertices[3].position.x = 0.02f; vertices[3].position.y = -0.05f; vertices[3].position.z = 0.38f;
+		vertices[3].nodes[0] = vertices[3].nodes[1] = LEFT_CALF; vertices[3].weight = 32767;
+		legs_drawn(&offset);
+		CHECK(-offset.i > -plain.i + 0.01f, "the knee at the eye sets the legs further back (%f, not %f)",
+			-offset.i, -plain.i);
+		mirror_begun();
+		drawn = first_person_legs_mirror_node_matrices(1, nodes);
+		CHECK(moved_whole(drawn, nodes, NODE_COUNT, &offset),
+			"the body in the mirror set back as far as the legs, the knee cleared of the window's eye");
 	}
 	/* what the body carries set back with it; another player and what they carry as they are */
 	CASE("carried")

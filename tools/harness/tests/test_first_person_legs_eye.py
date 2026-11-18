@@ -19,7 +19,7 @@ NEGATIVE_CONTROLS = {
     # the legs not kept clear of the eye (before fix-first-person-legs-knees)
     "not-cleared": (("if (across < clearance * clearance)", "if (0)"), "knee-at-eye"),
     # the near clip plane left out of the clearance
-    "no-near-plane": (("global_window_parameters.frustum.z_near + FIRST_PERSON_LEGS_CLEARANCE",
+    "no-near-plane": (("frustum->z_near + FIRST_PERSON_LEGS_CLEARANCE",
                        "FIRST_PERSON_LEGS_CLEARANCE"), "knee-at-eye"),
     # a vertex the upper body moves too counted as the legs'
     "upper-body-counted": (("(vertex->weight < 32767 &&\n\t\t\t\t(second", "(0 &&\n\t\t\t\t(second"), "upper-body"),

@@ -231,14 +231,16 @@ static boolean first_person_legs_waist(
 
 /* the least set back, from set_back on, at which every vertex of the legs
 alone (bound to the hips, thighs, calves and feet only) is farther from the
-eye than the near clip plane and FIRST_PERSON_LEGS_CLEARANCE: set back level
-(back, a unit vector), a vertex within that of the line through the eye is
-too near for the set backs between where it comes that near and where it has
-gone that far behind */
+eye of the view drawn with camera and frustum than its near clip plane and
+FIRST_PERSON_LEGS_CLEARANCE: set back level (back, a unit vector), a vertex
+within that of the line through the eye is too near for the set backs
+between where it comes that near and where it has gone that far behind */
 static real first_person_legs_clear_of_eye(
 	struct object_mesh const *mesh,
 	struct model const *model,
 	real_matrix4x3 const *nodes,
+	struct render_camera const *camera,
+	struct render_frustum const *frustum,
 	real_vector3d const *back,
 	real set_back)
 {
@@ -246,8 +248,8 @@ static real first_person_legs_clear_of_eye(
 	static real near_to[FIRST_PERSON_LEGS_MAXIMUM_NEAR];
 	boolean legs[FIRST_PERSON_LEGS_MAXIMUM_NODES];
 	real_matrix4x3 skins[FIRST_PERSON_LEGS_MAXIMUM_NODES];
-	real clearance = global_window_parameters.frustum.z_near + FIRST_PERSON_LEGS_CLEARANCE;
-	real_point3d const *eye = &global_window_parameters.camera.position;
+	real clearance = frustum->z_near + FIRST_PERSON_LEGS_CLEARANCE;
+	real_point3d const *eye = &camera->position;
 	short near_count = 0;
 	boolean moved = TRUE;
 	short node;
@@ -418,7 +420,7 @@ static real_matrix4x3 const *first_person_legs_pose(
 		/* (and as far back as keeps the legs clear of the eye: a crouched
 		walk's knees) */
 		if (back.i != 0.f || back.j != 0.f)
-			set_back = first_person_legs_clear_of_eye(mesh, model, nodes, &back, set_back);
+			set_back = first_person_legs_clear_of_eye(mesh, model, nodes, camera, frustum, &back, set_back);
 		if (set_back > FIRST_PERSON_LEGS_SET_BACK_MAXIMUM)
 			set_back = FIRST_PERSON_LEGS_SET_BACK_MAXIMUM;
 	}
