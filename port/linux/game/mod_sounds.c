@@ -156,7 +156,10 @@ static void mod_sound_free(
 	struct mod_sound *sound)
 {
 	long permutation_index;
+	long range_index;
 
+	for (range_index = 0; range_index < sound->definition.pitch_ranges.count; range_index++)
+		sound_pitch_range_played_beyond_release(&sound->ranges[range_index]);
 	for (permutation_index = 0; permutation_index < sound->permutation_count; permutation_index++)
 	{
 		if (sound->permutations[permutation_index].samples.address)

@@ -1,5 +1,7 @@
 """The native builds' sound channel pools hold a heavy fight: the desktop's with no channel taken, stock or with a
-sound mod's stereo 44 kHz effects; the phones' a stock one, and never the music's or speech's (#1125)."""
+sound mod's stereo 44 kHz effects; the phones' a stock one, and never the music's or scripted dialogue's (OpenH1 issue 1125)."""
+import functools
+import json
 import re
 import sys
 from pathlib import Path
@@ -7,7 +9,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run
+from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure
 from harness.audio import class_table, manager_types
 
 CAPACITY = "port/linux/include/halo_port_capacity.h"
@@ -19,23 +21,27 @@ NEGATIVE_CONTROLS = {
 }
 
 
+@functools.lru_cache(maxsize=None)
+def platform_pools(defines):
+    """Compile the real platform conditionals and preference initializer."""
+    preferences = read("source/sound/sound_preferences.c")
+    start = preferences.index("static struct sound_preferences default_sound_preferences")
+    initializer = preferences[start:preferences.index("};", start) + 2]
+    code = defines + read(CAPACITY) + "\n"
+    code += structure(read("source/sound/sound_preferences.h"), "sound_preferences") + "\n" + initializer
+    status, output = run(build("sound_channel_capacity", (("under_test.inc", code),)), "counts")
+    assert status == 0, output
+    return json.loads(output)
+
+
 def pools():
-    """(phone, desktop): the virtual and actual channel counts of each type, as halo_port_capacity.h has them"""
-    text = read(CAPACITY)
-    block = text[text.index("#define HALO_PORT_SOUND_VIRTUAL_CHANNELS") - 200:]
-    phone_part, desktop_part = block.split("#else", 1)
-
-    def counts(part, name):
-        return [int(n) for n in re.search(rf"#define {name} \{{([\d, ]+)\}}", part).group(1).split(",")]
-
-    return [{kind: counts(part, f"HALO_PORT_SOUND_{kind.upper()}_CHANNELS") for kind in ("virtual", "actual")}
-            for part in (phone_part, desktop_part)]
+    return platform_pools("#define HALO_ARM64_GUEST 1\n"), platform_pools("")
 
 
 def generated(fault=None):
     manager = read("source/sound/sound_manager.c")
     code = "\n".join(function(manager, name) for name in
-                     ["sound_valid_for_channel", "sound_class_is_music_or_speech", "sound_preempts_sound",
+                     ["sound_valid_for_channel", "sound_class_is_music_or_scripted_dialogue", "sound_preempts_sound",
                       "sound_find_best_channel"])
     phone, desktop = pools()
     flags = re.search(r"^short sound_channel_type_flags\[4\] = .*;$", read("source/sound/sound_preferences.c"),
@@ -78,16 +84,5 @@ def test_actual_channels_fit():
     ("web", "#define HALO_WEB 1\n#define HALO_GLES 1\n", ((16, 72, 24, 40), (18, 78, 27, 44))),
 ])
 def test_platform_selection(platform, defines, expected):
-    # Compile the real conditionals and preferences, rather than parsing both
-    # branches: OpenH1's HALO_GUEST would silently select desktop on Android.
-    from harness import structure
-    preferences = read("source/sound/sound_preferences.c")
-    start = preferences.index("static struct sound_preferences default_sound_preferences")
-    initializer = preferences[start:preferences.index("};", start) + 2]
-    code = defines + read(CAPACITY) + "\n"
-    code += structure(read("source/sound/sound_preferences.h"), "sound_preferences") + "\n" + initializer
-    virtual, actual = expected
-    code += "\nstatic short expected_virtual[] = {" + ",".join(map(str, virtual)) + "};\n"
-    code += "static short expected_actual[] = {" + ",".join(map(str, actual)) + "};\n"
-    status, output = run(build("sound_channel_capacity", (("under_test.inc", code),)), platform)
-    assert status == 0, output
+    pool = platform_pools(defines)
+    assert (tuple(pool["virtual"]), tuple(pool["actual"])) == expected, platform

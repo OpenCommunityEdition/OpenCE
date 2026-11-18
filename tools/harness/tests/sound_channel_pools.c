@@ -72,7 +72,7 @@ static void fight_of(short const *counts, boolean modded, short effects) {
  sound_count=0; taken=music_or_speech_taken=0;
  pools(counts);
  play(_sound_class_music,STEREO_44K,0.f);
- for(i=0;i<4;i++) play(_sound_class_unit_dialog,MONO_3D,5.f+i);
+ for(i=0;i<4;i++) play(_sound_class_scripted_dialog_to_other,MONO_3D,5.f+i);
  for(i=0;i<8;i++) play(class_named("first_person_damage"),MONO_2D,0.f);
  for(i=0;i<effects;i++) play(classes[i%4],effect_flags,1.f+i);
 }

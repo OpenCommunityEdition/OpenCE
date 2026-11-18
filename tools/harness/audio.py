@@ -115,11 +115,13 @@ def permutation_picker():
     with what it calls: the played bits of a range's permutations past 32 kept apart (OpenH1 issue 1170)"""
     picker = read("source/sound/sound_definitions.c")
     picker = picker[picker.index("/* ---------- constants */"):]
-    names = ["try_to_reset_permutations", "sound_definitions_played_beyond_clear", "sound_pitch_range_played_beyond",
+    names = ["try_to_reset_permutations", "sound_definitions_played_beyond_clear", "sound_pitch_range_played_beyond_release", "sound_pitch_range_played_beyond",
              "sound_pitch_range_permutation_played", "sound_pitch_range_permutation_set_played",
              "try_to_reset_permutations_beyond", "sound_definition_next_permutation"]
     table = "static struct sound_played_beyond_table sound_played_beyond_table;"
     assert table in picker, "sound_definitions.c's table of played bits past 32 is not where it was"
-    return "\n".join([enum_with(picker, "SOUND_PLAYED_BEYOND_LONGS"), structure(picker, "sound_played_beyond"),
+    macros = "#define LONG_BITS 32\n#define LONG_BITS_BITS 5\n"
+    macros += "\n".join(line for line in read("source/cseries/cseries.h").splitlines() if line.startswith("#define BIT_VECTOR_"))
+    return "\n".join([macros, enum_with(picker, "SOUND_PLAYED_BEYOND_LONGS"), structure(picker, "sound_played_beyond"),
                       structure(picker, "sound_played_beyond_table"), table,
                       *(function(picker, name) for name in names)]) + "\n"

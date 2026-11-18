@@ -29,7 +29,7 @@ symbols in this file:
 (halo_port_capacity.h: the platform budgets).
 A sound mod may make any class stereo (the Uncompressed Audio mod's weapons,
 reloads and engines are stereo 44 kHz), which then shared the music's 9
-channels and took them (#1125). */
+channels and took them (OpenH1 issue 1125). */
 static struct sound_preferences default_sound_preferences =
 {
 	0,

@@ -10,6 +10,10 @@ static unsigned long status[8],completed[8];
 #define pthread_mutex_lock(...) ((void)lock_depth++)
 #define pthread_mutex_unlock(...) ((void)lock_depth--)
 #define channel_get(i) (&dsound_globals.channels[i])
+#define virtual_channel_get(i) (&dsound_globals.virtual_channels[i])
+static short sound_channel_type_flags[4] = {8, 9, 10, 14};
+#define error(...) CHECK(FALSE,"actual channels exhausted")
+#define IDirectSoundStream_Flush(s) stream_flush(s)
 #define sound_cache_sound_hardware_unlock(...) ((void)unlocks++)
 #define interrupt_time_error(...) CHECK(FALSE,"invalid completion")
 #define SetEvent(...) ((void)events++)
@@ -52,6 +56,27 @@ static void reset(int count,int finished,int wrapped) {
 }
 int main(int argc,char **argv) {
  CHECK(argc==2,"case name"); const char *case_name=argv[1];
+ CASE("burst-remap") {
+  static struct sdl_stream voices[8];
+  int cycle, i;
+  dsound_globals.actual_channel_count=dsound_globals.virtual_channel_count=8;
+  for(cycle=0;cycle<32;cycle++) {
+   for(i=0;i<8;i++) {
+    struct sound_channel *channel=channel_get(i);
+    struct sound_virtual_channel *virtual=virtual_channel_get(i);
+    channel->stream=&voices[i].object; channel->type_flags=14;
+    channel->state=_sound_channel_playing; channel->virtual_channel_index=(short)i;
+    virtual->type_index=3; virtual->channel_index=(short)i;
+    voices[i].packet_count=1;
+    dsound_virtual_stop((short)i);
+   }
+   for(i=0;i<8;i++) {
+    dsound_virtual_remap((short)i);
+    CHECK(virtual_channel_get(i)->channel_index!=NONE,"burst could not reuse channel %d",i);
+   }
+  }
+  return 0;
+ }
  int count=!strcmp(case_name,"empty")?0:3;
  int finished=!strcmp(case_name,"unfinished")?0:(!strcmp(case_name,"all-finished")?2:1);
  reset(count,finished,!strcmp(case_name,"wrapped"));

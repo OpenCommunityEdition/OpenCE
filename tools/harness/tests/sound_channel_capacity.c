@@ -3,14 +3,9 @@
 #include "under_test.inc"
 int main(void)
 {
-    int type, actual = 0, virtual = 0;
-    for (type = 0; type < 4; type++)
-    {
-        CHECK(default_sound_preferences.actual_channel_counts[type] == expected_actual[type], "actual pool %d", type);
-        CHECK(default_sound_preferences.virtual_channel_counts[type] == expected_virtual[type], "virtual pool %d", type);
-        actual += expected_actual[type];
-        virtual += expected_virtual[type];
-    }
-    CHECK(actual <= 256 && virtual <= 256, "channel arrays overflow");
+    short *v = default_sound_preferences.virtual_channel_counts;
+    short *a = default_sound_preferences.actual_channel_counts;
+    printf("{\"virtual\":[%d,%d,%d,%d],\"actual\":[%d,%d,%d,%d]}\n",
+        v[0], v[1], v[2], v[3], a[0], a[1], a[2], a[3]);
     return 0;
 }

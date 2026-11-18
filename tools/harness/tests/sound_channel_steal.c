@@ -1,6 +1,6 @@
 /* The real sound_find_best_channel, sound_preempts_sound and
 sound_valid_for_channel, with the game's own sound class table: which sound
-loses its channel when every channel of a type plays (#1125). A sound's
+loses its channel when every channel of a type plays (OpenH1 issue 1125). A sound's
 distance squared to its listener is its source's scale here. */
 #include "harness.h"
 #include "types.inc"
@@ -52,6 +52,35 @@ int main(int argc,char **argv) {
  short weapon_fire, vehicle_engine, channel;
  CHECK(argc==2,"case name"); case_name=argv[1];
  weapon_fire=class_named("weapon_fire"); vehicle_engine=class_named("vehicle_engine");
+ CASE("combat-chatter") {
+  fill(9,MONO_3D,weapon_fire,weapon_fire);
+  channel=sound_find_best_channel(sound_new(_sound_class_unit_dialog,MONO_3D,100.f));
+  CHECK(channel==NONE,"distant combat chatter took weapon channel %d",channel);
+  return 0;
+ }
+ CASE("chatter-can-be-preempted") {
+  fill(4,MONO_3D,_sound_class_unit_dialog,weapon_fire);
+  channel=sound_find_best_channel(sound_new(weapon_fire,MONO_3D,1.f));
+  CHECK(channel==0,"combat chatter blocked a higher-priority weapon");
+  return 0;
+ }
+ CASE("scripted-classes") {
+  short classes[]={_sound_class_scripted_dialog_to_player,_sound_class_scripted_dialog_to_other,
+   _sound_class_scripted_dialog_force_unspatialized};
+  for(int i=0;i<3;i++) {
+   sound_count=0;
+   fill(4,MONO_3D,class_named("projectile_detonation"),class_named("projectile_detonation"));
+   channel=sound_find_best_channel(sound_new(classes[i],MONO_3D,100.f));
+   CHECK(channel!=NONE,"scripted dialogue class %d could not get a channel",classes[i]);
+  }
+  return 0;
+ }
+ CASE("protected-priorities") {
+  fill(4,STEREO_44K,_sound_class_scripted_dialog_to_player,_sound_class_scripted_dialog_to_player);
+  channel=sound_find_best_channel(sound_new(_sound_class_music,STEREO_44K,0.f));
+  CHECK(channel==NONE,"music displaced higher-priority scripted dialogue");
+  return 0;
+ }
  /* the issue's: nine stereo 44 kHz channels, music in one and a mod's
  stereo weapons in the rest; a 10th weapon sound, the nearest, takes a
  weapon's channel, never the music's */
@@ -62,9 +91,9 @@ int main(int argc,char **argv) {
   CHECK(channel==8,"took channel %d, not the farthest weapon's (8)",channel);
   return 0;
  }
- /* the same for a unit's line and an engine in mono 3D channels */
+ /* the same for scripted dialogue and an engine in mono 3D channels */
  CASE("speech-kept") {
-  fill(4,MONO_3D,_sound_class_unit_dialog,vehicle_engine);
+  fill(4,MONO_3D,_sound_class_scripted_dialog_to_other,vehicle_engine);
   channel=sound_find_best_channel(sound_new(vehicle_engine,MONO_3D,1.f));
   CHECK(channel!=NONE && channel!=0,"took channel %d (the line's is 0)",channel);
   return 0;

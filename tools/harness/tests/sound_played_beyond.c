@@ -144,6 +144,7 @@ static void sound_make(struct test_sound *sound, short actual, short count, real
 static short pick(struct test_sound *sound, unsigned long *seed)
 {
 	current_seed = seed;
+	bit_tests = 0;
 	return sound_definition_next_permutation(&sound->definition, 0, NONE);
 }
 
@@ -165,12 +166,85 @@ static short picks_distinct(struct test_sound *sound, unsigned long *seed, short
 	return last;
 }
 
+/* A boolean array models the original probing and skip rules without bit packing. */
+static short reference_pick(struct test_sound *sound, boolean *played, short previous, unsigned long *seed)
+{
+	short count = sound->range.actual_permutation_count;
+	short selected = seed_random_range(seed, 0, count), attempts = 0;
+	for (;;)
+	{
+		short i;
+		for (i = 0; i < count && played[i]; i++) {}
+		if (i == count)
+		{
+			memset(played, 0, MOST * sizeof(*played));
+			if (previous >= 0) played[previous] = TRUE;
+		}
+		if (!played[selected])
+		{
+			played[selected] = TRUE;
+			if (attempts++ == 16 || real_seed_random(seed) >= sound->permutations[selected].skip_fraction)
+				return selected;
+		}
+		selected = (short)((selected + 1) % count);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	static struct test_sound sound, old;
 	char const *name = argc > 1 ? argv[1] : "";
 
-	if (!strcmp(name, "forty"))
+	if (!strcmp(name, "skip-boundaries"))
+	{
+		short counts[] = {33, 40, 63, 64, 65, 255, 256};
+		int c, variant, iteration;
+		for (c = 0; c < 7; c++) for (variant = 0; variant < 3; variant++)
+		{
+			boolean played[MOST] = {0};
+			unsigned long seed = 19, reference_seed = seed;
+			short previous = NONE;
+			sound_make(&sound, counts[c], counts[c], 0.3f);
+			sound_definitions_played_beyond_clear();
+			if (variant == 1)
+				for (iteration = 0; iteration < counts[c]; iteration++) sound.permutations[iteration].skip_fraction = 1.f;
+			if (variant == 2)
+			{
+				unsigned long *bits = sound_pitch_range_played_beyond(&sound.range);
+				for (iteration = 0; iteration < counts[c] - 1; iteration++)
+				{
+					played[iteration] = TRUE;
+					sound_pitch_range_permutation_set_played(&sound.range, bits, (short)iteration);
+				}
+				sound.permutations[counts[c] - 1].skip_fraction = 1.f;
+			}
+			for (iteration = 0; iteration < 200; iteration++)
+			{
+				short result = pick(&sound, &seed);
+				CHECK(bit_tests <= MOST + 17, "picker rescanned played bits");
+				previous = reference_pick(&sound, played, previous, &reference_seed);
+				CHECK(result == previous && seed == reference_seed, "skip/seed changed: count %d variant %d", counts[c], variant);
+			}
+		}
+	}
+	else if (!strcmp(name, "retired-ranges"))
+	{
+		unsigned long seed = 19;
+		long iteration;
+		sound_make(&old, 40, 40, 0.f);
+		pick(&old, &seed);
+		for (iteration = 0; iteration < MAXIMUM_SOUND_PLAYED_BEYOND + 1L; iteration++)
+		{
+			unsigned long mask = old.range.played_permutation_mask;
+			sound_make(&sound, 40, 40, 0.f);
+			pick(&sound, &seed);
+			CHECK(sound_played_beyond_table.count == 2, "retired ranges accumulated");
+			sound_pitch_range_played_beyond_release(&sound.range);
+			sound_pitch_range_played_beyond_release(&sound.range);
+			CHECK(old.range.played_permutation_mask == mask, "retiring a range changed another");
+		}
+	}
+	else if (!strcmp(name, "forty"))
 	{
 		/* every one of 40 before any repeats, round after round; the first
 		of a round is never the last of the one before */
@@ -303,9 +377,11 @@ int main(int argc, char **argv)
         sound_make(&sound, 40, 40, 0.f);
         fail_allocation = TRUE;
         picks_distinct(&sound, &seed, 32, NONE);
-        CHECK(sound.range.actual_permutation_count == 32 && sound.range.played_beyond_index == 0,
-            "allocation failure must use only the original mask");
+        CHECK(sound.range.actual_permutation_count == 40,
+            "allocation failure changed the tag's variation count");
         CHECK(sound_played_beyond_table.count == 0, "failed allocation retained an entry");
+        fail_allocation = FALSE;
+        CHECK(pick(&sound, &seed) >= 32, "allocation recovery lost the remaining variations");
     }
     else if (!strcmp(name, "table-full"))
     {
@@ -319,9 +395,12 @@ int main(int argc, char **argv)
             "last index wrapped");
         sound_make(&sound, 40, 40, 0.f);
         picks_distinct(&sound, &seed, 32, NONE);
-        CHECK(sound.range.actual_permutation_count == 32, "full table did not fall back");
+        CHECK(sound.range.actual_permutation_count == 40, "full table changed the tag");
         CHECK(sound_pitch_range_played_beyond(&ranges[0]) == sound_played_beyond_table.entries[0].bits,
             "full table lost an existing range");
+        sound_pitch_range_played_beyond_release(&ranges[123]);
+        CHECK(pick(&sound, &seed) >= 32 && sound.range.played_beyond_index == 124,
+            "full table did not recover using the retired entry");
         sound_definitions_played_beyond_clear();
         free(ranges);
     }

@@ -8,16 +8,20 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from harness import CHECK_FAILED, build, constant, mutated, read, structure, run  # noqa: E402
+from harness import CHECK_FAILED, build, constant, function, mutated, read, structure, run  # noqa: E402
 from harness.audio import permutation_picker  # noqa: E402
 
-CASES = ["forty", "same-as-old", "pieces", "reloaded", "map-after-map", "allocation-failure", "table-full"]
+CASES = ["forty", "same-as-old", "pieces", "reloaded", "map-after-map", "allocation-failure", "table-full",
+         "skip-boundaries", "retired-ranges"]
 NEGATIVE_CONTROLS = {
+    "no-reset-after-skip": (("\t\t\tif (beyond)\n\t\t\t\ttry_to_reset_permutations_beyond(range, beyond);\n", ""),
+                            "skip-boundaries"),
+    "no-slot-reuse": (("table->free_index = index + 1;", "table->free_index = 0;"), "retired-ranges"),
     # the old clamp: a range picks from its first 32 permutations only
     "old-clamp": (("\t\tbeyond = sound_pitch_range_played_beyond(range);\n",
                    "\t\tbeyond = NULL;\n"), "forty"),
     # the issue's smallest change: the permutations past 32 are not kept as played, so they may repeat
-    "past-32-repeat": (("\t\tbeyond[(index - 32) >> 5] |= 1UL << ((index - 32) & 31);\n", "\t\t(void)beyond;\n"),
+    "past-32-repeat": (("\t\tBIT_VECTOR_SET_FLAG(beyond, index - 32, TRUE);\n", "\t\t(void)beyond;\n"),
                        "forty"),
     # the bits past 32 of a range whose map loaded again kept, not reset with its played mask
     "stale-bits": (("\tfor (word = 0; word < SOUND_PLAYED_BEYOND_LONGS; word++)\n"
@@ -39,6 +43,9 @@ def generated(fault=None):
     most = constant(definitions, "MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE")
     types += f"#define MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE {most}\n"
     code = permutation_picker()
+    probe = function(code, "sound_pitch_range_permutation_played")
+    code = "static unsigned long bit_tests;\n" + code.replace(probe, probe.replace("{",
+        '{\n CHECK(++bit_tests < 4096, "excessive probing or a stuck picker");', 1))
     if fault:
         code = mutated(code, *fault)
     return (("types.inc", types), ("under_test.inc", code))

@@ -2246,12 +2246,14 @@ static real source_distance_squared(
 	return distance_squared;
 }
 
-/* port: music and speech (the classes marked speech: the units' and the
-scripts' dialogue) */
-static boolean sound_class_is_music_or_speech(
+/* port: scripted dialogue is protected; combat chatter keeps its class priority */
+static boolean sound_class_is_music_or_scripted_dialogue(
 	short class_index)
 {
-	return class_index == _sound_class_music || sound_class_get(class_index)->speech;
+	return class_index == _sound_class_music ||
+		class_index == _sound_class_scripted_dialog_to_player ||
+		class_index == _sound_class_scripted_dialog_to_other ||
+		class_index == _sound_class_scripted_dialog_force_unspatialized;
 }
 
 static boolean sound_preempts_sound(
@@ -2265,21 +2267,19 @@ static boolean sound_preempts_sound(
 	struct sound_datum *champion_sound = sound_get(champion_sound_index);
 	struct sound_definition *champion_definition =
 		sound_definition_get(champion_sound->definition_index);
-	boolean challenger_kept = sound_class_is_music_or_speech(challenger_definition->sound_class);
+	/* port: only music and scripted dialogue outrank the class priorities */
+	boolean challenger_kept = sound_class_is_music_or_scripted_dialogue(challenger_definition->sound_class);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_manager.c",
 		0x763,
 		challenger_sound_index!=champion_sound_index);
 
-	/* port: music and speech outrank every other class, whatever its
-	priority. Music's is 2 and the units' speech 3, under the weapons' 4 and
-	the engines' 3, so when a channel type was full (a sound mod's stereo 44 kHz
-	weapons and engines, in the 9 channels the music plays in) an effect took
-	the music's or a line's channel and cut it off (#1125). Between two of
-	music or speech, or two others, the priorities and distances decide as
-	before. */
-	if (challenger_kept != sound_class_is_music_or_speech(champion_definition->sound_class))
+	/* port: stereo weapon and engine mods share music's pool and used to
+	cut it off (OpenH1 issue 1125). Protect music and scripted dialogue;
+	within that group, and between all other sounds including combat
+	chatter, retain the class priorities and distance tie-break. */
+	if (challenger_kept != sound_class_is_music_or_scripted_dialogue(champion_definition->sound_class))
 	{
 		return challenger_kept;
 	}

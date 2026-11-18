@@ -72,8 +72,9 @@ the Xbox's. */
 /* Sound mods can put weapons, music and speech in the same stereo pool.
 The software mixer is not limited to the Xbox's hardware voices. Keep
 smaller pools on Android and the web, as with their sound cache above.
-Actual channels include sounds fading out and must total at most the
-256 streams in sound_dsound_xbox.c. OpenH1's mixer timings do not measure
+Actual channels must total at most the 256 streams in sound_dsound_xbox.c.
+OpenCE cancels stopped packets synchronously and captures fades separately;
+a fading sound does not reserve a channel until the fade ends. OpenH1's mixer timings do not measure
 this backend; tools/harness/tests/test_sound_channel_pools.py checks
 contention and capacity, not runtime cost. */
 #if defined(HALO_ARM64_GUEST) || defined(HALO_WEB)

@@ -287,6 +287,16 @@ int main(int argc, char **argv)
 		CHECK(the_range(sound)->actual_permutation_count == variations, "%d picked from",
 			the_range(sound)->actual_permutation_count);
 		sound_definitions_played_beyond_clear();
+		if (argc > 1 && !strcmp(argv[1], "replaced-ranges"))
+		{
+			for (round = 0; round < 128; round++)
+			{
+				sound_definition_next_permutation(&sound->definition, 0, NONE);
+				CHECK(sound_played_beyond_table.count == 1, "freed mod ranges retained entries");
+				mod_sound_free(sound);
+				sound = sound_load();
+			}
+		}
 		for (round = 0; round < 4; round++)
 		{
 			boolean seen[MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE] = { 0 };
