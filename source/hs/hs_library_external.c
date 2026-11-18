@@ -107,6 +107,7 @@ symbols in this file:
 #include "object_lists.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
+#include "x10_warthogs.h" /* port: port/linux/game/x10_warthogs.c */
 
 /* ---------- constants */
 
@@ -945,10 +946,39 @@ void hs_object_create_anew(
 	return;
 }
 
+/* port: as hs_object_create_anew, but a10's hangar dressing destroys the
+warthog it names that x10_hog_2 is driving and does not place it again,
+on the hangar's upper deck, where x10_hog_2 destroyed it two seconds into
+the shot (x10_warthogs.c) */
+static void hs_object_create_anew_dressing(
+	short object_name_index)
+{
+	struct scenario_object_name *object_name;
+
+	object_name = TAG_BLOCK_GET_ELEMENT(
+		&global_scenario_get()->object_names,
+		object_name_index,
+		struct scenario_object_name);
+	if (x10_warthogs_dressing_driven(
+		global_scenario_index != NONE ? tag_get_name(global_scenario_index) : NULL,
+		object_name->name))
+	{
+		long object_index;
+
+		object_index = object_index_from_name_index(object_name_index);
+		if (object_index != NONE)
+			hs_object_destroy(object_index);
+		return;
+	}
+	hs_object_create_anew(object_name_index);
+
+	return;
+}
+
 void hs_object_create_anew_containing(
 	char const *name_string)
 {
-	hs_object_iterate_names_containing(name_string, hs_object_create_anew);
+	hs_object_iterate_names_containing(name_string, hs_object_create_anew_dressing); /* port: was hs_object_create_anew */
 
 	return;
 }

@@ -3,7 +3,8 @@ X10_WARTHOGS.H
 
 a10's opening cinematic ends in the hangar with Sergeant Johnson's speech:
 its warthog drives behind him on Legendary too, is destroyed out of sight
-before it crashes into the hangar's far wall, and neither of the scene's
+before it crashes into the hangar's far wall, no warthog on the hangar's
+upper deck vanishes from the scorpions' shot, and neither of the scene's
 warthog drivers is another Johnson (x10_warthogs.c).
 */
 
@@ -34,6 +35,13 @@ boolean x10_warthogs_run_shortened(
 	char const *strings,
 	long string_bytes,
 	long root_expression_index);
+
+/* whether the object of that name, in the scenario of that name, is the
+warthog a10's hangar dressing names but must not place again
+(hs_object_create_anew_containing): x10_warthog_2 */
+boolean x10_warthogs_dressing_driven(
+	char const *scenario_name,
+	char const *name);
 
 /* the placement of the object of that name: no variant, if it is one of
 the scene's warthog drivers placed with Johnson's. TRUE if it changed */

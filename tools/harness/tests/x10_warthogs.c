@@ -1,15 +1,18 @@
 /*
 X10_WARTHOGS.C (test)
 
-The real x10_warthogs_wake_once, x10_warthogs_run_shortened and
-x10_warthogs_driver_placed (x10_warthogs.c): a10's hangar scene, Sergeant
+The real x10_warthogs_wake_once, x10_warthogs_run_shortened,
+x10_warthogs_dressing_driven and x10_warthogs_driver_placed
+(x10_warthogs.c): a10's hangar scene, Sergeant
 Johnson's speech, woke its warthog's script (x10_hog_4) on Legendary twice,
 the second wake ending the script's sleep, so the warthog was destroyed
 before it was seen; the script slept for the warthog's whole run, which
-ends in a crash into the hangar's far wall; and the scene's two warthog
-drivers were placed with Johnson's variant. Legendary's own wake is taken
-out, the sleep made one of 120 ticks, and the drivers placed with no
-variant. The nodes are laid out as a10's are, in a data array of script
+ends in a crash into the hangar's far wall; the hangar's dressing placed
+x10_warthog_2 again on the upper deck, for x10_hog_2 to destroy it two
+seconds into the shot; and the scene's two warthog drivers were placed with
+Johnson's variant. Legendary's own wake is taken out, the sleep made one of
+120 ticks, the dressing's x10_warthog_2 not placed again, and the drivers
+placed with no variant. The nodes are laid out as a10's are, in a data array of script
 nodes: a call (permanent) names its function with its first child (a
 primitive of the function name type), which its arguments follow.
 test_x10_warthogs.py takes the code from the sources (under_test.inc).
@@ -23,6 +26,7 @@ typedef unsigned short word;
 typedef struct { real yaw, pitch, roll; } real_euler_angles3d;
 #define NUMBEROF(array) (sizeof(array) / sizeof((array)[0]))
 #define SET_FLAG(flags, bit, value) ((value) ? ((flags) |= FLAG(bit)) : ((flags) &= ~FLAG(bit)))
+#define csstrcmp strcmp
 
 #include "under_test.inc"
 
@@ -396,6 +400,20 @@ int main(int argc, char **argv)
 		CHECK(!run_shortened(NONE), "no root changed");
 		CHECK(!x10_warthogs_run_shortened(syntax, NULL, string_bytes, other_run), "no strings changed");
 		CHECK(nodes_unchanged(), "changed");
+		return 0;
+	}
+	/* a10's dressing places x10_warthog_2 no more; its parked warthogs
+	(x10_warthog_2a and 2b), x10_hog_5's, and another map's of that name are
+	placed as they were */
+	CASE("dressing")
+	{
+		CHECK(x10_warthogs_dressing_driven("levels\\a10\\a10", "x10_warthog_2"), "x10_warthog_2 placed again");
+		CHECK(!x10_warthogs_dressing_driven("levels\\a10\\a10", "x10_warthog_2a"), "x10_warthog_2a not placed");
+		CHECK(!x10_warthogs_dressing_driven("levels\\a10\\a10", "x10_warthog_2b"), "x10_warthog_2b not placed");
+		CHECK(!x10_warthogs_dressing_driven("levels\\a10\\a10", "x10_warthog_3"), "x10_warthog_3 not placed");
+		CHECK(!x10_warthogs_dressing_driven("levels\\a30\\a30", "x10_warthog_2"), "another map's not placed");
+		CHECK(!x10_warthogs_dressing_driven(NULL, "x10_warthog_2") &&
+			!x10_warthogs_dressing_driven("levels\\a10\\a10", NULL), "nothing placed");
 		return 0;
 	}
 	/* the two drivers placed with Johnson's variant are placed with none;

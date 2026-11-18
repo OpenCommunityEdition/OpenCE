@@ -1,9 +1,11 @@
-"""The real x10_warthogs_wake_once, x10_warthogs_run_shortened and x10_warthogs_driver_placed (x10_warthogs.c): a10's
-hangar scene, Sergeant Johnson's speech, woke its warthog's script (x10_hog_4) on Legendary twice, the second wake ending
-the script's sleep, so the warthog was destroyed before it was seen; the script slept for the warthog's whole run, which
-ends in a crash into the hangar's far wall; and the scene's two warthog drivers were placed with Johnson's variant.
-Legendary's own wake is taken out, the sleep made one of 120 ticks, and the drivers placed with no variant; scripts laid
-out otherwise, already changed, and other placements are left as they are."""
+"""The real x10_warthogs_wake_once, x10_warthogs_run_shortened, x10_warthogs_dressing_driven and
+x10_warthogs_driver_placed (x10_warthogs.c): a10's hangar scene, Sergeant Johnson's speech, woke its warthog's script
+(x10_hog_4) on Legendary twice, the second wake ending the script's sleep, so the warthog was destroyed before it was
+seen; the script slept for the warthog's whole run, which ends in a crash into the hangar's far wall; the hangar's
+dressing placed x10_warthog_2 again on the upper deck, for x10_hog_2 to destroy it two seconds into the scorpions'
+shot; and the scene's two warthog drivers were placed with Johnson's variant. Legendary's own wake is taken out, the
+sleep made one of 120 ticks, the dressing's x10_warthog_2 not placed again, and the drivers placed with no variant;
+scripts laid out otherwise, already changed, and other placements are left as they are."""
 
 import re
 import sys
@@ -14,11 +16,12 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["legendary", "woken once", "other wakes", "run", "shortened once", "other runs", "drivers"]
+CASES = ["legendary", "woken once", "other wakes", "run", "shortened once", "other runs", "dressing",
+         "drivers"]
 
 FUNCTIONS = ["script_node_get", "script_string_get", "script_call_name_node", "script_node_calls",
              "script_node_calls_with", "script_begin_name_node", "x10_warthogs_wake_once",
-             "x10_warthogs_run_shortened", "x10_warthogs_driver_placed"]
+             "x10_warthogs_run_shortened", "x10_warthogs_dressing_driven", "x10_warthogs_driver_placed"]
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -39,6 +42,10 @@ NEGATIVE_CONTROLS = {
     # a wait for any vehicle's recording changed
     "any-vehicle": (('script_node_calls_with(syntax, strings, string_bytes, ticks, "recording_time", HOG_VEHICLE_NAME)',
                      'script_node_calls(syntax, strings, string_bytes, ticks, "recording_time")'), "other runs"),
+    # the dressing's x10_warthog_2 kept in any map
+    "dressing-any-map": (("!csstrcmp(scenario_name, A10_SCENARIO_NAME) &&", ""), "dressing"),
+    # ... or every warthog of the dressing's name
+    "dressing-containing": (("!csstrcmp(name, HOG_VEHICLE_NAME)", "strstr(name, HOG_VEHICLE_NAME) != NULL"), "dressing"),
     # a driver of any variant placed with none
     "any-variant": (("!name || !object || object->variant_number != JOHNSON_VARIANT", "!name || !object"),
                     "drivers"),
@@ -52,7 +59,7 @@ def generated(fault=None):
     hs = read("source/hs/hs.h").replace("\r\n", "\n")
     definitions = read("source/hs/hs_scenario_definitions.h").replace("\r\n", "\n")
     scenario = read("source/scenario/scenario_definitions.h").replace("\r\n", "\n")
-    defines = "\n".join(re.findall(r"^#define (?:HOG_\w+|X10_HOG_RUN_TICKS|JOHNSON_VARIANT) .*$", source, re.M))
+    defines = "\n".join(re.findall(r"^#define (?:A10_SCENARIO_NAME|HOG_\w+|X10_HOG_RUN_TICKS|JOHNSON_VARIANT) .*$", source, re.M))
     names = re.search(r"^static char const \*const x10_warthog_driver_names\[\] =\n\{.*?^\};", source, re.M | re.S)
     code = "\n\n".join([enum_with(hs, "_hs_function_name"), structure(definitions, "hs_syntax_node"),
                         structure(scenario, "scenario_object_datum"),
@@ -82,6 +89,17 @@ def test_scripts_change_them():
     assert loaded.index("HOG_SCRIPT_NAME") < loaded.index("x10_warthogs_run_shortened(")
     assert "scenario_get_object_type_scenario_datums(scenario, _object_type_biped, &element_size)" in loaded
     assert "x10_warthogs_driver_placed(" in loaded
+
+
+def test_dressing_destroys_and_does_not_place():
+    """a10's dressing, made anew, destroys x10_warthog_2 and does not place it again; the rest as before."""
+    external = read("source/hs/hs_library_external.c").replace("\r\n", "\n")
+    containing = function(external, "hs_object_create_anew_containing")
+    assert "hs_object_iterate_names_containing(name_string, hs_object_create_anew_dressing);" in containing
+    dressing = function(external, "hs_object_create_anew_dressing")
+    driven = dressing.index("x10_warthogs_dressing_driven(")
+    destroyed = dressing.index("hs_object_destroy(object_index);", driven)
+    assert dressing.index("return;", destroyed) < dressing.index("hs_object_create_anew(object_name_index);")
 
 
 @pytest.mark.parametrize("case", CASES)

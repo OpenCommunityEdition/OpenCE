@@ -6,8 +6,8 @@ speech to his marines (hangar_2). Its words depend on the difficulty: four
 ifs, one for each, end with his "Am I right, marines?". After them, as the
 marines answer, hangar_2 wakes x10_hog_4, whose warthog (x10_warthog_2,
 hog_2_driver at the wheel) drives along the hangar's north side, behind him
-as he says "Damn right I am!". Three things were wrong with it, on the Xbox
-too:
+as he says "Damn right I am!". Four things were wrong with the hangar, on
+the Xbox too:
 
 - Legendary's if wakes x10_hog_4 as well, before Johnson's last line on
   that difficulty. The wake after the ifs then ends the script's sleep (a
@@ -20,6 +20,13 @@ too:
   south there and runs on into the far wall at full speed, where its crash
   sound plays (create_crashing_effects, vehicles.c) while Johnson walks
   among his marines; only at the run's end did the script destroy it.
+- The shot before the scorpions' (hangar_1) dresses the hangar for theirs
+  (dressing_2), and its (object_create_anew_containing "x10_warthog_2")
+  names x10_warthog_2 too, the warthog x10_hog_2 is still driving: made
+  anew, it is destroyed, out of the shot just cut away from, and placed
+  again where the scenario parks it, on the hangar's upper deck. At the end
+  of x10_hog_2's sleep, two seconds into the scorpions' shot, the script
+  destroys it there: a warthog on the deck vanished.
 - Both of the scene's warthog drivers (hog_2_driver, and hog_3_driver of
   x10_hog_5's warthog at "Today's your lucky day") are placed with
   Johnson's variant (JOHNSON_VARIANT: the marine model's sgt_johnson-100
@@ -31,7 +38,11 @@ wake of x10_hog_4 is taken out of its if's begin, so the script is woken
 once, after the ifs, as on every other difficulty; x10_hog_4's sleep for
 the rest of the run, (sleep (recording_time x10_warthog_2)), becomes a
 sleep of X10_HOG_RUN_TICKS, so the warthog and its driver are destroyed out
-of every shot and short of the hangar's west end; and the two drivers are
+of every shot and short of the hangar's west end; the dressing's
+x10_warthog_2 is destroyed, as made anew, and not placed again
+(x10_warthogs_dressing_driven, as the dressing names it:
+hs_object_create_anew_containing), so the deck stays as it is once the
+shot has run two seconds, as it was for the rest of it; and the two drivers are
 placed with no variant, so each gets a marine's head and arms at random, as
 the other marines of the scene do (they also drive x10_hog_2's and
 x10_hog_3's warthogs, earlier in the hangar). Each is changed only when it
@@ -311,6 +322,15 @@ boolean x10_warthogs_run_shortened(
 	}
 
 	return FALSE;
+}
+
+boolean x10_warthogs_dressing_driven(
+	char const *scenario_name,
+	char const *name)
+{
+	return scenario_name && name &&
+		!csstrcmp(scenario_name, A10_SCENARIO_NAME) &&
+		!csstrcmp(name, HOG_VEHICLE_NAME);
 }
 
 boolean x10_warthogs_driver_placed(
