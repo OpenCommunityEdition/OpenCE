@@ -156,7 +156,10 @@ static void mod_sound_free(
 	struct mod_sound *sound)
 {
 	long permutation_index;
+	long range_index;
 
+	for (range_index = 0; range_index < sound->definition.pitch_ranges.count; range_index++)
+		sound_pitch_range_played_beyond_release(&sound->ranges[range_index]);
 	for (permutation_index = 0; permutation_index < sound->permutation_count; permutation_index++)
 	{
 		if (sound->permutations[permutation_index].samples.address)
@@ -497,7 +500,6 @@ static struct mod_sound *mod_sound_new(
 			if (!mods_finite_real(range->natural_pitch) || !mods_finite_real(range->bend_bounds.lower) ||
 				!mods_finite_real(range->bend_bounds.upper) ||
 				range->actual_permutation_count < 1 ||
-				range->actual_permutation_count > MAXIMUM_PERMUTATIONS_PER_RANDOM_PITCH_RANGE ||
 				(unsigned long)range->actual_permutation_count > count)
 			{
 				goto refused;
@@ -510,7 +512,12 @@ static struct mod_sound *mod_sound_new(
 			if (range->bend_bounds.lower < 0.f)
 				goto refused;
 			range->playback_rate = 1.f / range->natural_pitch;
-			range->played_permutation_mask = 0xFFFFFFFF;
+			/* (any number of them picked from, each once before any repeats:
+			past 32, their played bits are sound_definitions.c's, none played
+			yet; of 32 or fewer, all played, so the first pick starts over,
+			as before) */
+			range->played_permutation_mask = range->actual_permutation_count > 32 ? 0 : 0xFFFFFFFF;
+			range->played_beyond_index = 0;
 			range->previous_permutation_index = NONE;
 			range->forced_permutation_index = NONE;
 			range->permutations.count = (long)count;

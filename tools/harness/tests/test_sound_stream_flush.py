@@ -9,7 +9,7 @@ from harness import CHECK_FAILED, build, function, mutated, read, run
 from harness.audio import stream_types
 
 CASES = ["mixed-head", "unfinished", "all-finished", "paused", "repeat", "ordinary",
-         "wrapped", "no-callback", "empty"]
+         "wrapped", "no-callback", "empty", "burst-remap"]
 NEGATIVE_CONTROLS = {
     "successful-cancellation": (("stream_complete_head(stream, XMEDIAPACKET_STATUS_FLUSHED,",
         "stream_complete_head(stream, head->finished ? XMEDIAPACKET_STATUS_SUCCESS : XMEDIAPACKET_STATUS_FLUSHED,"), "mixed-head"),
@@ -25,7 +25,9 @@ def generated(fault=None):
     game = read("source/sound/sound_dsound_xbox.c")
     code = function(game, "dsound_channel_callback") + "\n" + function(game, "channel_stop") + "\n"
     code += "\n".join(function(backend, name) for name in ["packet_release", "stream_complete_head",
-        "streams_complete_finished", "stream_from_interface", "stream_flush"])
+        "streams_complete_finished", "stream_from_interface", "stream_flush", "DirectSoundGetStreamVoiceStatus"])
+    code += "\n" + "\n".join(function(game, name) for name in
+        ["dsound_channel_stopped", "dsound_virtual_stop", "dsound_virtual_remap"])
     if fault:
         code = mutated(code, *fault)
     return (("types.inc", stream_types()), ("under_test.inc", code))

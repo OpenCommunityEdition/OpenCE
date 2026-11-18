@@ -35,6 +35,9 @@ controller, Xbox-menu and disabled-feature paths.
 
 ## Shared audio processing
 
+[Sound channels and variation selection](audio_channels.md) explains music/speech
+protection, platform pool limits and sound ranges with more than 32 variations.
+
 [Xbox audio processing](xbox_audio.md) covers measured HRTF, reverb, resampling,
 levels and their limitations across all map families.
 

@@ -901,6 +901,10 @@ void sound_initialize_for_new_map(
 	void)
 {
 	sound_listener_motion_reset(NONE); /* port: no motion from the previous map */
+	/* port: the new map's ranges of more than 32 permutations start with
+	none of those past 32 played (sound_definitions.c) */
+	sound_definitions_played_beyond_clear();
+
 	return;
 }
 
@@ -2242,6 +2246,16 @@ static real source_distance_squared(
 	return distance_squared;
 }
 
+/* port: scripted dialogue is protected; combat chatter keeps its class priority */
+static boolean sound_class_is_music_or_scripted_dialogue(
+	short class_index)
+{
+	return class_index == _sound_class_music ||
+		class_index == _sound_class_scripted_dialog_to_player ||
+		class_index == _sound_class_scripted_dialog_to_other ||
+		class_index == _sound_class_scripted_dialog_force_unspatialized;
+}
+
 static boolean sound_preempts_sound(
 	long challenger_sound_index,
 	long champion_sound_index,
@@ -2253,11 +2267,22 @@ static boolean sound_preempts_sound(
 	struct sound_datum *champion_sound = sound_get(champion_sound_index);
 	struct sound_definition *champion_definition =
 		sound_definition_get(champion_sound->definition_index);
+	/* port: only music and scripted dialogue outrank the class priorities */
+	boolean challenger_kept = sound_class_is_music_or_scripted_dialogue(challenger_definition->sound_class);
 
 	match_assert(
 		"c:\\halo\\SOURCE\\sound\\sound_manager.c",
 		0x763,
 		challenger_sound_index!=champion_sound_index);
+
+	/* port: stereo weapon and engine mods share music's pool and used to
+	cut it off (OpenH1 issue 1125). Protect music and scripted dialogue;
+	within that group, and between all other sounds including combat
+	chatter, retain the class priorities and distance tie-break. */
+	if (challenger_kept != sound_class_is_music_or_scripted_dialogue(champion_definition->sound_class))
+	{
+		return challenger_kept;
+	}
 
 	return
 		sound_class_get(challenger_definition->sound_class)->priority >
