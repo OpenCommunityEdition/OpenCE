@@ -84,6 +84,9 @@ their handlers open opens.
 /* (game_state_test_persistent_storage's declaration: without it the call
 took its boolean, a byte, as an int, whose other bytes nothing sets) */
 #include "saved games/game_state.h"
+/* (tag_get_name's declaration: without it the keyboard prompts' calls took
+the name it returns as an int, right only while a pointer is an int's size) */
+#include "tag_files/tag_files.h"
 #include "tag_files/tag_groups.h"
 #include "text/text_group.h"
 #include "text/unicode.h"
