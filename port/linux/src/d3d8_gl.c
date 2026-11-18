@@ -457,8 +457,12 @@ batch's blurred maps are kept side by side */
 static long shadow_slot_current;
 static unsigned long shadow_slot_data;
 /* the slots past the first are freed (render_targets_evict): how many fit
-in their budget changed (halo_shadow_map_slots) */
+in their budget changed (halo_shadow_map_slots), or display.shadow_map_reuse;
+and how many times they were */
 static BOOL shadow_slots_evicted;
+static unsigned long shadow_slots_freed;
+/* display.shadow_map_reuse, read with display.shadow_resolution */
+static BOOL shadow_reuse;
 
 static long shadow_scale_choose(void)
 {
@@ -477,6 +481,7 @@ static long shadow_scale_maximum(void)
 	if (!shadow_scale)
 	{
 		shadow_scale_read_at = config_changes();
+		shadow_reuse = config_boolean("display.shadow_map_reuse");
 		shadow_scale = shadow_scale_choose();
 		platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow_scale, SHADOW_MAP_SIZE * shadow_scale);
 	}
@@ -558,6 +563,17 @@ long halo_shadow_map_slots(unsigned long bytes)
 		slot_bytes += side * side * 4;
 	}
 	return (long)(bytes / slot_bytes);
+}
+
+int halo_shadow_map_reuse(void)
+{
+	shadow_scale_maximum();
+	return shadow_reuse;
+}
+
+unsigned long halo_shadow_map_slots_freed(void)
+{
+	return shadow_slots_freed;
 }
 
 /* display.hdr (xgpu_post.c): the back buffer in GL_RGBA16F, which keeps
@@ -3150,16 +3166,20 @@ long halo_screen_commit(void)
 	if (shadow_scale && shadow_scale_read_at != config_changes())
 	{
 		long shadow = shadow_scale_choose();
+		BOOL reuse = config_boolean("display.shadow_map_reuse");
 
 		shadow_scale_read_at = config_changes();
-		if (shadow != shadow_scale)
+		if (shadow != shadow_scale || reuse != shadow_reuse)
 		{
-			platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow, SHADOW_MAP_SIZE * shadow);
+			if (shadow != shadow_scale)
+				platform_log("shadow maps: %ldx%ld", SHADOW_MAP_SIZE * shadow, SHADOW_MAP_SIZE * shadow);
 			shadow_scale = shadow;
+			shadow_reuse = reuse;
 			shadow_scale_current = 0;
 			shadow_slots_evicted = TRUE;
 			render_targets_evict();
 			shadow_slots_evicted = FALSE;
+			shadow_slots_freed++;
 		}
 	}
 	if (!screen_width)

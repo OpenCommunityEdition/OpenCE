@@ -93,6 +93,10 @@ void halo_shadow_map_select(long scale, long slot, const void *slotted);
 /* how many slots of the blurred map past the first fit in bytes of the GPU's
 memory, at display.shadow_resolution (rasterizer_xbox_shadows.c) */
 long halo_shadow_map_slots(unsigned long bytes);
+/* display.shadow_map_reuse: small shadows' kept maps reused (render_objects.c) */
+int halo_shadow_map_reuse(void);
+/* how many times the slots past the first were freed, with what they held */
+unsigned long halo_shadow_map_slots_freed(void);
 /* how many times a model's size in the 480-line screen's pixels to measure
 it at (display.model_detail, source/models/models.c): level nonzero, to
 choose its level of detail, otherwise whether it is drawn */

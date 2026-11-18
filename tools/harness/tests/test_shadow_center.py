@@ -1,5 +1,6 @@
-"""The real render_object_shadow_begin (render_objects.c): an object's shadow map is centered where the frame draws the
-object between the ticks, as its model is drawn into the map, not where the tick left it."""
+"""The real render_object_shadow_begin and render_object_shadow_port_setup (render_objects.c): an object's shadow map
+is centered where the frame draws the object between the ticks, as its model is drawn into the map, not where the
+tick left it."""
 
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ from harness import CHECK_FAILED, build, function, mutated, read, run, structure
 
 CASES = ["centered-where-drawn", "at-the-tick"]
 
-# a fault in render_object_shadow_begin and the case that must catch it
+# a fault in render_object_shadow_port_setup and the case that must catch it
 NEGATIVE_CONTROLS = {
     # centered where the tick left the object, as before
     "centered-at-the-tick": (("render_interpolation_object_point(data->object_index, &center);", ""),
@@ -22,7 +23,8 @@ NEGATIVE_CONTROLS = {
 def generated(fault=None):
     source = read("source/render/render_objects.c")
     config = structure(source, "object_render_data") + "\n"
-    code = function(source, "render_object_shadow_begin")
+    # (the shadow's center, color and radius are worked out in a helper the maps' reuse shares)
+    code = function(source, "render_object_shadow_port_setup") + "\n" + function(source, "render_object_shadow_begin")
     if fault:
         code = mutated(code, *fault)
     return (("config.inc", config), ("under_test.inc", code + "\n"))
