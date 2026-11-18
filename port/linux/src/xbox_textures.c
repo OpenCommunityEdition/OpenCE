@@ -414,12 +414,32 @@ static BOOL decode_level(const struct xgpu_texture_description *description, uns
 			for (y = 0; y < height; y++)
 			{
 				unsigned long y_offset = spread(masks.y, y) | z_offset;
+				unsigned long *row = destination + (z * height + y) * width;
 
-				for (x = 0; x < width; x++)
+				/* port: the commonest kinds a row at a time, without
+				convert_texel's switch for each texel (the same texels: a
+				level start's palettized and 32-bit textures were 3 ms
+				each to convert) */
+				if (information.kind == _texel_p8 && palette)
 				{
-					const unsigned char *texel = source + (x_offsets[x] | y_offset) * information.bytes;
+					for (x = 0; x < width; x++)
+						row[x] = palette[source[x_offsets[x] | y_offset]];
+				}
+				else if (information.kind == _texel_a8r8g8b8 || information.kind == _texel_x8r8g8b8)
+				{
+					unsigned long or_mask = information.kind == _texel_x8r8g8b8 ? 0xff000000UL : 0;
 
-					destination[(z * height + y) * width + x] = convert_texel(information.kind, texel, palette, x, texel);
+					for (x = 0; x < width; x++)
+						row[x] = TEXEL32(source + (x_offsets[x] | y_offset) * 4) | or_mask;
+				}
+				else
+				{
+					for (x = 0; x < width; x++)
+					{
+						const unsigned char *texel = source + (x_offsets[x] | y_offset) * information.bytes;
+
+						row[x] = convert_texel(information.kind, texel, palette, x, texel);
+					}
 				}
 			}
 		}
