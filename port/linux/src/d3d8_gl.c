@@ -1089,6 +1089,9 @@ struct gl_device
 	D3DPRIMITIVETYPE immediate_type;
 	/* the input registers written since Begin, a bit each */
 	unsigned long immediate_written;
+	/* (the registers written since Begin, in the order of their first writes) */
+	unsigned char immediate_registers[XGPU_VERTEX_ATTRIBUTE_COUNT];
+	unsigned long immediate_register_count;
 	float *immediate_vertices;
 	unsigned long immediate_count;
 	unsigned long immediate_capacity;
@@ -6940,6 +6943,7 @@ void WINAPI D3DDevice_Begin(D3DPRIMITIVETYPE primitive_type)
 	device.immediate_type = primitive_type;
 	device.immediate_count = 0;
 	device.immediate_written = 0;
+	device.immediate_register_count = 0;
 }
 
 static void immediate_emit(void)
@@ -6957,8 +6961,33 @@ static void immediate_emit(void)
 		device.immediate_vertices = vertices;
 		device.immediate_capacity = capacity;
 	}
-	memcpy(device.immediate_vertices + device.immediate_count * floats, device.attributes, floats * sizeof(float));
+	/* Only the registers written since Begin: End reads no others from the
+	vertices (most draws write 3 of the 16, and all of them are 256 bytes) */
+	{
+		float *vertex = device.immediate_vertices + device.immediate_count * floats;
+		unsigned long slot;
+
+		for (slot = 0; slot < device.immediate_register_count; slot++)
+		{
+			unsigned long reg = device.immediate_registers[slot];
+
+			memcpy(vertex + reg * 4, device.attributes[reg], 4 * sizeof(float));
+		}
+	}
 	device.immediate_count++;
+}
+
+/* a register's first write since Begin: the vertices before it were given
+its value from before the write, which it still holds */
+static void immediate_first_write(unsigned long reg)
+{
+	unsigned long floats = XGPU_VERTEX_ATTRIBUTE_COUNT * 4;
+	unsigned long vertex;
+
+	for (vertex = 0; vertex < device.immediate_count; vertex++)
+		memcpy(device.immediate_vertices + vertex * floats + reg * 4, device.attributes[reg], 4 * sizeof(float));
+	device.immediate_written |= 1UL << reg;
+	device.immediate_registers[device.immediate_register_count++] = (unsigned char)reg;
 }
 
 void WINAPI D3DDevice_End(void)
@@ -6973,6 +7002,13 @@ void WINAPI D3DDevice_End(void)
 	device.immediate_active = FALSE;
 	if (!count || !prepare_draw(TRUE))
 		return;
+	/* (the registers not written, which the vertices were not given: the
+	first vertex's for the trace, which reads all of them) */
+	for (index = 0; index < XGPU_VERTEX_ATTRIBUTE_COUNT; index++)
+	{
+		if (!(device.immediate_written & (1UL << index)))
+			memcpy(device.immediate_vertices + index * 4, device.attributes[index], 4 * sizeof(float));
+	}
 	/* (the fixed-function pipeline's: positions into clip space) */
 	if (device.fixed_function)
 	{
@@ -7162,12 +7198,12 @@ static void set_attribute(INT reg, float a, float b, float c, float d)
 	}
 	if (reg < 0 || reg >= XGPU_VERTEX_ATTRIBUTE_COUNT)
 		return;
+	if (device.immediate_active && !(device.immediate_written & (1UL << reg)))
+		immediate_first_write((unsigned long)reg);
 	device.attributes[reg][0] = a;
 	device.attributes[reg][1] = b;
 	device.attributes[reg][2] = c;
 	device.attributes[reg][3] = d;
-	if (device.immediate_active)
-		device.immediate_written |= 1UL << reg;
 	/* like the hardware, writing register 0 completes a vertex */
 	if (device.immediate_active && (emit || reg == 0))
 		immediate_emit();
