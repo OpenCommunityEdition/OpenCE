@@ -96,6 +96,7 @@ index and tag, since the map placed them at the same index everywhere.
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
 #include "interface/hud_weapon.h"
+#include "items/items.h"
 #include "main/main.h"
 #include "models/model_animation_definitions.h"
 #include "models/model_definitions.h"
@@ -1990,12 +1991,25 @@ static void client_apply_attach(
 	long child_index = object_find((short)PIN(event->reals[0], -1.0f, 32767.0f), event->target, event->tag_index,
 		_object_mask_all);
 	long ancestor_index;
+	boolean off_map;
 
 	if (parent_index == NONE || child_index == NONE || parent_index == child_index)
 		return;
 	/* a resent attach this machine already has */
 	if (event->type == _coop_attach && object_get(child_index)->object.parent_object_index == parent_index)
 		return;
+	/* an item an update called carried is off the map and hidden here
+	(network_objects.c). One in a unit's inventory here waits for that unit's
+	next inventory. Any other goes back on the map for the attach, as an object
+	state would put it back; an inventory that takes it later takes it off
+	again. (objects_scripting_attach leaves a child with a parent as it is) */
+	off_map = event->type == _coop_attach && object_get(child_index)->object.parent_object_index == NONE &&
+		!TEST_FLAG(object_get(child_index)->object.flags, _object_connected_to_map_bit);
+	if (off_map && TEST_FLAG(_object_mask_item, object_get(child_index)->object.type) &&
+		TEST_FLAG(item_get(child_index)->item.flags, _item_attached_to_unit_bit))
+	{
+		return;
+	}
 	/* (not to one of its own children, which objects.c cannot do: copies
 	of the hierarchy that differ here, or a host's mistake) */
 	for (ancestor_index = object_get(parent_index)->object.parent_object_index; event->type == _coop_attach &&
@@ -2008,6 +2022,11 @@ static void client_apply_attach(
 		objects_scripting_detach(parent_index, child_index);
 	else
 	{
+		if (off_map)
+		{
+			object_reconnect_to_map(child_index, NULL);
+			object_set_visibility(child_index, TRUE);
+		}
 		objects_scripting_attach(parent_index, object_marker_name(parent_index, event->value), child_index,
 			object_marker_name(child_index, event->frame));
 	}
