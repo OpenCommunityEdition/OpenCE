@@ -126,6 +126,9 @@ void scenario_debug_to_file(FILE *stream);
 short global_structure_bsp_index_get(void);
 boolean scenario_load(const char *name);
 void scenario_location_from_point(struct location *location, const real_point3d *point);
+/* port: scenario.c */
+boolean scenario_leaf_cache_test_segment(const real_point3d *point0, const real_point3d *point1, long *leaf_index);
+void scenario_leaf_cache_keep(const real_point3d *point, long leaf_index, real clearance);
 void scenario_location_from_line(struct location *location, const struct location *start_location, const real_point3d *start_point, const real_point3d *end_point);
 boolean scenario_ensure_point_within_world(real_point3d *point);
 short scenario_get_fog_region_index(const struct location *location, const real_point3d *position);
