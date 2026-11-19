@@ -542,7 +542,7 @@ BOOL platform_offer_game_data(const char *destination)
 		snprintf(message, sizeof(message),
 			"Halo's game data (its maps folder) was not found.\n\n"
 			"Extract the maps folder from the Xbox disc image %s? "
-			"It is copied to %s/maps (about 2 GB).\n\n"
+			"It is copied to %s/maps (about 2 GB), and the movies next to it (about 650 MB).\n\n"
 			"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
 			found, destination);
 	}
@@ -551,7 +551,7 @@ BOOL platform_offer_game_data(const char *destination)
 		snprintf(message, sizeof(message),
 			"Halo's game data (its maps folder) was not found.\n\n"
 			"Extract the maps folder from an Xbox disc image (.iso) of Halo: Combat Evolved? "
-			"It is copied to %s/maps (about 2 GB).\n\n"
+			"It is copied to %s/maps (about 2 GB), and the movies next to it (about 650 MB).\n\n"
 			"(Or put the maps folder there yourself, or set paths.data in config.toml.)",
 			destination);
 	}

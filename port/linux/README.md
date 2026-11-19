@@ -134,6 +134,18 @@ The game writes the copy to `maps.partial`. When the copy is complete, the
 game changes the name to `maps`. If the copy stops before it is complete,
 the game asks for the disc image again at the next start.
 
+### Movies
+
+After `maps/`, the game copies the disc's `bink/` folder next to it: the
+Xbox's movies, about 650 MB. They are the intro before the first main
+menu, the three demo movies of attract mode, and the credits after the
+campaign's last level, which end with 343 Guilty Spark. A controller
+button, or Enter, Space or Escape, skips a movie. Without `bink/` the game
+skips its movies. Data copied before the game copied movies has no
+`bink/`: copy the disc image's `bink` folder next to `maps` by hand (any
+XISO tool can extract it). The Android app and the web page copy `maps/`
+only.
+
 ### Steam Deck
 
 Do the set-up in Desktop Mode: unpack the release, put `maps/` next to
