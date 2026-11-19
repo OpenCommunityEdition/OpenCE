@@ -21,6 +21,8 @@ NOTICES = [
     ("tomlc17 (config.toml, mod.toml, load_order.toml)", "port/third_party/tomlc17/LICENSE"),
     ("musl (the maths functions)", "port/third_party/musl-math/COPYRIGHT"),
     ("bcdec (MCC texture decoding)", "port/third_party/bcdec/LICENSE"),
+    ("FFmpeg's Bink decoders (the movies; port/third_party/ffmpeg-bink)",
+     "port/third_party/ffmpeg-bink/COPYING.LGPLv2.1"),
     ("stb_vorbis (Custom Edition maps' and mods' sounds)", "port/third_party/stb_vorbis/LICENSE"),
     ("jsmn (the server browser's lists of servers)", "port/third_party/jsmn/LICENSE"),
     ("Overpass (the menus' text and the page's)", "port/assets/fonts/Overpass-OFL.txt"),

@@ -378,7 +378,7 @@ def generate_web_build(n: Writer, sln: Any) -> None:
         description="WEB LICENSES $out",
     )
     n.build(outputs=licenses, rule="web_licenses", implicit=[PORT_DIR / "licenses.py", Path("LICENSE"), sdl_license,
-            Path("port/third_party/bcdec/LICENSE")])
+            Path("port/third_party/bcdec/LICENSE"), Path("port/third_party/ffmpeg-bink/COPYING.LGPLv2.1")])
     site_files.append(licenses)
     n.rule(
         name="web_version",

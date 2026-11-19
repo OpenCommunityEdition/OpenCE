@@ -1874,7 +1874,7 @@ saved with their syntax is not taken; the one before it is kept.
 | Memory | The port reserves the Xbox memory at `0x80000000`. Thus the game gets the fixed addresses that it expects. |
 | Saved games | The Xbox `UDATA` layout, with SHA-1 signatures. |
 | Networking | Winsock on BSD sockets. System link on a local network and on the internet. |
-| Bink video | Not available. The game skips the movies. |
+| Bink video | The Xbox's movies (Bink 1 video, Bink audio): `src/bink_rad.c` gives the game the Bink SDK's functions over `src/bink_decoder.c`, which is adapted from FFmpeg's Bink decoders (LGPL 2.1 or later, with its tables unchanged in `port/third_party/ffmpeg-bink`). The video is converted to the game's 32-bit texture each frame and the audio plays on a DirectSound stream. Refer to "Movies". |
 
 ## How the port operates
 

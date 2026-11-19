@@ -165,6 +165,10 @@ def main() -> int:
     shutil.copy2(ROOT / "port/third_party/expat/COPYING", dist / "expat-COPYING.txt")
     # MCC's texture decoder is distributed under bcdec's MIT option.
     shutil.copy2(ROOT / "port/third_party/bcdec/LICENSE", dist / "bcdec-LICENSE.txt")
+    # the movies' decoder (port/linux/src/bink_decoder.c, adapted from
+    # FFmpeg's, with its tables in port/third_party/ffmpeg-bink), in every
+    # build, under the LGPL 2.1 or later, which asks copies to carry it
+    shutil.copy2(ROOT / "port/third_party/ffmpeg-bink/COPYING.LGPLv2.1", dist / "ffmpeg-bink-COPYING.LGPLv2.1.txt")
     if args.platform == "android":
         # the Steam Workshop screen's Steam client (port/android/host/steam_*.c):
         # Zstandard's decoder, whose BSD license asks binaries to carry its
