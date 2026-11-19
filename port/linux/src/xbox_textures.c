@@ -1321,6 +1321,43 @@ static unsigned long palette_hash(const D3DCOLOR *palette)
 	return hash ? hash : 1;
 }
 
+/* Draws bind the same few palettes again and again. Each is remembered with
+a copy of its colors: comparing them is several times faster than hashing
+them again (each step of the hash waits on the one before), and finds a
+palette rewritten in place as surely as hashing it does. */
+#define RECENT_PALETTE_COUNT 16
+
+static struct
+{
+	const D3DCOLOR *address;
+	unsigned long hash;
+	D3DCOLOR colors[256];
+} recent_palettes[RECENT_PALETTE_COUNT];
+
+static unsigned long palette_hash_recent(const D3DCOLOR *palette)
+{
+	unsigned long slot, index;
+	D3DCOLOR difference = 0;
+
+	if (!palette)
+		return 0;
+	/* (every bit of the address mixed into the top ones: palettes may lie a
+	palette or a page apart) */
+	slot = ((((unsigned long)palette >> 6) * 2654435761UL & 0xffffffffUL) >> 24) % RECENT_PALETTE_COUNT;
+	if (recent_palettes[slot].address == palette)
+	{
+		/* (every color compared, without stopping early: it vectorizes) */
+		for (index = 0; index < 256; index++)
+			difference |= recent_palettes[slot].colors[index] ^ palette[index];
+		if (!difference)
+			return recent_palettes[slot].hash;
+	}
+	memcpy(recent_palettes[slot].colors, palette, sizeof(recent_palettes[slot].colors));
+	recent_palettes[slot].address = palette;
+	recent_palettes[slot].hash = palette_hash(recent_palettes[slot].colors);
+	return recent_palettes[slot].hash;
+}
+
 #ifdef HALO_ANDROID
 void android_ce_texture_gpu_forget(const void *resource)
 {
@@ -1494,7 +1531,7 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 	data = resource[1]; format_word = resource[3]; size_word = resource[4];
 	bucket = &texture_buckets[bucket_index(data, format_word, size_word)];
 	palettized = ((format_word & D3DFORMAT_FORMAT_MASK) >> D3DFORMAT_FORMAT_SHIFT) == 0x0b;
-	hash = palettized ? palette_hash(palette) : 0;
+	hash = palettized ? palette_hash_recent(palette) : 0;
 	recent = bucket_index(data, format_word, size_word) % RECENT_TEXTURE_COUNT;
 	watch_serial = memory_watch_serial();
 #ifdef HALO_ANDROID

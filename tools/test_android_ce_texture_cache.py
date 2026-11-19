@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import pytest
 from harness import function
+from test_palette_hash_recent import recent_palettes
 ROOT = Path(__file__).resolve().parents[1]
 
 def run_c(tmp_path, code):
@@ -92,8 +93,9 @@ void android_ce_texture_unbind(const void *r) { unbinds++; }
     code += re.sub(r'^#include .*$', '', storage, flags=re.M)
     code += '#undef calloc\n'
     code += gpu[gpu.index('struct texture_entry\n'):gpu.index('/* (every bit of the three mixed')]
-    for name in ('bucket_index', 'palette_hash', 'android_ce_texture_gpu_forget', 'texture_entry_pixels_valid'):
+    for name in ('bucket_index', 'android_ce_texture_gpu_forget', 'texture_entry_pixels_valid'):
         code += function(gpu, name) + '\n'
+    code += recent_palettes(gpu)
     code += r'''
 static GLuint texture_entry_result(struct texture_entry *e,GLenum *t,struct xgpu_texture_description *d) {
  *t=e->target;*d=e->description;return e->texture;
@@ -247,8 +249,9 @@ def test_normal_gpu_cache_keeps_write_tracking(tmp_path, platform):
             '#define HALO_WEB 1\n' if platform == 'web' else '') + GPU_FIXTURE
     code += 'static int ce_queries;static const void *android_ce_texture_pixels(const void *r,unsigned long *b) { ce_queries++;*b=0;return NULL; }\n'
     code += gpu[gpu.index('struct texture_entry\n'):gpu.index('/* (every bit of the three mixed')]
-    for name in ('bucket_index', 'palette_hash', 'texture_entry_pixels_valid'):
+    for name in ('bucket_index', 'texture_entry_pixels_valid'):
         code += function(gpu,name) + '\n'
+    code += recent_palettes(gpu)
     code += r'''
 static GLuint texture_entry_result(struct texture_entry *e,GLenum *t,struct xgpu_texture_description *d) {
  *t=e->target;*d=e->description;return e->texture;
