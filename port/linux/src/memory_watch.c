@@ -285,9 +285,26 @@ static void memory_watch_install(void)
 	memory_watch_initialize();
 }
 
+/* pages [first, first + count) made read-only in one call; one at a time
+where that fails (the run crosses a page not mapped) */
+static void protect_run(unsigned long first, unsigned long count)
+{
+	unsigned long page;
+
+	if (!count || !mprotect((void *)(PLATFORM_CONTIGUOUS_BASE + first * WATCH_PAGE_SIZE), count * WATCH_PAGE_SIZE,
+		PROT_READ))
+		return;
+	for (page = first; page < first + count; page++)
+		mprotect((void *)(PLATFORM_CONTIGUOUS_BASE + page * WATCH_PAGE_SIZE), WATCH_PAGE_SIZE, PROT_READ);
+}
+
+/* (each page is marked before the call that protects it, so a write that
+faults once it is protected is the watch's. Pages next to each other are
+protected in one call: a texture is many pages, and a call each was most of
+a new texture's cost) */
 void memory_watch_protect(unsigned long address, unsigned long size)
 {
-	unsigned long first, last, page;
+	unsigned long first, last, page, run;
 
 	if (!watch_active || !size || !platform_is_contiguous((void *)address))
 		return;
@@ -295,14 +312,18 @@ void memory_watch_protect(unsigned long address, unsigned long size)
 	last = page_index(address + size - 1);
 	if (last >= WATCH_PAGE_COUNT)
 		last = WATCH_PAGE_COUNT - 1;
+	run = first;
 	for (page = first; page <= last; page++)
 	{
-		if (page_protected[page] != 1)
+		if (page_protected[page] == 1)
 		{
-			page_protected[page] = 1;
-			mprotect((void *)(PLATFORM_CONTIGUOUS_BASE + page * WATCH_PAGE_SIZE), WATCH_PAGE_SIZE, PROT_READ);
+			protect_run(run, page - run);
+			run = page + 1;
 		}
+		else
+			page_protected[page] = 1;
 	}
+	protect_run(run, last + 1 - run);
 }
 
 unsigned long memory_watch_generation(unsigned long address, unsigned long size)

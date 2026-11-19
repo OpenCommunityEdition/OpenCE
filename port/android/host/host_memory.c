@@ -990,9 +990,21 @@ void host_memory_watch_use_hashes(void)
 /* memory_watch_protect: write-protects the pages of a range, or keeps their
 hash under host_memory_watch_use_hashes; a size outside the guest window
 is ignored */
+/* pages [first, first + count) made read-only in one call; one at a time
+where that fails (the run crosses a page not mapped) */
+static void protect_run(uint64_t first, uint64_t count)
+{
+	uint64_t page;
+
+	if (!count || !mprotect((void *)(HALO_GUEST_WINDOW_BASE + first * PAGE), count * PAGE, PROT_READ))
+		return;
+	for (page = first; page < first + count; page++)
+		mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ);
+}
+
 void host_memory_watch_protect(uint32_t address, uint32_t size)
 {
-	uint64_t first, last, page;
+	uint64_t first, last, page, run;
 
 	if (!watch_active || !size || !in_window(address))
 		return;
@@ -1005,14 +1017,20 @@ void host_memory_watch_protect(uint32_t address, uint32_t size)
 		watch_hash_protect(&page_hashes, (uint32_t)first, (uint32_t)last);
 		return;
 	}
+	/* (each page marked before the call that protects it; pages next to
+	each other in one call, as memory_watch.c's) */
+	run = first;
 	for (page = first; page <= last; page++)
 	{
-		if (page_protected[page] != 1)
+		if (page_protected[page] == 1)
 		{
-			page_protected[page] = 1;
-			mprotect((void *)(HALO_GUEST_WINDOW_BASE + page * PAGE), PAGE, PROT_READ);
+			protect_run(run, page - run);
+			run = page + 1;
 		}
+		else
+			page_protected[page] = 1;
 	}
+	protect_run(run, last + 1 - run);
 }
 
 uint32_t host_memory_watch_serial(void)
