@@ -335,74 +335,280 @@ int hud_hires_override_point_threshold(long asset)
 
 /* Catmull-Rom interpolation of the map's original texels. No font, sprite
  * rectangle, registration point or animation frame is substituted. Keeping
- * the input centres at (x + .5) also keeps the original HUD alignment. */
-static void upscale_weights(float t, float *weights)
-{
-	float square = t * t, cube = square * t;
+ * the input centres at (x + .5) also keeps the original HUD alignment.
+ *
+ * At exactly 4x, output texel 4k + phase falls at source position
+ * k + (phase - 1.5) / 4, so there are only four sets of weights (t = .625,
+ * .875, .125 and .375), each a multiple of 1/1024: phases 0 and 1 read
+ * source texels k - 2 .. k + 1, phases 2 and 3 k - 1 .. k + 2.
+ *
+ * The GPU draws it (upscale_draw): each output texel's 16 taps summed in
+ * integers, the filter's exact value rounded, in one pass the same on every
+ * build. Where that pass cannot be made, the CPU does it (upscale_pixels):
+ * the filter is separable, so each source row is first spread across to the
+ * output width (exact in float: 8-bit texels times 10-bit weights), then
+ * four output rows are made from each five of those, within a step of the
+ * exact value. */
+#define UPSCALE_WEIGHT(n) ((float)(n) / 1024.0f)
+#define UPSCALE_PHASE_0(a, b, c, d) (UPSCALE_WEIGHT(-45) * (a) + UPSCALE_WEIGHT(399) * (b) + \
+	UPSCALE_WEIGHT(745) * (c) + UPSCALE_WEIGHT(-75) * (d))
+#define UPSCALE_PHASE_1(a, b, c, d) (UPSCALE_WEIGHT(-7) * (a) + UPSCALE_WEIGHT(93) * (b) + \
+	UPSCALE_WEIGHT(987) * (c) + UPSCALE_WEIGHT(-49) * (d))
 
-	weights[0] = -0.5f * t + square - 0.5f * cube;
-	weights[1] = 1.0f - 2.5f * square + 1.5f * cube;
-	weights[2] = 0.5f * t + 2.0f * square - 1.5f * cube;
-	weights[3] = -0.5f * square + 0.5f * cube;
+static unsigned long upscale_clamp(long index, unsigned long count)
+{
+	return index < 0 ? 0 : index >= (long)count ? count - 1 : (unsigned long)index;
 }
 
+/* source row (row - 2, clamped) of the BGRA sheet across to the output
+ * width, as RGBA floats (16 floats a source texel); padded holds width + 4
+ * texels */
+static void upscale_across(const unsigned char *bgra, unsigned long width, unsigned long height, unsigned long row,
+	float *padded, float *out)
+{
+	const unsigned char *source = bgra + upscale_clamp((long)row - 2, height) * width * 4;
+	unsigned long x;
+
+	/* (two texels repeated at either end: the edges clamp) */
+	for (x = 0; x < width + 4; x++)
+	{
+		const unsigned char *texel = source + upscale_clamp((long)x - 2, width) * 4;
+
+		padded[x * 4 + 0] = texel[2];
+		padded[x * 4 + 1] = texel[1];
+		padded[x * 4 + 2] = texel[0];
+		padded[x * 4 + 3] = texel[3];
+	}
+	for (x = 0; x < width; x++)
+	{
+		const float *p = padded + x * 4;
+		float *texels = out + x * 16;
+		int channel;
+
+		for (channel = 0; channel < 4; channel++)
+		{
+			float a = p[channel], b = p[4 + channel], c = p[8 + channel], d = p[12 + channel];
+			float e = p[16 + channel];
+
+			texels[channel] = UPSCALE_PHASE_0(a, b, c, d);
+			texels[4 + channel] = UPSCALE_PHASE_1(a, b, c, d);
+			/* (phases 2 and 3 are 1 and 0 mirrored) */
+			texels[8 + channel] = UPSCALE_PHASE_1(e, d, c, b);
+			texels[12 + channel] = UPSCALE_PHASE_0(e, d, c, b);
+		}
+	}
+}
+
+static unsigned char upscale_byte(float value)
+{
+	value += 0.5f;
+	return (unsigned char)(value < 0.0f ? 0 : value > 255.0f ? 255 : (int)value);
+}
+
+/* the CPU's upscale: RGBA, width * 4 by height * 4; NULL past maximum */
 static unsigned char *upscale_pixels(const unsigned char *bgra, unsigned long width, unsigned long height,
 	unsigned long maximum)
 {
+	unsigned long count = width * 16, x, k;
 	unsigned char *out;
-	unsigned long x, y, channel;
+	float *rows, *padded;
 
 	if (!bgra || !width || !height || width > maximum || height > maximum)
 		return NULL;
-	out = malloc(width * height * 16 * 4);
-	if (!out)
-		return NULL;
-	for (y = 0; y < height * 4; y++)
+	out = malloc(width * height * 64);
+	/* (the five spread rows an output row reads, by row % 5) */
+	rows = malloc(5 * count * sizeof(float));
+	padded = malloc((width + 4) * 4 * sizeof(float));
+	if (out && rows && padded)
 	{
-		float sy = (y + 0.5f) * 0.25f - 0.5f, wy[4];
-		long iy = (long)sy;
-
-		if (sy < iy) iy--;
-		upscale_weights(sy - iy, wy);
-		for (x = 0; x < width * 4; x++)
+		for (k = 0; k < 4; k++)
+			upscale_across(bgra, width, height, k, padded, rows + k * count);
+		for (k = 0; k < height; k++)
 		{
-			float sx = (x + 0.5f) * 0.25f - 0.5f, wx[4];
-			long ix = (long)sx;
+			const float *row_a = rows + k % 5 * count, *row_b = rows + (k + 1) % 5 * count;
+			const float *row_c = rows + (k + 2) % 5 * count, *row_d = rows + (k + 3) % 5 * count;
+			const float *row_e = rows + (k + 4) % 5 * count;
+			unsigned char *out_0 = out + k * 4 * count, *out_1 = out_0 + count;
+			unsigned char *out_2 = out_1 + count, *out_3 = out_2 + count;
 
-			if (sx < ix) ix--;
-			upscale_weights(sx - ix, wx);
-			for (channel = 0; channel < 4; channel++)
+			upscale_across(bgra, width, height, k + 4, padded, rows + (k + 4) % 5 * count);
+			for (x = 0; x < count; x++)
 			{
-				float value = 0.0f;
-				long row, column;
-				unsigned long source_channel = channel == 0 ? 2 : channel == 2 ? 0 : channel;
+				float a = row_a[x], b = row_b[x], c = row_c[x], d = row_d[x], e = row_e[x];
 
-				for (row = 0; row < 4; row++)
-				{
-					long py = iy + row - 1;
-
-					if (py < 0) py = 0;
-					if (py >= (long)height) py = height - 1;
-					for (column = 0; column < 4; column++)
-					{
-						long px = ix + column - 1;
-
-						if (px < 0) px = 0;
-						if (px >= (long)width) px = width - 1;
-						value += bgra[(py * width + px) * 4 + source_channel] * wy[row] * wx[column];
-					}
-				}
-				out[(y * width * 4 + x) * 4 + channel] =
-					(unsigned char)(value < 0 ? 0 : value > 255 ? 255 : value + 0.5f);
+				out_0[x] = upscale_byte(UPSCALE_PHASE_0(a, b, c, d));
+				out_1[x] = upscale_byte(UPSCALE_PHASE_1(a, b, c, d));
+				out_2[x] = upscale_byte(UPSCALE_PHASE_1(e, d, c, b));
+				out_3[x] = upscale_byte(UPSCALE_PHASE_0(e, d, c, b));
 			}
 		}
 	}
+	else
+	{
+		free(out);
+		out = NULL;
+	}
+	free(rows);
+	free(padded);
 	return out;
 }
 
-unsigned char *hud_hires_upscale_pixels(const unsigned char *bgra, unsigned long width, unsigned long height)
+/* the GPU's: one triangle over the target, each texel's 16 taps of the
+ * source (BGRA bytes as an RGBA8UI texture, read exactly) */
+static const char upscale_vertex_source[] =
+	"void main()\n"
+	"{\n"
+	"\tgl_Position = vec4(float((gl_VertexID & 1) << 2) - 1.0, float((gl_VertexID & 2) << 1) - 1.0, 0.0, 1.0);\n"
+	"}\n";
+
+static const char upscale_fragment_source[] =
+	"uniform highp usampler2D source;\n"
+	"out vec4 result;\n"
+	"\n"
+	"/* the four phases' weights, in 1/1024 */\n"
+	"const int weights[16] = int[16](-45, 399, 745, -75, -7, 93, 987, -49, -49, 987, 93, -7, -75, 745, 399, -45);\n"
+	"\n"
+	"void main()\n"
+	"{\n"
+	"\tivec2 size = textureSize(source, 0);\n"
+	"\tivec2 position = ivec2(gl_FragCoord.xy);\n"
+	"\tivec2 phase = position & 3;\n"
+	"\tivec2 first = (position >> 2) - 2 + (phase >> 1);\n"
+	"\t/* (at most 1264 * 1264 * 255: 32 bits hold it) */\n"
+	"\tivec4 sum = ivec4(0);\n"
+	"\n"
+	"\tfor (int row = 0; row < 4; row++)\n"
+	"\t{\n"
+	"\t\tint y = clamp(first.y + row, 0, size.y - 1);\n"
+	"\t\tivec4 across = ivec4(0);\n"
+	"\n"
+	"\t\tfor (int column = 0; column < 4; column++)\n"
+	"\t\t\tacross += weights[phase.x * 4 + column] *\n"
+	"\t\t\t\tivec4(texelFetch(source, ivec2(clamp(first.x + column, 0, size.x - 1), y), 0));\n"
+	"\t\tsum += weights[phase.y * 4 + row] * across;\n"
+	"\t}\n"
+	"\t/* (rounded half up, in 1/(1024 * 1024); BGRA to RGBA) */\n"
+	"\tresult = vec4(clamp((max(sum, 0) + 524288) >> 20, 0, 255)).bgra / 255.0;\n"
+	"}\n";
+
+/* (the unit the source is read from: past the draws' (D3DTSS_MAXSTAGES) and
+ * the post-processing passes', so no sampler object is ever bound to it, as
+ * an integer texture needs) */
+#define UPSCALE_UNIT 4
+
+static struct
 {
-	return upscale_pixels(bgra, width, height, 256);
+	GLuint program, vertex_array, framebuffer;
+	int failed;
+} upscale_gpu;
+
+static void upscale_shader_header(struct xgpu_text *text)
+{
+#ifdef HALO_GLES
+	xgpu_text_append(text,
+		"#version %s\n"
+		"precision highp float;\n"
+		"precision highp int;\n",
+		xgpu_capabilities.shading_language);
+#else
+	xgpu_text_append(text, "#version 450 core\n");
+#endif
+}
+
+/* the GPU's program and objects, made once; FALSE if they cannot be (the
+ * CPU upscales from then on). It changes GL state behind the state cache's
+ * back (the program used), as the callers tell it */
+static int upscale_gpu_prepare(void)
+{
+	struct xgpu_text text = { 0 };
+	GLuint vertex_shader, fragment_shader;
+
+	if (upscale_gpu.program || upscale_gpu.failed)
+		return !upscale_gpu.failed;
+	upscale_gpu.failed = 1;
+	upscale_shader_header(&text);
+	xgpu_text_append(&text, "%s", upscale_vertex_source);
+	vertex_shader = xgpu_compile_shader(GL_VERTEX_SHADER, text.buffer, "HUD upscale");
+	text.length = 0;
+	upscale_shader_header(&text);
+	xgpu_text_append(&text, "%s", upscale_fragment_source);
+	fragment_shader = vertex_shader ? xgpu_compile_shader(GL_FRAGMENT_SHADER, text.buffer, "HUD upscale") : 0;
+	free(text.buffer);
+	if (fragment_shader)
+		upscale_gpu.program = xgpu_link_program(vertex_shader, fragment_shader, "HUD upscale");
+	if (vertex_shader)
+		glDeleteShader(vertex_shader);
+	if (fragment_shader)
+		glDeleteShader(fragment_shader);
+	if (!upscale_gpu.program)
+	{
+		platform_log("high-res HUD: the GPU's upscale cannot be made; the CPU's instead");
+		return 0;
+	}
+	glUseProgram(upscale_gpu.program);
+	glUniform1i(glGetUniformLocation(upscale_gpu.program, "source"), UPSCALE_UNIT);
+	glGenVertexArrays(1, &upscale_gpu.vertex_array);
+	glGenFramebuffers(1, &upscale_gpu.framebuffer);
+	upscale_gpu.failed = 0;
+	return 1;
+}
+
+void hud_hires_gl_initialize(void)
+{
+	/* (with the setting turned on later, at the first sheet) */
+	if (config_boolean("display.high_res_hud"))
+		upscale_gpu_prepare();
+}
+
+/* the upscale drawn into texture's first level (width * 4 by height * 4,
+ * made); FALSE if it was not. It is asked for while a draw's textures are
+ * found, before its targets and state are set (d3d8_gl.c, prepare_draw), so
+ * the GL state it changes is only forgotten after, as a multisampled target's
+ * resolve there is (hud_hires_upscale_texture) */
+static int upscale_draw(const unsigned char *bgra, unsigned long width, unsigned long height, GLuint texture)
+{
+	GLenum draw_buffer = GL_COLOR_ATTACHMENT0;
+	GLuint source;
+	int drawn;
+
+	if (!upscale_gpu_prepare())
+		return 0;
+	glActiveTexture(GL_TEXTURE0 + UPSCALE_UNIT);
+	glGenTextures(1, &source);
+	glBindTexture(GL_TEXTURE_2D, source);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8UI, (GLsizei)width, (GLsizei)height, 0, GL_RGBA_INTEGER,
+		GL_UNSIGNED_BYTE, bgra);
+	glBindFramebuffer(GL_FRAMEBUFFER, upscale_gpu.framebuffer);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+	glDrawBuffers(1, &draw_buffer);
+	drawn = glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	if (drawn)
+	{
+		glDisable(GL_SCISSOR_TEST);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_STENCIL_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+#ifndef HALO_GLES
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+#endif
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glViewport(0, 0, (GLsizei)width * 4, (GLsizei)height * 4);
+		glUseProgram(upscale_gpu.program);
+		glBindVertexArray(upscale_gpu.vertex_array);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+	else
+		platform_log("high-res HUD: the GPU cannot draw a %lu by %lu upscale; the CPU's instead", width * 4,
+			height * 4);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+	glDeleteTextures(1, &source);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	return drawn;
 }
 
 static unsigned char *png_decode(const unsigned char *data, unsigned long size,
@@ -410,11 +616,11 @@ static unsigned char *png_decode(const unsigned char *data, unsigned long size,
 
 /* The background's old icon otherwise draws over the existing high-res meter
  * contour. Only the five known Xbox sheets get this matching contour; their
- * text, and customized sheets, retain their original pixels and layout. */
-static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
-	unsigned long width, unsigned long height, long kind)
+ * text, and customized sheets, retain their original pixels and layout. It
+ * is drawn into the upscale's first level (bound) over the rectangle. */
+static void upscale_outline(const unsigned char *bgra, unsigned long width, unsigned long height, long kind)
 {
-	unsigned long crc, png_width, png_height, row;
+	unsigned long crc, png_width, png_height;
 	long asset;
 	unsigned char *outline;
 	char const *name;
@@ -445,9 +651,13 @@ static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
 			continue;
 		outline = png_decode((const unsigned char *)embedded->png, embedded->png_size, &png_width, &png_height);
 		if (outline && png_width == width * 4 && png_height == height * 4)
-			for (row = top * 4; row < bottom * 4; row++)
-				memcpy(pixels + (row * width * 4 + left * 4) * 4,
-					outline + (row * width * 4 + left * 4) * 4, (right - left) * 16);
+		{
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, (GLint)png_width);
+			glTexSubImage2D(GL_TEXTURE_2D, 0, (GLint)left * 4, (GLint)top * 4, (GLsizei)(right - left) * 4,
+				(GLsizei)(bottom - top) * 4, GL_RGBA, GL_UNSIGNED_BYTE,
+				outline + (top * 4 * png_width + left * 4) * 4);
+			glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+		}
 		free(outline);
 		break;
 	}
@@ -456,29 +666,38 @@ static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
 unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
 	unsigned long height, long kind, unsigned long *levels)
 {
-	unsigned char *pixels;
-	unsigned long largest;
+	unsigned long maximum = kind == 4 ? 512 : 256, largest;
 	GLuint texture;
 
-	if (!xgpu_gl_ready())
+	if (!xgpu_gl_ready() || !bgra || !width || !height || width > maximum || height > maximum)
 		return 0;
-	pixels = kind == 4 ? upscale_pixels(bgra, width, height, 512) : hud_hires_upscale_pixels(bgra, width, height);
-	if (!pixels)
-		return 0;
-	upscale_outline(pixels, bgra, width, height, kind);
 	*levels = 1;
 	for (largest = (width > height ? width : height) * 4; largest > 1; largest >>= 1)
 		(*levels)++;
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, (GLint)*levels - 1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width * 4, (GLsizei)height * 4,
-		0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+		0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	if (!upscale_draw(bgra, width, height, texture))
+	{
+		unsigned char *pixels = upscale_pixels(bgra, width, height, maximum);
+
+		if (!pixels)
+		{
+			glDeleteTextures(1, &texture);
+			xgpu_gl_state_invalidate();
+			return 0;
+		}
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (GLsizei)width * 4, (GLsizei)height * 4, GL_RGBA,
+			GL_UNSIGNED_BYTE, pixels);
+		free(pixels);
+	}
+	upscale_outline(bgra, width, height, kind);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	xgpu_gl_state_invalidate();
-	free(pixels);
 	return texture;
 }
 

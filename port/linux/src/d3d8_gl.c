@@ -22,6 +22,7 @@ Conventions carried over from the Xbox:
 */
 
 #include "xgpu.h"
+#include "hud_hires.h"
 #include "mcc_environment_shader.h"
 #include "sdl_platform.h"
 #include "halo_ui_pointer.h"
@@ -2631,6 +2632,7 @@ static void gl_initialize(void)
 		if (renderbuffer_size < maximum_target_size)
 			maximum_target_size = renderbuffer_size;
 	}
+	hud_hires_gl_initialize();
 	xgpu_gl_state_invalidate();
 	device.gl_ready = TRUE;
 	/* display.stats_log's line: the driver's own text for the renderer */
