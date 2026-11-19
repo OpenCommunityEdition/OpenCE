@@ -14,6 +14,7 @@ takes the code (under_test.inc) from the sources.
 #define MAXIMUM_ART 1024
 #define platform_log(...) ((void)0)
 #define xgpu_gl_texture_deleted(texture) ((void)0)
+#define xgpu_texture_lookups_changed() ((void)0)
 #define glDeleteTextures(count, textures) ((void)0)
 static unsigned int next_texture = 1;
 static const unsigned char *file_data(const char *name, unsigned long *size)

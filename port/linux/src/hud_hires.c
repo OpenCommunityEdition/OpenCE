@@ -299,6 +299,8 @@ void hud_hires_register_placeholder(long asset, const unsigned long *texture)
 {
 	long index;
 
+	/* (the placeholder's lookups give the texture drawn for it from now on) */
+	xgpu_texture_lookups_changed();
 	for (index = 0; index < placeholder_count && placeholders[index].asset != asset; index++)
 		;
 	if (texture && index == placeholder_count && placeholder_count < MAXIMUM_PLACEHOLDERS)

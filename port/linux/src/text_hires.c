@@ -298,6 +298,8 @@ int text_hires_glyph(long font, unsigned long code, struct text_hires_glyph *gly
 
 void text_hires_register_atlas(const unsigned long *texture, unsigned long width, unsigned long height)
 {
+	/* (the placeholder's lookups give the atlas from now on) */
+	xgpu_texture_lookups_changed();
 	placeholder_data = texture ? texture[1] : 0;
 	placeholder_width = width;
 	placeholder_height = height;

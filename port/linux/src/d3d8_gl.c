@@ -1994,6 +1994,8 @@ static struct render_target_entry *render_target_get(const D3DSurface *surface)
 	render_targets = entry;
 	entry->next_in_bucket = *render_target_bucket(entry->target.data);
 	*render_target_bucket(entry->target.data) = entry;
+	/* (a texture at its address is drawn from it from now on) */
+	xgpu_texture_lookups_changed();
 	return entry;
 }
 
@@ -4208,7 +4210,8 @@ static DWORD anisotropic_filtering(void)
 filtered and from its mip levels whatever the game asks: the HUD's meters are
 point sampled for one player, to keep the Xbox bitmaps' texels sharp.
 rendered: a render target the game draws into */
-static void configure_sampler(int stage, BOOL mipmapped, BOOL hires, BOOL rendered)
+/* (the sampler bound) */
+static GLuint configure_sampler(int stage, BOOL mipmapped, BOOL hires, BOOL rendered)
 {
 	/* the texture stage state each stage's sampler was last chosen by */
 	static DWORD configured[D3DTSS_MAXSTAGES][SAMPLER_STATE_WORDS];
@@ -4243,6 +4246,7 @@ static void configure_sampler(int stage, BOOL mipmapped, BOOL hires, BOOL render
 		configured_sampler[stage] = sampler_get(stage, inputs);
 	}
 	state_sampler(stage, configured_sampler[stage]);
+	return configured_sampler[stage];
 }
 
 
@@ -4519,6 +4523,92 @@ static GLuint feedback_copy(struct xgpu_render_target *target)
 }
 #endif
 
+/* Draws mostly bind the textures the draws before them bound, a stage taking
+turns between a few of them. A texture a stage's lookup gave its own pixels
+for (xgpu_texture_description.direct) is remembered with what it was looked
+up by: while no watched page is written, no lookup could give something else
+(xgpu_texture_lookup_serial, which a new frame changes too) and no setting
+changes, the same header and sampler states give the same texture and
+sampler without looking either up. */
+#define TEXTURE_STAGE_WAYS 8
+static const int texture_stage_sampler_states[] =
+{
+	D3DTSS_MINFILTER, D3DTSS_MIPFILTER, D3DTSS_MAGFILTER, D3DTSS_ADDRESSU, D3DTSS_ADDRESSV,
+	D3DTSS_ADDRESSW, D3DTSS_MIPMAPLODBIAS, D3DTSS_MAXMIPLEVEL, D3DTSS_MAXANISOTROPY, D3DTSS_BORDERCOLOR
+};
+#define TEXTURE_STAGE_SAMPLER_STATES (sizeof(texture_stage_sampler_states) / sizeof(texture_stage_sampler_states[0]))
+
+struct texture_stage_entry
+{
+	const D3DBaseTexture *texture;
+	DWORD data, format, size;
+	DWORD sampler_states[TEXTURE_STAGE_SAMPLER_STATES];
+	unsigned long watch_serial, lookup_serial, config_serial;
+	GLenum target;
+	GLuint texture_name, sampler;
+	float scale[2];
+	unsigned char sampler_type;
+};
+
+static struct texture_stage_entry texture_stages[D3DTSS_MAXSTAGES][TEXTURE_STAGE_WAYS];
+/* the way each stage remembers its next texture in, in turn */
+static unsigned long texture_stage_next_way[D3DTSS_MAXSTAGES];
+
+/* what the stage remembers of the texture, if what it was looked up by
+is as it was */
+static const struct texture_stage_entry *texture_stage_remembered(int stage, const D3DBaseTexture *texture,
+	unsigned long watch_serial, unsigned long lookup_serial)
+{
+	const DWORD *state = D3D__TextureState[stage];
+	const struct texture_stage_entry *entry;
+	DWORD difference;
+	unsigned long way, index;
+
+	for (way = 0; way < TEXTURE_STAGE_WAYS && texture_stages[stage][way].texture != texture; way++)
+		;
+	if (way == TEXTURE_STAGE_WAYS)
+		return NULL;
+	entry = &texture_stages[stage][way];
+	if (entry->lookup_serial != lookup_serial || entry->watch_serial != watch_serial ||
+		entry->config_serial != config_changes())
+		return NULL;
+	difference = (entry->data ^ texture->Data) | (entry->format ^ texture->Format) | (entry->size ^ texture->Size);
+	for (index = 0; index < TEXTURE_STAGE_SAMPLER_STATES; index++)
+		difference |= entry->sampler_states[index] ^ state[texture_stage_sampler_states[index]];
+	return difference == 0 ? entry : NULL;
+}
+
+static void texture_stage_remember(int stage, const D3DBaseTexture *texture, unsigned long watch_serial,
+	unsigned long lookup_serial, GLenum target, GLuint texture_name, GLuint sampler, const float *scale,
+	unsigned char sampler_type)
+{
+	const DWORD *state = D3D__TextureState[stage];
+	struct texture_stage_entry *entry;
+	unsigned long way, index;
+
+	/* (in the way it was remembered in before, if it was: once a way) */
+	for (way = 0; way < TEXTURE_STAGE_WAYS && texture_stages[stage][way].texture != texture; way++)
+		;
+	if (way == TEXTURE_STAGE_WAYS)
+		way = texture_stage_next_way[stage]++ % TEXTURE_STAGE_WAYS;
+	entry = &texture_stages[stage][way];
+	entry->texture = texture;
+	entry->data = texture->Data;
+	entry->format = texture->Format;
+	entry->size = texture->Size;
+	for (index = 0; index < TEXTURE_STAGE_SAMPLER_STATES; index++)
+		entry->sampler_states[index] = state[texture_stage_sampler_states[index]];
+	entry->watch_serial = watch_serial;
+	entry->lookup_serial = lookup_serial;
+	entry->config_serial = config_changes();
+	entry->target = target;
+	entry->texture_name = texture_name;
+	entry->sampler = sampler;
+	entry->scale[0] = scale[0];
+	entry->scale[1] = scale[1];
+	entry->sampler_type = sampler_type;
+}
+
 static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale[4][4])
 {
 	/* Bind only after resolving every stage, since texture uploads can
@@ -4531,6 +4621,7 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 	{
 		D3DBaseTexture *texture = device.textures[stage];
 		unsigned long mode = stage_texture_mode(stage);
+		const struct texture_stage_entry *remembered;
 
 		texture_scale[stage][0] = texture_scale[stage][1] = 1.0f;
 		texture_scale[stage][2] = texture_scale[stage][3] = 1.0f;
@@ -4541,11 +4632,26 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			key->sampler_type[stage] = mode == 0x11 ? _xgpu_sampler_2d : _xgpu_sampler_none;
 			continue;
 		}
+		remembered = texture_stage_remembered(stage, texture, memory_watch_serial(), xgpu_texture_lookup_serial());
+		if (remembered)
+		{
+			gl_targets[stage] = remembered->target;
+			gl_textures[stage] = remembered->texture_name;
+			state_sampler(stage, remembered->sampler);
+			texture_scale[stage][0] = remembered->scale[0];
+			texture_scale[stage][1] = remembered->scale[1];
+			/* (the texture's own pixels: no high-res meter's) */
+			if (stage == 0)
+				key->coverage_alpha = key->point_threshold = key->ce_meter_channels = 0;
+			key->sampler_type[stage] = remembered->sampler_type;
+			continue;
+		}
 		{
 			struct xgpu_render_target *target = xgpu_render_target_find(texture->Data);
 			struct xgpu_texture_description description;
 			GLenum gl_target;
 			GLuint gl_texture;
+			GLuint sampler;
 
 			if (target)
 			{
@@ -4587,7 +4693,7 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			}
 			gl_targets[stage] = gl_target;
 			gl_textures[stage] = gl_texture;
-			configure_sampler(stage, description.levels > 1, description.hires, target != NULL);
+			sampler = configure_sampler(stage, description.levels > 1, description.hires, target != NULL);
 			if (stage == 0)
 			{
 				key->coverage_alpha = description.hires_coverage != FALSE;
@@ -4596,6 +4702,14 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			}
 			key->sampler_type[stage] = gl_target == GL_TEXTURE_CUBE_MAP ? _xgpu_sampler_cube :
 				gl_target == GL_TEXTURE_3D ? _xgpu_sampler_3d : _xgpu_sampler_2d;
+			/* (not a render target's: its pixels change as it is drawn into,
+			and its lookup resolves them; the serials as the lookup left
+			them, an upload in it having written a watched page) */
+			if (!target && description.direct)
+			{
+				texture_stage_remember(stage, texture, memory_watch_serial(), xgpu_texture_lookup_serial(),
+					gl_target, gl_texture, sampler, texture_scale[stage], key->sampler_type[stage]);
+			}
 		}
 	}
 #ifdef HALO_GLES

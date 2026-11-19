@@ -15,7 +15,7 @@ SOURCE = 'port/linux/src/xbox_textures.c'
 def generated(fault=None, config_fault=None):
     source = read(SOURCE)
     config = '\n'.join(re.findall(r'^#define TEXTURE_\w+.*$', source, re.M) + re.findall(
-        r'^static (?:unsigned long|Uint64) texture_(?:frame|drop_serial|sweep_\w+|next_sweep)\b.*;$', source, re.M))
+        r'^static (?:unsigned long|Uint64) texture_(?:frame|drop_serial|lookup_serial|sweep_\w+|next_sweep)\b.*;$', source, re.M))
     code = function(source, 'xgpu_texture_cache_begin_frame')
     if config_fault:
         config = mutated(config, *config_fault)
