@@ -139,6 +139,77 @@ long bsp3d_test_point(
 	return NONE;
 }
 
+/* port: (bsp3d_test_point_clearance) the least of a clearance so far and a
+point's distance from one more plane it was sorted by, less what a float
+distance can be wrong by: a normal up to a thousandth longer than 1, and the
+rounding of this distance and of the other point's (a NaN is no clearance).
+point_size: |x| + |y| + |z| of the point */
+real bsp3d_clearance_least(
+	real least,
+	real_plane3d const *plane,
+	real distance,
+	real point_size)
+{
+	real margin = (real)fabs(distance) * 0.999f -
+		(point_size + (real)fabs(plane->d)) * 4.0e-6f - 1.0e-4f;
+
+	if (!(margin >= least))
+		least = margin;
+
+	return least;
+}
+
+/* port: bsp3d_test_point, and the point's clearance: its least distance from
+a plane it was sorted by, less what a float distance can be wrong by. A point
+nearer than that to this one is on the same side of each of those planes, so
+in the same leaf (scenario_location_from_point). 0 for a point in no leaf */
+long bsp3d_test_point_clearance(
+	struct bsp3d const *bsp,
+	long node_index,
+	union real_point3d const *point,
+	real *clearance)
+{
+	long first_node_index = node_index;
+	real point_size = (real)(fabs(point->x) + fabs(point->y) + fabs(point->z));
+	real least = 1.0e30f;
+	short depth = 0;
+
+	*clearance = 0.0f;
+	do
+	{
+		struct bsp3d_node const *node;
+		real_plane3d const *plane;
+		real distance;
+
+		if (node_index < 0 ||
+			node_index >= bsp->nodes.count ||
+			depth++ >= MAXIMUM_BSP3D_TRAVERSAL_DEPTH)
+		{
+			return bsp3d_test_point(bsp, first_node_index, point);
+		}
+		node = TAG_BLOCK_GET_ELEMENT(
+			&bsp->nodes,
+			node_index,
+			struct bsp3d_node);
+		plane = TAG_BLOCK_GET_ELEMENT(
+			&bsp->planes,
+			node->plane_designator,
+			real_plane3d);
+
+		distance = plane3d_distance_to_point(plane, point);
+		least = bsp3d_clearance_least(least, plane, distance, point_size);
+		node_index = node->children[distance >= 0.f];
+	}
+	while (!(node_index & LONG_MIN));
+
+	if (node_index == NONE)
+		return NONE;
+	if (least > 0.0f)
+		*clearance = least;
+
+	return node_index & LONG_MAX;
+}
+
 long bsp3d_clip_line_to_leaves(
 	struct bsp3d const *bsp,
 	long node_index,
