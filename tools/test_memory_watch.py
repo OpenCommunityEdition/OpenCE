@@ -1,7 +1,7 @@
 """The Linux build's write tracking and crash report (port/linux/src/memory_watch.c): memory_watch.c compiled as
-it is, beside a platform.h of the test's (a watched window of the test's own memory), with a main that installs
-other handlers as a library would, writes to watched pages and faults. Needs a C compiler (clang, or CC), not
-the game.
+it is (with its mprotect calls counted), beside a platform.h of the test's (a watched window of the test's own
+memory), with a main that installs other handlers as a library would, writes to watched pages and faults. Needs
+a C compiler (clang, or CC), not the game.
 
     python -m pytest -q tools/test_memory_watch.py
 """
@@ -100,6 +100,19 @@ static int foreign_installed(void)
 		(current.sa_sigaction == foreign_jumping || current.sa_sigaction == foreign_chaining);
 }
 
+/* (counted.c's: memory_watch.c's mprotect calls) */
+extern int test_protect_calls;
+
+/* a write to a page already watched: noticed, and made */
+static int noticed_write(unsigned long offset)
+{
+	unsigned long before = memory_watch_generation(test_window + offset, 0x1000);
+
+	*(volatile int *)(test_window + offset) = 9;
+	return memory_watch_generation(test_window + offset, 0x1000) > before &&
+		*(volatile int *)(test_window + offset) == 9;
+}
+
 static int watched_write(unsigned long offset)
 {
 	unsigned long before;
@@ -137,6 +150,61 @@ int main(int argc, char **argv)
 		memory_watch_begin_frame();
 		printf("after_frame foreign_installed=%d watched_write=%d foreign_calls=%d\n", foreign_installed(),
 			watched_write(0x2000), foreign_calls);
+		return 0;
+	}
+	if (!strcmp(mode, "runs"))
+	{
+		int calls, page, noticed = 0;
+
+		/* pages next to each other, none watched: one call */
+		calls = test_protect_calls;
+		memory_watch_protect(test_window, 8 * 0x1000);
+		printf("fresh calls=%d\n", test_protect_calls - calls);
+		/* one watched in the middle (13): a call either side of it */
+		memory_watch_protect(test_window + 13 * 0x1000, 0x1000);
+		calls = test_protect_calls;
+		memory_watch_protect(test_window + 10 * 0x1000, 8 * 0x1000);
+		printf("split calls=%d\n", test_protect_calls - calls);
+		/* a range that ends on a watched page, and one that starts on one */
+		calls = test_protect_calls;
+		memory_watch_protect(test_window + 8 * 0x1000, 3 * 0x1000);
+		printf("ends watched calls=%d\n", test_protect_calls - calls);
+		/* all watched: none */
+		calls = test_protect_calls;
+		memory_watch_protect(test_window, 18 * 0x1000);
+		printf("again calls=%d\n", test_protect_calls - calls);
+		/* a range that is not page aligned: its pages */
+		calls = test_protect_calls;
+		memory_watch_protect(test_window + 20 * 0x1000 + 0x800, 0x1000);
+		printf("unaligned calls=%d\n", test_protect_calls - calls);
+		for (page = 0; page < 18; page++)
+			noticed += noticed_write(page * 0x1000);
+		noticed += noticed_write(20 * 0x1000);
+		noticed += noticed_write(21 * 0x1000);
+		printf("noticed=%d\n", noticed);
+		/* written pages (made writable) watched again, as a run */
+		calls = test_protect_calls;
+		memory_watch_protect(test_window, 8 * 0x1000);
+		calls = test_protect_calls - calls;
+		printf("rewatched calls=%d noticed=%d\n", calls, noticed_write(0x3000));
+		return 0;
+	}
+	if (!strcmp(mode, "hole"))
+	{
+		int calls, page, noticed = 0;
+
+		/* a page in the range that is not mapped: the call for the run
+		fails, and each page is protected on its own */
+		munmap((void *)(test_window + 4 * 0x1000), 0x1000);
+		calls = test_protect_calls;
+		memory_watch_protect(test_window, 8 * 0x1000);
+		printf("calls=%d\n", test_protect_calls - calls);
+		for (page = 0; page < 8; page++)
+		{
+			if (page != 4)
+				noticed += noticed_write(page * 0x1000);
+		}
+		printf("noticed=%d\n", noticed);
 		return 0;
 	}
 	if (!strcmp(mode, "without"))
@@ -184,6 +252,23 @@ int main(int argc, char **argv)
 """
 
 
+# memory_watch.c with its mprotect calls counted
+COUNTED = r"""
+#include <sys/mman.h>
+
+int test_protect_calls;
+
+static int counted_mprotect(void *address, size_t length, int protection)
+{
+	test_protect_calls++;
+	return mprotect(address, length, protection);
+}
+
+#define mprotect counted_mprotect
+#include "memory_watch.c"
+"""
+
+
 @pytest.fixture(scope="module")
 def program(tmp_path_factory):
     compiler = os.environ.get("CC", "clang")
@@ -194,10 +279,11 @@ def program(tmp_path_factory):
     # compiled from a folder that has the test's)
     (work / "platform.h").write_text(PLATFORM_H)
     (work / "memory_watch.c").write_text(SOURCE.read_text())
+    (work / "counted.c").write_text(COUNTED)
     (work / "main.c").write_text(MAIN)
     executable = work / "watch"
     subprocess.run([compiler, "-std=gnu11", "-O1", "-g", "-Wall", "-Werror", "-Wno-unused-result", "-D_GNU_SOURCE", "-I", str(work),
-                    str(work / "main.c"), str(work / "memory_watch.c"), "-o", str(executable)], check=True)
+                    str(work / "main.c"), str(work / "counted.c"), "-o", str(executable)], check=True)
     return executable
 
 
@@ -250,3 +336,28 @@ def test_an_ignored_signal_stays_ignored(program):
     result = run(program, "ignored")
     assert result.returncode == 0
     assert result.stdout.strip() == "survived"
+
+
+def test_pages_next_to_each_other_are_protected_in_one_call(program):
+    result = run(program, "runs")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "fresh calls=1",
+        # 10-12 and 14-17, page 13 already watched
+        "split calls=2",
+        # 8 and 9; 10 already watched
+        "ends watched calls=1",
+        "again calls=0",
+        # the half pages at either end: pages 20 and 21
+        "unaligned calls=1",
+        # every page protected: each write noticed (and made)
+        "noticed=20",
+        "rewatched calls=1 noticed=1",
+    ]
+
+
+def test_a_run_that_cannot_be_protected_is_protected_a_page_at_a_time(program):
+    result = run(program, "hole")
+    assert result.returncode == 0, result.stderr
+    # the failed call, then one for each page (the one not mapped fails too)
+    assert result.stdout.splitlines() == ["calls=9", "noticed=7"]
