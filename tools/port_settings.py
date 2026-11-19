@@ -1364,7 +1364,7 @@ def title_backdrop(width: float) -> str:
 # pausebox5 redraw's rounded box (ui-svg-handmade/shell/bitmaps), drawn to
 # hold each number of buttons, one frame each (the Xbox's 2-button box is
 # 159 units high, and each button 35 more)
-PAUSE_BOX_BUTTONS = [3, 4]
+PAUSE_BOX_BUTTONS = [3, 4, 5]
 # the campaign pause box, tall enough for five rows (SETTINGS added) or six
 # (network co-op's FRIENDLY FIRE too) at the PC version's pause menu's pitch
 # (30) with the prompts still under the last row: the stock box is 159, and
@@ -1374,7 +1374,7 @@ PAUSE_BOX_EXTRA_HEIGHTS = [195, 225]
 
 
 def pause_box_height(buttons: int) -> int:
-    return 159 + (buttons - 2) * 35
+    return 159 + (buttons - 2) * 35 - 35
 
 
 def pause_box_svg(piece: str, height: int, header: bool = False) -> str:
@@ -2410,6 +2410,7 @@ def multiplayer_files() -> dict:
         OPENCE_EDIT.replace("/", ".") + ".port.xml": head + _opence_options() + ["</menus>", ""],
         MODS.replace("/", ".") + ".xml": [head[0], "<!-- The port's Mods screen, in the PC version's style "
                                           "(tools/port_settings.py) -->", head[2]] + _mods() + ["</menus>", ""],
+        "pause.choose_team.xml": head + _pause_team() + ["</menus>", ""],
     }
 
 
@@ -2716,4 +2717,53 @@ def _mcc_downloads() -> list:
                          *label, ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("align", "center")],
                          [f'<on event="a" {action}/>', f'<on event="start" {action}/>',
                           '<on event="left_mouse" run="mouse emit accept event"/>'])
+    return lines
+
+def _pause_team() -> list:
+    """the choose team screen of the in-game pause menu, laid out as the main pause
+    screen is (values read from its dump): the port's box (the teambox pictures,
+    tools/ce_menus.py's pause_art), a list of the map's own menu_bkds buttons, and the
+    map's button_key_sm prompts in the box's footer. To line it up, change only the numbers."""
+    base = "pause/choose_team"
+    box_width = 226            # the stock box's width
+    box_height = pause_box_height(3)
+    box_x = (640 - box_width) // 2
+    centred = (480 - box_height) // 2
+    box_y = centred + 19       # bigger moves the box down
+    button_width = 202
+    button_height = 27
+    button_x = box_x + 8       # the stock list is 8 in from the box
+    button_top = centred + 30  # bigger moves all three buttons down
+    pitch = 35                 # the distance between buttons
+    key_x = box_x + 25         # the prompts, as the stock screen has them
+    key_y = centred + box_height - 21   # the prompts; bigger moves them down
+    buttons = [("blue", "BLUE TEAM", ['<on event="a" run="port team blue" close="all"/>',
+                                      '<on event="start" run="port team blue" close="all"/>']),
+               ("red", "RED TEAM", ['<on event="a" run="port team red" close="all"/>',
+                                    '<on event="start" run="port team red" close="all"/>']),
+               ("back", "BACK", ['<on event="a" back="true"/>', '<on event="start" back="true"/>'])]
+
+    lines = _widget(f"{base}/choose_team_screen",
+                    [("controller", 1), ("width", 640), ("height", 480),
+                     ("flags", "pass_unhandled_to_focused_child")],
+                    ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
+                     f'<child widget="{base}/box_left" x="{box_x}" y="{box_y}"/>',
+                     f'<child widget="{base}/box_center" x="{box_x + 16}" y="{box_y}"/>',
+                     f'<child widget="{base}/box_right" x="{box_x + box_width - 16}" y="{box_y}"/>',
+                     f'<child widget="{base}/team_list"/>',
+                     f'<child widget="ui\\shell\\main_menu\\button_key_sm" x="{key_x}" y="{key_y}"/>'])
+    for piece, width in (("left", 16), ("center", box_width - 32), ("right", 16)):
+        lines += _widget(f"{base}/box_{piece}",
+                         [("width", width), ("height", box_height), ("bitmap", f"pause/teambox_{piece}")], [])
+    lines += _widget(f"{base}/team_list",
+                     [("type", "column_list"), ("width", 640), ("height", 480),
+                      ("flags", "pass_unhandled_to_focused_child up_down_tabs_children")],
+                     [f'<child widget="{base}/button_{key}" x="{button_x}" y="{button_top + index * pitch}"/>'
+                      for index, (key, _, _) in enumerate(buttons)])
+    for key, text, handlers in buttons:
+        lines += _widget(f"{base}/button_{key}",
+                         [("type", "text"), ("width", button_width), ("height", button_height),
+                          ("bitmap", "ui\\shell\\bitmaps\\menu_bkds"), ("text", text), ("font", "ui\\large_ui"),
+                          ("color", "#FFFFFFFF"), ("align", "center"), ("text_y", 4)],
+                         handlers + ['<on event="left_mouse" run="mouse emit accept event"/>'])
     return lines

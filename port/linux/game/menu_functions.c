@@ -154,6 +154,8 @@ boolean pc_menu_event_function_invoke(struct widget_instance *widget, struct eve
 	long function_index, boolean *widget_deleted);
 void pc_menu_game_data_function_invoke(struct widget_instance *widget, long function);
 
+boolean pc_menu_team_set(struct widget_instance *widget, struct event_record *event, char team);
+
 /* ---------- constants */
 
 #define MAXIMUM_STRINGS 64
@@ -8974,6 +8976,14 @@ boolean pc_menu_event_function_invoke(
 		{
 			return coop_friendly_fire_change();
 		}
+		else if (!strcmp(name, "port team red"))
+		{
+			return pc_menu_team_set(widget, event, 0);
+		}
+		else if (!strcmp(name, "port team blue"))
+		{
+			return pc_menu_team_set(widget, event, 1);
+		}
 		else if (!strcmp(name, "player profile save changes"))
 		{
 			return profile_save_changes(widget, widget_deleted);
@@ -9413,4 +9423,187 @@ void pc_menu_game_data_function_invoke(
 		coop_friendly_fire_text(widget);
 	else if (!strcmp(name, "port playlist edit desc"))
 		playlist_edit_description(widget);
+}
+/* port: a Custom Edition map's own New Game screen names Halo PC's functions
+26 (the list's start) and 46 or 52 (its update): the menus' map list runs for it */
+boolean pc_menu_map_list_initialize(struct widget_instance *widget)
+{
+	return map_list_initialize(widget);
+}
+/* port: the map list's update for a map's own screen, with its arrows placed and the menus' row marks hidden */
+void pc_menu_map_list_update(struct widget_instance *widget)
+{
+	char const *const *names;
+	map_list_update(widget);
+	short last;
+	
+	{
+		struct widget_instance *row_top = named(widget, "list_item_0", 0);
+		struct widget_instance *row_end = named(widget, "list_item_10", 0);
+		short total = ui_widget_port_multiplayer_maps(&names, &last);
+
+		if (row_top)
+		{
+			visible_set(named(row_top, "scroll_up_button", 0), map_list.first > 0);
+			visible_set(named(row_top, "scroll_down_button", 0), FALSE);
+		}
+		if (row_end)
+		{
+			/* port: the last row is the down arrow's, not a map's */
+			row_end->visible = TRUE;
+			visible_set(named(row_end, "list_item_text", 0), FALSE);
+			visible_set(named(row_end, "list_item_arrows", 0), FALSE);
+			visible_set(named(row_end, "scroll_up_button", 0), FALSE);
+			visible_set(named(row_end, "scroll_down_button", 0), map_list.first + 9 < total);
+		}
+	}
+	hide_row_arrows(widget);
+}
+
+/* port: a map's own New Game screen: the map chosen is kept until the game
+ends, when the server is in pregame to take it */
+static short pending_map_index = -1;
+/* port: keeps the map chosen for the next game (applied by pc_menu_new_game_apply) */
+boolean pc_menu_map_stash(struct widget_instance *list)
+{
+	char const *const *names;
+	short last_used;
+	short index;
+	short count;
+
+	count = ui_widget_port_multiplayer_maps(&names, &last_used);
+	map_list_update(list);
+	index = map_list.chosen;
+	if (index < 0 || index >= count)
+		return FALSE;
+	pending_map_index = index;
+	return TRUE;
+}
+/* port: the menus' gametype list, for a map's own gametype screen */
+boolean pc_menu_gametype_list_initialize(struct widget_instance *list)
+{
+	boolean result;
+	result = gametype_list_initialize(list);
+	return result;
+}
+/* port: the menus' gametype list, for a map's own gametype screen */
+void pc_menu_gametype_list_update(struct widget_instance *list)
+{
+	gametype_list_update(list);
+	hide_row_arrows(list);
+}
+/* port: a map's own list's first and last rows are its scroll arrows: a page up or down */
+void pc_menu_map_row_click(struct widget_instance *row)
+{
+	char const *const *names;
+	short last_used;
+	short total;
+
+	if (!strcmp(row->name, "list_item_0"))
+		map_list.first = (short)MAX(0, map_list.first - 9);
+	else if (!strcmp(row->name, "list_item_10"))
+	{
+		total = ui_widget_port_multiplayer_maps(&names, &last_used);
+		map_list.first = (short)MIN(MAX(0, total - 9), map_list.first + 9);
+	}
+}
+
+static boolean restart_pending = FALSE;
+static long pending_gametype = NONE;
+/* port: the gametype chosen is kept and the game ends as its time limit would */
+boolean pc_menu_new_game_begin(struct widget_instance *list, boolean *widget_deleted)
+{
+	gametype_list_update(list);
+	if (multiplayer.gametype_chosen >= multiplayer.bank_count || pending_map_index < 0 ||
+		!global_network_game_server_get() || !game_engine_running())
+		return FALSE;
+	pending_gametype = multiplayer.gametypes[multiplayer.bank[multiplayer.gametype_chosen]];
+	game_engine_end_game();
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+/* port: the match is restarted: the game ends as for a new game, with nothing chosen, so the server returns to pregame with its map and gametype and starts at once */
+boolean pc_menu_restart_game(boolean *widget_deleted)
+{
+	if (!global_network_game_server_get() || !game_engine_running())
+		return FALSE;
+	restart_pending = TRUE;
+	game_engine_end_game();
+	*widget_deleted = TRUE;
+	return TRUE;
+}
+/* port: the kept map and gametype are given to the server once it is in pregame; TRUE if there were any */
+boolean pc_menu_new_game_apply(void)
+{
+	boolean applied = restart_pending || (pending_map_index >= 0 && pending_gametype != NONE);
+
+	if (pending_map_index >= 0)
+		ui_widget_port_multiplayer_map_choose(pending_map_index);
+	if (pending_gametype != NONE)
+		ui_widget_port_gametype_choose(pending_gametype);
+	pending_map_index = -1;
+	pending_gametype = NONE;
+	restart_pending = FALSE;
+	return applied;
+}
+
+/* port: a map's own OK button (Halo PC's function 164) runs the handlers its
+screen's list has for the custom activation event */
+boolean pc_menu_activate_screen(
+	struct widget_instance *widget,
+	struct event_record *event,
+	boolean *widget_deleted)
+{
+	struct widget_instance *top = widget;
+	boolean deleted = FALSE;
+	boolean found;
+
+	while (top->parent)
+		top = top->parent;
+	found = ui_widget_port_dispatch_event(top, EVENT_CUSTOM_ACTIVATION, event_controller(widget, event), &deleted);
+	if (deleted)
+		*widget_deleted = TRUE;
+	return found;
+}
+
+boolean network_game_client_update_local_player_data(void *client, struct network_player *player);
+struct network_game *network_game_get_game(void);
+
+/* port: red 0, blue 1, for the pressing controller's player: in the lobby,
+and in a game (the host applies it: mcc_ui_team_request) */
+boolean pc_menu_team_set(struct widget_instance *widget, struct event_record *event, char team)
+{
+	struct network_game *game = network_game_get_game();
+	short machine_index = network_game_client_get_local_machine_index();
+	short controller = event_controller(widget, event);
+	long index;
+
+	if (!game || machine_index == NONE || !game->variant.universal_variant.teams ||
+		game->variant_options.auto_team_balance)
+	{
+		return campaign_fail();
+	}
+	for (index = 0; index < (long)NUMBEROF(game->players); index++)
+	{
+		if (network_player_is_valid(&game->players[index]) &&
+			(short)game->players[index].machine_index == machine_index &&
+			(short)game->players[index].controller_index == controller)
+		{
+			struct network_player player = game->players[index];
+
+			player.team_index = team;
+			return network_game_client_update_local_player_data(global_network_game_client_get(), &player)
+				|| campaign_fail();
+		}
+	}
+	return campaign_fail();
+}
+
+/* port: a Custom Edition map's choose team screen (Halo PC's function 157):
+its buttons in the order its screen lists them, blue first, red second */
+boolean pc_menu_team_choose(struct widget_instance *widget, struct event_record *event)
+{
+	short place = sibling_index(widget);
+
+	return pc_menu_team_set(widget, event, place == 0 ? 1 : 0);
 }

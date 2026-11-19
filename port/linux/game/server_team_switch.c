@@ -60,6 +60,9 @@ the hooks find none.
 /* the platform layer's */
 unsigned long system_milliseconds(void);
 
+/* game_engine.c's */
+void game_engine_player_reset_score(long player_index);
+
 /* ---------- constants */
 
 enum
@@ -158,6 +161,7 @@ static short team_switch_counted_team(
 /* moves a player: their team, their network data's (which their next unit
 carries to every machine) and the host's game record's */
 static void team_switch_move_player(
+	long player_index,
 	struct player_datum *player,
 	short team)
 {
@@ -169,6 +173,13 @@ static void team_switch_move_player(
 	player->network_player_data.team_index = (char)team;
 	if (game && VALID_INDEX(list_index, NUMBEROF(game->players)))
 		game->players[list_index].team_index = (char)team;
+	/* port: the player's own game score starts over (flags, hill time, ball time, laps);
+	kills, deaths, assists and the old team's scores stay */
+	csmemset(
+		&player->statistics.multiplayer_statistics,
+		0,
+		sizeof(player->statistics.multiplayer_statistics));
+	game_engine_player_reset_score(player_index);
 }
 
 boolean server_team_switch(
@@ -255,7 +266,7 @@ boolean server_team_switch(
 	if (player->unit_index == NONE)
 	{
 		/* (the dead carry nothing: they are moved now) */
-		team_switch_move_player(player, team);
+		team_switch_move_player(player_index, player, team);
 	}
 	else
 	{
@@ -293,7 +304,7 @@ void server_team_switch_damage(
 		move->no_statistics = no_statistics;
 }
 
-void server_team_switch_player_killed(
+boolean server_team_switch_player_killed(
 	long *killing_player_index,
 	long *killing_object_index,
 	long dead_player_index,
@@ -323,7 +334,9 @@ void server_team_switch_player_killed(
 		*killing_player_index = NONE;
 		*killing_object_index = NONE;
 		*friendly_fire = FALSE;
+		return TRUE;
 	}
+	return FALSE;
 }
 
 void server_team_switch_player_dead(
@@ -337,5 +350,40 @@ void server_team_switch_player_dead(
 	move->active = FALSE;
 	player = player_try_and_get(dead_player_index);
 	if (player && !player->quit_out_of_game)
-		team_switch_move_player(player, move->team);
+		team_switch_move_player(dead_player_index, player, move->team);
+}
+/* port: the pause menu's team choice (mcc_ui_teams.c routes the request): the
+gametype's own settings decide, not server.team_switch */
+boolean server_team_switch_request(
+	long player_index,
+	short team)
+{
+	struct player_datum *player = player_try_and_get(player_index);
+	unsigned long slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+
+	if (!player || player->quit_out_of_game || slot >= NUMBEROF(team_switch_moves) || !VALID_INDEX(team, 2))
+		return FALSE;
+	if (!global_scenario || global_scenario->type != _scenario_type_multiplayer ||
+		!game_engine_running() || !game_engine_can_score() || !game_engine_has_teams() ||
+		infection_enabled() || game_variant_options_get()->auto_team_balance)
+	{
+		return FALSE;
+	}
+	if (player->team_index == team || team_switch_move_get(player_index))
+		return FALSE;
+	if (player->unit_index == NONE)
+	{
+		team_switch_move_player(player_index, player, team);
+	}
+	else
+	{
+		team_switch_moves[slot].active = TRUE;
+		team_switch_moves[slot].no_statistics = FALSE;
+		team_switch_moves[slot].died = FALSE;
+		team_switch_moves[slot].team = team;
+		team_switch_moves[slot].player_index = player_index;
+		team_switch_moves[slot].unit_index = player->unit_index;
+		unit_kill_no_statistics(player->unit_index);
+	}
+	return TRUE;
 }

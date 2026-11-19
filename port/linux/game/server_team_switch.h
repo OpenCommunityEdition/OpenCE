@@ -17,11 +17,12 @@ void server_team_switch_damage(long player_index, long unit_index, boolean no_st
 
 /* (game_engine_player_killed, before the gametype hears of it) a switching
 player's death is no one's kill */
-void server_team_switch_player_killed(long *killing_player_index, long *killing_object_index,
+boolean server_team_switch_player_killed(long *killing_player_index, long *killing_object_index,
 	long dead_player_index, boolean *friendly_fire);
 
 /* (game_engine_player_killed, where the auto team balance moves the dead) a
 switching player is moved to their new team */
 void server_team_switch_player_dead(long dead_player_index);
 
+boolean server_team_switch_request(long player_index, short team);
 #endif
