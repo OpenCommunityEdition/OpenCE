@@ -173,6 +173,7 @@ symbols in this file:
 
 #include "interface/progress_bar.h"
 #include "loading_widescreen.h" /* port: port/linux/src/loading_widescreen.c */
+#include "loading_time.h" /* port: port/linux/game/loading_time.c */
 #include "cache/cache_files.h"
 /* The January object retains out-of-line copies of the D3D and D3DX inline
  * wrappers.  The stock XDK definitions of D3DINLINE (static __forceinline) and
@@ -1865,6 +1866,8 @@ void progress_bar_display(
 {
 #line 827 "c:\\halo\\SOURCE\\interface\\progress_bar.c"
 	match_assert(__FILE__, __LINE__, (progress>=0.f) && (progress<=1.f));
+	/* port: no further than display.loading_seconds has gone */
+	progress= loading_time_progress(progress);
 
 	if (progress_bar_mode.active && progress>0.f)
 	{

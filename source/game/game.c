@@ -121,6 +121,7 @@ struct game_options;
 #include "cseries/cseries.h"
 #include "game/game.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "loading_time.h" /* port: port/linux/game/loading_time.c */
 #include "ai/ai.h"
 #include "bink/bink_playback.h"
 #include "bungie_net/network/transport.h"
@@ -875,6 +876,8 @@ void game_precache_new_map(
 					cache_files_precache_is_copying_map(map_name));
 			ui_widget_load_progress_widget();
 			progress_bar_begin(global_scenario_index != NONE);
+			/* port: display.loading_seconds, read for this load */
+			loading_time_begin();
 			do
 			{
 				map_status = cache_files_precache_map_status(
@@ -885,6 +888,16 @@ void game_precache_new_map(
 			}
 			while (!map_status);
 
+			/* port: a level ready sooner than display.loading_seconds keeps
+			the loading screen up until then, so that its sweep plays out as
+			it did over the Xbox's slower copy from the disc */
+			while (map_status == _cached_map_file_success && loading_time_holding())
+			{
+				main_pregame_render();
+				main_rasterizer_throttle();
+				main_present_frame();
+			}
+			loading_time_end();
 			progress_bar_end();
 			ui_widgets_close_all();
 			if (map_status == _cached_map_file_failed)

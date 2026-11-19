@@ -23,6 +23,16 @@ These small engine hooks are necessary because projection and front-buffer
 capture are private to their respective implementations. Map loading and
 simulation contracts are unchanged.
 
+`display.loading_seconds` (default 0) holds a level's loading screen for at
+least that many seconds. The sweep, its fade and the chant follow the load's
+progress, which a computer reaches in under a second; the Xbox's copy from
+the disc took several. `loading_time_progress` in
+[loading_time.c](../port/linux/game/loading_time.c) shows the progress no
+faster than the time goes, and `game_precache_new_map` in
+[game.c](../source/game/game.c) draws the loading screen until the time is
+up, then ends the load as before. A failed load is not held, and a network
+game is not held, so other machines do not wait for this one.
+
 MCC conversion keeps its own stage tracking and draw scheduling in
 [mcc_loading.c](../port/linux/game/mcc_loading.c). `mcc_loading_begin` starts
 the same stock loading renderer, `mcc_loading_pulse` displays its progress,
