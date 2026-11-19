@@ -222,10 +222,16 @@ void attract_mode_start(
 void game_end_credits_start(
 	void)
 {
+	/* port: port_config.c's */
+	int config_boolean(const char *name);
+
 	ui_stop_main_menu_music();
 	sound_stop_all();
 
-	bink_playback_start(attract_mode_get_localized_movie_path(_bink_outro_movie), 0x2e);
+	/* port: the credits' 16:9 picture fills a wide screen with
+	display.widescreen_credits */
+	bink_playback_start(attract_mode_get_localized_movie_path(_bink_outro_movie), 0x2e |
+		(config_boolean("display.widescreen_credits") ? FLAG(_bink_playback_widescreen_picture_bit) : 0));
 
 	return;
 }

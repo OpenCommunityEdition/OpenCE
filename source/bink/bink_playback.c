@@ -682,6 +682,30 @@ static void bink_draw_frame(
 	{
 		screen_bounds= rasterizer_globals.reserved04.screen_bounds;
 	}
+	/* port: a 16:9 picture letterboxed in the movie (the credits), as large
+	as the screen holds it: the movie's own black bars go past a wide
+	screen's edges (display.widescreen_credits; 4:3 is drawn as before) */
+	else if (TEST_FLAG(bink_globals.flags, _bink_playback_widescreen_picture_bit))
+	{
+		short screen_width= rasterizer_globals.reserved04.screen_bounds.x1-
+			rasterizer_globals.reserved04.screen_bounds.x0;
+		short screen_height= rasterizer_globals.reserved04.screen_bounds.y1-
+			rasterizer_globals.reserved04.screen_bounds.y0;
+		real scale= MIN((real)screen_width/(real)bink_globals.width,
+			(real)screen_height*16.0f/(9.0f*(real)bink_globals.width));
+		short width= (short)((real)bink_globals.width*scale+0.5f);
+		short height= (short)((real)bink_globals.height*scale+0.5f);
+
+		if (scale<1.0f)
+		{
+			width= bink_globals.width;
+			height= bink_globals.height;
+		}
+		screen_bounds.x0= (short)((screen_width-width)/2);
+		screen_bounds.x1= (short)((screen_width+width)/2);
+		screen_bounds.y0= (short)((screen_height-height)/2);
+		screen_bounds.y1= (short)((screen_height+height)/2);
+	}
 	else
 	{
 		short screen_width= rasterizer_globals.reserved04.screen_bounds.x1-

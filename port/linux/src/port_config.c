@@ -239,6 +239,9 @@ static const struct config_setting config_settings[] =
 	{ "display.player_name_scale", _config_real, "1.0", "HALO_PLAYER_NAME_SCALE", _environment_value, _platform_all,
 		"How large the players' names are drawn: 1.0 three quarters of the size of\n"
 		"the HUD's text, 0.25 to 4." },
+	{ "display.widescreen_credits", _config_boolean, "false", "HALO_WIDESCREEN_CREDITS", _environment_value, _platform_all,
+		"Fill a wide screen with the credits' picture, which their movie has\n"
+		"16:9 inside its 4:3 frame; false shows the 4:3 frame, as the Xbox." },
 	{ "display.match_timer", _config_boolean, "false", "HALO_MATCH_TIMER", _environment_value, _platform_all,
 		"Draw the match clock at the bottom right in multiplayer. It counts up\n"
 		"from the game's first tick, which the items' respawn periods count from\n"

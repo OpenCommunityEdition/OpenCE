@@ -20,6 +20,9 @@ enum
 	_bink_playback_return_to_main_menu_when_finished_bit,
 	_bink_playback_dont_allow_skipping_if_filesystem_check_thread_is_active_bit,
 	_bink_playback_eat_up_memory_like_a_goddamn_beaver_bit,
+	/* port: the movie's picture is 16:9, letterboxed in its 4:3 frame (the
+	credits): a wide screen is filled with it (display.widescreen_credits) */
+	_bink_playback_widescreen_picture_bit,
 	NUMBER_OF_BINK_PLAYBACK_FLAGS,
 };
 
