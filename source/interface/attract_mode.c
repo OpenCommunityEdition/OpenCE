@@ -35,6 +35,43 @@ static char bss_00453ae8[128];
 
 static short data_002e4c84 = NONE;
 
+/* port: port_config.c's */
+int config_boolean(const char *name);
+
+/* port: whether an attract movie can play: display.attract_mode, and one of
+the three in the bink folder (which importing a disc fills,
+port/linux/src/xiso.c) in any language. Without one the music would stop
+and start again every 75 seconds. The folder is looked at once. */
+static boolean attract_mode_movies_available(
+	void)
+{
+	static short available = NONE;
+
+	if (available==NONE)
+	{
+		const char *suffixes[] = { "", "_de", "_fr", "_es", "_it" };
+		short movie;
+		short suffix;
+
+		available = FALSE;
+		for (movie = 1; movie<=NUMBER_OF_ATTRACT_MODE_MOVIES && !available; movie++)
+		{
+			for (suffix = 0; suffix<NUMBEROF(suffixes) && !available; suffix++)
+			{
+				struct file_reference movie_file;
+				char path[64];
+
+				_snprintf(path, NUMBEROF(path), "d:\\bink\\attract%d%s.bik", movie, suffixes[suffix]);
+				path[NUMBEROF(path) - 1] = '\0';
+				if (file_exists(file_reference_create_from_path(&movie_file, path, FALSE)))
+					available = TRUE;
+			}
+		}
+	}
+
+	return available && config_boolean("display.attract_mode");
+}
+
 /* ---------- public code */
 
 boolean attract_mode_should_start(
@@ -42,6 +79,8 @@ boolean attract_mode_should_start(
 {
 	boolean should_start = FALSE;
 	real progress;
+	/* port: (attract_mode_movies_available) */
+	boolean movies_available = attract_mode_movies_available();
 
 	if (cache_files_precache_in_progress() &&
 		cache_files_precache_map_status(&progress)==1)
@@ -61,7 +100,8 @@ boolean attract_mode_should_start(
 		time_since_last_event = MAX(attract_mode_countdown_timer, time_since_last_event);
 		time_elapsed = current_time-time_since_last_event;
 	
-		if (time_elapsed>=ATTRACT_MODE_COUNTDOWN-MUSIC_FADE_TIME)
+		/* port: (only with a movie to play) */
+		if (movies_available && time_elapsed>=ATTRACT_MODE_COUNTDOWN-MUSIC_FADE_TIME)
 		{
 			if (ui_main_menu_music_active())
 			{
@@ -76,7 +116,7 @@ boolean attract_mode_should_start(
 			}
 		}
 
-		if (time_elapsed>=ATTRACT_MODE_COUNTDOWN)
+		if (movies_available && time_elapsed>=ATTRACT_MODE_COUNTDOWN)
 		{
 			should_start = TRUE;
 		}

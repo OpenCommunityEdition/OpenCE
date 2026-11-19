@@ -226,6 +226,10 @@ static const struct config_setting config_settings[] =
 	{ "display.menus", _config_string, "\"pc\"", "HALO_MENUS", _environment_value, _platform_all,
 		"The menus: \"pc\" for the PC version's main menu (port/assets/menus,\n"
 		"and a menus folder here for your own), \"xbox\" for the Xbox's." },
+	{ "display.attract_mode", _config_boolean, "true", "HALO_ATTRACT_MODE", _environment_value, _platform_all,
+		"After 75 seconds at the main menu with nothing pressed, play one of\n"
+		"the Xbox's three demo movies, as the Xbox did (it needs the movies,\n"
+		"in a bink folder next to maps)." },
 	{ "display.menu_language", _config_string, "\"maps\"", "HALO_MENU_LANGUAGE", _environment_value, _platform_all,
 		"The PC menus' language: \"maps\" for the language of the Custom Edition\n"
 		"whose loc.map is in custom_maps (as that edition shows them; English\n"
