@@ -159,5 +159,8 @@ void halo_menus_log(char const *file, long line, char const *message, char const
 drawn for, until halo_menus_art_forget */
 void halo_menus_art_register(void const *texture, char const *png);
 void halo_menus_art_forget(void);
+/* the art of a texture registered so decoded ahead, on a thread of its own, if
+it has not been (menu_files.c) */
+void halo_menus_art_ahead(void const *texture);
 
 #endif

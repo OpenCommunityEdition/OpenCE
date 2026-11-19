@@ -644,6 +644,17 @@ unsigned int hud_hires_png_texture(const void *png, unsigned long size, unsigned
 	return png_pixels_texture(pixels, width, height, levels);
 }
 
+unsigned char *hud_hires_png_pixels(const void *png, unsigned long size, unsigned long *width, unsigned long *height)
+{
+	return png_decode(png, size, width, height);
+}
+
+unsigned int hud_hires_pixels_texture(unsigned char *pixels, unsigned long width, unsigned long height,
+	unsigned long *levels)
+{
+	return png_pixels_texture(pixels, width, height, levels);
+}
+
 unsigned int hud_hires_override_texture(long asset, unsigned long *levels)
 {
 	const struct hud_hires_embedded *embedded;

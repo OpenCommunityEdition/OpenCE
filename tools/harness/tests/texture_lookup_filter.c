@@ -22,6 +22,35 @@ static const unsigned char *file_data(const char *name, unsigned long *size)
 	return (const unsigned char *)name;
 }
 #define hud_hires_png_texture(png, size, levels) (*(levels) = 1, next_texture++)
+/* (the menus' decoding ahead, which these cases do not ask for: no thread) */
+#define xgpu_gl_ready() 1
+static unsigned char *hud_hires_png_pixels(const void *png, unsigned long size, unsigned long *width,
+	unsigned long *height)
+{
+	(void)png;
+	(void)size;
+	*width = *height = 0;
+	return NULL;
+}
+static unsigned int hud_hires_pixels_texture(unsigned char *pixels, unsigned long width, unsigned long height,
+	unsigned long *levels)
+{
+	(void)width;
+	(void)height;
+	free(pixels);
+	*levels = 1;
+	return next_texture++;
+}
+typedef int pthread_mutex_t, pthread_cond_t, pthread_t;
+#define PTHREAD_MUTEX_INITIALIZER 0
+#define PTHREAD_COND_INITIALIZER 0
+static void pthread_ignored(void *object) { (void)object; }
+#define pthread_mutex_lock(mutex) pthread_ignored(mutex)
+#define pthread_mutex_unlock(mutex) pthread_ignored(mutex)
+#define pthread_cond_wait(condition, mutex) pthread_ignored(condition)
+#define pthread_cond_broadcast(condition) pthread_ignored(condition)
+#define pthread_create(thread, attributes, start, argument) ((void)(thread), (void)(start), 1)
+#define pthread_detach(thread) pthread_ignored(&(thread))
 #define hud_hires_override_texture(asset, levels) (*(levels) = 1, (unsigned int)(asset) + 100)
 #define render_thread_running() 0
 static char *copy_of(const char *text)

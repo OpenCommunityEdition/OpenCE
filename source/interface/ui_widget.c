@@ -1382,6 +1382,10 @@ static boolean ui_widget_load_children_recursive(
 /* port: whether the tag is one of the menus' (port/linux/game/menu_tags.c) */
 boolean pc_menu_tag(
 	long tag_index);
+/* port: the pictures of the screens a screen of the menus' can open decoded
+ahead as it opens (port/linux/game/menu_tags.c) */
+void pc_menu_screen_opened(
+	long tag_index);
 /* port: whether this machine has, or is adding, a second player: co-op,
 split screen, the lobby's (port/linux/game/menu_functions.c) */
 unsigned char pc_menu_split_players(
@@ -4093,6 +4097,8 @@ struct widget_instance *ui_widget_load_by_name_or_tag(
 					previous_local_player_index = NONE;
 				}
 				widget_globals.active_widgets[widget_stack] = widget;
+				/* port: the pictures of the screens it can open decoded ahead */
+				pc_menu_screen_opened(tag_index);
 				if (invoking_widget_tag != NONE &&
 					!TEST_FLAG(
 						ui_widget_definition_get(invoking_widget_tag)->flags,
