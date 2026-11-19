@@ -162,16 +162,50 @@ void server_mode_fatal(const char *text)
 static void print_help(void)
 {
 	fprintf(stdout,
-		"halo [--server] [--config <file>] [--keygen] [--sign <text>] [--probe [<invite>]] [--version] [--help]\n"
+		"halo [--server] [--config <file>] [--keygen] [--sign <text>] [--probe [<invite>]] [--check-script <file>] [--version] [--help]\n"
 		"  --server         a dedicated server (docs/dedicated_server.md)\n"
 		"  --probe [<invite>]  prints the invite's game (or the LAN's first) as one line of JSON\n"
 		"  --config <file>  the settings file (else config.toml beside the executable)\n"
 		"  --keygen         writes a publisher key for the master servers and prints its public key\n"
 		"  --sign <text>    prints the publisher key's signature of the text (an application's proof)\n"
+		"  --check-script <file>  compiles a mutator's .hsc script and says why it does not (docs/mutators.md)\n"
 		"  --version        prints the build and its network version\n");
 }
 
 /* the command line's arguments that are answered and end the process */
+/* port/linux/game/mutator_scripts.c: a mutator's script compiled against the
+host API, without starting a game */
+extern int mutator_scripts_check_text(const char *name, const char *source, long length);
+
+/* halo --check-script <file>: the file read here, by its host path (the
+game's fopen takes Xbox paths), and compiled there */
+static int check_script(const char *path)
+{
+	/* (mutator_hs_program_compile's limit, and one byte to know it is over) */
+	enum { MAXIMUM = 32767 + 1 };
+	FILE *file = fopen(path, "rb");
+	char *source;
+	size_t length;
+	int code;
+
+	if (!file)
+	{
+		fprintf(stderr, "%s: cannot be read\n", path);
+		return SERVER_EXIT_CONFIGURATION;
+	}
+	source = malloc(MAXIMUM);
+	if (!source)
+	{
+		fclose(file);
+		return SERVER_EXIT_CONFIGURATION;
+	}
+	length = fread(source, 1, MAXIMUM, file);
+	fclose(file);
+	code = mutator_scripts_check_text(path, source, (long)length);
+	free(source);
+	return code;
+}
+
 static void answer_command_line(void)
 {
 	char argument[1024];
@@ -201,6 +235,17 @@ static void answer_command_line(void)
 				exit(SERVER_EXIT_CONFIGURATION);
 			}
 			exit(server_master_sign_text(text) ? EXIT_SUCCESS : SERVER_EXIT_CONFIGURATION);
+		}
+		if (!strcmp(argument, "--check-script"))
+		{
+			char path[1024];
+
+			if (!posix_command_line_argument(index + 1, path, sizeof(path)))
+			{
+				fprintf(stderr, "--check-script: give a mutator's .hsc script\n");
+				exit(SERVER_EXIT_CONFIGURATION);
+			}
+			exit(check_script(path));
 		}
 	}
 }

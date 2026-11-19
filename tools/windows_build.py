@@ -511,6 +511,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         # the port's zlib
         for name in ZLIB_SOURCES:
             add_object(ZLIB_DIR / name, " ".join([abi, "-std=gnu11", *ZLIB_DEFINES, "-w"]))
+
         # the game's sin, pow and the rest, the same on every port
         # (port/include/halo_math.h)
         for source in musl_math_sources():

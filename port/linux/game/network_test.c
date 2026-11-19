@@ -41,7 +41,8 @@ debug.network_test_kill (the host kills the last player every so often),
 debug.network_test_shoot (every so often each machine's player hits the
 next with their weapon's projectile: a client's through its report to the
 host) and debug.network_test_vehicle (the host seats the last player as a
-vehicle's driver that many seconds in, takes them out 15 seconds on, and 5
+vehicle's driver that many seconds in (an add-on's vehicle, when there is
+one: addons.c), takes them out 15 seconds on, and 5
 seconds later stands them at a vehicle's driver's entrance, where a joining
 machine's player holds the action button, as getting in does)
 and debug.network_test_pickup (the last player stands on a weapon lying
@@ -459,6 +460,33 @@ static void network_test_log_players(
 			local_player_index == NONE ? 0L : (long)player_get(local_player_index)->respawn_timer,
 			divergence_samples, divergence_apart, divergence_mean, divergence_largest);
 	}
+	/* each vehicle an add-on placed (addons.c): where it is, how fast it
+	goes, and how many ride it */
+	{
+		extern boolean addons_vehicle(long definition_index);
+		struct object_iterator vehicles;
+
+		object_iterator_new(&vehicles, _object_mask_vehicle, 0);
+		while (object_iterator_next(&vehicles))
+		{
+			struct object_datum *vehicle = object_get(vehicles.index);
+			long riders = 0;
+			long child;
+
+			if (!addons_vehicle(vehicle->definition_index))
+				continue;
+			for (child = vehicle->object.first_child_object_index; child != NONE;
+				child = object_get(child)->object.next_object_index)
+			{
+				if (object_get(child)->object.type == _object_type_biped)
+					riders++;
+			}
+			platform_log("network test: tick %ld add-on vehicle %08lx at (%.3f %.3f %.3f) speed %.3f riders %ld"
+				" vitality %.2f", game_time_get(), (unsigned long)vehicles.index, vehicle->object.position.x,
+				vehicle->object.position.y, vehicle->object.position.z,
+				magnitude3d(&vehicle->object.translational_velocity), riders, vehicle->object.body_vitality);
+		}
+	}
 }
 
 /* each of this machine's players hits the next player with their weapon's
@@ -677,16 +705,23 @@ static void network_test_vehicle(
 		real_point3d const *position = &object_get(last->unit_index)->object.position;
 		short seat_index;
 
+		extern boolean addons_vehicle(long definition_index);
+		boolean addon = FALSE;
+
 		object_iterator_new(&vehicles, _object_mask_vehicle, 0);
 		while (object_iterator_next(&vehicles))
 		{
 			real_point3d const *vehicle_position = &object_get(vehicles.index)->object.position;
 			real distance = distance_squared3d(position, vehicle_position);
+			/* (an add-on's vehicle first, when there is one: addons.c) */
+			boolean vehicle_addon = addons_vehicle(object_get(vehicles.index)->definition_index);
 
-			if (nearest_index == NONE || distance < nearest_distance)
+			if (nearest_index == NONE || (vehicle_addon && !addon) ||
+				(vehicle_addon == addon && distance < nearest_distance))
 			{
 				nearest_index = vehicles.index;
 				nearest_distance = distance;
+				addon = vehicle_addon;
 			}
 		}
 		if (nearest_index == NONE)

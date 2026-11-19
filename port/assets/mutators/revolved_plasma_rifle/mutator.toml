@@ -1,0 +1,67 @@
+name = "Revolved plasma rifle"
+id = "revolved_plasma_rifle"
+version = "2"
+description = "The plasma rifle as Combat Revolved has it, without its zoom: 6 to 9 shots a second, a spread of at most 0.75 degrees, slower bolts of 13 damage that reach 45 world units, and less overheating and wear."
+format = 2
+
+[[tags]]
+group = "weapon"
+tag = 'weapons\plasma rifle\plasma rifle'
+heat_recovery_threshold = 0.15
+heat_loss_per_second = 0.36
+age_heat_recovery_penalty = 0
+age_rate_of_fire_penalty = 0
+age_misfire_start = 0.85
+age_misfire_chance = 0.25
+active_camo_ding = 0.25
+active_camo_regrowth_rate = 0.075
+[tags.triggers.0]
+initial_rate_of_fire = 6
+final_rate_of_fire = 9
+rate_of_fire_acceleration_time = 0.8
+rate_of_fire_deceleration_time = 0.6
+rounds_between_tracers = 0
+error_acceleration_time = 0.8
+error_deceleration_time = 0.6
+projectile_error_angle_upper_bound = 0.75
+heat_generated_per_round = 0.0861
+age_generated_per_round = 0.003
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\plasma rifle\bolt'
+maximum_range = 45
+air_damage_range_lower_bound = 15
+air_damage_range_upper_bound = 45
+water_damage_range_lower_bound = 15
+water_damage_range_upper_bound = 45
+initial_velocity = 27
+final_velocity = 27
+[tags.material_responses.hunter_shield]
+default_response = "disappear"
+
+[[tags]]
+group = "damage_effect"
+tag = 'weapons\plasma rifle\bolt'
+damage_minimum = 13
+damage_lower_bound = 13
+damage_upper_bound = 13
+active_camouflage_damage = 1
+[tags.material_modifiers]
+dirt = 1
+sand = 1
+stone = 1
+snow = 1
+wood = 1
+hollow_metal = 0.5
+rubber = 1
+hunter_armor = 0.25
+hunter_skin = 1
+jackal_energy_shield = 2
+engineer_force_field = 2
+cyborg = 1
+monitor = 1
+plastic = 1
+water = 1
+leaves = 1
+ice = 1

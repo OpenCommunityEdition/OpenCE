@@ -42,6 +42,7 @@ symbols in this file:
 
 #include "following_camera.h"
 #include "passenger_camera.h" /* port: port/linux/game/passenger_camera.c */
+#include "mutator_scripts.h" /* port: port/linux/game/mutator_scripts.c */
 #include "cseries/errors.h" /* port: (error, for a short camera track) */
 #include "observer.h"
 
@@ -197,15 +198,19 @@ void following_camera_update(
 	struct player_control_unit_camera_info camera_info;
 	struct camera_command *command;
 	boolean passenger; /* port: only this local display view borrows a seat's camera */
+	boolean script_view; /* port: the view a mutator's script asks for (port/linux/game/mutator_scripts.c) */
 
 	match_assert("c:\\halo\\SOURCE\\camera\\following_camera.c", 138, camera);
 	match_assert("c:\\halo\\SOURCE\\camera\\following_camera.c", 139, result);
 
 	player_control_get_unit_camera_info(controls->local_player_index, &camera_info);
 	passenger = passenger_camera_info(controls->local_player_index, &camera_info);
+	script_view = mutator_view_active(controls->local_player_index);
 	command = &result->command;
 
 	command->position = camera_info.position;
+	if (script_view)
+		command->position.z += mutator_view_height(controls->local_player_index);
 	command->timer = 0.f;
 	command->flags = 0;
 	command->field_of_view = DEGREES_TO_RADIANS(70.f);
@@ -237,7 +242,9 @@ void following_camera_update(
 			camera->crouched = crouched;
 		}
 
-		if (controls->active && !passenger) /* port: no free orbit outside the passenger's firing arc */
+		/* port: no free orbit outside the passenger's firing arc, nor from a
+		script's view */
+		if (controls->active && !passenger && !script_view)
 		{
 			camera->facing_offset.yaw += controls->facing_delta.yaw;
 			camera->facing_offset.pitch += controls->facing_delta.pitch;
@@ -259,6 +266,12 @@ void following_camera_update(
 		/* port: keep the reference camera inside this passenger's weapon arc */
 		if (passenger)
 			passenger_camera_clamp_facing(controls->local_player_index, &facing);
+		/* port: from in front, looking back along the aim at the player */
+		if (mutator_view_backward(controls->local_player_index))
+		{
+			facing.yaw += _pi;
+			facing.pitch = -facing.pitch;
+		}
 		vector3d_from_euler_angles2d(&command->forward, &facing);
 
 		match_vassert(
@@ -278,6 +291,13 @@ void following_camera_update(
 		command->depth = MAX(
 			(command->depth - 0.6f) * camera->distance_scale + 0.6f,
 			0.6f);
+		/* port: straight back along the view, so that the crosshair is the aim
+		(the observer takes the depth back from the focus and its offset) */
+		if (script_view)
+		{
+			csmemset(&command->offset, 0, sizeof(command->offset));
+			command->depth = mutator_view_distance(controls->local_player_index);
+		}
 
 		object_get_velocities(camera_info.unit_index, &command->velocity, NULL);
 		SET_FLAG(command->flags, 0, TRUE);

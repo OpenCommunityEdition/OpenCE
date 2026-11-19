@@ -98,6 +98,8 @@ node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds'
 python -m pytest -q tools/test_dedicated_server.py          # the dedicated server with clients (needs assets/maps)
 python -m pytest -q tools/test_server_sim.py tools/test_egg.py   # the server's web page and protocol simulator, the egg
 python -m pytest -q tools/test_net_compare.py               # net_compare.py's judging of logs, its copies and their processes
+python -m pytest -q tools/test_mutator_scripts.py tools/test_mutator_index.py
+                                                            # mutators' .hsc compiled by the game (no assets), the index
 python tools/net_compare.py --a build/linux/halo --b <other build> --data <game data> --swap
                                                             # two builds in one network game, in step (retail maps: local only)
 ```
@@ -368,6 +370,8 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [docs/master_protocol.md](docs/master_protocol.md) | The master servers' protocol: publishing, the probe, the signed list |
 | [docs/steam_workshop.md](docs/steam_workshop.md) | Android's Steam Workshop screen: signing in with Steam and downloading MCC content from its depots, in the app's host |
 | [docs/mods.md](docs/mods.md) | Mods: folders of Halo PC tag files whose sounds, bitmaps, text and models play over a map's on one machine |
+| [docs/mutators.md](docs/mutators.md) | Mutators: tag edits, poses, add-ons and native HS scripts that change a game's rules, set by data files and played alike on every machine |
+| [docs/addons.md](docs/addons.md) | Add-ons: a vehicle and its tags, built from a Custom Edition map into a .cevehicle that a mutator adds to the maps it plays on |
 | [port/assets/text_filter/README.md](port/assets/text_filter/README.md) | Streamer mode's words: Surge AI's list, the review, the allowed words |
 | [port/assets/menus/README.md](port/assets/menus/README.md) | The menu files' format and how to write them again |
 | [port/assets/menus/NON_HANDDRAWN.md](port/assets/menus/NON_HANDDRAWN.md) | Menu pictures that are not redraws |

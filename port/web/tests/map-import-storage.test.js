@@ -195,12 +195,45 @@ test('case preserved for cleanup, aliases, devices and prefix collisions refused
     assert.throws(()=>api.validate({version:1,...payload(paths)},true));
   }
 });
-test('two same-origin games share guard; manual imports and removal across games refuse',async()=>{
+test('only one same-origin game owns the guard; imports refuse until exit',async()=>{
   const e=environment(),first=e.load(),second=e.load(),importer=e.load();
-  await first.startGame();await second.startGame();
+  await first.startGame();
+  await assert.rejects(second.startGame(),/already running in another tab/);
+  await assert.rejects(first.startGame(),/already running in another tab/);
   await assert.rejects(importer.importPlan(plan(),()=>false,()=>{}),/busy/);
-  await assert.rejects(first.dispatchLocal('removeBegin',{folder},true),/other games/);
-  await tick();assert.equal(e.held.filter(l=>l.name===first.GUARD).length,2);
+  await assert.rejects(importer.dispatchLocal('removeBegin',{folder}),/other games/);
+  await tick();assert.equal(e.held.filter(l=>l.name===first.GUARD).length,1);
+  await first.stopGame();await first.stopGame();
+  await second.startGame();await second.stopGame();
+  await importer.importPlan(plan(),()=>false,()=>{});
+});
+test('simultaneous starts have one winner, including starts in one tab',async()=>{
+  for(const sameTab of [false,true]) {
+    const e=environment(),first=e.load(),second=sameTab?first:e.load();
+    const results=await Promise.allSettled([first.startGame(),second.startGame()]);
+    assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+    assert.equal(e.held.filter(l=>l.name===first.GUARD).length,1);
+    await first.stopGame();await second.stopGame();
+    assert.equal(e.held.length,0);
+  }
+});
+test('active import refuses game startup without recovery touching storage',async()=>{
+  const e=environment(),importer=e.load(),game=e.load();
+  const release=await importer.lock(importer.GUARD);
+  const before=e.trace.length;
+  await assert.rejects(game.startGame(),/finish the import/);
+  assert.equal(e.trace.length,before);
+  await release();await game.startGame();await game.stopGame();
+});
+test('recovery and mutation-lock failures release game ownership',async()=>{
+  const e=environment(),game=e.load(),other=e.load();
+  await e.put('mcc_transactions/'+folder+'.json','not json');
+  await assert.rejects(game.startGame());
+  assert.equal(e.held.length,0);
+  const release=await other.lock(other.MUTATION);
+  await assert.rejects(game.startGame(),/busy/);
+  assert.equal(e.held.filter(l=>l.name===game.GUARD).length,0);
+  await release();
 });
 test('unknown quota differs from zero; unsupported locks fail promptly',async()=>{
   const e=environment(),api=e.load();e.navigator.storage.estimate=async()=>({});

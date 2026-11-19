@@ -98,6 +98,15 @@ def build(test, generated):
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(f"{test}.c does not compile:\n{result.stderr}")
+    # Some sandboxes strip the executable bits from files the compiler makes
+    # and refuse chmod by path; restoring them through a descriptor works.
+    fd = os.open(executable, os.O_RDONLY)
+    try:
+        os.fchmod(fd, 0o755)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
     return executable
 
 

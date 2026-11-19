@@ -22,6 +22,10 @@ static struct {
 
 static byte *mcc_hs_stack_end(struct hs_thread_datum *thread)
 {
+    /* Isolated native programs own heap-backed datums; campaign/checkpoint
+     * thread layouts and their strict inline bounds remain unchanged. */
+    if (hs_isolated_running)
+        return (byte *)thread+hs_thread_data->size;
     if (mcc_threads.array && hs_thread_data==mcc_threads.array)
         return (byte *)thread+MCC_SCRIPT_THREAD_BYTES;
     return thread->stack_data+HS_THREAD_STACK_SIZE;

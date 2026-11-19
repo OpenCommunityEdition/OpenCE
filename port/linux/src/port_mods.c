@@ -796,39 +796,6 @@ static void toml_string_append(char *text, size_t size, const char *name)
 	text[length] = 0;
 }
 
-/* writes `text` to the file `path`, whole: to a file beside it first, which
-then takes its place (so that a write cut short leaves the file as it was) */
-static int text_file_write(const char *path, const char *text)
-{
-	char temporary[MAXIMUM_PATH_LENGTH];
-	int written;
-#ifdef HALO_ARM64_GUEST
-	FILE *file;
-#endif
-
-	if (snprintf(temporary, sizeof(temporary), "%s.new", path) >= (int)sizeof(temporary))
-		return 0;
-#ifdef HALO_ARM64_GUEST
-	/* (the guest's own C library: SDL's are the host's) */
-	file = fopen(temporary, "wb");
-	if (!file)
-		return 0;
-	written = fwrite(text, 1, strlen(text), file) == strlen(text);
-	written = fclose(file) == 0 && written;
-	if (written)
-		written = rename(temporary, path) == 0;
-	if (!written)
-		remove(temporary);
-#else
-	written = SDL_SaveFile(temporary, text, strlen(text));
-	if (written)
-		written = SDL_RenamePath(temporary, path);
-	if (!written)
-		SDL_RemovePath(temporary);
-#endif
-	return written;
-}
-
 static long file_add(long mod, const char *key, const char *path)
 {
 	struct port_mod_file *file;
@@ -1335,7 +1302,7 @@ int port_mods_save(void)
 	}
 	strcat(text, "]\n");
 	posix_make_directory(mods_root(root, sizeof(root)));
-	written = text_file_write(order_file(root, path, sizeof(path)), text);
+	written = config_file_write(order_file(root, path, sizeof(path)), text);
 	/* (kept in memory when it cannot be written, so that the mods are still
 	played as chosen until the game quits) */
 	free(port_mods.unsaved_order);

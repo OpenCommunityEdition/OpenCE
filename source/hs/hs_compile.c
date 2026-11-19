@@ -631,6 +631,12 @@ static void hs_tokenize_nonprimitive(
 extern struct data_array *hs_syntax_data;
 
 static struct hs_compile_globals hs_compile_globals;
+/* port: private compiler mode; never enable via scenario initialization. */
+static boolean hs_isolated_compiling;
+#include "mutator_hs.h"
+static boolean hs_isolated_program;
+
+extern int hs_isolated_function_allowed(short index);
 
 char const whitespace_characters[2] = { ' ', '\t' };
 char const eol_characters[2] = { '\n', '\r' };
@@ -821,6 +827,163 @@ static boolean hs_get_parameter_indices(
 
 	return result;
 }
+/* port: compile exactly one expression using native tokenizer/type checker.
+ * Caller bounds source/depth and owns syntax/source memory. No tag allocation. */
+long hs_isolated_compile(char *source, long length, short type,
+	struct data_array *syntax, char *error_text)
+{
+	struct hs_compile_globals saved = hs_compile_globals;
+	struct data_array *saved_syntax = hs_syntax_data;
+	struct hs_tokenizer tokenizer;
+	long root = NONE;
+
+	memset(&hs_compile_globals, 0, sizeof(hs_compile_globals));
+	hs_compile_globals.initialized = TRUE;
+	hs_compile_globals.compiled_source = source;
+	hs_compile_globals.compiled_source_size = length;
+	hs_compile_globals.error_offset = NONE;
+	hs_compile_globals.disallow_blocks = TRUE;
+	hs_compile_globals.disallow_sets = TRUE;
+	hs_syntax_data = syntax;
+	hs_isolated_compiling = TRUE;
+	tokenizer.cursor = source;
+	skip_whitespace(&tokenizer.cursor);
+	if (*tokenizer.cursor)
+		root = hs_tokenize(&tokenizer);
+	else
+		hs_compile_globals.error = "empty isolated expression.";
+	if (!hs_compile_globals.error)
+	{
+		skip_whitespace(&tokenizer.cursor);
+		if (*tokenizer.cursor)
+			hs_compile_globals.error = "expected exactly one expression.";
+		else if (!hs_parse(root, type) && !hs_compile_globals.error)
+			hs_compile_globals.error = "invalid isolated expression.";
+	}
+	if (hs_compile_globals.error)
+	{
+		strncpy(error_text, hs_compile_globals.error, 255);
+		error_text[255] = 0;
+		root = NONE;
+	}
+	hs_isolated_compiling = FALSE;
+	hs_syntax_data = saved_syntax;
+	hs_compile_globals = saved;
+	return root;
+}
+
+/* Tokenize with the engine; two declaration passes permit forward and recursive
+ * static calls. All block storage belongs to the bridge, never the tag heap. */
+int hs_isolated_program_compile(char *source, long length,
+	struct data_array *syntax, char *error)
+{
+	struct hs_compile_globals saved = hs_compile_globals;
+	struct data_array *saved_syntax = hs_syntax_data;
+	struct hs_tokenizer tokenizer;
+	struct scenario *scenario = global_scenario_get();
+	long roots[128], bodies[128];
+	short kinds[128], count = 0, i, j;
+	boolean success = FALSE;
+	memset(&hs_compile_globals, 0, sizeof(hs_compile_globals));
+	hs_compile_globals.initialized = TRUE;
+	hs_compile_globals.compiled_source = source;
+	hs_compile_globals.compiled_source_size = length;
+	hs_compile_globals.error_offset = NONE;
+	hs_syntax_data = syntax;
+	hs_isolated_compiling = hs_isolated_program = TRUE;
+	tokenizer.cursor = source;
+	while (!hs_compile_globals.error)
+	{
+		long root, node[5], n;
+		char *name, *kind;
+		short type;
+		skip_whitespace(&tokenizer.cursor);
+		if (!*tokenizer.cursor) break;
+		if (count == 128) { hs_compile_globals.error = "too many declarations."; break; }
+		root = hs_tokenize(&tokenizer);
+		if (hs_compile_globals.error || root == NONE) break;
+		if (TEST_FLAG(hs_syntax_get(root)->flags, _hs_syntax_node_primitive_bit))
+		{ hs_compile_globals.error = "expected a declaration."; break; }
+		n = hs_syntax_get(root)->data;
+		for (j = 0; j < 4; j++)
+		{
+			node[j] = n;
+			if (n == NONE || !TEST_FLAG(hs_syntax_get(n)->flags, _hs_syntax_node_primitive_bit)) break;
+			n = hs_syntax_get(n)->next_node_index;
+		}
+		if (j < 3) { hs_compile_globals.error = "invalid declaration."; break; }
+		kind = source + hs_syntax_get(node[0])->source_offset;
+		if (!strcmp(kind, "global"))
+		{
+			struct hs_global *g = (struct hs_global *)scenario->hs_globals.address;
+			type = string_list_find(source + hs_syntax_get(node[1])->source_offset, NUMBER_OF_HS_TYPES, hs_type_names);
+			name = source + hs_syntax_get(node[2])->source_offset;
+			n = hs_syntax_get(node[2])->next_node_index;
+			if (n == NONE || hs_syntax_get(n)->next_node_index != NONE || scenario->hs_globals.count == 64)
+			{ hs_compile_globals.error = "invalid global declaration."; break; }
+			for (j = 0; j < scenario->hs_globals.count; j++)
+				if (!strcmp(g[j].name, name)) break;
+			if (j != scenario->hs_globals.count) { hs_compile_globals.error = "duplicate global."; break; }
+			if (strlen(name) > 31 || !*name || type < _hs_type_boolean || type > _hs_type_string)
+			{ hs_compile_globals.error = "invalid global name or type."; break; }
+			strcpy(g[j].name, name); g[j].type = type;
+			g[j].initialization_expression_index = n;
+			scenario->hs_globals.count++;
+			kinds[count] = 0; bodies[count] = j;
+		}
+		else if (!strcmp(kind, "script") && j == 4 &&
+			!strcmp(source + hs_syntax_get(node[1])->source_offset, "static"))
+		{
+			struct hs_script *s = (struct hs_script *)scenario->hs_scripts.address;
+			long begin;
+			type = string_list_find(source + hs_syntax_get(node[2])->source_offset, NUMBER_OF_HS_TYPES, hs_type_names);
+			name = source + hs_syntax_get(node[3])->source_offset;
+			n = hs_syntax_get(node[3])->next_node_index;
+			if (n == NONE || scenario->hs_scripts.count == 64 || strlen(name) > 31 || !*name || type < _hs_type_void || type > _hs_type_string)
+			{ hs_compile_globals.error = "invalid static script declaration."; break; }
+			for (j = 0; j < scenario->hs_scripts.count; j++) if (!strcmp(s[j].name, name)) break;
+			if (j != scenario->hs_scripts.count) { hs_compile_globals.error = "duplicate script."; break; }
+			begin = datum_new(syntax);
+			if (begin == NONE) { hs_compile_globals.error = "syntax exhausted."; break; }
+			hs_syntax_get(begin)->flags = FLAG(_hs_syntax_node_primitive_bit);
+			hs_syntax_get(begin)->type = _hs_function_name;
+			hs_syntax_get(begin)->function_index = _hs_function_begin;
+			hs_syntax_get(begin)->next_node_index = n;
+			hs_syntax_get(begin)->source_offset = NONE;
+			hs_syntax_get(root)->data = begin;
+			strcpy(s[j].name, name); s[j].return_type = type;
+			s[j].script_type = _hs_script_static; s[j].root_expression_index = root;
+			scenario->hs_scripts.count++;
+			kinds[count] = 1; bodies[count] = j;
+		}
+		else { hs_compile_globals.error = "only globals and static scripts are allowed."; break; }
+		roots[count++] = root;
+	}
+	for (i = 0; i < count && !hs_compile_globals.error; i++)
+	{
+		long expression;
+		short type;
+		if (kinds[i])
+		{
+			struct hs_script *s = (struct hs_script *)scenario->hs_scripts.address + bodies[i];
+			expression = roots[i]; type = s->return_type;
+		}
+		else
+		{
+			struct hs_global *g = (struct hs_global *)scenario->hs_globals.address + bodies[i];
+			expression = g->initialization_expression_index; type = g->type;
+		}
+		if (!hs_parse(expression, type) && !hs_compile_globals.error)
+			hs_compile_globals.error = "invalid program expression.";
+	}
+	success = !hs_compile_globals.error;
+	if (!success) { strncpy(error, hs_compile_globals.error, 255); error[255] = 0; }
+	hs_isolated_compiling = hs_isolated_program = FALSE;
+	hs_syntax_data = saved_syntax;
+	hs_compile_globals = saved;
+	return success;
+}
+
 /* ---------- public code */
 
 
@@ -1169,9 +1332,15 @@ static boolean hs_parse_variable(
 		0x4E4,
 		hs_type_valid(expression->type) || expression->type==_hs_unparsed);
 
+	/* port: sandbox constants never resolve external or scenario globals. */
+	if (hs_isolated_compiling && !hs_isolated_program)
+		return FALSE;
+
 	global_index = hs_find_global_by_name(
 		hs_compile_globals.compiled_source + expression->source_offset);
 	expression->data = global_index;
+	if (hs_isolated_program && global_index != NONE && (global_index & 0x8000))
+		global_index = NONE;
 	if (global_index != NONE)
 	{
 		short global_type = hs_global_get_type((short)expression->data);
@@ -1214,9 +1383,22 @@ static void hs_parse_call_predicate(
 
 	if (predicate->type != _hs_function_name)
 	{
-		expression->function_index = hs_find_function_by_name(
-			hs_compile_globals.compiled_source + predicate->source_offset);
+		/* port: a mutator's host API is found before the engine's functions, so
+		one of the same name (game_time) is the API's, not a refused engine one */
+		expression->function_index = hs_isolated_program ? mutator_hs_api_find(
+			hs_compile_globals.compiled_source + predicate->source_offset) : NONE;
+		if (expression->function_index == NONE)
+			expression->function_index = hs_find_function_by_name(
+				hs_compile_globals.compiled_source + predicate->source_offset);
 		predicate->type = _hs_function_name;
+		if (hs_isolated_compiling && expression->function_index != NONE &&
+			!hs_isolated_function_allowed(expression->function_index))
+		{
+			hs_compile_globals.error = "function is not allowed in isolated HS.";
+			hs_compile_globals.error_offset = predicate->source_offset;
+			expression->function_index = NONE;
+			return;
+		}
 		if (expression->function_index == NONE)
 		{
 			expression->function_index = hs_find_script_by_name(
@@ -1224,6 +1406,9 @@ static void hs_parse_call_predicate(
 			if (expression->function_index != NONE)
 				SET_FLAG(expression->flags, _hs_syntax_node_script_bit, TRUE);
 		}
+		if (hs_isolated_compiling && !hs_isolated_program &&
+				TEST_FLAG(expression->flags, _hs_syntax_node_script_bit))
+				expression->function_index = NONE;
 		predicate->function_index = expression->function_index;
 	}
 	else
@@ -2366,6 +2551,25 @@ static boolean hs_parse_nonprimitive(
 						result = TRUE;
 					}
 				}
+				else if (hs_isolated_program && expression->function_index >= MUTATOR_HS_API_BASE)
+				{
+					const struct mutator_hs_api *api = mutator_hs_api_get(expression->function_index);
+					long argument = predicate->next_node_index;
+					short n;
+					result = api && (!expression->type || hs_can_cast(api->return_type, expression->type));
+					if (result)
+					{
+						if (!expression->type) expression->type = api->return_type;
+						for (n = 0; n < api->argument_count && result; n++)
+						{
+							result = argument != NONE && hs_parse(argument, api->argument_types[n]);
+							if (result) argument = hs_syntax_get(argument)->next_node_index;
+						}
+						if (argument != NONE) result = FALSE;
+					}
+					if (!result && !hs_compile_globals.error)
+						hs_compile_globals.error = "invalid host function arguments or return type.";
+				}
 				else
 				{
 					struct hs_function_definition *function = hs_function_get(expression->function_index);
@@ -2898,6 +3102,16 @@ boolean hs_parse(
 	boolean result = TRUE;
 	struct hs_syntax_node *expression = hs_syntax_get(expression_index);
 
+	/* port: no parser for strings, tags, objects or inferred globals may run. */
+	if (hs_isolated_compiling && expected_type != _hs_unparsed &&
+		(expected_type < _hs_type_void || expected_type >
+			 (hs_isolated_program ? _hs_type_string : _hs_type_long_integer)))
+	{
+		hs_compile_globals.error = "type is not allowed in isolated HS.";
+		hs_compile_globals.error_offset = expression->source_offset;
+		return FALSE;
+	}
+
 	match_assert(
 		"c:\\halo\\SOURCE\\hs\\hs_compile.c",
 		0x48E,
@@ -3132,6 +3346,8 @@ boolean hs_parse_set(
 				short global_index = hs_find_global_by_name(
 					hs_compile_globals.compiled_source + variable_expression->source_offset);
 
+				if (hs_isolated_program && global_index != NONE && (global_index & 0x8000))
+					global_index = NONE;
 				if (global_index != NONE)
 				{
 					short global_type = hs_global_get_type(global_index);

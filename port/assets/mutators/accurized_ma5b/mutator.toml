@@ -1,0 +1,66 @@
+name = "Accurized MA5B"
+id = "accurized_ma5b"
+version = "1"
+description = "The assault rifle zooms 2x with the pistol's scope, its bullets spread from 0.05 to 3 degrees, carry 300 world units and ricochet off stone, metal, ice and energy shields."
+format = 2
+
+[[tags]]
+group = "weapon"
+tag = 'weapons\assault rifle\assault rifle'
+zoom_level_count = 1
+zoom_magnification_minimum = 2
+zoom_magnification_maximum = 2
+zoom_in_sound = 'sound\sfx\weapons\sniper rifle\sniper_2x_zoom'
+zoom_out_sound = 'sound\sfx\weapons\sniper rifle\sniper_10x_zoom'
+[tags.triggers.0]
+projectile_error_angle_lower_bound = 0.05
+projectile_error_angle_upper_bound = 3
+rounds_between_tracers = 2
+error_deceleration_time=0.1
+
+[[tags]]
+group = "projectile"
+tag = 'weapons\assault rifle\bullet'
+maximum_range = 300
+[tags.material_responses.stone]
+potential_response = "reflect"
+potential_skip_fraction = 0.9
+potential_angle_upper_bound = 60
+potential_effect = 'weapons\assault rifle\effects\impact stone'
+[tags.material_responses.hollow_metal]
+potential_response = "reflect"
+potential_skip_fraction = 0.9
+potential_angle_upper_bound = 60
+potential_effect = 'weapons\assault rifle\effects\impact metal hollow reflect'
+[tags.material_responses.thin_metal]
+potential_response = "reflect"
+potential_skip_fraction = 0.9
+potential_angle_upper_bound = 60
+potential_effect = 'weapons\assault rifle\effects\impact metal thin reflect'
+[tags.material_responses.thick_metal]
+potential_response = "reflect"
+potential_skip_fraction = 0.9
+potential_angle_upper_bound = 60
+potential_effect = 'weapons\assault rifle\effects\impact metal thick reflect'
+[tags.material_responses.ice]
+potential_response = "reflect"
+potential_skip_fraction = 0.9
+potential_angle_upper_bound = 60
+potential_effect = 'weapons\assault rifle\effects\impact ice'
+[tags.material_responses.force_field]
+default_response = "reflect"
+[tags.material_responses.hunter_armor]
+default_response = "reflect"
+[tags.material_responses.engineer_force_field]
+default_response = "reflect"
+[tags.material_responses.cyborg_energy_shield]
+default_response = "reflect"
+[tags.material_responses.elite_energy_shield]
+default_response = "reflect"
+
+[[tags]]
+group = "weapon_hud_interface"
+tag = 'weapons\assault rifle\assault rifle'
+valid_crosshair_types = ["aim", "zoom"]
+crosshairs = { from = 'weapons\pistol\pistol', elements = [1, 2], append = true }
+screen_effects = { from = 'weapons\pistol\pistol' }

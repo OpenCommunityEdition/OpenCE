@@ -698,6 +698,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
+#include "object_death.h" /* port: port/linux/game/object_death.c */
 #include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
 
 /* port: the control and animation impulses the host's actors give their
@@ -2850,6 +2851,9 @@ void unit_died(
 		}
 
 		unit->unit.time_of_death = game_time_get();
+		/* port: and as a mutator's [death] has it, an effect and the body
+		gone from view (port/linux/game/object_death.c) */
+		object_death(unit_index);
 	}
 
 	unit->unit.flags &= ~(

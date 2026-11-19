@@ -219,6 +219,7 @@ async function runChecks() {
 // ---------- the game data (xiso-worker.js)
 
 let dataReady = false;
+let dataStored = false;
 let launcherStorageActive = false;
 
 function formatBytes(bytes) {
@@ -227,10 +228,20 @@ function formatBytes(bytes) {
 
 async function refreshData() {
   dataReady = false;
+  dataStored = false;
   let text = 'No game data yet: choose your disc image of Halo: Combat Evolved for the Xbox.';
   try {
     const root = await navigator.storage.getDirectory();
+    // A failed import has no completion marker but still needs a cleanup button.
+    try {
+      const drive = await (await root.getDirectoryHandle('save')).getDirectoryHandle('z');
+      for await (const [name] of drive.entries()) {
+        if (/^cache\d+\.map$/i.test(name)) { dataStored = true; break; }
+      }
+    } catch { /* No map cache yet. */ }
     const maps = await root.getDirectoryHandle('maps');
+    dataStored = true;
+    text = 'Incomplete game data: delete the maps to reclaim space, then import again.';
     const marker = await (await maps.getFileHandle('.complete')).getFile();
     const complete = JSON.parse(await marker.text());
     text = `${complete.files.length} files of maps (${formatBytes(complete.bytes)}), ready.`;
@@ -239,7 +250,7 @@ async function refreshData() {
     // none, or a copy that did not finish
   }
   $('data-status').textContent = text;
-  $('delete-data').disabled = !dataReady;
+  $('delete-data').disabled = launcherStorageActive || !!mapImportWorker || gameStarted || !dataStored;
   await refreshStorage();
   updatePlay();
 }
@@ -314,9 +325,11 @@ function setImporting(importing) {
   $('image-input').disabled = busy;
   $('folder-input').disabled = busy;
   for (const id of mapImportControls) $(id).disabled = busy;
-  $('mod-label').classList.toggle('disabled', busy);
-  $('mod-input').disabled = busy;
-  $('delete-data').disabled = busy || !dataReady;
+  for (const panel of Object.values(FOLDERS)) {
+    $(panel.label).classList.toggle('disabled', busy);
+    $(panel.input).disabled = busy;
+  }
+  $('delete-data').disabled = busy || gameStarted || !dataStored;
   $('play').disabled = busy || !canPlay();
 }
 
@@ -399,32 +412,45 @@ $('map-import-cancel').addEventListener('click', () => {
   mapImportWorker.postMessage({ type: 'cancel' });
 });
 
-// ---------- mods (mods-worker.js): /data/mods, all of them played unless
-// the game's main menu's Mods turns them off (port/linux/src/port_mods.c)
+// ---------- mods and mutators (mods-worker.js): /data/mods, all of them
+// played unless the game's main menu's Mods turns them off
+// (port/linux/src/port_mods.c); /data/mutators, those the game's Mods >
+// MUTATORS or Server Setup's MUTATOR OPTIONS turns on
+// (port/linux/src/port_mutators.c)
 
-// the name a mod's mod.toml gives it, else its folder's
-async function modName(directory, folder) {
+// each kind of folder: its file of settings, its storage's folder, and the
+// page's elements of its panel
+const FOLDERS = {
+  mods: { toml: 'mod.toml', what: 'mod', status: 'mods-status', list: 'mods-list', label: 'mod-label',
+    input: 'mod-input', summary: 'summary-mods' },
+  mutators: { toml: 'mutator.toml', what: 'mutator', status: 'mutators-status', list: 'mutators-list',
+    label: 'mutator-label', input: 'mutator-input', summary: 'summary-mutators' },
+};
+
+// the name a mod's mod.toml (a mutator's mutator.toml) gives it, else its folder's
+async function folderName(directory, folder, toml) {
   try {
-    const text = await (await (await directory.getFileHandle('mod.toml')).getFile()).text();
+    const text = await (await (await directory.getFileHandle(toml)).getFile()).text();
     const match = /^\s*name\s*=\s*"([^"\n]*)"/m.exec(text);
     if (match && match[1].trim()) return match[1].trim();
   } catch {
-    // (none: not a mod the game plays)
+    // (none: not one the game plays)
   }
   return folder;
 }
 
-async function refreshMods() {
-  const list = $('mods-list');
+async function refreshFolders(kind) {
+  const panel = FOLDERS[kind];
+  const list = $(panel.list);
   const found = [];
   try {
     const root = await navigator.storage.getDirectory();
-    const mods = await root.getDirectoryHandle('mods');
-    for await (const [folder, handle] of mods.entries()) {
-      if (handle.kind === 'directory') found.push({ folder, name: await modName(handle, folder) });
+    const folders = await root.getDirectoryHandle(kind);
+    for await (const [folder, handle] of folders.entries()) {
+      if (handle.kind === 'directory') found.push({ folder, name: await folderName(handle, folder, panel.toml) });
     }
   } catch {
-    // no mods folder yet
+    // no such folder yet
   }
   // (as the game orders them by default: their folders' names, whatever the
   // case of their A to Z, port_mods.c's names_compare)
@@ -442,55 +468,59 @@ async function refreshMods() {
     remove.textContent = 'Remove';
     remove.className = 'danger';
     remove.addEventListener('click', () => {
-      if (confirm(`Remove the mod ${name} from this browser?`)) modTask({ type: 'remove', name: folder });
+      if (confirm(`Remove the ${panel.what} ${name} from this browser?`)) {
+        folderTask(kind, { type: 'remove', name: folder });
+      }
     });
     item.append(label, remove);
     return item;
   }));
-  $('mods-status').textContent = found.length ? `${found.length} mod${found.length === 1 ? '' : 's'} in this browser.` :
-    'No mods yet.';
-  summarize('summary-mods', null, found.length ? `${found.length} mod${found.length === 1 ? '' : 's'}` : 'None yet');
+  const count = `${found.length} ${panel.what}${found.length === 1 ? '' : 's'}`;
+  $(panel.status).textContent = found.length ? `${count} in this browser.` : `No ${panel.what}s yet.`;
+  summarize(panel.summary, null, found.length ? count : 'None yet');
   await refreshStorage();
 }
 
-async function modTask(message) {
-  const release = await beginStorageTask('mods-status');
+async function refreshMods() {
+  await refreshFolders('mods');
+  await refreshFolders('mutators');
+}
+
+async function folderTask(kind, message) {
+  const panel = FOLDERS[kind];
+  const release = await beginStorageTask(panel.status);
   if (!release) return;
   let worker;
   try { worker = new Worker('mods-worker.js'); }
-  catch (error) { await release(); $('mods-status').textContent = error.message; return; }
-  $('mod-label').classList.add('disabled');
-  $('mod-input').disabled = true;
+  catch (error) { await release(); $(panel.status).textContent = error.message; return; }
   worker.onmessage = async (event) => {
     const data = event.data;
     if (data.type === 'progress') {
-      $('mods-status').textContent = `Copying ${data.file}: ${formatBytes(data.done)} of ${formatBytes(data.total)}`;
+      $(panel.status).textContent = `Copying ${data.file}: ${formatBytes(data.done)} of ${formatBytes(data.total)}`;
       return;
     }
     worker.terminate();
     await release();
-    $('mod-label').classList.remove('disabled');
-    $('mod-input').disabled = false;
-    await refreshMods();
-    if (data.type === 'error') $('mods-status').textContent = data.message;
-    else if (message.type === 'add') logLine(`mods: ${data.name}, ${data.files} files, ${data.bytes} bytes`);
+    await refreshFolders(kind);
+    if (data.type === 'error') $(panel.status).textContent = data.message;
+    else if (message.type === 'add') logLine(`${kind}: ${data.name}, ${data.files} files, ${data.bytes} bytes`);
   };
   worker.onerror = async (event) => {
     worker.terminate();
     await release();
-    $('mod-label').classList.remove('disabled');
-    $('mod-input').disabled = false;
-    await refreshMods();
-    $('mods-status').textContent = 'The copy failed: ' + event.message;
+    await refreshFolders(kind);
+    $(panel.status).textContent = 'The copy failed: ' + event.message;
   };
-  worker.postMessage(message);
+  worker.postMessage({ ...message, kind });
 }
 
-$('mod-input').addEventListener('change', (event) => {
-  const files = [...event.target.files];
-  event.target.value = '';
-  if (files.length) modTask({ type: 'add', files });
-});
+for (const kind of Object.keys(FOLDERS)) {
+  $(FOLDERS[kind].input).addEventListener('change', (event) => {
+    const files = [...event.target.files];
+    event.target.value = '';
+    if (files.length) folderTask(kind, { type: 'add', files });
+  });
+}
 
 $('delete-data').addEventListener('click', async () => {
   if (!confirm('Delete the maps copied into this browser? Saved games stay.')) return;
@@ -856,10 +886,22 @@ async function play() {
   } catch {
     // (a phone may still dim)
   }
+  let options = null;
+  let runtimeAttempted = false;
+  const releaseStoppedGame = () => {
+    // An abort/factory rejection can leave pthreads holding OPFS handles.
+    // Never hand ownership to another tab while those workers can still run.
+    if (runtimeAttempted) {
+      if (!options?.PThread?.terminateAllThreads) return;
+      options.PThread.terminateAllThreads();
+    }
+    void window.HaloMapStorage.stopGame();
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+  };
   try {
     await prepareInit();
     await loadScript('halo.js');
-    const options = {
+    options = {
       canvas,
       arguments: gameArguments(),
       print: (text) => { logLine(text); console.log(text); },
@@ -901,8 +943,12 @@ async function play() {
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
         $('ask').hidden = false;
       },
-      onAbort: (what) => showFatal('The game stopped: ' + what),
+      onAbort: (what) => {
+        releaseStoppedGame();
+        showFatal('The game stopped: ' + what);
+      },
       onExit: (status) => {
+        releaseStoppedGame();
         if (status) showFatal(`The game stopped (status ${status}). The log below says why.`);
         else location.reload();
       },
@@ -910,11 +956,13 @@ async function play() {
     // (the module these options become, which p2p.js calls into as soon as
     // the game asks it for a connection)
     window.HaloP2P.attach(options);
+    runtimeAttempted = true;
     game = await window.createHalo(options);
     // the on-screen touch controls (touch.js), and the room's frames (net.js)
     window.HaloTouch.start(game, $('touch'));
     window.HaloNet.attach(game);
   } catch (error) {
+    releaseStoppedGame();
     showFatal(String(error && error.message ? error.message : error));
   }
 }

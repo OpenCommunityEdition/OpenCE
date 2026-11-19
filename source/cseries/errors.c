@@ -143,6 +143,32 @@ static unsigned long debug_file_port_repeat_count = 0;
 static volatile long debug_file_port_lock = 0;
 /* (write_to_error_file's header again, atop the file begun again) */
 static boolean debug_file_port_rolled = FALSE;
+#ifdef HALO_WEB
+static boolean debug_file_web_closed = FALSE;
+
+void debug_file_web_close(void)
+{
+	while (__sync_lock_test_and_set(&debug_file_port_lock, 1))
+	{
+	}
+	debug_file_web_closed = TRUE;
+	if (debug_file_port)
+	{
+		if (debug_file_port_repeat_count)
+		{
+			char repeated[64];
+
+			sprintf(repeated, "last line repeated %lu times\r\n", debug_file_port_repeat_count);
+			debug_file_port_write(debug_file_port, "", repeated);
+			debug_file_port_repeat_count = 0;
+		}
+		if (debug_file_port)
+			fclose(debug_file_port);
+		debug_file_port = NULL;
+	}
+	__sync_lock_release(&debug_file_port_lock);
+}
+#endif
 
 static void write_to_debug_file(
 	char const *string,
@@ -157,6 +183,14 @@ static void write_to_debug_file(
 	for (spin = 0; spin < 50000000 && __sync_lock_test_and_set(&debug_file_port_lock, 1); spin++)
 	{
 	}
+
+#ifdef HALO_WEB
+	if (debug_file_web_closed)
+	{
+		__sync_lock_release(&debug_file_port_lock);
+		return;
+	}
+#endif
 
 	/* port: a dedicated server's debug.txt also on the standard error
 	(server.log_debug_echo), and there alone when the file cannot be written

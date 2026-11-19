@@ -325,18 +325,57 @@ function writeAll(access, bytes, position, name) {
   }
 }
 
+// Count only the directory that replacement will remove, including interrupted
+// imports and the completion marker. Saves, caches and other origin data stay.
+async function directoryBytes(directory) {
+  let total = 0;
+  for await (const entry of directory.values()) {
+    const bytes = entry.kind === 'directory' ? await directoryBytes(entry) : (await entry.getFile()).size;
+    if (!Number.isSafeInteger(bytes) || bytes < 0 || !Number.isSafeInteger(total + bytes)) {
+      throw new Error('Could not measure the existing maps safely. The existing maps have not been changed.');
+    }
+    total += bytes;
+  }
+  return total;
+}
+
 async function copy(files) {
   const total = files.reduce((sum, file) => sum + file.size, 0);
-  if (navigator.storage.estimate) {
-    const { quota, usage } = await navigator.storage.estimate();
-    if (quota && quota - usage < total) {
-      throw new Error(`The browser lets this site keep ${Math.floor((quota - usage) / 1e6)} MB more, ` +
-        `and the maps take ${Math.ceil(total / 1e6)} MB.`);
-    }
+  const text = new TextEncoder().encode(JSON.stringify({ files: files.map((file) => file.name), bytes: total }));
+  const required = total + text.length;
+  if (files.some((file) => !Number.isSafeInteger(file.size) || file.size < 0) || !Number.isSafeInteger(required)) {
+    throw new Error('The maps have an invalid size. The existing maps have not been changed.');
   }
   const storage = await navigator.storage.getDirectory();
-  // (a new copy replaces whatever an earlier, perhaps interrupted, one left)
-  await storage.removeEntry('maps', { recursive: true }).catch(() => {});
+  let previous = null;
+  try {
+    previous = await storage.getDirectoryHandle('maps');
+  } catch (error) {
+    if (error.name !== 'NotFoundError') throw error;
+  }
+  const reclaimable = previous ? await directoryBytes(previous) : 0;
+  let estimate;
+  try {
+    estimate = navigator.storage.estimate && await navigator.storage.estimate();
+  } catch (_) {
+    // An unavailable estimate is not evidence that replacement will fit.
+  }
+  const { quota, usage } = estimate || {};
+  if (!Number.isFinite(quota) || quota < 0 || !Number.isFinite(usage) || usage < 0) {
+    throw new Error('The browser could not estimate available storage for replacing the maps. ' +
+      'The existing maps have not been changed. Try again when a storage estimate is available.');
+  }
+  const available = Math.max(0, quota - usage + reclaimable);
+  if (available < required) {
+    throw new Error(`After replacing the existing maps (${Math.floor(reclaimable / 1e6)} MB reclaimed), ` +
+      `the browser lets this site keep ${Math.floor(available / 1e6)} MB more, ` +
+      `and the new maps and completion marker need ${Math.ceil(required / 1e6)} MB. ` +
+      'The existing maps have not been changed. Saves and caches are not removed.');
+  }
+  // Inputs have been checked by imageFiles/folderFiles and the estimated final
+  // storage fits. Replacement is destructive, not atomic: a later read/write or
+  // quota failure can still leave an incomplete import (without .complete).
+  if (previous) await storage.removeEntry('maps', { recursive: true });
   const maps = await storage.getDirectoryHandle('maps', { create: true });
   let done = 0;
   let lastReport = 0;
@@ -368,7 +407,6 @@ async function copy(files) {
   const marker = await (await maps.getFileHandle('.complete', { create: true })).createSyncAccessHandle();
   try {
     marker.truncate(0);
-    const text = new TextEncoder().encode(JSON.stringify({ files: files.map((file) => file.name), bytes: total }));
     writeAll(marker, text, 0, '.complete');
     marker.flush();
   } finally {

@@ -21,6 +21,7 @@ game (shell_xbox.c's main, renamed halo_game_main by tools/web_build.py).
 #include "web_memory.h"
 
 int halo_game_main(void);
+void web_shutdown_initialize(void);
 /* web_net.c: the arguments, for posix_command_line_argument */
 void web_net_arguments(int count, char **values);
 /* web_library.js: a line for the page (kind 0 a status, 2 an invite link, 3 a
@@ -85,9 +86,10 @@ int main(int argc, char **argv)
 	/* the canvas fills the page, which the page's own button takes
 	fullscreen (a page may only do so from a click) */
 	set_default("HALO_DISPLAY_MODE", "windowed");
+	web_shutdown_initialize();
 	web_memory_initialize();
 	/* (an invite link among them is joined: port/linux/src/p2p.c) */
 	web_net_arguments(argc, argv);
 	web_js_post(0, "starting");
-	return halo_game_main();
+	exit(halo_game_main());
 }

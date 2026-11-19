@@ -20,12 +20,12 @@
     return parts;
   }
 
-  async function lock(name, mode = 'exclusive') {
+  async function lock(name, mode = 'exclusive', busy = 'Map storage is busy in another tab. Quit that game or finish its download first.') {
     if (!navigator.locks?.request) throw new Error('This browser cannot safely coordinate map storage between tabs.');
     let acquired, failed;
     const ready = new Promise((resolve, reject) => { acquired = resolve; failed = reject; });
     const request = navigator.locks.request(name, { mode, ifAvailable: true }, async held => {
-      if (!held) { failed(new Error('Map storage is busy in another tab. Quit that game or finish its download first.')); return; }
+      if (!held) { failed(new Error(busy)); return; }
       let release;
       const done = new Promise(resolve => { release = resolve; });
       acquired(() => { release(); return request; });
@@ -260,13 +260,24 @@
   }
 
   async function startGame() {
-    const release = await lock(MUTATION);
+    // Same ordering as importPlan: never recover files before owning the guard.
+    // ifAvailable makes both a duplicate game and an active import fail promptly.
+    const release = await lock(GUARD, 'exclusive',
+      'The game is already running in another tab, or game data is being imported. Quit the game in that tab or finish the import, then press Play again.');
     try {
-      await recover();
-      if (gameRelease) throw new Error('This tab already owns a game.');
-      gameRelease = await lock(GUARD, 'shared');
-    } finally { await release(); }
+      const mutation = await lock(MUTATION);
+      try { await recover(); } finally { await mutation(); }
+      gameRelease = release;
+    } catch (error) { await release(); throw error; }
   }
+
+  async function stopGame() {
+    const release = gameRelease;
+    gameRelease = null;
+    if (release) await release();
+  }
+  // The browser releases document-owned locks on tab close. Do not release on
+  // visibilitychange/pagehide: a hidden or bfcached page may still own a runtime.
 
   async function visible(folder) {
     if (!/^dl_[0-9a-f]{20}$/.test(folder)) return { visible: true };
@@ -391,7 +402,7 @@
     };
   }
 
-  const api = { dispatch, dispatchLocal, worker, startGame, lock, recover, importPlan, validate, plainPath, write, GUARD, MUTATION };
+  const api = { dispatch, dispatchLocal, worker, startGame, stopGame, lock, recover, importPlan, validate, plainPath, write, GUARD, MUTATION };
   root.HaloMapStorage = api;
   if (typeof module !== 'undefined') module.exports = api;
 })(globalThis);

@@ -499,6 +499,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     # library
     for source in opus_sources():
         objects.append(guest_object(source, " ".join([opus_cflags(guest_abi), *libc_includes])))
+
     # internet play's signatures, for public games' listings
     # (port/third_party/monocypher; p2p_crypto.c)
     for name in ("monocypher.c", "monocypher-ed25519.c"):

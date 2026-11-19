@@ -15,6 +15,7 @@ and the debug keyboard that the game's console reads.
 #include "port_config.h"
 #include "p2p.h"
 #include "port_mods.h"
+#include "port_mutators.h"
 #include "server_mode.h"
 #include "server_master.h"
 #include "player_link.h"
@@ -23,6 +24,9 @@ and the debug keyboard that the game's console reads.
 #include "../game/text_filter.h"
 
 #include <SDL3/SDL.h>
+#ifdef HALO_WEB
+#include <emscripten.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -314,6 +318,9 @@ BOOL platform_sdl_initialize(void)
 	/* (the mods, and whether to play those that say they cannot be played
 	together, before the window opens: port_mods.c) */
 	port_mods_startup();
+	/* (the mutators, and the stock mutators written into stock_mutators
+	again: port_mutators.c) */
+	port_mutators_scan();
 	return TRUE;
 }
 
@@ -1204,14 +1211,23 @@ static void menu_cursor_mouse_used(BOOL in_menus)
 /* the swap interval set, each change only (on the desktop
 platform_video_swap's: vsync while focused, none unfocused, its frames
 paced at the refresh instead) */
+#ifndef HALO_WEB
 static int platform_swap_interval_applied = -1;
+#endif
 
 static void platform_swap_interval(int interval)
 {
+#ifndef HALO_WEB
 	if (platform_swap_interval_applied == interval)
 		return;
 	SDL_GL_SetSwapInterval(interval);
 	platform_swap_interval_applied = interval;
+#else
+	/* SDL's Emscripten swap interval changes main-loop timing, not the
+	GL context. Video starts before main_loop installs its RAF callback;
+	that callback owns the browser's pacing (source/main/main.c). */
+	(void)interval;
+#endif
 }
 
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
@@ -2293,6 +2309,11 @@ void platform_pump_events(void)
 		{
 		case SDL_EVENT_QUIT:
 			pthread_mutex_unlock(&input_lock);
+#ifdef HALO_WEB
+			/* exit on this worker proxies to the page asynchronously. Stop
+			its RAF first so no further frame can process another quit. */
+			emscripten_cancel_main_loop();
+#endif
 			platform_log("window closed");
 			exit(EXIT_SUCCESS);
 		case SDL_EVENT_KEY_DOWN:

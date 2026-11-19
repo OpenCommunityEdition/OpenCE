@@ -94,6 +94,14 @@ checked as it is copied (`mods-worker.js`). Every mod is on; the game's main
 menu, Mods, orders them and turns them off. The game asks in a dialog of the
 page when mods say they cannot be played together (`web_js_ask`).
 
+Mutators (`docs/mutators.md`): under **Mutators**, **Add a mutator folder…**
+copies a mutator's `mutator.toml` and the files beside it (its native HS script,
+its add-on, its settings) into the browser's storage (`mutators/`, the data
+root's for the game), replacing one of the same folder's name, and
+**Remove** deletes one. The stock mutators are in the game already. They are
+turned on in the game: the main menu's Mods (MUTATORS), or Server Setup's
+MUTATOR OPTIONS, with their SETTINGS.
+
 The page asks the browser to keep the site's data. A browser that is short
 of space may delete it otherwise; **Settings and data** says which. The
 storage belongs to the site's address: `halocombatevolved.com` and the
@@ -123,7 +131,18 @@ The controls are the desktop builds' (refer to "Controls" in
   nor gyroscope aiming yet.
 
 The game keeps `config.toml`, the saved games and profiles (`save/`) and
-`debug.txt` in the browser's storage beside `maps/`. **Settings and data**
+`debug.txt` in the browser's storage beside `maps/`. Web links wrap `exit`
+(`web_shutdown.c`): the game worker cancels its frame loop and drains the
+normal C/C++ exit handlers before the real exit tears down the runtime.
+The cleanup registered before entering the game runs after the game's later
+shutdown handlers but before WasmFS's global destructor: it closes the debug
+stdio stream, flushes other stdio, and closes descriptors 3..4095 (WasmFS's
+file-table limit). This includes raw POSIX opens and the descriptors owned by
+Xbox file HANDLEs; flushing alone does not release OPFS access handles.
+It deliberately leaves stdio 0..2 and the persistent files in place. Keep
+`EXIT_RUNTIME=1`; keeping the runtime alive is not a substitute for closing
+files. A browser tab killed without a normal game exit cannot run this path.
+**Settings and data**
 exports the saved games, the profiles and `config.toml` as a zip (not the
 game's copies of the maps), downloads the log, and deletes the game
 data. The game's own Settings screens have the settings that apply in a
@@ -507,7 +526,7 @@ jsDelivr).
 | `port/web/src/web_stubs.c` | UPnP and an MSVC intrinsic |
 | `port/web/src/web_shared.h`, `web_touch.c` | The words of memory the page reads and writes: frames shown, the touch controls' state |
 | `port/web/src/web_library.js`, `web_pre.js` | The JavaScript halves: messages to the page, the brokers' WebSockets, the workers' errors |
-| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), touch controls, rooms and WebRTC; separate Xbox, CE, MCC and mod importers; `map-import-storage.js` and `map-storage-worker.js` own browser transactions; service worker, manifest and icons |
+| `port/web/site/` | The page (`index.html`, `app.js`, `style.css`), the touch controls (`touch.js`), rooms (`net.js`), internet play's WebRTC (`p2p.js`), its service worker (`sw.js`); separate Xbox (`xiso-worker.js`), CE, MCC and mod/mutator (`mods-worker.js`) importers; `map-import-storage.js` and `map-storage-worker.js` own browser transactions; the web app's manifest and icons |
 | `port/web/stamp_version.py`, `licenses.py` | `version.json` and `licenses.txt` |
 | `port/web/tests/` | The tests above |
 | `tools/web_serve.py` | A local server for the site |

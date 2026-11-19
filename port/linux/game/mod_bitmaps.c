@@ -1169,7 +1169,7 @@ long mod_bitmaps_update(
 	PC's, are found again too: they are drawn by the same table) */
 	if (changed && (played_count || custom_edition_cache_tags_loaded()))
 	{
-		mod_bitmaps_globals.orders_found = custom_edition_loaded_reordered_bitmaps_find();
+		mod_bitmaps_globals.orders_found = custom_edition_loaded_reordered_bitmaps_find(0);
 	}
 	if (changed)
 	{

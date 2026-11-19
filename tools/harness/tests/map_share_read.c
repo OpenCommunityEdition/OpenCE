@@ -69,6 +69,8 @@ FRAME_UNUSED(frame_have)
 FRAME_UNUSED(frame_request)
 FRAME_UNUSED(frame_refuse)
 FRAME_UNUSED(frame_hashes_request)
+FRAME_UNUSED(frame_mutator_request)
+FRAME_UNUSED(frame_mutator_block)
 FRAME_UNUSED(frame_hashes)
 
 static void connection_close(struct connection *connection, char const *why)

@@ -227,10 +227,12 @@ boolean custom_edition_reordered_bitmaps_find(
 	unsigned long loaded_bytes,
 	unsigned long behaviours);
 /* As custom_edition_reordered_bitmaps_find, in the loaded map's tags, which
-the validator has checked: for the bitmaps of mods (mod_bitmaps.c), Halo
-PC's on any map. FALSE after logging why it cannot. */
+the validator has checked: for the bitmaps of mods (mod_bitmaps.c) and
+add-ons (addons.c), Halo PC's on any map, with the Halo PC behaviours of the
+maps theirs were made from too (an add-on's). FALSE after logging why it
+cannot. */
 boolean custom_edition_loaded_reordered_bitmaps_find(
-	void);
+	unsigned long behaviours);
 /* The order (enum custom_edition_channel_order) Halo PC keeps the channels
 of bitmap `bitmap_index` of the tag `handle` names in, of those found. */
 short custom_edition_bitmap_channel_order(
@@ -337,6 +339,31 @@ boolean custom_edition_models_convert(
 	byte *model_data);
 void custom_edition_models_dispose(
 	void);
+
+/* An add-on's gbxmodels (port/linux/game/addons.c: `count` of them, named
+`names`, as its tag data has them) given this build's layout and compressed
+geometry in buffers of their own, made from the add-on's `model_data_bytes`
+of model data, whose strips start at `index_data_offset`. Their geometry is
+checked to lie within it first. Returns the geometry, which
+custom_edition_addon_models_dispose releases, or NULL after logging why: the
+models are then partly converted and must not be used. */
+struct model;
+void *custom_edition_addon_models_convert(
+	struct model **models,
+	char const *const *names,
+	long count,
+	byte *model_data,
+	unsigned long model_data_bytes,
+	unsigned long index_data_offset);
+void custom_edition_addon_models_dispose(
+	void *geometry);
+/* A model copied from a stock map, whose tags the validator has checked and
+which are still in the Xbox tag cache (stock_tags.c): each part given buffers of
+its own, made from a copy of what its buffers name. Returns the geometry, which
+custom_edition_addon_models_dispose releases, or NULL after logging why. */
+void *custom_edition_stock_model_make(
+	struct model *model,
+	char const *name);
 
 /* Called by scenario_structure_bsp_load and scenario_structure_bsp_unload
 for the structure BSPs of a Custom Edition map: gives its materials

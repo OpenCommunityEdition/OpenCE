@@ -101,6 +101,7 @@ symbols in this file:
 #include "console.h"
 #include "game_state.h"
 #include "coop_vehicles.h" /* port: preserve replacement-vehicle homes across reverts */
+#include "mutator_scripts.h" /* port: port/linux/game/mutator_scripts.c */
 #include "network_coop.h" /* port: checkpoint roster restoration and host team-wipe policy */
 #include "game.h"
 #include "tag_files.h"
@@ -196,6 +197,8 @@ static game_state_before_save_proc before_save_procs[] =
 	dummy,
 	/* port: the host's vehicle home table follows the saved object handles. */
 	coop_vehicles_before_save,
+	/* port: a mutator's script's models, which are not saved */
+	mutator_scripts_before_save,
 };
 
 static game_state_before_load_proc before_load_procs[] =
@@ -230,6 +233,8 @@ static game_state_after_load_proc after_load_procs[] =
 	scripted_hud_messages_clear,
 	/* port: restore matching homes or forget an unrelated disk/core load. */
 	coop_vehicles_after_load,
+	/* port: (none of the objects loaded is a script's model) */
+	mutator_scripts_after_load,
 	/* port: (vehicle_riding.c: also for a revert in the same structure) */
 	bipeds_riding_latch,
 	/* port: a cinematic's skip goes back to the checkpoint gone back to */

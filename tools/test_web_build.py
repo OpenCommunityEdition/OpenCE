@@ -195,6 +195,69 @@ def test_the_sockets_inside_the_page(tmp_path):
     assert "web_net: ok" in result.stdout
 
 
+@pytest.mark.parametrize("release", [False, True])
+def test_web_exit_terminates_runtime(release):
+    text = graph(release=release)
+    assert "-sEXIT_RUNTIME=1" in text
+    assert "-sEXIT_RUNTIME=0" not in text
+    assert "-sPROXY_TO_PTHREAD=1" in text
+
+
+@pytest.mark.skipif(not shutil.which("cc"), reason="no C compiler")
+@pytest.mark.parametrize("web", [False, True])
+def test_swap_interval_and_quit_lifecycle(tmp_path, web):
+    # Compile the actual platform snippets without SDL or the game. The web
+    # test rejects any swap call: SDL maps it to main-loop timing, which is
+    # invalid before the game registers its RAF callback.
+    source = (ROOT / "port/linux/src/sdl_platform.c").read_text()
+    swap = source[source.index("#ifndef HALO_WEB\nstatic int platform_swap_interval_applied"):
+                  source.index("BOOL platform_video_initialize(")]
+    quit_case = source.split("case SDL_EVENT_QUIT:", 1)[1].split("case SDL_EVENT_KEY_DOWN:", 1)[0]
+    program = tmp_path / "lifecycle.c"
+    program.write_text('''
+#include <assert.h>
+#include <stdlib.h>
+#include <setjmp.h>
+static int swaps, interval, cancelled, logged, input_lock;
+static jmp_buf stopped;
+static void SDL_GL_SetSwapInterval(int value) { ++swaps; interval = value; }
+static void pthread_mutex_unlock(int *lock) { (void)lock; }
+static void emscripten_cancel_main_loop(void) { ++cancelled; }
+static void platform_log(const char *text) { (void)text; ++logged; }
+static void test_exit(int status) {
+    assert(status == EXIT_SUCCESS);
+#ifdef HALO_WEB
+    assert(cancelled == 1);
+#else
+    assert(cancelled == 0);
+#endif
+    assert(logged == 1);
+    longjmp(stopped, 1);
+}
+#define exit test_exit
+''' + swap + '''
+static void quit(void) {
+''' + quit_case + '''
+}
+int main(void) {
+    platform_swap_interval(1);
+    platform_swap_interval(1);
+    platform_swap_interval(0);
+#ifdef HALO_WEB
+    assert(swaps == 0);
+#else
+    assert(swaps == 2 && interval == 0);
+#endif
+    if (!setjmp(stopped)) quit();
+    return 0;
+}
+''')
+    binary = tmp_path / "lifecycle"
+    subprocess.run(["cc", "-std=c99", *(["-DHALO_WEB"] if web else []),
+                    str(program), "-o", str(binary)], check=True)
+    subprocess.run([str(binary)], check=True, timeout=10)
+
+
 def test_the_menus_name_known_platforms_and_match_their_generator():
     import port_settings
 

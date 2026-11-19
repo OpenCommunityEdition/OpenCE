@@ -241,6 +241,7 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "bots.h" /* port: port/linux/game/bots.c */
 #include "server_team_switch.h" /* port: port/linux/game/server_team_switch.c */
+#include "mutator_scripts.h" /* port: port/linux/game/mutator_scripts.c */
 #include "cutscene/cinematics.h" /* port: network co-op's first spawns */
 #include "editor/editor_stubs.h"
 #include "effects/effects.h"
@@ -4645,7 +4646,9 @@ static void player_examine_nearby_objects(
 
 				case _object_type_weapon:
 				case _object_type_equipment:
-					player_examine_nearby_item(player_index, object_indices[object_number]);
+					/* port: not a script's model, which is only drawn */
+					if (!mutator_scripts_object_local(object_indices[object_number]))
+						player_examine_nearby_item(player_index, object_indices[object_number]);
 					break;
 
 				case _object_type_control:
@@ -5103,6 +5106,9 @@ void players_update_before_game(
 				}
 			}
 		}
+
+		/* port: a mutator's script's tick (port/linux/game/mutator_scripts.c) */
+		mutator_scripts_tick();
 
 		players_compute_combined_pvs(players_globals->combined_pvs_local, TRUE);
 		players_compute_combined_pvs(players_globals->combined_pvs, FALSE);

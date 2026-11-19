@@ -30,8 +30,8 @@ def test_case(case):
     (('row->vertical_offset = y;', 'row->vertical_offset = y; row->child->vertical_offset = y;'), 'layout'),
     (('if (row->visible && !strncmp(row->name, "op_coop_", 8))\n\t\t\t\t{',
       'if (!strncmp(row->name, "op_coop_", 8))\n\t\t\t\t{'), 'layout'),
-    (('index += spinner->parameters.list.number_of_items;',
-      'if (row->visible) index += spinner->parameters.list.number_of_items;'), 'help'),
+    (('index += ui_widget_spinner_own_item_count(spinner);',
+      'if (row->visible) index += ui_widget_spinner_own_item_count(spinner);'), 'help'),
     (('struct widget_instance *pickups = named(list, "coop_extra_pickups_spinner", 0);',
       'struct widget_instance *pickups = NULL;'), 'layout'),
     (('struct widget_instance *vehicles = named(list, "coop_extra_vehicles_spinner", 0);',
@@ -56,12 +56,24 @@ def test_team_wipe_generated_screen():
     text = '\n'.join(port_settings.multiplayer_files()[name])
     root = ET.fromstring(text)
     widgets = {widget.get('name'): widget for widget in root.findall('widget')}
+    server = base.removesuffix('coop_options/')
+    labels = root.find(f"strings[@name='{server}labels']")
+    mutators = widgets[server + 'mutator_options_label']
+    assert int(mutators.get('string_index')) == 14
+    assert labels[14].get('text') == 'MUTATOR OPTIONS:'
+    helps = root.find(f"strings[@name='{server}help_strings']")
+    assert len(helps) == 18
+    assert helps[17].get('text').startswith('The mutators that change')
+    riding = widgets[base + 'coop_vehicle_riding_spinner']
+    riding_values = root.find(f"strings[@name='{riding.get('string_list')}']")
+    assert [item.get('text') for item in riding_values] == ['ON', 'OFF']
     spinner = widgets[base + 'coop_team_wipe_spinner']
     strings = root.find(f"strings[@name='{spinner.get('string_list')}']")
     assert [item.get('text') for item in strings] == ['AUTO', 'REVERT CHECKPOINT', 'RESPAWN ONLY']
     menu = widgets[base + 'coop_options_menu']
     rows = [child for child in menu.findall('child') if '/op_coop_' in child.get('widget', '')]
     assert len(rows) == 10
+    assert any(row.get('widget') == base + 'op_coop_vehicle_riding' for row in rows)
     assert any(row.get('widget') == base + 'op_coop_team_wipe' for row in rows)
     help_top = int(widgets[base + 'coop_options_help'].get('top'))
     for row in rows:
