@@ -11,6 +11,14 @@ glow trails, wobble and fade remain. Widescreen expands the entire composition
 horizontally; false restores the central 4:3 framing. No replacement art is
 bundled. The Xbox chant plays in either mode, under master/effects volume.
 
+`display.widescreen_loading_fill` (default false) keeps the 4:3 picture's
+proportions in the widened frame: it fills the width, and the rows above and
+below what the frame shows are left out, an eighth of the picture's height
+at each edge at 16:9 (its columns at the sides, for a frame narrower than
+4:3). `loading_widescreen_picture_crop` works out the share left out, and
+`draw_layer_int` moves the picture's texture coordinates in by it. The
+sweep, blur and feedback are drawn over the frame as before.
+
 Read `progress_bar_begin`, `progress_bar_render` and `progress_bar_end` in
 [progress_bar.c](../source/interface/progress_bar.c), then
 [loading_widescreen.c](../port/linux/src/loading_widescreen.c) and

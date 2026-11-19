@@ -41,3 +41,15 @@ def test_stock_loading_framing(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_picture_crop_wired():
+    """The picture's four corners take the crop; the sweep's coordinates do not."""
+    layer = function((ROOT / "source/interface/progress_bar.c").read_text(), "draw_layer_int")
+    assert "loading_widescreen_picture_crop((real)halo_screen_width()/480.f, &crop_columns, &crop_rows);" in layer
+    corners = re.findall(r"D3DVSDE_TEXCOORD0, ([^;]+)\);", layer)
+    assert corners == ["0.f + crop_columns, half_height - crop_rows",
+                       "half_width - crop_columns, half_height - crop_rows",
+                       "half_width - crop_columns, 0.f + crop_rows",
+                       "0.f + crop_columns, 0.f + crop_rows"]
+    assert "crop" not in "".join(re.findall(r"D3DVSDE_TEXCOORD1, [^;]+;", layer))

@@ -1916,23 +1916,30 @@ static void draw_layer_int(
 	real half_width= layer->texture_width*0.5f;
 	real half_height= layer->texture_height*0.5f;
 	real mask_position;
+	real crop_columns, crop_rows;
 
+	/* port: display.widescreen_loading_fill keeps the picture's proportions
+	across a widened frame, leaving out its rows above and below the frame
+	rather than stretching it (port/linux/src/loading_widescreen.c) */
+	loading_widescreen_picture_crop((real)halo_screen_width()/480.f, &crop_columns, &crop_rows);
+	crop_columns*= half_width;
+	crop_rows*= half_height;
 	generate_gravy_rect(layer, &rect);
 	IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_DIFFUSE,
 		color->red, color->green, color->blue, alpha);
 	mask_position= progress*768.f - 64.f - 64.f;
 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 0.f - mask_position, 0.f);
-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, 0.f, half_height);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, 0.f + crop_columns, half_height - crop_rows);
 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x0, rect.y0, 0.5f, 1.f);
 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 640.f - mask_position, 0.f);
-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, half_width, half_height);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, half_width - crop_columns, half_height - crop_rows);
 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x1, rect.y0, 0.5f, 1.f);
 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 640.f - mask_position, 16.f);
-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, half_width, 0.f);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, half_width - crop_columns, 0.f + crop_rows);
 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x1, rect.y1, 0.5f, 1.f);
 	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD1, 0.f - mask_position, 16.f);
-	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, 0.f, 0.f);
+	IDirect3DDevice8_SetVertexData2f(global_d3d_device, D3DVSDE_TEXCOORD0, 0.f + crop_columns, 0.f + crop_rows);
 	IDirect3DDevice8_SetVertexData4f(global_d3d_device, D3DVSDE_VERTEX, rect.x0, rect.y1, 0.5f, 1.f);
 	IDirect3DDevice8_End(global_d3d_device);
 

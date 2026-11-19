@@ -219,6 +219,10 @@ static const struct config_setting config_settings[] =
 	{ "display.widescreen_loading", _config_boolean, "true", "HALO_WIDESCREEN_LOADING", _environment_value, _platform_all,
 		"Widen the stock loading screen, keeping its original picture, sweep\n"
 		"and glow trails. False keeps the central 4:3 framing." },
+	{ "display.widescreen_loading_fill", _config_boolean, "false", "HALO_WIDESCREEN_LOADING_FILL", _environment_value, _platform_all,
+		"With widescreen_loading, draw the loading picture at its own 4:3\n"
+		"proportions, filling the width and leaving out its top and bottom\n"
+		"edges; false stretches it to the screen's width." },
 	{ "display.shadow_resolution", _config_integer, "128", "HALO_SHADOW_RESOLUTION", _environment_value,
 		_platform_all,
 		"The size the objects' shadows are drawn at, in pixels each way: 128 as\n"

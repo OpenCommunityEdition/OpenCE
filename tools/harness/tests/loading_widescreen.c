@@ -24,8 +24,11 @@ typedef unsigned int GLuint;
 #define GL_SCISSOR_TEST 2
 #define GL_COLOR_BUFFER_BIT 3
 #define GL_LINEAR 4
-static int enabled;
-static int config_boolean(char const *name) {assert(!strcmp(name,"display.widescreen_loading"));return enabled;}
+static int enabled,fill;
+static int config_boolean(char const *name) {
+    if(!strcmp(name,"display.widescreen_loading_fill"))return fill;
+    assert(!strcmp(name,"display.widescreen_loading"));return enabled;
+}
 /* FEATURE */
 static struct {
     D3DXMATRIX saved_projection,saved_world,saved_view,projection,world,view;
@@ -93,6 +96,22 @@ static struct trace render(float progress) {
     assert(trace.fade_calls==1 && trace.initial_calls==1 && trace.shaders==2 && trace.vblank==1 && trace.invalidated==1);
     return trace;
 }
+/* the picture keeps its proportions only with both settings on: rows
+ * left out above and below a wider frame, columns at the sides of a
+ * narrower one, none at 4:3 */
+static void expect_crop(float aspect,float columns,float rows) {
+    float c=-1,r=-1;loading_widescreen_picture_crop(aspect,&c,&r);
+    assert(fabs(c-columns)<.00001f && fabs(r-rows)<.00001f);
+}
+static void check_crop(void) {
+    enabled=1;fill=0;loading_widescreen_begin();expect_crop(854.f/480.f,0,0);loading_widescreen_end();
+    enabled=0;fill=1;loading_widescreen_begin();expect_crop(854.f/480.f,0,0);loading_widescreen_end();
+    enabled=1;fill=1;loading_widescreen_begin();
+    expect_crop(16.f/9.f,0,.125f);expect_crop(640.f/480.f,0,0);
+    expect_crop(21.f/9.f,0,(1-(4.f/3)/(21.f/9))*.5f);expect_crop(1.25f,.03125f,0);expect_crop(0,0,0);
+    fill=0;expect_crop(16.f/9.f,0,.125f); /* latched for this session */
+    loading_widescreen_end();fill=1;expect_crop(16.f/9.f,0,0);
+}
 int main(void) {
     static const long widths[]={640,854,1120};
     static const float progress[]={.1f,.5f,.95f};
@@ -119,5 +138,6 @@ int main(void) {
     }
     i=copies;device.front_buffer_asked=0;front_buffer_take();assert(copies==(int)i);
     loading_widescreen_end();assert(!loading_widescreen_active());
+    check_crop();
     puts("stock effect/audio commands preserved; full-width feedback and session reset passed");return 0;
 }
