@@ -612,6 +612,7 @@ void network_distributed_player_killed(long *killing_player_index, long *killing
 	long dead_player_index, boolean *friendly_fire);
 /* port/linux/game/network_damage.c's */
 boolean network_damage_killer_score(long player_index, long *score);
+boolean switch_death;
 
 /* ---------- constants */
 
@@ -967,18 +968,34 @@ long game_engine_get_team_score(
 {
 	struct data_iterator iterator;
 	struct player_datum *player;
+	struct player_datum *any_player = NULL;
+	long any_player_index = NONE;
+	long score = 0;
 
 	data_iterator_new(&iterator, player_data);
-	player = (struct player_datum *)data_iterator_next(&iterator);
-	while (player)
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 	{
 		if (player->team_index == team_index)
 			return game_engine->get_player_score(iterator.datum_index, TRUE);
-
-		player = (struct player_datum *)data_iterator_next(&iterator);
+		if (any_player == NULL)
+		{
+			any_player = player;
+			any_player_index = iterator.datum_index;
+		}
 	}
 
-	return 0;
+	/* port: no player is on the team (everyone switched away or left): the game type's
+	own score for the team, read through any player with the team index swapped for the call */
+	if (any_player != NULL)
+	{
+		long original_team_index = any_player->team_index;
+
+		any_player->team_index = team_index;
+		score = game_engine->get_player_score(any_player_index, TRUE);
+		any_player->team_index = original_team_index;
+	}
+
+	return score;
 }
 
 real linear_to_non_linear_alpha(
@@ -1179,14 +1196,20 @@ static void game_engine_generate_title_string(
 		long left = infection_enabled() ? infection_remaining_ticks() :
 			game_variant_options_get()->time_limit * 60L * TICKS_PER_SECOND - game_time_get();
 		wchar_t time_string[32];
+		wchar_t *remaining_string;
 
 		ticks_to_unicode_time_string(MAX(left, 0), NUMBEROF(time_string), time_string);
+		/* the tag's " Remaining" (its leading space is part of it) */
+		string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
+		remaining_string = string_list_index != NONE ?
+			unicode_string_list_get_string(string_list_index, 189) : L"";
 		if (secondary_string[0] && secondary_string != time_left_string)
 		{
-			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s, %s left", secondary_string, time_string);
+			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s, %s%s", secondary_string, time_string,
+				remaining_string);
 		}
 		else
-			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s left", time_string);
+			usnprintf(time_left_string, NUMBEROF(time_left_string), L"%s%s", time_string, remaining_string);
 		time_left_string[NUMBEROF(time_left_string) - 1] = 0;
 		secondary_string = time_left_string;
 	}
@@ -2096,6 +2119,7 @@ static void game_engine_rasterize_scoreboard(
 	short top;
 	wchar_t *column_name;
 	wchar_t *score_name;
+	wchar_t *ping_name;
 	/* port: the pointer (1: picking; -1: none on this platform), where it
 	is in the drawing's coordinates, and whether its click was taken */
 	struct halo_ui_pointer pointer;
@@ -2292,12 +2316,13 @@ static void game_engine_rasterize_scoreboard(
 	string_list_index = tag_loaded('ustr', "ui\\multiplayer_game_text");
 	column_name = string_list_index != NONE && !campaign ? unicode_string_list_get_string(string_list_index, 0x43) : L"";
 	score_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 0x44) : L"";
+	ping_name = string_list_index != NONE ? unicode_string_list_get_string(string_list_index, 191) : L"";
 	score_string[0] = 0;
 	if (!campaign)
 		game_engine->format_score_name(score_string);
 	/* port: bounded (the map's column names) */
 	usnprintf(row_string, NUMBEROF(row_string), L"\t%s\t%s\t%s\t%s", column_name, score_name, score_string,
-		network ? L"Ping" : L"");
+		network ? ping_name : L"");
 	row_string[NUMBEROF(row_string) - 1] = 0;
 	{
 		long column;
@@ -5115,8 +5140,8 @@ void game_engine_player_killed(
 	/* port: the death of an MCC team change is no one's kill (mcc_ui_teams.c) */
 	mcc_ui_team_respawn_death(&killing_player_index, &killing_object_index, dead_player_index, &friendly_fire);
 	/* port: and a dedicated server's !switch's (server_team_switch.c) */
-	server_team_switch_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
-		&friendly_fire);
+	switch_death = server_team_switch_player_killed(&killing_player_index, &killing_object_index,
+		dead_player_index, &friendly_fire);
 
 	/* the distributed netcode: a client's copy of a death has the host's
 	killer (port/linux/game/network_distributed.c) */
@@ -5170,7 +5195,7 @@ void game_engine_player_killed(
 		}
 	}
 
-	if (!player_kill)
+	if (!player_kill && !switch_death)
 		dead_player->respawn_timer += global_variant.universal_variant.suicide_penalty;
 
 	/* port: a dedicated server's !switch moves the dead here, as the auto
@@ -7752,6 +7777,18 @@ void game_engine_player_added(
 	return;
 }
 
+/* port: a player who changed team starts their game score again: the game type's own
+per-player reset (slayer's and oddball's score, king's hill state, race's laps) without
+game_engine_player_added's team assignment */
+void game_engine_player_reset_score(
+	long player_index)
+{
+	if (game_engine && game_engine->player_added)
+		game_engine->player_added(player_index);
+
+	return;
+}
+
 real game_engine_get_distance_rating_for_spawn(
 	long player_index,
 	real_point3d const *position)
@@ -9590,7 +9627,7 @@ void game_engine_client_respawn_countdown(
 		return;
 	player = player_get(player_index);
 	if (player->quit_out_of_game == TRUE ||
-		player->statistics.deaths == 0 ||
+		(player->statistics.deaths == 0 && player->dead_unit_index == NONE) ||
 		player->respawn_timer <= 1 ||
 		game_engine_player_is_out_of_lives(player_index) ||
 		game_engine_player_is_odd_man_out(player_index) ||
@@ -9624,7 +9661,7 @@ boolean game_engine_should_spawn_player(
 		{
 			should_spawn = FALSE;
 		}
-		else if (player->statistics.deaths == 0)
+		else if (player->statistics.deaths == 0 && player->dead_unit_index == NONE)
 		{
 			should_spawn = TRUE;
 		}

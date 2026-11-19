@@ -46,7 +46,7 @@ Custom Edition maps after the Xbox levels have their display indices
 #define PC_LEVEL_NAMES_TAG_NAME "pc\\main_menu\\mp_map_list"
 #define PC_LEVEL_DESCRIPTIONS_TAG_NAME "pc\\main_menu\\multiplayer_type_select\\mp_map_select\\map_data"
 
-/* ui\multiplayer_game_text holds 184 strings in the PAL release's maps
+/* ui\multiplayer_game_text holds 194 strings in the PAL release's maps
 (01.01.14.2342, the build this code is), but only the first 36 in the NTSC
 release's (01.10.12.2276), whose executable had the rest (the kill feed,
 scores, game type messages) built in. This code asks the tag for all of
@@ -202,11 +202,21 @@ static wchar_t *const fallback_multiplayer_game_text_strings[] =
 	/* 181 */ L"%s kills %d team %d of %d",
 	/* 182 */ L"%s kills %d of %d",
 	/* 183 */ L"You were telefragged",
+	/* 184 */ L"All - ",
+	/* 185 */ L"Team - ",
+	/* 186 */ L"Vehicle - ",
+	/* 187 */ L"%s: ",
+	/* 188 */ L"[%s]: ",
+	/* 189 */ L" Remaining",
+	/* 190 */ L"Server IP Address - ",
+	/* 191 */ L"Ping",
+	/* 192 */ L"Server Message of the Day",
+	/* 193 */ L"** SERVER **",
 };
 
-/* indices 36 to 183 */
+/* indices 36 to 193 */
 typedef char fallback_multiplayer_game_text_string_count_check[
-	NUMBEROF(fallback_multiplayer_game_text_strings) == 184 - FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING ? 1 : -1];
+	NUMBEROF(fallback_multiplayer_game_text_strings) == 194 - FIRST_FALLBACK_MULTIPLAYER_GAME_TEXT_STRING ? 1 : -1];
 
 /* the built-in string for a string list too short to hold string_index,
 or NULL */

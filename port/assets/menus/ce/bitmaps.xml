@@ -362,6 +362,18 @@
 		<frame png="ce/port/pause/pausebox_right__2.png" width="16" height="256"/>
 		<frame png="ce/port/pause/pausebox_right__3.png" width="16" height="256"/>
 	</bitmap>
+		<bitmap name="pause/teambox_left">
+		<frame png="ce/port/pause/teambox_left__0.png" width="16" height="256"/>
+		<frame png="ce/port/pause/teambox_left__1.png" width="16" height="256"/>
+	</bitmap>
+	<bitmap name="pause/teambox_center">
+		<frame png="ce/port/pause/teambox_center__0.png" width="4" height="256"/>
+		<frame png="ce/port/pause/teambox_center__1.png" width="4" height="256"/>
+	</bitmap>
+	<bitmap name="pause/teambox_right">
+		<frame png="ce/port/pause/teambox_right__0.png" width="16" height="256"/>
+		<frame png="ce/port/pause/teambox_right__1.png" width="16" height="256"/>
+	</bitmap>
 	<bitmap name="pause/objectives_left">
 		<frame png="ce/port/pause/objectives_left__0.png" width="16" height="256"/>
 		<frame png="ce/port/pause/objectives_left__1.png" width="16" height="256"/>

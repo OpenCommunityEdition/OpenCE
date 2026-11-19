@@ -12,6 +12,7 @@
 #include "units/units.h"
 #include "mcc_cache.h"
 #include "mcc_ui_teams.h"
+#include "server_team_switch.h"
 #include <string.h>
 
 struct mcc_team_respawn {
@@ -103,11 +104,12 @@ boolean mcc_ui_team_request(struct network_game_server *server,
     short packet_type = _message_client_player_settings_request;
     short packet_version = HALO_PORT_NETWORK_GAME_MESSAGE_VERSION;
     long machine_index, slot;
+    boolean mcc;
     /* Server state 1 is a running round. No pregame/postgame interception. */
-    if (!mcc_cache_tags_loaded() || !server ||
-        network_game_server_get_state(server, NULL) != 1) return FALSE;
+    if (!server || network_game_server_get_state(server, NULL) != 1) return FALSE;
     game = network_game_server_get_game(server);
-    if (!game || !mcc_level_name(game->map.name)) return FALSE;
+    if (!game) return FALSE;
+    mcc = mcc_cache_tags_loaded() && mcc_level_name(game->map.name) != 0;
     if (!global_scenario || global_scenario->type != 1 ||
         !game->variant.universal_variant.teams || !machine || !message || size <= (short)sizeof(word))
         return TRUE;
@@ -136,8 +138,13 @@ boolean mcc_ui_team_request(struct network_game_server *server,
             identity->machine_index != machine_index ||
             identity->controller_index != request.controller_index) continue;
         if (player->team_index == request.team_index) return TRUE;
-        /* Respect the host's existing automatic balance rule. */
-        if (!mcc_ui_team_balance_allows((short)machine_index, request.controller_index, request.team_index)) return TRUE;
+        /* port: manual switching only while the gametype's auto team balance is off */
+        if (game->variant_options.auto_team_balance) return TRUE;
+        if (!mcc) {
+            /* every other map: the same move the dedicated server's !switch makes */
+            server_team_switch_request(iterator.datum_index, request.team_index);
+            return TRUE;
+        }
         current->team_index = request.team_index;
         identity->team_index = request.team_index;
         player->team_index = request.team_index;

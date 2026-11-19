@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="16"
+   height="256"
+   viewBox="0 0 16 256"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="teambox_left__0.svg">
+  <metadata
+     id="metadata33">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="2560"
+     inkscape:window-height="1017"
+     id="namedview31"
+     showgrid="false"
+     inkscape:zoom="2"
+     inkscape:cx="-90.14961"
+     inkscape:cy="231.66541"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <defs
+     id="defs4">
+    <clipPath
+       id="body-area">
+      <rect
+         x="-16"
+         y="0"
+         width="48"
+         height="166"
+         id="rect7" />
+    </clipPath>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#body"
+       id="linearGradient4590"
+       gradientUnits="userSpaceOnUse"
+       x1="0"
+       y1="2"
+       x2="0"
+       y2="166" />
+    <linearGradient
+       id="linearGradient4296"
+       gradientUnits="userSpaceOnUse"
+       x1="0"
+       y1="2"
+       x2="0"
+       y2="166">
+      <stop
+         offset="0"
+         stop-color="#0a2649"
+         id="stop12-5" />
+      <stop
+         offset="1"
+         stop-color="#050d1c"
+         id="stop14-3" />
+    </linearGradient>
+    <clipPath
+       id="body-area-5">
+      <rect
+         x="-16"
+         y="0"
+         width="48"
+         height="166"
+         id="rect7-9" />
+    </clipPath>
+    <clipPath
+       id="strip-1">
+      <rect
+         x="2"
+         y="2"
+         width="32"
+         height="190"
+         rx="7.5"
+         id="rect23-9" />
+    </clipPath>
+  </defs>
+  <defs
+     id="defs9">
+    <linearGradient
+       id="body"
+       gradientUnits="userSpaceOnUse"
+       x1="0"
+       y1="2"
+       x2="0"
+       y2="166">
+      <stop
+         offset="0"
+         stop-color="#0a2649"
+         id="stop12" />
+      <stop
+         offset="1"
+         stop-color="#050d1c"
+         id="stop14" />
+    </linearGradient>
+  </defs>
+  <defs
+     id="defs20">
+    <clipPath
+       id="strip">
+      <rect
+         x="2"
+         y="2"
+         width="32"
+         height="190"
+         rx="7.5"
+         id="rect23" />
+    </clipPath>
+  </defs>
+  <path
+     inkscape:connector-curvature="0"
+     style="fill:url(#linearGradient4590);fill-opacity:0.75;fill-rule:evenodd"
+     d="m 9.5,1 7.5,0 0,192 -7.5,0 A 8.5,8.5 0 0 1 1,184.5 L 1,9.5 A 8.5,8.5 0 0 1 9.5,1 Z"
+     clip-path="url(#body-area-5)"
+     id="path16-9"
+     transform="matrix(1,0,0,0.68919526,-0.00337681,0.30987361)" />
+  <path
+     inkscape:connector-curvature="0"
+     style="fill:none;stroke:#2896ff;stroke-width:2"
+     d="m 16.996624,0.99906862 -7.4999998,0 c -4.69442,0 -8.50000001,3.60245498 -8.50000001,8.29687498 l 0,123.9115564 c 0,4.69442 3.80558001,8.5 8.50000001,8.5 l 7.4999998,0"
+     id="path18-1"
+     sodipodi:nodetypes="cssssc" />
+  <g
+     clip-path="url(#strip-1)"
+     id="g25-4"
+     transform="translate(-0.00337681,-51.282178)">
+    <rect
+       style="fill:#000000;fill-opacity:0.75"
+       x="0"
+       y="166"
+       width="16"
+       height="26"
+       id="rect27-4" />
+    <rect
+       style="fill:#2896ff"
+       x="0"
+       y="166"
+       width="16"
+       height="0.75"
+       id="rect29-9" />
+  </g>
+</svg>

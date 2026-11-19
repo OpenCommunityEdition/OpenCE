@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's multiplayer screens, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="pause/choose_team/choose_team_screen" controller="1" width="640" height="480" flags="pass_unhandled_to_focused_child">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="pause/choose_team/box_left" x="207" y="179"/>
+		<child widget="pause/choose_team/box_center" x="223" y="179"/>
+		<child widget="pause/choose_team/box_right" x="417" y="179"/>
+		<child widget="pause/choose_team/team_list"/>
+		<child widget="ui\shell\main_menu\button_key_sm" x="232" y="298"/>
+	</widget>
+	<widget name="pause/choose_team/box_left" width="16" height="159" bitmap="pause/teambox_left">
+	</widget>
+	<widget name="pause/choose_team/box_center" width="194" height="159" bitmap="pause/teambox_center">
+	</widget>
+	<widget name="pause/choose_team/box_right" width="16" height="159" bitmap="pause/teambox_right">
+	</widget>
+	<widget name="pause/choose_team/team_list" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children">
+		<child widget="pause/choose_team/button_blue" x="215" y="190"/>
+		<child widget="pause/choose_team/button_red" x="215" y="225"/>
+		<child widget="pause/choose_team/button_back" x="215" y="260"/>
+	</widget>
+	<widget name="pause/choose_team/button_blue" type="text" width="202" height="27" bitmap="ui\shell\bitmaps\menu_bkds" text="BLUE TEAM" font="ui\large_ui" color="#FFFFFFFF" align="center" text_y="4">
+		<on event="a" run="port team blue" close="all"/>
+		<on event="start" run="port team blue" close="all"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="pause/choose_team/button_red" type="text" width="202" height="27" bitmap="ui\shell\bitmaps\menu_bkds" text="RED TEAM" font="ui\large_ui" color="#FFFFFFFF" align="center" text_y="4">
+		<on event="a" run="port team red" close="all"/>
+		<on event="start" run="port team red" close="all"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="pause/choose_team/button_back" type="text" width="202" height="27" bitmap="ui\shell\bitmaps\menu_bkds" text="BACK" font="ui\large_ui" color="#FFFFFFFF" align="center" text_y="4">
+		<on event="a" back="true"/>
+		<on event="start" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>
