@@ -28,6 +28,7 @@ high-res HUD's are (hud_hires.c).
 
 #include <SDL3/SDL.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1034,6 +1035,15 @@ static struct
 	unsigned int texture;
 	unsigned long levels;
 	int failed;
+	/* decoded ahead (art_lock): its state, its PNG, and once decoded its
+	texels (NULL if they could not be) and their size */
+	int ahead;
+	const unsigned char *ahead_png;
+	unsigned long ahead_png_size;
+	unsigned char *pixels;
+	unsigned long width, height;
+	/* its texels' share of ahead_bytes */
+	unsigned long ahead_bytes;
 } art[MAXIMUM_ART];
 static long art_count;
 /* a bit of 4096 for each bitmap's Data (art_filter_bit): a texture whose
@@ -1046,11 +1056,156 @@ static unsigned long art_filter_bit(unsigned long data)
 	return (unsigned long)((data * 2654435761UL) & 0xFFFFFFFFUL) >> 20;
 }
 
+/* ---------- decoding ahead
+
+As a screen opens, the game asks for the pictures of the screens it can open
+next (halo_menus_art_ahead, port/linux/game/menu_tags.c); their PNGs are
+decoded on a thread of their own, so that the first frame to draw one only
+uploads it. What is decoded and not yet drawn is kept until the art is
+forgotten, as the textures are, up to MAXIMUM_AHEAD_BYTES; beyond that the
+rest are decoded when first drawn, as before. */
+
+#define MAXIMUM_AHEAD_BYTES (64UL << 20)
+
+enum
+{
+	_ahead_none,
+	_ahead_queued,
+	_ahead_decoding,
+	_ahead_decoded,
+};
+
+static pthread_mutex_t art_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t art_decoded = PTHREAD_COND_INITIALIZER;
+static int ahead_running, ahead_stopping;
+/* the texels queued or decoded and not yet drawn, from their PNGs' sizes */
+static unsigned long ahead_bytes;
+
+static void *ahead_thread_main(void *unused)
+{
+	(void)unused;
+	pthread_mutex_lock(&art_lock);
+	while (!ahead_stopping)
+	{
+		long index;
+		const unsigned char *png;
+		unsigned long size, width = 0, height = 0;
+		unsigned char *pixels;
+
+		for (index = 0; index < art_count && art[index].ahead != _ahead_queued; index++)
+			;
+		if (index == art_count)
+			break;
+		art[index].ahead = _ahead_decoding;
+		png = art[index].ahead_png;
+		size = art[index].ahead_png_size;
+		pthread_mutex_unlock(&art_lock);
+		pixels = hud_hires_png_pixels(png, size, &width, &height);
+		pthread_mutex_lock(&art_lock);
+		art[index].pixels = pixels;
+		art[index].width = width;
+		art[index].height = height;
+		art[index].ahead = _ahead_decoded;
+		pthread_cond_broadcast(&art_decoded);
+	}
+	ahead_running = 0;
+	pthread_cond_broadcast(&art_decoded);
+	pthread_mutex_unlock(&art_lock);
+	return NULL;
+}
+
+/* the thread stopped (after the PNG it is decoding), before the art changes */
+static void ahead_stop(void)
+{
+	pthread_mutex_lock(&art_lock);
+	ahead_stopping = 1;
+	while (ahead_running)
+		pthread_cond_wait(&art_decoded, &art_lock);
+	ahead_stopping = 0;
+	pthread_mutex_unlock(&art_lock);
+}
+
+/* what was decoded ahead for art and not drawn let go (the thread stopped) */
+static void ahead_free(long index)
+{
+	free(art[index].pixels);
+	art[index].pixels = NULL;
+	ahead_bytes -= art[index].ahead_bytes;
+	art[index].ahead_bytes = 0;
+	art[index].ahead = _ahead_none;
+}
+
+static long art_find(unsigned long data)
+{
+	unsigned long bit = art_filter_bit(data);
+	long index;
+
+	if (!(art_filter[bit >> 3] & 1 << (bit & 7)))
+		return -1;
+	for (index = 0; index < art_count; index++)
+	{
+		if (art[index].data == data)
+			return index;
+	}
+	return -1;
+}
+
+void halo_menus_art_ahead(void const *texture)
+{
+	long index = art_find(((const unsigned long *)texture)[1]);
+	const unsigned char *png;
+	unsigned long size = 0, width, height;
+	pthread_t thread;
+
+	/* (no png: out of memory registering it) */
+	if (index < 0 || art[index].failed || !art[index].png || art[index].texture || art[index].ahead != _ahead_none ||
+		!xgpu_gl_ready())
+		return;
+	/* (read here: file_data adds to the files) */
+	png = file_data(art[index].png, &size);
+	/* (its size as its header gives it, which png_decode checks) */
+	if (!png || size < 24)
+		return;
+	width = (unsigned long)png[16] << 24 | (unsigned long)png[17] << 16 | (unsigned long)png[18] << 8 | png[19];
+	height = (unsigned long)png[20] << 24 | (unsigned long)png[21] << 16 | (unsigned long)png[22] << 8 | png[23];
+	if (width > 8192 || height > 8192)
+		return;
+	pthread_mutex_lock(&art_lock);
+	if (ahead_bytes + width * height * 4 > MAXIMUM_AHEAD_BYTES)
+	{
+		pthread_mutex_unlock(&art_lock);
+		return;
+	}
+	art[index].ahead = _ahead_queued;
+	art[index].ahead_png = png;
+	art[index].ahead_png_size = size;
+	art[index].ahead_bytes = width * height * 4;
+	ahead_bytes += art[index].ahead_bytes;
+	if (!ahead_running)
+	{
+		ahead_running = 1;
+		if (pthread_create(&thread, NULL, ahead_thread_main, NULL) == 0)
+		{
+			pthread_detach(thread);
+		}
+		else
+		{
+			/* (then it is decoded when first drawn) */
+			ahead_running = 0;
+			ahead_free(index);
+		}
+	}
+	pthread_mutex_unlock(&art_lock);
+}
+
+/* ---------- the textures */
+
 void halo_menus_art_register(void const *texture, char const *png)
 {
 	unsigned long data = ((const unsigned long *)texture)[1];
 	long index;
 
+	ahead_stop();
 	for (index = 0; index < art_count; index++)
 	{
 		if (art[index].data == data)
@@ -1072,6 +1227,7 @@ void halo_menus_art_register(void const *texture, char const *png)
 	else
 	{
 		free(art[index].png);
+		ahead_free(index);
 		if (art[index].texture)
 		{
 			xgpu_gl_texture_deleted(art[index].texture);
@@ -1088,9 +1244,11 @@ void halo_menus_art_forget(void)
 {
 	long index;
 
+	ahead_stop();
 	for (index = 0; index < art_count; index++)
 	{
 		free(art[index].png);
+		ahead_free(index);
 		if (art[index].texture)
 		{
 			xgpu_gl_texture_deleted(art[index].texture);
@@ -1101,27 +1259,48 @@ void halo_menus_art_forget(void)
 	memset(art_filter, 0, sizeof(art_filter));
 }
 
-unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
+/* its texture: from its texels if decoded ahead (waited for if being
+decoded), else from its PNG */
+static unsigned int art_texture_make(long index)
 {
-	unsigned long bit = art_filter_bit(data);
-	long index;
+	unsigned char *pixels = NULL;
+	unsigned long width = 0, height = 0;
+	int decoded = 0;
 
-	if (!(art_filter[bit >> 3] & 1 << (bit & 7)))
-		return 0;
-	for (index = 0; index < art_count; index++)
+	pthread_mutex_lock(&art_lock);
+	while (art[index].ahead == _ahead_decoding)
+		pthread_cond_wait(&art_decoded, &art_lock);
+	if (art[index].ahead == _ahead_decoded)
 	{
-		if (art[index].data == data)
-			break;
+		pixels = art[index].pixels;
+		width = art[index].width;
+		height = art[index].height;
+		art[index].pixels = NULL;
+		decoded = 1;
 	}
-	/* (no png: out of memory registering it) */
-	if (index == art_count || art[index].failed || !art[index].png)
-		return 0;
-	if (!art[index].texture)
+	/* (one still queued is decoded here instead) */
+	ahead_free(index);
+	pthread_mutex_unlock(&art_lock);
+	if (!decoded)
 	{
 		unsigned long size = 0;
 		const unsigned char *png = file_data(art[index].png, &size);
 
-		art[index].texture = png ? hud_hires_png_texture(png, size, &art[index].levels) : 0;
+		return png ? hud_hires_png_texture(png, size, &art[index].levels) : 0;
+	}
+	return hud_hires_pixels_texture(pixels, width, height, &art[index].levels);
+}
+
+unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
+{
+	long index = art_find(data);
+
+	/* (no png: out of memory registering it) */
+	if (index < 0 || art[index].failed || !art[index].png)
+		return 0;
+	if (!art[index].texture)
+	{
+		art[index].texture = art_texture_make(index);
 		if (!art[index].texture)
 		{
 			platform_log("menus: could not draw %s", art[index].png);

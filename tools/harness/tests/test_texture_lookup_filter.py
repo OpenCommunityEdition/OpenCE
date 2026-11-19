@@ -4,7 +4,6 @@ filters exactly when registered.
     python tools/harness/tests/test_texture_lookup_filter.py     # the cases, then how fast with and without filters
 """
 
-import re
 import sys
 from pathlib import Path
 
@@ -24,7 +23,7 @@ NEGATIVE_CONTROLS = {
 }
 
 # the filters' checks taken out: the lookups as they were (for the benchmark)
-UNFILTERED = [("menu", "\tif (!(art_filter[bit >> 3] & 1 << (bit & 7)))\n\t\treturn 0;\n", ""),
+UNFILTERED = [("menu", "\tif (!(art_filter[bit >> 3] & 1 << (bit & 7)))\n\t\treturn -1;\n", ""),
               ("hud", "\tif (!(placeholder_filter[bit >> 3] & 1 << (bit & 7)))\n\t\treturn 0;\n", "")]
 
 
@@ -46,13 +45,9 @@ def under_test(faults=()):
             menu = mutated(menu, before, after)
         else:
             hud = mutated(hud, before, after)
-    text = re.search(r"static struct\n\{\n\tunsigned long data;\n\tchar \*png;.*?\nstatic long art_count;\n", menu, re.S).group(0)
-    text += menu[menu.index("static unsigned char art_filter["):menu.index("}\n", menu.index("art_filter_bit(")) + 2]
-    register, code = first_function(menu, "run_art_register", "halo_menus_art_register")
-    text += code + f"\n#define art_register {register}\n"
-    forget, code = first_function(menu, "run_art_forget", "halo_menus_art_forget")
-    text += code + f"\n#define art_forget {forget}\n"
-    text += function(menu, "menu_art_texture") + "\n"
+    # (the menus' art, its decoding ahead with it: texture_lookup_filter.c starts no thread)
+    text = menu[menu.index("/* ---------- art */"):] + "\n"
+    text += "#define art_register halo_menus_art_register\n#define art_forget halo_menus_art_forget\n"
     text += hud[hud.index("#define MAXIMUM_PLACEHOLDERS"):hud.index("/* the sequences")]
     register, code = first_function(hud, "run_register_placeholder", "hud_hires_register_placeholder")
     text += code + "\n"

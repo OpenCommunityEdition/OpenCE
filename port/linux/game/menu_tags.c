@@ -76,6 +76,7 @@ char const *pc_menus_root_name(void);
 char const *pc_menu_function_name(long function_index);
 char const *pc_menu_game_data_input_name(long function_index);
 boolean pc_menu_tag(long tag_index);
+void pc_menu_screen_opened(long tag_index);
 boolean pc_menu_frame_placement(struct bitmap_data const *bitmap, short *x, short *y, short *width, short *height);
 
 /* ---------- constants */
@@ -2727,6 +2728,117 @@ boolean pc_menu_tag(
 	}
 	return menu_tags.loaded && tag_index != NONE &&
 		DATUM_INDEX_TO_ABSOLUTE_INDEX(tag_index) >= menu_tags.original_count;
+}
+
+/* ---------- decoding ahead */
+
+#define MAXIMUM_AHEAD_WIDGETS 512
+
+/* the widgets walked (ahead_walk), each once */
+static struct
+{
+	long tags[MAXIMUM_AHEAD_WIDGETS];
+	long count;
+} ahead_walked;
+
+static boolean ahead_walk_first(
+	long tag_index)
+{
+	long index;
+
+	for (index = 0; index < ahead_walked.count; index++)
+	{
+		if (ahead_walked.tags[index] == tag_index)
+			return FALSE;
+	}
+	if (ahead_walked.count == MAXIMUM_AHEAD_WIDGETS)
+		return FALSE;
+	ahead_walked.tags[ahead_walked.count++] = tag_index;
+	return TRUE;
+}
+
+static void ahead_bitmap(
+	struct tag_reference const *reference)
+{
+	struct bitmap_group *group;
+	long index;
+
+	if (reference->index == NONE)
+		return;
+	group = bitmap_group_get(reference->index);
+	for (index = 0; index < group->bitmaps.count; index++)
+	{
+		struct bitmap_data *bitmap = (struct bitmap_data *)group->bitmaps.address + index;
+
+		if (bitmap->hardware_format)
+			halo_menus_art_ahead(bitmap->hardware_format);
+	}
+}
+
+/* a widget of ours and its children, each once: their pictures decoded ahead
+(pictures), or else the widgets their event handlers and conditionals open
+added to the screens (each once) */
+static void ahead_walk(
+	long tag_index,
+	boolean pictures,
+	long *screens,
+	long *screen_count)
+{
+	struct ui_widget_definition *definition;
+	long index;
+
+	if (!pc_menu_tag(tag_index) || !ahead_walk_first(tag_index))
+		return;
+	definition = tag_get(UI_WIDGET_DEFINITION_TAG, tag_index);
+	if (pictures)
+	{
+		ahead_bitmap(&definition->background_bitmap);
+		ahead_bitmap(&definition->list_header_bitmap);
+		ahead_bitmap(&definition->list_footer_bitmap);
+	}
+	else
+	{
+		for (index = 0; index < definition->event_handlers.count + definition->conditional_widgets.count; index++)
+		{
+			long screen = index < definition->event_handlers.count ?
+				((struct ui_widget_event_handler_reference *)definition->event_handlers.address)[index].widget_tag.index :
+				((struct ui_widget_conditional_reference *)definition->conditional_widgets.address)[
+					index - definition->event_handlers.count].widget_tag.index;
+			long known;
+
+			for (known = 0; known < *screen_count && screens[known] != screen; known++)
+				;
+			if (pc_menu_tag(screen) && known == *screen_count && *screen_count < MAXIMUM_AHEAD_WIDGETS)
+				screens[(*screen_count)++] = screen;
+		}
+	}
+	for (index = 0; index < definition->child_widgets.count; index++)
+	{
+		ahead_walk(((struct ui_widget_child_reference *)definition->child_widgets.address)[index].widget_tag.index,
+			pictures, screens, screen_count);
+	}
+	ahead_walk(definition->extended_description_widget.index, pictures, screens, screen_count);
+}
+
+/* port: as a screen of ours opens (source/interface/ui_widget.c), its
+pictures (a button's focused frame, drawn once it has the focus) and those of
+the screens it can open decoded ahead, on a thread of their own
+(menu_files.c), so that the first frame each shows only uploads them; they
+are kept as the textures are, until the menus' tags are let go */
+void pc_menu_screen_opened(
+	long tag_index)
+{
+	static long screens[MAXIMUM_AHEAD_WIDGETS];
+	long screen_count = 0, index;
+
+	if (!pc_menu_tag(tag_index))
+		return;
+	ahead_walked.count = 0;
+	ahead_walk(tag_index, FALSE, screens, &screen_count);
+	ahead_walked.count = 0;
+	ahead_walk(tag_index, TRUE, screens, &screen_count);
+	for (index = 0; index < screen_count; index++)
+		ahead_walk(screens[index], TRUE, screens, &screen_count);
 }
 
 /* where in its widget, and how large, a frame of ui.map's that a menu file
