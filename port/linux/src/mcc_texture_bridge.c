@@ -128,6 +128,7 @@ static void *mcc_texture_register(void const *bitmap,unsigned long format,
     entry->next=mcc_gpu_textures[bucket];mcc_gpu_textures[bucket]=entry;
     bucket=mcc_texture_bucket(entry->header);
     entry->hardware_next=mcc_gpu_hardware[bucket];mcc_gpu_hardware[bucket]=entry;
+    xgpu_texture_lookups_changed();
     return entry->header;
 }
 
@@ -198,6 +199,7 @@ BOOL xgpu_mcc_texture_get(DWORD const *resource,D3DCOLOR const *palette,
 void mcc_texture_bridge_dispose(void)
 {
     unsigned long bucket;
+    xgpu_texture_lookups_changed();
     memset(mcc_gpu_hardware,0,sizeof(mcc_gpu_hardware));
     for (bucket=0;bucket<MCC_TEXTURE_BUCKETS;bucket++) {
         struct mcc_gpu_texture *entry=mcc_gpu_textures[bucket];

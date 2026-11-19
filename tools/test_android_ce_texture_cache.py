@@ -40,8 +40,9 @@ typedef unsigned long long Uint64;
 #define PLATFORM_PHYSICAL_TO_VIRTUAL(x) ((void *)(uintptr_t)(x))
 struct xgpu_texture_description {
  unsigned long width, height, depth, levels, format;
- BOOL cube_map;
+ BOOL cube_map, hires, ce_meter_channels, direct;
 };
+static unsigned long texture_lookup_serial = 1;
 static BOOL xgpu_mcc_texture_get(const DWORD *r,const D3DCOLOR *p,GLuint *t,GLenum *g,struct xgpu_texture_description *d) { return FALSE; }
 static int android_texture_fixes=1;
 static unsigned long serial=1, generation=1, uploads, next_texture;
@@ -109,7 +110,7 @@ static void read_pixels(struct bitmap_data *b,void *h) {
 
 def gpu_lookup(source):
     # Exercise the complete lookup with MCC ownership inactive.
-    return function(source, 'xgpu_texture_get')
+    return function(source, 'texture_entry_given') + '\n' + function(source, 'xgpu_texture_get')
 
 
 
@@ -174,6 +175,8 @@ headers[0]=android_ce_texture_get(&bitmaps[0],1024,1,read_pixels);CHECK(headers[
 xgpu_texture_get(headers[0],palette,&target,&description);CHECK(uploads==1);
 palette[5]=42;xgpu_texture_get(headers[0],palette,&target,&description);CHECK(uploads==2);
 palette[5]=0;xgpu_texture_get(headers[0],palette,&target,&description);CHECK(uploads==2);
+/* (a palette is not watched: never remembered for a draw's stage) */
+CHECK(!description.direct);
 android_ce_texture_reset();
 for(i=0;i<TEXTURE_BUCKET_COUNT;i++)CHECK(texture_buckets[i]==NULL);''',
         'oom': r'''
@@ -261,6 +264,8 @@ int main(void) {
  if(uploads!=1)return 1;
  xgpu_texture_get(header,NULL,&target,&description);
  if(uploads!=1)return 2;
+ /* (its own pixels, found again: as remembered for a draw's stage) */
+ if(!description.direct)return 4;
  serial++;generation++;
  xgpu_texture_get(header,NULL,&target,&description);
  if(uploads!=2)return 3;

@@ -224,6 +224,9 @@ struct xgpu_texture_description
 	BOOL hires_coverage; /* ... whose green is its coverage (a meter's) */
 	BOOL hires_point_threshold; /* ... whose red holds discrete segment data */
 	BOOL ce_meter_channels;
+	/* (xgpu_texture_get) the texture's own pixels, as they are: no palette,
+	replacement or channel change, and the cache in use */
+	BOOL direct;
 };
 
 void xgpu_texture_describe(DWORD format_word, DWORD size_word, struct xgpu_texture_description *description);
@@ -237,6 +240,11 @@ from guest memory as needed; *target receives GL_TEXTURE_2D etc. */
 GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *target,
 	struct xgpu_texture_description *description);
 void xgpu_texture_cache_begin_frame(void);
+/* changes whenever a texture lookup might give something other than it
+gave for the same header (xbox_textures.c), as xgpu_texture_lookups_changed
+says it may */
+unsigned long xgpu_texture_lookup_serial(void);
+void xgpu_texture_lookups_changed(void);
 /* (debug.gpu_stats) a texture of this many bytes uploaded to GL (d3d8_gl.c) */
 void xgpu_statistics_texture_upload(unsigned long bytes);
 
