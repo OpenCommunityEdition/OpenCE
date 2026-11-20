@@ -3894,6 +3894,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	unsigned long hash, index;
 	struct fragment_entry **bucket;
 	struct fragment_entry *entry;
+	struct nv2a_pixel_shader_key canonical;
 	char *source;
 
 	for (index = 0; index < RECENT_FRAGMENT_COUNT; index++)
@@ -3914,6 +3915,20 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry = device_record_new(sizeof(*entry));
 	entry->hash = hash;
 	entry->key = *key;
+	/* port: a key whose GLSL does not depend on all of its bits (state the
+	game left set from an earlier draw) is another name for the shader of
+	the key with those bits cleared, so that each shader is compiled once
+	(nv2a_pixel_shader_key_canonicalize) */
+	canonical = *key;
+	nv2a_pixel_shader_key_canonicalize(&canonical);
+	if (!words_equal(&canonical, key, sizeof(*key)))
+	{
+		entry->shader = fragment_shader_get(&canonical);
+		entry->next = *bucket;
+		*bucket = entry;
+		recent[recent_next++ % RECENT_FRAGMENT_COUNT] = entry;
+		return entry->shader;
+	}
 	source = nv2a_pixel_shader_to_glsl(key);
 	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
 	shader_hash_set(entry->shader, source);
