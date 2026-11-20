@@ -512,6 +512,9 @@ moves); TRUE when it was put there */
 boolean network_objects_reconcile(long object_index, real_point3d const *position, real_vector3d const *forward,
 	real_vector3d const *up, real_vector3d const *velocity, real_vector3d const *angular_velocity,
 	real blend_distance, short kind);
+/* object_set_position, and the object's children moved with it at once */
+void network_objects_set_position(long object_index, real_point3d const *position, real_vector3d const *forward,
+	real_vector3d const *up);
 /* a vehicle's pose the netcode wrote (from before), not its own motion:
 every such write calls it */
 enum network_vehicle_write
