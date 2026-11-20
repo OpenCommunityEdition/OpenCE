@@ -220,6 +220,9 @@ biped_riding_vehicle_written carries after it) */
 void biped_riding_vehicle_writing(long vehicle_index);
 void biped_riding_vehicle_written(long vehicle_index, real_point3d const *before_position,
 	real_vector3d const *before_forward, real_vector3d const *before_up);
+/* the players riding a vehicle drawn gliding with it, as its children are
+(render_interpolation_correct_object) */
+void biped_riding_correct_riders(long vehicle_index, real_vector3d const *offset);
 /* Engine object update hooks (vehicle_riding_bipeds.c). */
 void vehicle_riding_objects_initialize(void);
 void vehicle_riding_objects_reset(void);

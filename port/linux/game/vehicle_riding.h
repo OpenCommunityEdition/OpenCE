@@ -322,6 +322,7 @@ enum vehicle_riding_settle
 /* the settings, taken at a map's start, a game's start and every load;
 whether riding is on */
 boolean vehicle_riding_latch(void);
+boolean vehicle_riding_look_carries(void);
 /* the map's choice where it made one, else the decision stored at the map's start (a local game's, or the host's
 in a network game); never in film playback or the editor */
 boolean vehicle_riding_enabled(void);

@@ -21,12 +21,17 @@ The engine-facing riding hooks, kept separate from the decompiled biped physics.
 #include "physics/physics.h"
 #include "scenario/scenario.h"
 #include "network_coop.h" /* port/linux/game/network_coop.c */
+#include "network_distributed.h"
 #include "vehicle_riding_bipeds.h"
 #include "saved games/game_state.h"
 
 /* port/linux/game/network_objects.c's (a vehicle a client puts where
 the host has it, with no physics of its own) */
 boolean network_objects_vehicle_followed(long vehicle_index);
+
+/* render_interpolation.c's */
+void render_interpolation_correct_object(long object_index, real_vector3d const *offset);
+void render_interpolation_camera_unmoved(long object_index, real_vector3d const *offset);
 
 /* ---------- vehicle riding (vehicle_riding.c) */
 
@@ -1319,12 +1324,13 @@ static boolean biped_riding_contacts(
 }
 
 /* what biped_riding_vehicle_writing measured of a player's biped against the unwritten hull: the vehicle
-and whether it touched the pill */
+and whether it touched the pill, and whether the write then carried it */
 struct biped_riding_write_record
 {
 	long vehicle_index;
 	boolean touched_before;
 	boolean recorded;
+	boolean carried;
 };
 
 static struct biped_riding_write_record biped_riding_writes[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
@@ -1373,6 +1379,7 @@ void biped_riding_vehicle_writing(
 	for (at = 0; at < biped_riding_write_slot_count; at++)
 	{
 		biped_riding_writes[biped_riding_write_slots[at]].recorded = FALSE;
+		biped_riding_writes[biped_riding_write_slots[at]].carried = FALSE;
 	}
 	biped_riding_write_slot_count = 0;
 	for (at = 0; at < count; at++)
@@ -1457,11 +1464,91 @@ void biped_riding_vehicle_written(
 				moved.y = biped->object.position.y + (reached.y - base.y);
 				moved.z = biped->object.position.z + (reached.z - base.z);
 				object_set_position(units[at], &moved, NULL, NULL);
+				record->carried = TRUE;
 				if (riding.ticks > 0)
 					biped_riding_rebase(units[at]);
 			}
 		}
 	}
+}
+
+/* the players riding a vehicle, which are not its children, drawn gliding with it as a seated one is: the
+players on or in it, and those its write just carried (the write runs before the vehicle's correction) */
+void biped_riding_correct_riders(
+	long vehicle_index,
+	real_vector3d const *offset)
+{
+	long units[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short count = biped_riding_write_candidates(units);
+	short at;
+
+	for (at = 0; at < count; at++)
+	{
+		struct biped_datum *biped = biped_get(units[at]);
+		short player = biped_riding_player(biped);
+		struct biped_riding_write_record *record =
+			player >= 0 && player < HALO_PORT_MAXIMUM_NETWORK_PLAYERS ? &biped_riding_writes[player] : NULL;
+		boolean carried = record && record->carried && record->vehicle_index == vehicle_index;
+
+		if (biped->object.parent_object_index != NONE)
+			continue;
+		/* (the remote take already glides from here onto the written deck) */
+		if (!carried && unit_get_local_player_index(units[at]) == NONE &&
+			distributed_rider_prediction_pending(player, units[at]))
+			continue;
+		if (carried || (biped->biped.riding_object_index == vehicle_index && biped->biped.riding_ticks > 0))
+		{
+			render_interpolation_correct_object(units[at], offset);
+			if (!carried)
+				render_interpolation_camera_unmoved(units[at], offset);
+		}
+		if (carried)
+			record->carried = FALSE;
+	}
+}
+
+/* the move a fully riding player's biped on the host (its own or a client's) still owes to the netcode's writes of
+its vehicle since its last tick, which its next carry takes: its base's offset, and the turn of its view when the
+carry turns it (a client's writes carry its riders at once, network_objects.c) */
+boolean biped_riding_uncarried_write(
+	long biped_index,
+	real_vector3d *offset,
+	real *dyaw)
+{
+	static real_vector3d const forward = { 1.f, 0.f, 0.f };
+	static real_vector3d const up = { 0.f, 0.f, 1.f };
+	struct biped_datum *biped;
+	struct vehicle_riding_mark *mark;
+	real_matrix4x3 since;
+	real_point3d base, moved;
+	real height, width;
+
+	if (biped_index == NONE || game_connection() != _game_connection_network_server)
+		return FALSE;
+	biped = biped_try_and_get(biped_index);
+	if (!biped || biped->object.parent_object_index != NONE || biped->biped.riding_ticks != RIDING_TICKS ||
+		biped->biped.riding_object_index == NONE)
+		return FALSE;
+	if (!biped_riding_applies(biped))
+		return FALSE;
+	mark = vehicle_riding_player_mark(biped_riding_player(biped));
+	if (!mark || mark->role != _vehicle_riding_role_simulated)
+		return FALSE;
+	/* (a take this tick put a remote player where the client's word has it, which the next carry may or may not follow:
+	it is drawn where the tick left it) */
+	if (unit_get_local_player_index(biped_index) == NONE &&
+		distributed_prediction_taken_now(biped_riding_player(biped), biped_index))
+		return FALSE;
+	/* (the correction's getter resets a slot of another vehicle: drawing never may) */
+	if (!object_try_and_get_and_verify_type(biped->biped.riding_object_index, _object_mask_vehicle))
+		return FALSE;
+	vehicle_riding_correction_since(vehicle_riding_vehicle_correction(biped->biped.riding_object_index),
+		&mark->correction, &since);
+	biped_get_physics_pill(biped_index, &base, &height, &width);
+	matrix4x3_transform_point(&since, &base, &moved);
+	vector_from_points3d(&base, &moved, offset);
+	*dyaw = vehicle_riding_look_carries() ? vehicle_riding_yaw(&forward, &up, &since.forward, &since.up) : 0.f;
+	return TRUE;
 }
 
 /* a biped in a seat rides nothing, and its view is not turned */
