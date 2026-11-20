@@ -25,8 +25,11 @@ The engine-facing riding hooks, kept separate from the decompiled biped physics.
 #include "saved games/game_state.h"
 
 /* port/linux/game/network_objects.c's (a vehicle a client puts where
-the host has it, with no physics of its own) */
+the host has it, with no physics of its own; an object moved with its
+children) */
 boolean network_objects_vehicle_followed(long vehicle_index);
+void network_objects_set_position(long object_index, real_point3d const *position, real_vector3d const *forward,
+	real_vector3d const *up);
 
 /* ---------- vehicle riding (vehicle_riding.c) */
 
@@ -1456,7 +1459,7 @@ void biped_riding_vehicle_written(
 				moved.x = biped->object.position.x + (reached.x - base.x);
 				moved.y = biped->object.position.y + (reached.y - base.y);
 				moved.z = biped->object.position.z + (reached.z - base.z);
-				object_set_position(units[at], &moved, NULL, NULL);
+				network_objects_set_position(units[at], &moved, NULL, NULL);
 				if (riding.ticks > 0)
 					biped_riding_rebase(units[at]);
 			}
