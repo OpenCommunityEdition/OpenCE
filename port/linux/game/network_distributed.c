@@ -630,7 +630,8 @@ static struct distributed_accepted_state
 	long taken_air_unit_index;
 	long taken_air_vehicle;
 } distributed_accepted[MAXIMUM_TRACKED_PLAYERS];
-/* fixed before either pass, since taking a word clears its valid bit */
+/* fixed before either pass, since taking a word clears its valid bit;
+cleared as each player's rider pass begins */
 static boolean distributed_rider_pass[MAXIMUM_TRACKED_PLAYERS];
 /* ... what its own ticks did to its copy of each client's player's unit on
 foot, beyond the client's word it took (an explosion's throw, a jump): how
@@ -3636,6 +3637,37 @@ static boolean distributed_prediction_rides(
 		distributed_predictions[player_index].state.deck_present;
 }
 
+/* a pending rider take supplies its own glide, including the vehicle pass's write */
+boolean distributed_rider_prediction_pending(
+	short player_index,
+	long unit_index)
+{
+	if (game_connection() != _game_connection_network_server || !distributed_machines.in_tick ||
+		player_index < 0 || player_index >= MAXIMUM_TRACKED_PLAYERS ||
+		!distributed_rider_pass[player_index] || !distributed_predictions[player_index].valid ||
+		mcc_script_effects_host_movement())
+	{
+		return FALSE;
+	}
+	return unit_index != NONE &&
+		distributed_living_unit(distributed_player(player_index)) == unit_index &&
+		distributed_predictions[player_index].state.unit_index == unit_index &&
+		object_get(unit_index)->object.parent_object_index == NONE &&
+		unit_get(unit_index)->unit.player_index != NONE &&
+		network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index);
+}
+
+/* whether the host's last netcode pass took the player's word on the unit: the take put it where the word has it, not
+where its carry would */
+boolean distributed_prediction_taken_now(
+	short player_index,
+	long unit_index)
+{
+	return player_index >= 0 && player_index < MAXIMUM_TRACKED_PLAYERS &&
+		distributed_predictions[player_index].taken_host_time == game_time_get() &&
+		distributed_predictions[player_index].state.unit_index == unit_index;
+}
+
 static void distributed_apply_predictions(
 	boolean riders)
 {
@@ -3651,6 +3683,9 @@ static void distributed_apply_predictions(
 
 		if (distributed_rider_pass[player_index] != riders)
 			continue;
+		/* (only writes before this player's rider pass can leave the glide to its take) */
+		if (riders)
+			distributed_rider_pass[player_index] = FALSE;
 		unit_index = distributed_living_unit(distributed_player(player_index));
 		if (unit_index != NONE && object_get(unit_index)->object.parent_object_index != NONE)
 			unit_index = NONE;
