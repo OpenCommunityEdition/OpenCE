@@ -74,6 +74,8 @@ symbols in this file:
 #include "structure_bsp_definitions.h"
 #include "structure_vector_tests.h"
 #include "structures.h"
+#include "cache/cache_files.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -1104,3 +1106,35 @@ void structure_get_planar_fog(
 }
 
 /* ---------- private code */
+
+/* port: shader_precompile.c (structure_render_precompile_shaders, over its
+surfaces): each fog's screen, the camera put in the fog */
+void structure_render_fog_screen(void); /* structure_render.c */
+void structure_fog_screens_precompile_shaders(void)
+{
+	struct render_fog saved = global_window_parameters.fog;
+	struct tag_iterator iterator;
+	long tag_index;
+
+	tag_iterator_new(&iterator, 'fog ');
+	while ((tag_index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct structure_planar_fog_definition *definition = tag_get('fog ', tag_index);
+		real depth = definition->maximum_depth > 0.0f ? definition->maximum_depth : 1.0f;
+
+		if (definition->screen.layer_count <= 0)
+			continue;
+		global_window_parameters.fog = saved;
+		global_window_parameters.fog.screen = &definition->screen;
+		global_window_parameters.fog.runtime_flags = 0;
+		global_window_parameters.fog.planar_maximum_depth = depth;
+		global_window_parameters.fog.plane.n.i = 0.0f;
+		global_window_parameters.fog.plane.n.j = 0.0f;
+		global_window_parameters.fog.plane.n.k = 1.0f;
+		/* (the camera at the fog's full depth) */
+		global_window_parameters.fog.plane.d = global_window_parameters.camera.position.z + depth;
+		structure_render_fog_screen();
+		shader_precompile_fog_screen_models();
+	}
+	global_window_parameters.fog = saved;
+}

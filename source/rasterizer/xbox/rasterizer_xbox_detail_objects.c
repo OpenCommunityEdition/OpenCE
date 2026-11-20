@@ -86,6 +86,9 @@ symbols in this file:
 
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
+#include "cache/cache_files.h" /* port: shader_precompile.c */
+#include "cache/texture_cache.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -940,3 +943,30 @@ void rasterizer_detail_objects_dispose(
 }
 
 /* ---------- private code */
+
+/* port: shader_precompile.c: each detail object collection's
+vertex shader with the detail objects' pixel shader and its map loaded */
+void rasterizer_detail_objects_precompile_shaders(void)
+{
+	struct tag_iterator iterator;
+	long tag_index;
+
+	if (!rasterizer_debug_options.draw_detail_objects || main_get_window_count() > 1 || !local_d3d_vertex_buffer)
+		return;
+	_rasterizer_detail_objects_begin();
+	tag_iterator_new(&iterator, 'dobc');
+	while ((tag_index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct detail_object_collection_definition *collection = detail_object_collection_definition_get(tag_index);
+		struct bitmap_group *group = collection->map.index != NONE ? bitmap_group_get(collection->map.index) : NULL;
+
+		if (group && group->bitmaps.count > 0)
+			_texture_cache_bitmap_get_hardware_format(
+				TAG_BLOCK_GET_ELEMENT(&group->bitmaps, 0, struct bitmap_data), TRUE, TRUE);
+		rasterizer_set_texture(0, 0, 1, collection->map.index, 0);
+		if (collection->collection_type != NONE)
+			rasterizer_set_vertex_shader_permutation(0x21, 0xB, collection->collection_type);
+		IDirect3DDevice8_DrawVertices(global_d3d_device, D3DPT_QUADLIST, 0, NUMBER_OF_VERTICES_PER_QUADRILATERAL);
+	}
+	_rasterizer_detail_objects_end();
+}
