@@ -73,7 +73,7 @@ def generated(fault=None):
           'vehicle_riding_correction_since', 'vehicle_riding_yaw', 'vehicle_riding_turn_vector',
           'vehicle_riding_applies']] +
         [function(read('port/linux/game/network_distributed.c'), name) for name in
-         ['distributed_rider_prediction_pending', 'distributed_prediction_taken_now']] +
+         ['distributed_rider_prediction_pending']] +
         [function(bipeds, name) for name in ['biped_riding_applies', 'biped_riding_write_candidates', 'biped_riding_correct_riders',
                                              'biped_riding_uncarried_write']])
     if fault:

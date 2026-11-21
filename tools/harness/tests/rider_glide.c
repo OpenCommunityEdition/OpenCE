@@ -78,14 +78,13 @@ static short connection = _game_connection_network_server;
 static short game_connection(void) { return connection; }
 static struct { boolean in_tick; } distributed_machines;
 static boolean distributed_rider_pass[MAXIMUM_TRACKED_PLAYERS];
-static struct { boolean valid; long taken_host_time; struct { long unit_index; } state; } distributed_predictions[MAXIMUM_TRACKED_PLAYERS];
+static struct { boolean valid; struct { long unit_index; } state; } distributed_predictions[MAXIMUM_TRACKED_PLAYERS];
 static struct player_datum *distributed_player(short index) { return &players[index]; }
 static long distributed_living_unit(struct player_datum const *player) { return player->unit_index; }
 static struct biped_datum *unit_get(long index) { return &bipeds[index & 0xFFFF]; }
 static boolean network_coop_player_has_structure_bsp(long index) { return TRUE; }
 static boolean mcc_script_effects_host_movement(void) { return FALSE; }
 boolean distributed_rider_prediction_pending(short player_index, long unit_index);
-boolean distributed_prediction_taken_now(short player_index, long unit_index);
 static long game_time_get(void) { return 100; }
 static boolean server_mode;
 static int halo_server_mode(void) { return server_mode; }
@@ -470,7 +469,6 @@ int main(int argc, char **argv)
 		marks[1].role = _vehicle_riding_role_simulated;
 		marks[1].correction = corrections[VEHICLE & 0xFFFF];
 		distributed_predictions[1].state.unit_index = OTHER_RIDER;
-		distributed_predictions[1].taken_host_time = NONE;
 		set_real_point3d(&moved_root, t.i, t.j, t.k);
 		vehicle_riding_correction_compose(&corrections[VEHICLE & 0xFFFF], &root, &forward, &up, &moved_root, &forward, &up);
 		nodes[VEHICLE & 0xFFFF].position = moved_root;
@@ -482,13 +480,6 @@ int main(int argc, char **argv)
 		render_interpolation_object_point(OTHER_RIDER, &point);
 		CHECK(fabs(point.x - nodes[OTHER_RIDER & 0xFFFF].position.x - t.i) < 1e-4f &&
 			fabs(point.z - nodes[OTHER_RIDER & 0xFFFF].position.z - t.k) < 1e-4f, "shadow left behind");
-
-		/* a take put the rider where its word has it: drawn where the tick left it */
-		distributed_predictions[1].taken_host_time = game_time_get();
-		next_frame();
-		CHECK(render_interpolation_object_node_matrices(OTHER_RIDER) == NULL &&
-			render_interpolation_object_node_matrices(WEAPON) == NULL, "taken rider drawn carried");
-		distributed_predictions[1].taken_host_time = NONE;
 
 		server_mode = TRUE;
 		next_frame();

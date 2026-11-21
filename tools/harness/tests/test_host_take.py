@@ -14,7 +14,7 @@ from harness.riding import engine, without_includes  # noqa: E402
 NETWORK = "port/linux/game/network_distributed.c"
 RIDING = "port/linux/game/vehicle_riding.c"
 CASES = ["host-deck-lagging", "host-deck-relative-speed", "host-deck-advance-refused", "host-deck-anchor-walk",
-         "host-deck-node-forgery", "host-deck-temporaries", "host-deck-host-moved"]
+         "host-deck-node-forgery", "host-deck-temporaries", "host-deck-host-moved", "host-along-written", "host-take-carried"]
 NETWORK_FUNCTIONS = ("distributed_apply_state", "distributed_riding_transition", "distributed_on_foot_bound", "distributed_on_foot_fall_speed",
                      "distributed_on_foot_ceiling", "distributed_on_foot_move_valid",
                       "distributed_supported_elevator", "distributed_riding_elevator", "distributed_air_part_vehicle", "distributed_take_riding", "distributed_take_prediction",
@@ -27,6 +27,8 @@ RIDING_FUNCTIONS = ("riding_snapshot", "vehicle_riding_point_to_local", "vehicle
 
 # source, replacements, and the case that must fail a CHECK (never compilation)
 NEGATIVE_CONTROLS = {
+    "along-not-rebased": ("network", [("if (vehicle_riding_is_riding(&host))\n\t\t\tbiped_riding_rebase(unit_index);",
+        "if (FALSE)\n\t\t\tbiped_riding_rebase(unit_index);")], "host-along-written"),
     "deck-taken-in-world": ("network", [("target.z -= base.z - object->object.position.z;",
          "target.z -= base.z - object->object.position.z;\n\ttarget = state->position;")], "host-deck-lagging"),
     "bound-world-speed": ("network", [("subtract_vectors3d(velocity, frame_velocity, &relative);",
@@ -38,6 +40,8 @@ NEGATIVE_CONTROLS = {
         "(vehicle_riding_is_riding(&host) ? deck->place.z - ground_place_height")], "host-deck-node-forgery"),
     "deck-anchor-unchecked": ("network", [("else if (ticks <= 0 || !distributed_on_foot_move_valid(bound, &anchor, &target, ticks))",
         "else if (FALSE)")], "host-deck-anchor-walk"),
+    "blend-from-uncarried": ("network", [("\tif (vehicle_riding_is_riding(&host))\n\t{\n\t\tcarried.x +=",
+        "\tif (FALSE)\n\t{\n\t\tcarried.x +=")], "host-take-carried"),
     "host-moved-unchecked": ("network", [("if (!distributed_on_foot_move_valid(bound, &taken_host, &host_now, now - accepted.taken_host_time))",
         "if (FALSE)")], "host-deck-host-moved"),
 }

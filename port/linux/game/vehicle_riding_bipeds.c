@@ -1534,11 +1534,6 @@ boolean biped_riding_uncarried_write(
 	mark = vehicle_riding_player_mark(biped_riding_player(biped));
 	if (!mark || mark->role != _vehicle_riding_role_simulated)
 		return FALSE;
-	/* (a take this tick put a remote player where the client's word has it, which the next carry may or may not follow:
-	it is drawn where the tick left it) */
-	if (unit_get_local_player_index(biped_index) == NONE &&
-		distributed_prediction_taken_now(biped_riding_player(biped), biped_index))
-		return FALSE;
 	/* (the correction's getter resets a slot of another vehicle: drawing never may) */
 	if (!object_try_and_get_and_verify_type(biped->biped.riding_object_index, _object_mask_vehicle))
 		return FALSE;

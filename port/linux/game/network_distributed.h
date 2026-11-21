@@ -300,8 +300,6 @@ long distributed_player_from_byte(byte player_index);
 boolean distributed_player_is_local(long player_index);
 /* whether this tick's host rider pass will attempt the unit's pending prediction */
 boolean distributed_rider_prediction_pending(short player_index, long unit_index);
-/* whether the host's last netcode pass took the player's word on the unit */
-boolean distributed_prediction_taken_now(short player_index, long unit_index);
 /* the player's living unit, or NONE */
 long distributed_living_unit(struct player_datum const *player);
 /* whether the player is one of that client machine's (the host) */

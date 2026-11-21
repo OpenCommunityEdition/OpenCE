@@ -57,6 +57,7 @@ machine (their datum identifiers need not be).
 #include "mcc_cache.h"
 #include "cseries/errors.h"
 #include "cache/cache_files.h"
+#include "cutscene/cinematics.h"
 #include "devices/devices.h"
 #include "models/model_animation_definitions.h"
 #include "game/game.h"
@@ -3210,7 +3211,7 @@ static boolean distributed_take_riding(
 	struct distributed_accepted_state accepted = distributed_accepted[player_index];
 	long now = game_time_get();
 	real_point3d base, host_place, place, host_now, anchor, taken_host;
-	real_point3d target;
+	real_point3d target, carried, aim;
 	real_vector3d world_velocity;
 	real height, width;
 	real ground_place_height = distributed_host_speeds[player_index].ground_place_height;
@@ -3316,22 +3317,45 @@ static boolean distributed_take_riding(
 	{
 		return FALSE;
 	}
+	/* (a riding copy still owes its next carry the vehicle pass's write, which the target already sits on: a blend
+	from where the copy stands would halve the write with the word's error and leave the copy behind its place on
+	the deck. A copy in its window is not carried, and blends from where it is) */
+	carried = object->object.position;
+	if (vehicle_riding_is_riding(&host))
+	{
+		carried.x += host_now.x - base.x;
+		carried.y += host_now.y - base.y;
+		carried.z += host_now.z - base.z;
+	}
+	aim = target;
+	/* (so written that a place not a number is put in full; a co-op cutscene puts it in full as
+	distributed_object_follows_host does, to keep up with the host's camera) */
+	if (!leash && !landing && !(network_coop_active() && cinematic_in_progress()) &&
+		distance_squared3d(&target, &carried) <= HOST_BLEND_DISTANCE * HOST_BLEND_DISTANCE)
+	{
+		aim.x = carried.x + (target.x - carried.x) * 0.5f;
+		aim.y = carried.y + (target.y - carried.y) * 0.5f;
+		aim.z = carried.z + (target.z - carried.z) * 0.5f;
+	}
 	if (deck_part || leash)
 	{
-		/* (the word's place passed every check, while the copy was put in the air by an aim at the client's world place (a world take, a leash take or an along route) off it by the two
-		vehicle copies' offset: half of that would be the state this tick sends, and a word further than the blend
-		would be put there in full anyway) */
-		if (!distributed_apply_state(unit_index, state, &target, &world_velocity, 0.0f,
-			leash || landing ? 0.f : HOST_BLEND_DISTANCE, 0.0f, 0.0f))
+		/* (the aim is already blended above, from where the carry will leave the copy) */
+		if (!distributed_apply_state(unit_index, state, &aim, &world_velocity, 0.0f, 0.0f, 0.0f, 0.0f))
 			return FALSE;
 		if (leash)
 			accepted.transition_leash_time = now;
 		biped_riding_rebase(unit_index);
 	}
-	else if (!distributed_apply_state(unit_index, state, &target, NULL, 0.0f, HOST_BLEND_DISTANCE, bound->speed,
-		distributed_on_foot_fall_speed(bound, target.z)))
+	else
 	{
-		return FALSE;
+		if (!distributed_apply_state(unit_index, state, &aim, NULL, 0.0f, 0.0f, bound->speed,
+			distributed_on_foot_fall_speed(bound, target.z)))
+			return FALSE;
+		/* (the target is placed by the deck as the vehicle pass left it, while the copy's snapshot is still the one its last
+		tick left: its next carry would add the pass's write a second time, or find it moved alone and open its
+		window. A copy in its window is not carried, and keeps its anchor) */
+		if (vehicle_riding_is_riding(&host))
+			biped_riding_rebase(unit_index);
 	}
 	distributed_predictions[player_index].taken_time = distributed_predictions[player_index].time;
 	distributed_predictions[player_index].taken_host_time = now;
@@ -3655,17 +3679,6 @@ boolean distributed_rider_prediction_pending(
 		object_get(unit_index)->object.parent_object_index == NONE &&
 		unit_get(unit_index)->unit.player_index != NONE &&
 		network_coop_player_has_structure_bsp(unit_get(unit_index)->unit.player_index);
-}
-
-/* whether the host's last netcode pass took the player's word on the unit: the take put it where the word has it, not
-where its carry would */
-boolean distributed_prediction_taken_now(
-	short player_index,
-	long unit_index)
-{
-	return player_index >= 0 && player_index < MAXIMUM_TRACKED_PLAYERS &&
-		distributed_predictions[player_index].taken_host_time == game_time_get() &&
-		distributed_predictions[player_index].state.unit_index == unit_index;
 }
 
 static void distributed_apply_predictions(
