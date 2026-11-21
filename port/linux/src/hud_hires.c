@@ -556,22 +556,30 @@ static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
 	}
 }
 
-unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
-	unsigned long height, long kind, unsigned long *levels)
+/* the upscaled texels of a sheet of that kind (no GL: any thread), and the
+factor they are upscaled by; NULL if the sheet is too large or memory runs out */
+static unsigned char *upscale_compute(const unsigned char *bgra, unsigned long width, unsigned long height,
+	long kind, unsigned long *factor)
 {
 	unsigned char *pixels;
-	unsigned long largest;
-	unsigned long factor = kind == 1 ? UPSCALE_LINE_ART_FACTOR : UPSCALE_FACTOR;
-	GLuint texture;
 
-	if (!xgpu_gl_ready())
-		return 0;
-	pixels = upscale_pixels(bgra, width, height, kind == 4 ? 512 : 256, factor);
+	*factor = kind == 1 ? UPSCALE_LINE_ART_FACTOR : UPSCALE_FACTOR;
+	pixels = upscale_pixels(bgra, width, height, kind == 4 ? 512 : 256, *factor);
 	if (!pixels)
-		return 0;
+		return NULL;
 	upscale_outline(pixels, bgra, width, height, kind);
 	if (kind == 1)
-		upscale_sharpen_alpha(pixels, width * factor, height * factor);
+		upscale_sharpen_alpha(pixels, width * *factor, height * *factor);
+	return pixels;
+}
+
+/* the upscaled texels as a mipmapped texture (the GL thread), freed */
+static unsigned int upscale_upload(unsigned char *pixels, unsigned long width, unsigned long height,
+	unsigned long factor, unsigned long *levels)
+{
+	unsigned long largest;
+	GLuint texture;
+
 	*levels = 1;
 	for (largest = (width > height ? width : height) * factor; largest > 1; largest >>= 1)
 		(*levels)++;
@@ -586,6 +594,206 @@ unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long 
 	xgpu_gl_state_invalidate();
 	free(pixels);
 	return texture;
+}
+
+/* ---------- upscaling in the background */
+
+/* A line-art sheet (kind 1: the message icons, the weapons the pickup
+prompt shows, the crosshair's warnings) is upscaled 8 times and sharpened,
+some 70 ms of work for a 128x128 sheet, which on the GL thread held up the
+frame the sheet was first drawn in: the game stuttered as the player came
+near a weapon and its prompt showed. It is upscaled on a thread of its own
+(hud_hires_upscale_begin); until it is done the sheet is drawn from the
+map's own texels, as with display.high_res_hud off. Android and the web
+upscale it at once, as before. */
+#ifdef HUD_HIRES_DECODE_AHEAD
+#define MAXIMUM_UPSCALE_JOBS 8
+
+enum
+{
+	_upscale_job_free,
+	_upscale_job_queued,
+	_upscale_job_working,
+	_upscale_job_done,
+};
+
+static struct
+{
+	int state;
+	/* (its entry gone while it was worked on: freed when done) */
+	int cancelled;
+	/* the map's texels (the job's), and the upscaled ones once done */
+	unsigned char *source;
+	unsigned char *pixels;
+	unsigned long width, height, factor;
+	long kind;
+} upscale_jobs[MAXIMUM_UPSCALE_JOBS];
+static pthread_mutex_t upscale_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t upscale_queued = PTHREAD_COND_INITIALIZER;
+static int upscale_thread_running;
+
+static void *upscale_thread_main(void *unused)
+{
+	(void)unused;
+	pthread_mutex_lock(&upscale_lock);
+	for (;;)
+	{
+		long job;
+
+		for (job = 0; job < MAXIMUM_UPSCALE_JOBS && upscale_jobs[job].state != _upscale_job_queued; job++)
+		{
+		}
+		if (job == MAXIMUM_UPSCALE_JOBS)
+		{
+			pthread_cond_wait(&upscale_queued, &upscale_lock);
+			continue;
+		}
+		upscale_jobs[job].state = _upscale_job_working;
+		pthread_mutex_unlock(&upscale_lock);
+		{
+			unsigned long factor;
+			unsigned char *pixels = upscale_compute(upscale_jobs[job].source, upscale_jobs[job].width,
+				upscale_jobs[job].height, upscale_jobs[job].kind, &factor);
+
+			pthread_mutex_lock(&upscale_lock);
+			free(upscale_jobs[job].source);
+			upscale_jobs[job].source = NULL;
+			if (upscale_jobs[job].cancelled)
+			{
+				free(pixels);
+				upscale_jobs[job].state = _upscale_job_free;
+			}
+			else
+			{
+				upscale_jobs[job].pixels = pixels;
+				upscale_jobs[job].factor = factor;
+				upscale_jobs[job].state = _upscale_job_done;
+			}
+		}
+	}
+	return NULL;
+}
+#endif
+
+long hud_hires_upscale_begin(unsigned char *bgra, unsigned long width, unsigned long height, long kind)
+{
+#ifdef HUD_HIRES_DECODE_AHEAD
+	long job;
+
+	if (kind != 1 || !bgra || !xgpu_gl_ready())
+		return 0;
+	pthread_mutex_lock(&upscale_lock);
+	for (job = 0; job < MAXIMUM_UPSCALE_JOBS && upscale_jobs[job].state != _upscale_job_free; job++)
+	{
+	}
+	if (job < MAXIMUM_UPSCALE_JOBS && !upscale_thread_running)
+	{
+		pthread_t thread;
+
+		if (pthread_create(&thread, NULL, upscale_thread_main, NULL) == 0)
+		{
+			pthread_detach(thread);
+			upscale_thread_running = 1;
+		}
+	}
+	if (job == MAXIMUM_UPSCALE_JOBS || !upscale_thread_running)
+	{
+		pthread_mutex_unlock(&upscale_lock);
+		return 0;
+	}
+	upscale_jobs[job].state = _upscale_job_queued;
+	upscale_jobs[job].cancelled = 0;
+	upscale_jobs[job].source = bgra;
+	upscale_jobs[job].pixels = NULL;
+	upscale_jobs[job].width = width;
+	upscale_jobs[job].height = height;
+	upscale_jobs[job].kind = kind;
+	pthread_cond_signal(&upscale_queued);
+	pthread_mutex_unlock(&upscale_lock);
+	return job + 1;
+#else
+	(void)bgra;
+	(void)width;
+	(void)height;
+	(void)kind;
+	return 0;
+#endif
+}
+
+unsigned int hud_hires_upscale_finish(long job, unsigned long *levels, int *pending)
+{
+#ifdef HUD_HIRES_DECODE_AHEAD
+	unsigned char *pixels;
+	unsigned long width, height, factor;
+
+	*pending = 0;
+	if (job < 1 || job > MAXIMUM_UPSCALE_JOBS)
+		return 0;
+	job--;
+	pthread_mutex_lock(&upscale_lock);
+	if (upscale_jobs[job].state != _upscale_job_done)
+	{
+		*pending = upscale_jobs[job].state == _upscale_job_queued || upscale_jobs[job].state == _upscale_job_working;
+		pthread_mutex_unlock(&upscale_lock);
+		return 0;
+	}
+	pixels = upscale_jobs[job].pixels;
+	width = upscale_jobs[job].width;
+	height = upscale_jobs[job].height;
+	factor = upscale_jobs[job].factor;
+	upscale_jobs[job].pixels = NULL;
+	upscale_jobs[job].state = _upscale_job_free;
+	pthread_mutex_unlock(&upscale_lock);
+	return pixels ? upscale_upload(pixels, width, height, factor, levels) : 0;
+#else
+	(void)job;
+	(void)levels;
+	*pending = 0;
+	return 0;
+#endif
+}
+
+void hud_hires_upscale_cancel(long job)
+{
+#ifdef HUD_HIRES_DECODE_AHEAD
+	if (job < 1 || job > MAXIMUM_UPSCALE_JOBS)
+		return;
+	job--;
+	pthread_mutex_lock(&upscale_lock);
+	switch (upscale_jobs[job].state)
+	{
+	case _upscale_job_queued:
+		free(upscale_jobs[job].source);
+		upscale_jobs[job].source = NULL;
+		upscale_jobs[job].state = _upscale_job_free;
+		break;
+	case _upscale_job_working:
+		upscale_jobs[job].cancelled = 1;
+		break;
+	case _upscale_job_done:
+		free(upscale_jobs[job].pixels);
+		upscale_jobs[job].pixels = NULL;
+		upscale_jobs[job].state = _upscale_job_free;
+		break;
+	}
+	pthread_mutex_unlock(&upscale_lock);
+#else
+	(void)job;
+#endif
+}
+
+unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
+	unsigned long height, long kind, unsigned long *levels)
+{
+	unsigned char *pixels;
+	unsigned long factor;
+
+	if (!xgpu_gl_ready())
+		return 0;
+	pixels = upscale_compute(bgra, width, height, kind, &factor);
+	if (!pixels)
+		return 0;
+	return upscale_upload(pixels, width, height, factor, levels);
 }
 
 static unsigned long big_endian_long(const unsigned char *bytes)

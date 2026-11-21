@@ -11,6 +11,7 @@ struct texture_entry
 	struct { unsigned long width, height; } description;
 	unsigned long address, generation, last_used_frame;
 	GLuint hud_upscale;
+	long hud_upscale_job;
 };
 #include "config.inc"
 static struct texture_entry *texture_buckets[TEXTURE_BUCKET_COUNT];
@@ -19,6 +20,13 @@ static Uint64 clock_ms;
 static Uint64 SDL_GetTicks(void) { return clock_ms; }
 static void glDeleteTextures(int count, const GLuint *texture) { }
 static void xgpu_gl_state_invalidate(void) { }
+/* the HUD upscale job a dropped texture's entry cancelled (hud_hires.c) */
+static long cancelled_job;
+static void hud_hires_upscale_cancel(long job)
+{
+	if (job)
+		cancelled_job = job;
+}
 /* the high-res HUD's settings never change here */
 static unsigned long hud_hires_settings_changed(void) { return 0; }
 static int hud_hires_bitmap_affected(unsigned long address, long width, long height, unsigned long changed)
@@ -29,6 +37,8 @@ static int hud_hires_bitmap_affected(unsigned long address, long width, long hei
 
 /* the texture drawn every frame, and the one drawn until a time */
 enum { ALWAYS = 1, BUCKET_ALWAYS = 7, SOMETIMES = 2, BUCKET_SOMETIMES = 9 };
+/* the upscale job the texture drawn for a time has (0: none) */
+static long sometimes_job;
 
 static void add(GLuint texture, int bucket)
 {
@@ -36,6 +46,7 @@ static void add(GLuint texture, int bucket)
 
 	entry->texture = texture;
 	entry->last_used_frame = texture_frame;
+	entry->hud_upscale_job = texture == SOMETIMES ? sometimes_job : 0;
 	entry->next = texture_buckets[bucket];
 	texture_buckets[bucket] = entry;
 }
@@ -104,6 +115,14 @@ int main(int argc, char **argv)
 	{
 		/* round the sweeps more than once */
 		check_idle(play(360, 25.0, 80.0));
+	}
+	CASE("job")
+	{
+		/* a texture dropped while its HUD upscale is still being made
+		cancels it, which would otherwise finish for an entry gone */
+		sometimes_job = 5;
+		check_idle(play(60, 1.0, 80.0));
+		CHECK(cancelled_job == 5, "the dropped texture's upscale job not cancelled (%ld)", cancelled_job);
 	}
 	return 0;
 }

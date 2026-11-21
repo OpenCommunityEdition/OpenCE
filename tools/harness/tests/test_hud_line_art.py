@@ -45,10 +45,16 @@ def generated(fault=None):
 
 def test_wired():
     """The message icons' sheets (kind 1) are drawn 8 times their size and sharpened; the others as before."""
-    texture = function(read(SOURCE).replace("\r\n", "\n"), "hud_hires_upscale_texture")
-    assert "unsigned long factor = kind == 1 ? UPSCALE_LINE_ART_FACTOR : UPSCALE_FACTOR;" in texture
-    assert "if (kind == 1)\n\t\tupscale_sharpen_alpha(pixels, width * factor, height * factor);" in texture
-    assert "(GLsizei)(width * factor), (GLsizei)(height * factor)" in texture
+    source = read(SOURCE).replace("\r\n", "\n")
+    compute = function(source, "upscale_compute")
+    assert "*factor = kind == 1 ? UPSCALE_LINE_ART_FACTOR : UPSCALE_FACTOR;" in compute
+    assert "if (kind == 1)\n\t\tupscale_sharpen_alpha(pixels, width * *factor, height * *factor);" in compute
+    assert "(GLsizei)(width * factor), (GLsizei)(height * factor)" in function(source, "upscale_upload")
+    texture = function(source, "hud_hires_upscale_texture")
+    assert "upscale_compute(bgra, width, height, kind, &factor)" in texture
+    assert "upscale_upload(pixels, width, height, factor, levels)" in texture
+    # (only the line-art sheets, the slow ones, are upscaled on a thread of their own)
+    assert "if (kind != 1 || !bgra || !xgpu_gl_ready())" in function(source, "hud_hires_upscale_begin")
     tags = read("port/linux/game/hud_hires_tags.c").replace("\r\n", "\n")
     assert '{ "ui\\\\hud\\\\bitmaps\\\\combined\\\\hud_msg_icons", 0, 3 },' in tags
 
