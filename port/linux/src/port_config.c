@@ -587,6 +587,14 @@ static const struct config_setting config_settings[] =
 		"profile starts at The Pillar of Autumn and opens each level as the one\n"
 		"before it is finished, as on the Xbox. Profiles already made keep their\n"
 		"progress; the console's profile_reset_campaign starts one over." },
+	{ "game.carry_weapons", _config_boolean, "false", "HALO_CARRY_WEAPONS", _environment_value, _platform_all,
+		"true: winning a campaign level alone or in split screen takes each\n"
+		"player's weapons, with their rounds and battery, the one in hand and the\n"
+		"grenades into the next level, in place of the loadout it starts with\n"
+		"(and again if that level is restarted). A weapon the next level's map\n"
+		"does not have is left out, its place taken by one of that level's own.\n"
+		"Not in network co-op. false: each level starts with its own loadout, as\n"
+		"on the Xbox." },
 
 	{ "game.downloaded_maps", _config_string, "\"\"", "HALO_DOWNLOADED_MAPS", _environment_value, _platform_all,
 		"Maps played as downloaded ones, besides those map sharing downloaded:\n"

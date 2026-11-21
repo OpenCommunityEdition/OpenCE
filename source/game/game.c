@@ -185,6 +185,7 @@ struct game_options;
 #include "units/bipeds.h" /* port: bipeds_riding_latch */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "mcc_loading.h" /* port: port/linux/game/mcc_loading.c */
+#include "campaign_carry.h" /* port: port/linux/game/campaign_carry.c */
 #ifdef HALO_PROFILE
 #include "profile_console.h" /* port: port/linux/game/profile_console.c */
 #endif
@@ -713,6 +714,9 @@ void game_initialize_for_new_map(
 	hs_initialize_for_new_map();
 	recorded_animations_initialize_for_new_map();
 	cheats_initialize_for_new_map();
+	/* port: weapons carried from the level won before, for this one if it is
+	the next (port/linux/game/campaign_carry.c) */
+	campaign_carry_new_map(game_globals->options.map_name);
 
 	game_globals->active = TRUE;
 	objects_place();

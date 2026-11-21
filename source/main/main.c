@@ -381,6 +381,7 @@ symbols in this file:
 #include "networking/network_server_manager.h" /* port: a co-op game's level won */
 #include "network_coop.h"
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
+#include "campaign_carry.h" /* port: port/linux/game/campaign_carry.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "network_aim_assist.h" /* port: port/linux/game/network_aim_assist.c */
@@ -2505,6 +2506,9 @@ static void main_won_map_private(
 	csstrncpy(next, main_script_next_level, sizeof(next) - 1);
 	next[sizeof(next) - 1] = 0;
 	main_script_next_level[0] = 0;
+	/* port: the local players' weapons and grenades, for the next level to
+	begin with, with game.carry_weapons (port/linux/game/campaign_carry.c) */
+	campaign_carry_take();
 
 	/* port: explicit MCC campaigns own their mission order and host decision.
 	 * The Xbox/CE level table below cannot represent package mission identities. */
