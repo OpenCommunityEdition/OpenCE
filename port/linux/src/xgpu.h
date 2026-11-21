@@ -180,6 +180,8 @@ struct nv2a_pixel_shader_key
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
+/* the key with what its GLSL does not depend on cleared (nv2a_psh.c) */
+void nv2a_pixel_shader_key_canonicalize(struct nv2a_pixel_shader_key *key);
 
 #ifdef HALO_GLES
 /* ES samplers have no LOD bias of their own */

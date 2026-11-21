@@ -44,6 +44,10 @@ void *texture_cache_steal_memory(
 	long size);
 void texture_cache_debug_render(
 	void);
+/* port: TRUE hands out each cached bitmap's hardware format alone, its
+pixels not read, while a map's GPU programs are made (shader_precompile.c) */
+void texture_cache_set_no_pixels(
+	boolean no_pixels);
 
 /* ---------- globals */
 

@@ -90,6 +90,7 @@ symbols in this file:
 /* port: static transparent part links for the newly loaded model tags. */
 #include "models/models.h"
 #include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -175,6 +176,7 @@ void render_initialize(
 void render_initialize_for_new_map(
 	void)
 {
+	shader_precompile_new_map(); /* port: display.shader_precompile */
 	/* port: preserve retail's energy-then-two-sided-glass compositing. */
 	models_fix_transparent_part_links();
 	render_objects_initialize_for_new_map();
@@ -336,6 +338,9 @@ static void render_window(
 	structure_visibility_compute();
 	player_effect_get_screen_flash(local_player_index, &parameters.screen_flash);
 	rasterizer_window_begin(&parameters);
+	/* port: the map's programs made in its first view (display.shader_precompile) */
+	if (rasterizer_target == _render_target_primary && !bink_playback_in_progress())
+		shader_precompile_window();
 
 	if (!bink_playback_in_progress())
 	{

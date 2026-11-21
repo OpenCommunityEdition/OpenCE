@@ -139,6 +139,8 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "saved games/game_state.h"
+#include "cache/cache_files.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -743,6 +745,74 @@ void _rasterizer_decals_begin(
 	return;
 }
 
+/* port: a decal blend function's shader, as _rasterizer_decals_draw sets it
+(taken out of it for shader_precompile.c) */
+static void rasterizer_decals_set_blend_function(
+	short framebuffer_blend_function)
+{
+	local_framebuffer_blend_function = framebuffer_blend_function;
+	if (framebuffer_blend_function == _shader_framebuffer_blend_function_multiply ||
+		framebuffer_blend_function == _shader_framebuffer_blend_function_double_multiply)
+	{
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_COLORWRITEENABLE,
+			D3DCOLORWRITEENABLE_ALL);
+	}
+	else
+	{
+		IDirect3DDevice8_SetRenderState(
+			global_d3d_device,
+			D3DRS_COLORWRITEENABLE,
+			D3DCOLORWRITEENABLE_RED|D3DCOLORWRITEENABLE_GREEN|D3DCOLORWRITEENABLE_BLUE);
+	}
+	switch (local_framebuffer_blend_function)
+	{
+		case _shader_framebuffer_blend_function_add:
+		case _shader_framebuffer_blend_function_reverse_subtract:
+		case _shader_framebuffer_blend_function_max:
+			pixel_shader.rgb_inputs[0] = 0x08040000;
+			pixel_shader.rgb_inputs[1] = 0x340c0000;
+			break;
+
+		case _shader_framebuffer_blend_function_multiply:
+		case _shader_framebuffer_blend_function_min:
+			pixel_shader.rgb_inputs[0] = 0x28240820;
+			pixel_shader.rgb_inputs[1] = 0x340c1420;
+			pixel_shader.alpha_inputs[1] = 0x341c1420;
+			break;
+
+		case _shader_framebuffer_blend_function_double_multiply:
+			pixel_shader.rgb_inputs[0] = 0xa8240820;
+			pixel_shader.rgb_inputs[1] = 0x340c14a0;
+			pixel_shader.alpha_inputs[1] = 0x341c14a0;
+			break;
+
+		case _shader_framebuffer_blend_function_alpha_blend:
+			pixel_shader.rgb_inputs[0] = 0x08040000;
+			pixel_shader.rgb_inputs[1] = 0x200c0000;
+			pixel_shader.alpha_inputs[1] = 0x34180000;
+			break;
+
+		case _shader_framebuffer_blend_function_alpha_multiply_add:
+			pixel_shader.rgb_inputs[0] = 0x08040000;
+			pixel_shader.rgb_inputs[1] = 0x340c0000;
+			pixel_shader.alpha_inputs[1] = 0x34180000;
+			break;
+
+		default:
+			match_vassert(
+				"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
+				470,
+				FALSE,
+				"### ERROR unsupported framebuffer blend function");
+			break;
+	}
+	rasterizer_set_framebuffer_blend_function(local_framebuffer_blend_function);
+	rasterizer_set_pixel_shader(&pixel_shader);
+	return;
+}
+
 void _rasterizer_decals_draw(
 	short cluster_index)
 {
@@ -773,66 +843,8 @@ void _rasterizer_decals_draw(
 		if (local_framebuffer_blend_function != framebuffer_blend_function)
 		{
 			rasterizer_decals_draw_batch(); /* port: (decal_batch) */
-			local_framebuffer_blend_function = framebuffer_blend_function;
-			if (framebuffer_blend_function == _shader_framebuffer_blend_function_multiply ||
-				framebuffer_blend_function == _shader_framebuffer_blend_function_double_multiply)
-			{
-				IDirect3DDevice8_SetRenderState(
-					global_d3d_device,
-					D3DRS_COLORWRITEENABLE,
-					D3DCOLORWRITEENABLE_ALL);
-			}
-			else
-			{
-				IDirect3DDevice8_SetRenderState(
-					global_d3d_device,
-					D3DRS_COLORWRITEENABLE,
-					D3DCOLORWRITEENABLE_RED|D3DCOLORWRITEENABLE_GREEN|D3DCOLORWRITEENABLE_BLUE);
-			}
-			switch (local_framebuffer_blend_function)
-			{
-				case _shader_framebuffer_blend_function_add:
-				case _shader_framebuffer_blend_function_reverse_subtract:
-				case _shader_framebuffer_blend_function_max:
-					pixel_shader.rgb_inputs[0] = 0x08040000;
-					pixel_shader.rgb_inputs[1] = 0x340c0000;
-					break;
-
-				case _shader_framebuffer_blend_function_multiply:
-				case _shader_framebuffer_blend_function_min:
-					pixel_shader.rgb_inputs[0] = 0x28240820;
-					pixel_shader.rgb_inputs[1] = 0x340c1420;
-					pixel_shader.alpha_inputs[1] = 0x341c1420;
-					break;
-
-				case _shader_framebuffer_blend_function_double_multiply:
-					pixel_shader.rgb_inputs[0] = 0xa8240820;
-					pixel_shader.rgb_inputs[1] = 0x340c14a0;
-					pixel_shader.alpha_inputs[1] = 0x341c14a0;
-					break;
-
-				case _shader_framebuffer_blend_function_alpha_blend:
-					pixel_shader.rgb_inputs[0] = 0x08040000;
-					pixel_shader.rgb_inputs[1] = 0x200c0000;
-					pixel_shader.alpha_inputs[1] = 0x34180000;
-					break;
-
-				case _shader_framebuffer_blend_function_alpha_multiply_add:
-					pixel_shader.rgb_inputs[0] = 0x08040000;
-					pixel_shader.rgb_inputs[1] = 0x340c0000;
-					pixel_shader.alpha_inputs[1] = 0x34180000;
-					break;
-
-				default:
-					match_vassert(
-						"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_decals.c",
-						470,
-						FALSE,
-						"### ERROR unsupported framebuffer blend function");
-					break;
-			}
-			rasterizer_set_framebuffer_blend_function(local_framebuffer_blend_function);
-			rasterizer_set_pixel_shader(&pixel_shader);
+			/* port: as before, in rasterizer_decals_set_blend_function */
+			rasterizer_decals_set_blend_function(framebuffer_blend_function);
 			if (rasterizer_debug_options.statistics_mode == _rasterizer_statistics_mode_geometry)
 				rasterizer_frame_statistics.decal_shader_change_count++;
 		}
@@ -1035,4 +1047,44 @@ static boolean rasterizer_decal_vertices_locked_proc(
 	last_decal_index_queried_by_lruv_cache = decal_index;
 
 	return locked;
+}
+
+/* port: shader_precompile.c: each layer with each decal tag's blend
+function and map, after each blend function (a function's shader keeps what
+the one before it set that it does not set itself) */
+void rasterizer_decals_precompile_shaders(void)
+{
+	static struct decal_vertex vertices[4];
+	short layer;
+
+	if (rasterizer_debug_options.drawing_mode != _rasterizer_drawing_mode_normal ||
+		!rasterizer_debug_options.draw_environment_decals)
+	{
+		return;
+	}
+	for (layer = 0; layer < NUMBER_OF_DECAL_LAYERS; layer++)
+	{
+		struct tag_iterator iterator;
+		long tag_index;
+
+		tag_iterator_new(&iterator, DECAL_GROUP_TAG);
+		while ((tag_index = tag_iterator_next(&iterator)) != NONE)
+		{
+			struct decal_shader_definition *shader = &decal_definition_get(tag_index)->shader;
+			short before;
+
+			for (before = NONE; before < NUMBER_OF_SHADER_FRAMEBUFFER_BLEND_FUNCTIONS; before++)
+			{
+				rasterizer_decals_begin(layer);
+				if (before != NONE)
+					rasterizer_decals_set_blend_function(before);
+				rasterizer_decals_set_blend_function(shader->framebuffer_blend_function);
+				rasterizer_set_texture(0, 0, 1, shader->map.index, 0);
+				decal_batch[0].vertices = vertices;
+				decal_batch[0].vertex_count = 4;
+				decal_batch_count = 1;
+				rasterizer_decals_end();
+			}
+		}
+	}
 }

@@ -83,6 +83,20 @@ void rasterizer_memory_pool_end(
 	return;
 }
 
+/* port: shader_precompile.c */
+unsigned long rasterizer_memory_pool_used(
+	void)
+{
+	return (unsigned long)global_memory_index;
+}
+
+void rasterizer_memory_pool_release(
+	unsigned long used)
+{
+	if (used < (unsigned long)global_memory_index)
+		global_memory_index = (long)used;
+}
+
 void rasterizer_memory_pool_dispose(
 	void)
 {

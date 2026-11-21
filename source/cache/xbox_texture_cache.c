@@ -347,8 +347,65 @@ static struct xbox_texture_cache_globals xbox_texture_cache_globals;
 struct texture_cache_debug_options texture_cache_debug_options = {0};
 boolean debug_texture_cache = FALSE;
 static unsigned long texture_cache_last_failure_time = 0;
+/* port: while a map's GPU programs are made (port/linux/game/shader_precompile.c),
+a cached bitmap is handed out as a hardware format of its own, built from its
+fields, its pixels not read: a program depends on the kind of texture each
+stage samples, not on its texels, and every bitmap of a map read at once
+would be slow and would not fit Android's and the web build's cache (the
+Xbox's 22 MB). Its Data is D3D_PORT_TEXTURE_DATA_NO_PIXELS. Each bitmap
+keeps its header while they are handed out, as a loaded one does (a stage
+keeps its texture over many draws); past the table's size, bitmaps are read
+as ever. */
+enum
+{
+	TEXTURE_CACHE_NO_PIXELS_HEADER_COUNT = 8192,
+};
+struct texture_cache_no_pixels_header
+{
+	struct bitmap_data *bitmap;
+	D3DBaseTexture header;
+};
+static boolean texture_cache_no_pixels = FALSE;
+static struct texture_cache_no_pixels_header
+	texture_cache_no_pixels_headers[TEXTURE_CACHE_NO_PIXELS_HEADER_COUNT];
 
 /* ---------- public code */
+
+/* port: shader_precompile.c */
+void texture_cache_set_no_pixels(
+	boolean no_pixels)
+{
+	if (no_pixels && !texture_cache_no_pixels)
+		csmemset(texture_cache_no_pixels_headers, 0, sizeof(texture_cache_no_pixels_headers));
+	texture_cache_no_pixels = no_pixels;
+}
+
+/* port: the bitmap's header without its pixels, NULL past the table's
+size (texture_cache_no_pixels) */
+static D3DBaseTexture *texture_cache_no_pixels_header_get(
+	struct bitmap_data *bitmap)
+{
+	unsigned long index = ((unsigned long)bitmap >> 2) % TEXTURE_CACHE_NO_PIXELS_HEADER_COUNT;
+	long probe;
+
+	for (probe = 0; probe < TEXTURE_CACHE_NO_PIXELS_HEADER_COUNT; probe++)
+	{
+		struct texture_cache_no_pixels_header *entry = &texture_cache_no_pixels_headers[
+			(index + probe) % TEXTURE_CACHE_NO_PIXELS_HEADER_COUNT];
+
+		if (entry->bitmap == bitmap)
+			return &entry->header;
+		if (!entry->bitmap)
+		{
+			entry->bitmap = bitmap;
+			texture_cache_initialize_hardware_format(bitmap, &entry->header);
+			entry->header.Data = D3D_PORT_TEXTURE_DATA_NO_PIXELS;
+			return &entry->header;
+		}
+	}
+
+	return NULL;
+}
 
 void texture_cache_delete(
 	void)
@@ -1067,6 +1124,17 @@ void *_texture_cache_bitmap_get_hardware_format(
 		"c:\\halo\\SOURCE\\cache\\xbox_texture_cache.c",
 		210,
 		load || !block);
+	/* port: or, while the GPU programs are made, its header alone (to a
+	caller that would load it: one that asks whether it is loaded draws
+	otherwise when it isn't, and is answered as ever) */
+	if (texture_cache_no_pixels && load && TEST_FLAG(bitmap->flags, _bitmap_cached_bit) &&
+		texture_cache_bitmap_valid(bitmap))
+	{
+		D3DBaseTexture *header = texture_cache_no_pixels_header_get(bitmap);
+
+		if (header)
+			return header;
+	}
 #ifdef HALO_ANDROID
 	/* port: CE's frame working set is not bounded by the Xbox texture arena.
 	 * Keep dynamic textures and both other map families on their own paths. */
