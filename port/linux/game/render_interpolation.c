@@ -125,6 +125,10 @@ struct interpolated_object
 	/* ... the two snapshots' rotations, found when first blended */
 	struct interpolation_rotation *rotations;
 	boolean rotations_valid[2];
+	/* whether the two snapshots are different poses, not one moving: found
+	when first blended, theirs alone (not the frame's) */
+	boolean snap;
+	boolean snap_valid;
 };
 
 struct interpolated_camera
@@ -487,6 +491,7 @@ void render_interpolation_tick(void)
 		record->tick = interpolation_tick;
 		record->has_previous = continuing;
 		record->blended_frame = NONE;
+		record->snap_valid = FALSE;
 	}
 }
 
@@ -547,21 +552,30 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 		real_matrix4x3 const *latest = record->nodes + record->latest * record->node_capacity;
 		real_matrix4x3 *blended = record->nodes + 2 * record->node_capacity;
 		short node_index;
-		/* (so written that a position not a number snaps) */
-		boolean snap = !(distance_squared(&previous[0].position, &latest[0].position) <=
-			OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE);
+		boolean snap;
 
-		/* a node moved further in the root's frame than a tick allows: the
-		two snapshots are different poses, not one moving (so written that
-		a position not a number snaps) */
-		for (node_index = 1; !snap && node_index < record->node_count; node_index++)
+		/* (once a tick, not every frame: the snapshots' alone) */
+		if (!record->snap_valid)
 		{
-			real_point3d previous_local, latest_local;
+			/* (so written that a position not a number snaps) */
+			snap = !(distance_squared(&previous[0].position, &latest[0].position) <=
+				OBJECT_SNAP_DISTANCE * OBJECT_SNAP_DISTANCE);
 
-			matrix4x3_inverse_transform_point(&previous[0], &previous[node_index].position, &previous_local);
-			matrix4x3_inverse_transform_point(&latest[0], &latest[node_index].position, &latest_local);
-			snap = !(distance_squared(&previous_local, &latest_local) <= NODE_SNAP_DISTANCE * NODE_SNAP_DISTANCE);
+			/* a node moved further in the root's frame than a tick allows:
+			the two snapshots are different poses, not one moving (so written
+			that a position not a number snaps) */
+			for (node_index = 1; !snap && node_index < record->node_count; node_index++)
+			{
+				real_point3d previous_local, latest_local;
+
+				matrix4x3_inverse_transform_point(&previous[0], &previous[node_index].position, &previous_local);
+				matrix4x3_inverse_transform_point(&latest[0], &latest[node_index].position, &latest_local);
+				snap = !(distance_squared(&previous_local, &latest_local) <= NODE_SNAP_DISTANCE * NODE_SNAP_DISTANCE);
+			}
+			record->snap = snap;
+			record->snap_valid = TRUE;
 		}
+		snap = record->snap;
 		if (!snap)
 		{
 			struct interpolation_rotation *previous_rotations =
@@ -669,6 +683,8 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 		}
 		correction_add(&record->correction, &record->correction_pending, offset);
 		record->blended_frame = NONE;
+		/* (its snapshots moved: found again, as before) */
+		record->snap_valid = FALSE;
 	}
 	/* a local player's unit (by itself, or with what it rides): its
 	first-person view, which the observer poses from it, glides with it */
