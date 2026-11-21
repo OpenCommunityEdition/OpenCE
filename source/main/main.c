@@ -3823,9 +3823,14 @@ static boolean main_loop_iteration(
 					render_frame = main_globals.main_menu_scenario_loaded ||
 						(main_globals.halt_time_scale &&
 							(game_time_get_paused() || game_time_get_elapsed()>0 || game_time_get_speed()<1.0f));
-					/* frames between ticks too (render_interpolation.c) */
+					/* frames between ticks too (render_interpolation.c),
+					once the map has ticked. port: before its first tick the
+					world is as loaded, without the camera and the fade its
+					scripts give it in that tick (a cinematic's start showed
+					the sky from nowhere), so the original's rule holds until then */
 					if (halo_interpolation_enabled())
-						render_frame = main_globals.main_menu_scenario_loaded || main_globals.halt_time_scale;
+						render_frame = main_globals.main_menu_scenario_loaded ||
+							(main_globals.halt_time_scale && (render_frame || game_time_get()>0));
 					render_frame &= !game_engine_running() || game_time_get()>=3;
 
 					profile_scope_enter(main_non_deterministic_update_section)
