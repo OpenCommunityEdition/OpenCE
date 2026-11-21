@@ -55,6 +55,8 @@ static struct { long corrections; } distributed_statistics;
 static real vehicle_write;
 static real pill_offset = -0.1f;
 static boolean replay_frames;
+static boolean network_coop_active(void) { return FALSE; }
+static boolean cinematic_in_progress(void) { return FALSE; }
 static struct vehicle_riding_vehicle replay_body, replay_node;
 real vehicle_riding_transition_leash(void) { return 0.25f; }
 static real_point3d const body_place = { -0.5f, 0.2f, 0.0f };
@@ -364,6 +366,72 @@ int main(int argc, char **argv)
         moved.x += 3.0f; host_tick_at(0, &moved); prediction(0, moved);
         CHECK(take(&b), "word on the host's own move refused");
         CHECK(distributed_accepted[0].host_time == 2, "host's own move kept the old anchor"); return 0;
+    }
+    /* a word with no deck part, taken after the vehicle pass moved the deck under the copy: the copy is left on the
+    written deck's snapshot, so its next carry owes nothing of the write, whether the word was blended or put */
+    CASE("host-along-written")
+    {
+        static real const writes[2] = { 0.1f, 0.5f };
+        long at;
+        for (at = 0; at < 2; at++)
+        {
+            real_point3d word, base, last, carried;
+            real h, w;
+            vehicles[0].position.x += writes[at];
+            vehicles[0].correction.vehicle_index = V;
+            vehicles[0].correction.translation.i += writes[at];
+            word = to_world(&body_place);
+            word.y += 0.06f; word.z += 0.1f;
+            distributed_predictions[0].state.deck_present = FALSE;
+            distributed_predictions[0].state.position = word;
+            CHECK(take(&b), "word without a part refused (write %f)", writes[at]);
+            biped_get_physics_pill(0, &base, &h, &w);
+            vehicle_riding_point_to_world(&riding[0].vehicle_position, &riding[0].vehicle_forward, &riding[0].vehicle_up,
+                &riding[0].local_point, &last);
+            vehicle_riding_point_to_world(&vehicles[0].position, &vehicles[0].forward, &vehicles[0].up,
+                &riding[0].local_point, &carried);
+            CHECK(distance_squared3d(&base, &last) < 1e-8f, "copy %f off its snapshot after a write of %f",
+                distance3d(&base, &last), writes[at]);
+            CHECK(distance_squared3d(&carried, &last) < 1e-8f, "next carry takes the write of %f again", writes[at]);
+            /* (the drawing owes a rider the writes since its mark: none, once it is rebased) */
+            CHECK(riding[0].mark.correction.vehicle_index == V &&
+                riding[0].mark.correction.translation.i == vehicles[0].correction.translation.i,
+                "copy's mark is not the written vehicle's: drawn carried by the write of %f", writes[at]);
+            game_time++; host_tick(0); prediction(0, body_place);
+        }
+        return 0;
+    }
+    /* a take blends from where the copy's next carry would put it: the vehicle pass's write is not halved with the
+    word's error, with a deck part or without one (0.1: within the blend from both places; 0.3: within it only from
+    the carried one) */
+    CASE("host-take-carried")
+    {
+        static real const writes[2] = { 0.1f, 0.3f };
+        long at;
+        for (at = 0; at < 4; at++)
+        {
+            real_point3d place = body_place, half = body_place, base;
+            real h, w;
+            setup();
+            vehicles[0].position.x += writes[at / 2];
+            place.y += 0.06f; half.y += 0.03f;
+            prediction(0, place);
+            if (at & 1)
+            {
+                distributed_predictions[0].state.deck_present = FALSE;
+                distributed_predictions[0].state.position = to_world(&place);
+                distributed_predictions[0].state.position.z += 0.1f;
+            }
+            CHECK(take(&b), "word refused (write %f, part %d)", writes[at / 2], !(at & 1));
+            biped_get_physics_pill(0, &base, &h, &w);
+            {
+                real_point3d expected = to_world(&half);
+                CHECK(distance_squared3d(&base, &expected) < 1e-8f,
+                    "copy %f off half way from its carried place to the word (write %f, part %d)",
+                    distance3d(&base, &expected), writes[at / 2], !(at & 1));
+            }
+        }
+        return 0;
     }
     fprintf(stderr, "no case %s\n", case_name); return 2;
 }

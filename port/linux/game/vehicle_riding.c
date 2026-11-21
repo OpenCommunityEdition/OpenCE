@@ -2008,6 +2008,12 @@ real vehicle_riding_kept_dyaw(
 	return riding_kept_dyaws[local_player_index];
 }
 
+/* whether a carry turns a player's view too (the latched debug.riding_look_carry) */
+boolean vehicle_riding_look_carries(void)
+{
+	return riding_look_carry != FALSE;
+}
+
 short vehicle_riding_claim(
 	long riding_object_index,
 	short count,
