@@ -53,6 +53,10 @@ enum
 	_contrail_point_transitioning_bit = 1,
 };
 
+/* port: how far (world units) the marker is drawn from the newest point
+before the trail's head is drawn out to it (render_contrail) */
+#define CONTRAIL_HEAD_MINIMUM_GAP 0.001f
+
 /* ---------- macros */
 
 /* ---------- structures */
@@ -126,6 +130,32 @@ static void render_contrail(
 	short vertex_count;
 	long triangle_buffer_index;
 	long vertex_buffer_index;
+	/* port: the trail's head, on its object's marker as the frame draws it
+	(contrail_head_position): a copy of the newest point moved there, drawn
+	before the points, which are as they were. Only where the marker has
+	moved off the newest point: on the frame a point is made there, and with
+	smooth motion off, the trail is drawn as before */
+	struct contrail_point_datum head;
+	real_point3d head_position;
+	boolean has_head = FALSE;
+	boolean head_pending;
+
+	if (contrail_head_position(contrail, instance_index, &head_position))
+	{
+		struct contrail_point_datum const *newest = datum_get(
+			contrail_point_data,
+			contrail->first_contrail_point_indices[instance_index]);
+		real_vector3d gap;
+
+		vector_from_points3d(&newest->position, &head_position, &gap);
+		if (magnitude_squared3d(&gap) > CONTRAIL_HEAD_MINIMUM_GAP * CONTRAIL_HEAD_MINIMUM_GAP)
+		{
+			head = *newest;
+			head.position = head_position;
+			head.next_contrail_point_index = contrail->first_contrail_point_indices[instance_index];
+			has_head = TRUE;
+		}
+	}
 
 	bitmap = bitmap_group_get_bitmap_from_sequence(
 		definition->bitmap.index,
@@ -134,7 +164,7 @@ static void render_contrail(
 	rasterizer_globals.current_lock_operation = _rasterizer_lock_contrail;
 	if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
 	{
-		segment_count = contrail->contrail_point_counts[instance_index] - 1;
+		segment_count = contrail->contrail_point_counts[instance_index] - 1 + (has_head ? 1 : 0);
 		triangle_count = segment_count + segment_count;
 		vertex_count = triangle_count + 2;
 		triangle_buffer_index = rasterizer_dynamic_triangles_new(triangle_count);
@@ -169,6 +199,10 @@ static void render_contrail(
 			if (definition->scale_flags & (1 << _contrail_texture_repeats_u_bit))
 				texture_u_step *= contrail->density;
 			texture_u_step = -texture_u_step;
+			/* port: (the head a step before the newest point, so that the
+			points keep their texture) */
+			if (has_head)
+				texture_u -= texture_u_step;
 			texture_offset_v = contrail->texture_offset_v;
 			texture_v_far = definition->texture_repeats_v;
 			if (definition->scale_flags & (1 << _contrail_texture_repeats_v_bit))
@@ -176,6 +210,7 @@ static void render_contrail(
 			texture_v_far += texture_offset_v;
 			previous_point = NULL;
 			point_index = contrail->first_contrail_point_indices[instance_index];
+			head_pending = has_head;
 
 			while (point_index != NONE)
 			{
@@ -188,7 +223,8 @@ static void render_contrail(
 				real_vector3d orientation;
 				real_vector3d facing_normal;
 
-				point = datum_get(contrail_point_data, point_index);
+				/* port: (the head first: its next is the newest point) */
+				point = head_pending ? &head : datum_get(contrail_point_data, point_index);
 				state = TAG_BLOCK_GET_ELEMENT(
 					&definition->states,
 					point->state_index,
@@ -399,6 +435,7 @@ static void render_contrail(
 				previous_point = point;
 				vertices += 2;
 				point_index = point->next_contrail_point_index;
+				head_pending = FALSE;
 			}
 
 			vertices -= vertex_count;

@@ -537,6 +537,51 @@ void contrail_owner_collision(
 	return;
 }
 
+/* port: where an active contrail's newest point would be made now: on its
+object's marker as the frame draws it (render_contrails.c draws the trail's
+head there). FALSE for a contrail on no object, making no points, or whose
+object has no such marker. Points are made once a tick, on the first frame
+after it (contrails_update): through the rest of the tick the object is
+drawn gliding on (port/linux/game/render_interpolation.c) and the trail
+stopped short of it, by up to a tick's flight (a Ghost's or a plasma
+turret's bolt, three or four world units), and caught up 30 times a second. */
+boolean contrail_head_position(
+	struct contrail_datum const *contrail,
+	short instance_index,
+	real_point3d *position)
+{
+	struct object_datum *object;
+	struct object_definition *object_definition;
+	struct object_marker markers[MAXIMUM_CONTRAIL_INSTANCES];
+	short marker_count;
+
+	if (contrail->object_index == NONE ||
+		!TEST_FLAG(contrail->flags, _contrail_active_bit) ||
+		instance_index < 0 || instance_index >= MAXIMUM_CONTRAIL_INSTANCES)
+	{
+		return FALSE;
+	}
+	object = object_try_and_get(contrail->object_index);
+	if (!object)
+		return FALSE;
+	object_definition = object_definition_get(object->definition_index);
+	if (!VALID_INDEX(contrail->attachment_index, object_definition->object.attachments.count))
+		return FALSE;
+	marker_count = object_get_marker_by_name(
+		contrail->object_index,
+		TAG_BLOCK_GET_ELEMENT(
+			&object_definition->object.attachments,
+			contrail->attachment_index,
+			struct object_attachment_definition)->marker_name,
+		markers,
+		NUMBEROF(markers));
+	if (instance_index >= marker_count)
+		return FALSE;
+	*position = markers[instance_index].matrix.position;
+
+	return TRUE;
+}
+
 /* ---------- private code */
 
 static void contrail_verify(
