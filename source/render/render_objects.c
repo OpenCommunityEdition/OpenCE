@@ -375,6 +375,8 @@ void render_objects(
 /* port: port/linux/game/first_person_legs.c */
 boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
+/* port: port/linux/game/first_person_shadow.c */
+boolean first_person_shadow_wanted(long object_index);
 /* port: port/linux/game/shield_color.c */
 real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
 /* port: port/linux/game/overshield_effect.c */
@@ -494,7 +496,11 @@ static void render_object_list(
 		(overshield_effect.c), so they are not copied again */
 		real const *shown_functions = object->object.outgoing_function_values;
 
-		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices))
+		/* port: and in the shadows' pass, the body of the player the view is
+		seen from, with what it carries, with display.first_person_shadow
+		(port/linux/game/first_person_shadow.c) */
+		if (!object_is_first_person_camera(object_index) || render.camera.mirrored || (legs && node_matrices) ||
+			(data->shadow && first_person_shadow_wanted(object_index)))
 		{
 			struct render_model_effect model_effect;
 
@@ -1156,7 +1162,10 @@ static void render_object(
 	{
 		struct object_datum *object = object_get(data->object_index);
 
-		if (!object_is_first_person_camera(data->object_index) &&
+		/* port: the body of the player the view is seen from casts one too
+		with display.first_person_shadow (port/linux/game/first_person_shadow.c) */
+		if ((!object_is_first_person_camera(data->object_index) ||
+				first_person_shadow_wanted(data->object_index)) &&
 			!TEST_FLAG(object->object.flags, _object_shadowless_bit) &&
 			(!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
 				object->object.first_child_object_index != NONE))
