@@ -227,7 +227,12 @@ typedef char verify_animation_graph_first_person_weapon_animations_size[
 struct animation_graph_node
 {
 	char name[TAG_STRING_LENGTH+1];
-	byte reserved0020[0x20];
+	/* port: the node's parent, as model_animations.c's copy has it
+	(first_person_weapon_overlay_nodes) */
+	short next_sibling_node_index;
+	short first_child_node_index;
+	short parent_node_index;
+	byte reserved0026[0x1A];
 };
 
 typedef char verify_animation_graph_node_size[
@@ -1127,10 +1132,87 @@ static boolean first_person_weapon_animation_fits(
 	return FALSE;
 }
 
+/* port: each of the graph's first node_count nodes' parent, NONE for none
+(render_interpolation_first_person) */
+static void first_person_weapon_node_parents(
+	struct animation_graph *animation_graph,
+	short node_count,
+	short *parents)
+{
+	short node_index;
+
+	for (node_index= 0; node_index<node_count; node_index++)
+	{
+		struct animation_graph_node const *node= TAG_BLOCK_GET_ELEMENT(
+			&animation_graph->nodes,
+			node_index,
+			struct animation_graph_node);
+
+		parents[node_index]= VALID_INDEX(node->parent_node_index, node_count) ? node->parent_node_index : NONE;
+	}
+
+	return;
+}
+
+/* port: the nodes an overlay animation moves (it has their rotation,
+translation or scale), with their children, of the graph's first node_count
+nodes, as a bit vector, and each node's parent (render_interpolation_first_person) */
+static void first_person_weapon_overlay_nodes(
+	struct animation_graph *animation_graph,
+	struct animation const *animation,
+	short node_count,
+	unsigned long *nodes,
+	short *parents)
+{
+	short node_index;
+	boolean changed= TRUE;
+
+	csmemset(nodes, 0, BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_NODES_PER_ANIMATION)*sizeof(unsigned long));
+	first_person_weapon_node_parents(animation_graph, node_count, parents);
+	for (node_index= 0; node_index<node_count && node_index<animation->node_count; node_index++)
+	{
+		if (BIT_VECTOR_TEST_FLAG(animation->nodes_with_rotation_flags, node_index) ||
+			BIT_VECTOR_TEST_FLAG(animation->nodes_with_translation_flags, node_index) ||
+			BIT_VECTOR_TEST_FLAG(animation->nodes_with_scale_flags, node_index))
+		{
+			BIT_VECTOR_SET_FLAG(nodes, node_index, TRUE);
+		}
+	}
+	/* (a node's children: in one pass where each comes after its parent,
+	as a graph's nodes do) */
+	while (changed)
+	{
+		changed= FALSE;
+		for (node_index= 0; node_index<node_count; node_index++)
+		{
+			struct animation_graph_node const *node= TAG_BLOCK_GET_ELEMENT(
+				&animation_graph->nodes,
+				node_index,
+				struct animation_graph_node);
+
+			if (!BIT_VECTOR_TEST_FLAG(nodes, node_index) &&
+				VALID_INDEX(node->parent_node_index, node_count) &&
+				BIT_VECTOR_TEST_FLAG(nodes, node->parent_node_index))
+			{
+				BIT_VECTOR_SET_FLAG(nodes, node_index, TRUE);
+				changed= TRUE;
+			}
+		}
+	}
+
+	return;
+}
+
 static void first_person_weapon_build_node_matrices(
 	short local_player_index)
 {
 	struct first_person_weapon *first_person_weapon= first_person_weapon_get(local_player_index);
+	/* port: the frame of the ammunition's overlay, when it shows the rounds
+	loaded, the nodes it moves, and the graph's nodes' parents
+	(render_interpolation_first_person) */
+	short count_frame= NONE;
+	unsigned long count_nodes[BIT_VECTOR_SIZE_IN_LONGS(MAXIMUM_NODES_PER_ANIMATION)];
+	short count_parents[MAXIMUM_NODES_PER_ANIMATION];
 
 	if (!first_person_weapon->rendered)
 	{
@@ -1302,6 +1384,15 @@ static void first_person_weapon_build_node_matrices(
 							firing_animation,
 							weapon->weapon.magazines[0].rounds_loaded,
 							first_person_weapon->node_orientations);
+						/* port: a count, which changes in a tick: its nodes are not
+						blended from one of its frames to the next (render_interpolation.c) */
+						count_frame= weapon->weapon.magazines[0].rounds_loaded;
+						first_person_weapon_overlay_nodes(
+							animation_graph,
+							firing_animation,
+							(short)MIN(animation_graph->nodes.count, MAXIMUM_NODES_PER_ANIMATION),
+							count_nodes,
+							count_parents);
 					}
 				}
 
@@ -1458,14 +1549,26 @@ static void first_person_weapon_build_node_matrices(
 			&render.camera.up);
 		/* the pose between the last two ticks (render_interpolation.c) */
 		/* port: no more nodes than the weapon's matrices hold (a map's count);
-		the weapon and its graph tell its poses from another weapon's */
+		the weapon and its graph tell its poses from another weapon's; each
+		node's parent, for a node put elsewhere in a tick (a round into the
+		hand), as for the count's */
+		if (count_frame==NONE)
+		{
+			first_person_weapon_node_parents(
+				animation_graph,
+				(short)MIN(animation_graph->nodes.count, MAXIMUM_NODES_PER_ANIMATION),
+				count_parents);
+		}
 		render_interpolation_first_person(
 			local_player_index,
 			first_person_weapon->weapon_index,
 			weapon_definition->weapon.interface_definition.first_person_animations.index,
 			first_person_weapon->node_matrices,
 			(short)MIN(animation_graph->nodes.count, MAXIMUM_NODES_PER_ANIMATION),
-			&render.camera);
+			&render.camera,
+			count_frame,
+			count_frame!=NONE ? count_nodes : NULL,
+			count_parents);
 	}
 
 	return;
