@@ -43,6 +43,10 @@ static void render_interpolation_object_point(long object_index, real_point3d *p
 	point->y += drawn_offset.j;
 	point->z += drawn_offset.k;
 }
+/* (an object seen by no view in first person: its shadow cast as it is;
+first_person_legs_shadow_place sets your own body's back with LEGS) */
+static boolean object_is_first_person_camera(long object_index) { return FALSE; }
+static void first_person_legs_shadow_place(long object_index, boolean seen_in_first_person, real_point3d *center) {}
 
 static void perpendicular3d(real_vector3d const *vector, real_vector3d *perpendicular)
 {

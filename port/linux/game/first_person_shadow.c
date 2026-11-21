@@ -6,7 +6,9 @@ Shadow, display.first_person_shadow): the body the game animates as others
 see it, and the weapon in its hands, cast as their shadows are cast. The
 stock game draws neither the body nor its shadow for the player whose view
 it is. Only the shadows' pass takes the body (render_objects.c); the view
-still draws the first-person weapon and arms alone.
+still draws the first-person weapon and arms alone. With LEGS the shadow is
+cast from the body set back as far as the legs are drawn set back, so that
+they stand on it (first_person_legs_shadow_place).
 */
 
 #include "cseries.h"

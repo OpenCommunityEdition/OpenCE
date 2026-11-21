@@ -53,6 +53,18 @@ it sank into a funnel) */
 #define FIRST_PERSON_LEGS_LID_UP 0.01f
 
 static real_matrix4x3 first_person_legs_matrices[FIRST_PERSON_LEGS_MAXIMUM_NODES];
+
+/* the body whose legs a view draws, while its shadow is cast
+(first_person_legs_shadow_place), its scene, how far it is set back, and
+the poses it and what it carries cast it with */
+static long first_person_legs_shadow_unit_index = NONE;
+static long first_person_legs_shadow_scene_index = NONE;
+static real_vector3d first_person_legs_shadow_offset;
+static real_matrix4x3 first_person_legs_shadow_matrices[FIRST_PERSON_LEGS_MAXIMUM_NODES];
+static real_matrix4x3 first_person_legs_shadow_carried_matrices[FIRST_PERSON_LEGS_MAXIMUM_NODES];
+
+/* port/linux/game/first_person_shadow.c */
+boolean first_person_shadow_wanted(long object_index);
 static boolean first_person_legs_enabled(
 	void)
 {
@@ -200,11 +212,15 @@ static boolean first_person_legs_waist(
 }
 
 /* the pose to draw the legs with: the body's own (as it is drawn now), all
-but the legs folded into the hips, the whole set back behind the eye; NULL:
-none (a body without named legs) */
-real_matrix4x3 const *first_person_legs_node_matrices(
+but the legs folded into the hips (fold_body; else the whole body), the
+whole set back behind the eye of the window's view, into matrices, by
+*offset; NULL: none (a body without named legs) */
+static real_matrix4x3 const *first_person_legs_pose(
 	long object_index,
-	real_matrix4x3 const *nodes)
+	real_matrix4x3 const *nodes,
+	boolean fold_body,
+	real_matrix4x3 *matrices,
+	real_vector3d *offset)
 {
 	struct object_datum *object = object_try_and_get(object_index);
 	struct object_definition *definition;
@@ -289,21 +305,105 @@ real_matrix4x3 const *first_person_legs_node_matrices(
 			set_back = FIRST_PERSON_LEGS_SET_BACK_MAXIMUM;
 	}
 
+	offset->i = back.i * set_back;
+	offset->j = back.j * set_back;
+	offset->k = back.k * set_back;
 	for (index = 0; index < count; index++)
 	{
 		struct model_node const *node = TAG_BLOCK_GET_ELEMENT(&model->nodes, index, struct model_node);
-		real_matrix4x3 *matrix = &first_person_legs_matrices[index];
+		real_matrix4x3 *matrix = &matrices[index];
 
 		*matrix = nodes[index];
 		/* (the root kept: it is the body's frame, not a part of it) */
-		if (node->parent_node_index != NONE && !first_person_legs_node(node->name))
+		if (fold_body && node->parent_node_index != NONE && !first_person_legs_node(node->name))
 		{
 			matrix->position = fold;
 			matrix->scale = 0.001f;
 		}
-		matrix->position.x += back.i * set_back;
-		matrix->position.y += back.j * set_back;
-		matrix->position.z += back.k * set_back;
+		matrix->position.x += offset->i;
+		matrix->position.y += offset->j;
+		matrix->position.z += offset->k;
 	}
-	return first_person_legs_matrices;
+	return matrices;
+}
+
+/* the pose to draw the legs with in the window's view: the body's own,
+all but the legs folded into the hips, the whole set back behind the eye;
+NULL: none (a body without named legs) */
+real_matrix4x3 const *first_person_legs_node_matrices(
+	long object_index,
+	real_matrix4x3 const *nodes)
+{
+	real_vector3d offset;
+
+	return first_person_legs_pose(object_index, nodes, TRUE, first_person_legs_matrices, &offset);
+}
+
+/* an object's shadow placed, centered at center (render_objects.c's
+render_object_shadow_begin): the shadow of the body a view sees its legs
+of (display.first_person_shadow, seen_in_first_person) is cast from that
+body whole, set back as far as the legs are (up to about 1 m, more the
+further down the view looks), so that the legs stand on it; its map's
+center is set back with it. Any other object's shadow is cast as it is */
+void first_person_legs_shadow_place(
+	long object_index,
+	boolean seen_in_first_person,
+	real_point3d *center)
+{
+	first_person_legs_shadow_unit_index = NONE;
+	if (!seen_in_first_person || !first_person_legs_wanted(object_index) || !first_person_shadow_wanted(object_index))
+		return;
+	if (!first_person_legs_pose(object_index, object_get_node_matrices(object_index), FALSE,
+		first_person_legs_shadow_matrices, &first_person_legs_shadow_offset))
+	{
+		return;
+	}
+	first_person_legs_shadow_unit_index = object_index;
+	first_person_legs_shadow_scene_index = render.scene_index;
+	center->x += first_person_legs_shadow_offset.i;
+	center->y += first_person_legs_shadow_offset.j;
+	center->z += first_person_legs_shadow_offset.k;
+}
+
+/* the pose an object casts its shadow with: the body placed above set back,
+and what it carries (its children, their children) set back with it; any
+other object as it is (nodes) */
+real_matrix4x3 const *first_person_legs_shadow_node_matrices(
+	long object_index,
+	real_matrix4x3 const *nodes)
+{
+	struct object_datum *object = object_try_and_get(object_index);
+	long carrier_index = object_index;
+	long count;
+	long index;
+	short depth;
+
+	if (first_person_legs_shadow_unit_index == NONE || first_person_legs_shadow_scene_index != render.scene_index ||
+		!object || !nodes)
+	{
+		return nodes;
+	}
+	if (object_index == first_person_legs_shadow_unit_index)
+		return first_person_legs_shadow_matrices;
+	for (depth = 0; depth < 8; depth++)
+	{
+		struct object_datum *carrier = object_try_and_get(carrier_index);
+
+		if (!carrier || carrier->object.parent_object_index == NONE)
+			break;
+		carrier_index = carrier->object.parent_object_index;
+		if (carrier_index == first_person_legs_shadow_unit_index)
+			break;
+	}
+	count = object->object.node_matrices.size / (long)sizeof(real_matrix4x3);
+	if (carrier_index != first_person_legs_shadow_unit_index || count <= 0 || count > FIRST_PERSON_LEGS_MAXIMUM_NODES)
+		return nodes;
+	for (index = 0; index < count; index++)
+	{
+		first_person_legs_shadow_carried_matrices[index] = nodes[index];
+		first_person_legs_shadow_carried_matrices[index].position.x += first_person_legs_shadow_offset.i;
+		first_person_legs_shadow_carried_matrices[index].position.y += first_person_legs_shadow_offset.j;
+		first_person_legs_shadow_carried_matrices[index].position.z += first_person_legs_shadow_offset.k;
+	}
+	return first_person_legs_shadow_carried_matrices;
 }

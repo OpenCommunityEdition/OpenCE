@@ -375,6 +375,8 @@ void render_objects(
 /* port: port/linux/game/first_person_legs.c */
 boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
+void first_person_legs_shadow_place(long object_index, boolean seen_in_first_person, real_point3d *center);
+real_matrix4x3 const *first_person_legs_shadow_node_matrices(long object_index, real_matrix4x3 const *nodes);
 /* port: port/linux/game/first_person_shadow.c */
 boolean first_person_shadow_wanted(long object_index);
 /* port: port/linux/game/shield_color.c */
@@ -487,7 +489,11 @@ static void render_object_list(
 			object_is_first_person_camera(object_index) && first_person_legs_wanted(object_index);
 		real_matrix4x3 const *node_matrices = legs ?
 			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
-			object_get_node_matrices(object_index);
+			/* port: your own body's shadow, set back as far as your legs
+			(first_person_legs_shadow_place) */
+			data->shadow ?
+				first_person_legs_shadow_node_matrices(object_index, object_get_node_matrices(object_index)) :
+				object_get_node_matrices(object_index);
 		/* port: the function values the picture shows
 		(object_function_values_for_render), kept in the rasterizer's memory
 		for the frame: a modifier's group, a queued transparent part and a
@@ -809,6 +815,11 @@ static boolean render_object_shadow_begin(
 	edge and corner fade cut its shadow's trailing side by as much as each
 	frame's blend, flickering */
 	render_interpolation_object_point(data->object_index, &center);
+	/* port: your own body's, with display.first_person_shadow, cast from it
+	set back as far as LEGS draws your legs, so that they stand on it
+	(port/linux/game/first_person_legs.c) */
+	first_person_legs_shadow_place(data->object_index,
+		object_is_first_person_camera(data->object_index), &center);
 
 	perpendicular3d(&data->lighting->shadow_vector, &shadow_right);
 	normalize3d(&shadow_right);
