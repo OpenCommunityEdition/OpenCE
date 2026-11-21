@@ -59,6 +59,8 @@ static struct object_definition projectile_definition = { { { 1, &attachment, NU
 static struct object_datum projectile;
 static real_point3d projectile_position;
 static struct object_datum *object_get(long index) { return &projectile; }
+static struct object_datum *object_try_and_get(long index) { return index == NONE ? NULL : &projectile; }
+#define VALID_INDEX(index, count) ((index) >= 0 && (index) < (count))
 static struct object_definition *object_definition_get(long index) { return &projectile_definition; }
 static boolean object_get_function_value(long object_index, short function_index, real *value)
 {
@@ -277,6 +279,60 @@ int main(int argc, char **argv)
 			frame(1.0f / 144.0f);
 		CHECK(tick_count > 170, "the trail was not looked at after the jumps (%ld ticks)", tick_count);
 		same_each_tick(expected, "with the game's time gone back and jumping ahead");
+		return 0;
+	}
+	/* a trail making a point a tick (the turret's): its head drawn out to the
+	projectile (contrail_head_position) in every frame of every tick */
+	CASE("head-each-tick")
+	{
+		real_point3d head;
+		long frames = 0;
+
+		for (index = 0; index < 144; index++)
+		{
+			frame(1.0f / 144.0f);
+			if (game_time < 2)
+				continue;
+			CHECK(contrail_head_position(datum_get(contrail_data, contrail_index), 0, &head),
+				"no head at frame %ld (tick %ld) of a trail making a point a tick", index, game_time);
+			frames++;
+		}
+		CHECK(frames > 100, "the head was looked at in only %ld frames", frames);
+		return 0;
+	}
+	/* a trail making a point every third tick (a charged plasma bolt's, 10 a
+	second): its head drawn out only in the ticks a point is made in, and
+	behind the projectile in the ticks between, as the Xbox drew it */
+	CASE("head-on-point-ticks")
+	{
+		real_point3d head;
+		boolean point_this_tick = FALSE;
+		long with = 0;
+		long without = 0;
+
+		turret.point_generation_rate = 10.0f;
+		for (index = 0; index < 144 * 2; index++)
+		{
+			struct contrail_datum *contrail = datum_get(contrail_data, contrail_index);
+			long newest = contrail->first_contrail_point_indices[0];
+			long tick = game_time;
+			boolean drawn_out;
+
+			frame(1.0f / 144.0f);
+			contrail = datum_get(contrail_data, contrail_index);
+			if (game_time != tick)
+				point_this_tick = contrail->first_contrail_point_indices[0] != newest;
+			if (game_time < 2)
+				continue;
+			drawn_out = contrail_head_position(contrail, 0, &head);
+			CHECK(drawn_out == point_this_tick, "frame %ld (tick %ld): the head %s, a point %s in this tick",
+				index, game_time, drawn_out ? "drawn out" : "not drawn out", point_this_tick ? "made" : "not made");
+			if (drawn_out)
+				with++;
+			else
+				without++;
+		}
+		CHECK(with > 0 && without > with, "the head drawn out in %ld frames and not in %ld", with, without);
 		return 0;
 	}
 	fprintf(stderr, "unknown case '%s'\n", case_name);

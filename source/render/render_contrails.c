@@ -132,9 +132,10 @@ static void render_contrail(
 	long vertex_buffer_index;
 	/* port: the trail's head, on its object's marker as the frame draws it
 	(contrail_head_position): a copy of the newest point moved there, drawn
-	before the points, which are as they were. Only where the marker has
-	moved off the newest point: on the frame a point is made there, and with
-	smooth motion off, the trail is drawn as before */
+	before the points, which are as they were. Only in the tick the newest
+	point was made in, and where the marker has moved off it since: with
+	smooth motion off, and on the ticks between a slow trail's points, the
+	trail is drawn as before */
 	struct contrail_point_datum head;
 	real_point3d head_position;
 	boolean has_head = FALSE;

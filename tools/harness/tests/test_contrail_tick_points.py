@@ -1,8 +1,10 @@
 """The real contrails_update (contrails.c) over a projectile moving a tick at a time, with a Covenant plasma turret's
 contrail: on the first frame after a tick its points are made and aged by the ticks' time, a 30th of a second each,
 so that the trail is the same each tick at any frame rate, as the Xbox drew it a frame a tick; a game time gone back
-or jumping counts as a tick."""
+or jumping counts as a tick. The trail's head is drawn out to the projectile (contrail_head_position) only in a tick
+its newest point was made in, so a trail making fewer points than ticks stays behind between them, as on the Xbox."""
 
+import re
 import sys
 from pathlib import Path
 
@@ -11,9 +13,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["steady-at-144", "uneven-frames", "time-jumps"]
-FUNCTIONS = ("contrail_scale_value", "contrail_scale_random_value", "contrail_next_frame",
-             "contrail_compute_new_point_count", "contrail_add_points", "contrail_update_points", "contrails_update")
+CASES = ["steady-at-144", "uneven-frames", "time-jumps", "head-each-tick", "head-on-point-ticks"]
+FUNCTIONS = ("contrail_point_made_now", "contrail_scale_value", "contrail_scale_random_value", "contrail_next_frame",
+             "contrail_compute_new_point_count", "contrail_add_points", "contrail_update_points", "contrails_update",
+             "contrail_head_position")
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -27,6 +30,10 @@ NEGATIVE_CONTROLS = {
     "time-back": (("ticks < 1 || ", ""), "time-jumps"),
     # a game time jumping ahead ages them all at once
     "time-ahead": ((" || ticks > TICKS_PER_SECOND", ""), "time-jumps"),
+    # the head drawn out in every tick, a slow trail's too (before the head kept to its point's tick)
+    "head-every-tick": ((" || made->game_time != game_time_get())", ")"), "head-on-point-ticks"),
+    # no point's tick noted
+    "tick-not-noted": (("\tmade->game_time = game_time_get();", ""), "head-each-tick"),
 }
 
 
@@ -46,6 +53,9 @@ def generated(fault=None):
         structure(definitions, "contrail_point_state"),
         structure(definitions, "contrail_shader"),
         structure(definitions, "contrail_definition"),
+        structure(source, "contrail_point_made"),
+        re.search(r"^static struct contrail_point_made contrail_points_made\[MAXIMUM_CONTRAIL_POINTS\];\r?$", source,
+                  re.M).group(),
     ]) + "\n"
     code = "\n".join(function(source, name) for name in FUNCTIONS) + "\n"
     if fault:
