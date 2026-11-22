@@ -301,6 +301,11 @@ static const struct config_setting config_settings[] =
 		"facing away, 8 smaller groups, 16 nearer rooms first; 0 walks them as\n"
 		"the Xbox does. The console's structure_culling changes it until the\n"
 		"game quits." },
+	{ "display.batch_models", _config_boolean, "true", "HALO_BATCH_MODELS", _environment_value, _platform_all,
+		"Draws the models' opaque parts grouped by their shader, after the\n"
+		"models, rather than each object's in turn: the same picture, drawn with\n"
+		"less work when there are many objects (network co-op's extra enemies);\n"
+		"false draws them as the Xbox does." },
 	{ "display.model_detail", _config_string, "\"stock\"", "HALO_MODEL_DETAIL", _environment_value, _platform_all,
 		"Which of their levels of detail models are drawn at: \"stock\" chooses by\n"
 		"their size on the Xbox's 480 lines, at any resolution; \"native\" by their\n"

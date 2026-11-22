@@ -102,6 +102,8 @@ this list to generate the guest's entry points */
 	X(glMemoryBarrier) \
 	X(glBindBufferBase) \
 	X(glBindBufferRange) \
+	X(glGetUniformBlockIndex) \
+	X(glUniformBlockBinding) \
 	X(glGenVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
@@ -113,6 +115,9 @@ this list to generate the guest's entry points */
 	X(glDrawArrays) \
 	X(glDrawElements) \
 	X(glDrawElementsBaseVertex) \
+	X(glDrawElementsInstancedBaseVertex) \
+	X(glDrawElementsInstanced) \
+	X(glTexBuffer) \
 	X(glCreateShader) \
 	X(glShaderSource) \
 	X(glCompileShader) \
@@ -130,6 +135,7 @@ this list to generate the guest's entry points */
 	X(glGetUniformLocation) \
 	X(glUniform1i) \
 	X(glUniform1iv) \
+	X(glUniform4iv) \
 	X(glUniform1f) \
 	X(glUniform4fv) \
 	X(glUniform2f) \
@@ -222,6 +228,9 @@ driver's threads while precompiling (d3d8_gl.c) */
 	X(glBufferStorage) \
 	X(glMapBufferRange) \
 	X(glBindBufferBase) \
+	X(glBindBufferRange) \
+	X(glGetUniformBlockIndex) \
+	X(glUniformBlockBinding) \
 	X(glGenVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
@@ -238,6 +247,9 @@ driver's threads while precompiling (d3d8_gl.c) */
 	X(glDrawArrays) \
 	X(glDrawElements) \
 	X(glDrawElementsBaseVertex) \
+	X(glDrawElementsInstancedBaseVertex) \
+	X(glDrawElementsInstanced) \
+	X(glTexBuffer) \
 	X(glCreateShader) \
 	X(glShaderSource) \
 	X(glCompileShader) \
@@ -259,6 +271,7 @@ driver's threads while precompiling (d3d8_gl.c) */
 	X(glGetUniformLocation) \
 	X(glUniform1i) \
 	X(glUniform1iv) \
+	X(glUniform4iv) \
 	X(glUniform1f) \
 	X(glUniform4fv) \
 	X(glUniform2f) \
@@ -359,6 +372,8 @@ pointers, sees the declarations without these aliases */
 #define glMemoryBarrier halo_glMemoryBarrier
 #define glBindBufferBase halo_glBindBufferBase
 #define glBindBufferRange halo_glBindBufferRange
+#define glGetUniformBlockIndex halo_glGetUniformBlockIndex
+#define glUniformBlockBinding halo_glUniformBlockBinding
 #define glGenVertexArrays halo_glGenVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
@@ -370,6 +385,9 @@ pointers, sees the declarations without these aliases */
 #define glDrawArrays halo_glDrawArrays
 #define glDrawElements halo_glDrawElements
 #define glDrawElementsBaseVertex halo_glDrawElementsBaseVertex
+#define glDrawElementsInstancedBaseVertex halo_glDrawElementsInstancedBaseVertex
+#define glDrawElementsInstanced halo_glDrawElementsInstanced
+#define glTexBuffer halo_glTexBuffer
 #define glCreateShader halo_glCreateShader
 #define glShaderSource halo_glShaderSource
 #define glCompileShader halo_glCompileShader
@@ -387,6 +405,7 @@ pointers, sees the declarations without these aliases */
 #define glGetUniformLocation halo_glGetUniformLocation
 #define glUniform1i halo_glUniform1i
 #define glUniform1iv halo_glUniform1iv
+#define glUniform4iv halo_glUniform4iv
 #define glUniform1f halo_glUniform1f
 #define glUniform4fv halo_glUniform4fv
 #define glUniform2f halo_glUniform2f
@@ -469,6 +488,9 @@ pointers, sees the declarations without these aliases */
 #define glBufferStorage halo_glBufferStorage
 #define glMapBufferRange halo_glMapBufferRange
 #define glBindBufferBase halo_glBindBufferBase
+#define glBindBufferRange halo_glBindBufferRange
+#define glGetUniformBlockIndex halo_glGetUniformBlockIndex
+#define glUniformBlockBinding halo_glUniformBlockBinding
 #define glGenVertexArrays halo_glGenVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
@@ -485,6 +507,9 @@ pointers, sees the declarations without these aliases */
 #define glDrawArrays halo_glDrawArrays
 #define glDrawElements halo_glDrawElements
 #define glDrawElementsBaseVertex halo_glDrawElementsBaseVertex
+#define glDrawElementsInstancedBaseVertex halo_glDrawElementsInstancedBaseVertex
+#define glDrawElementsInstanced halo_glDrawElementsInstanced
+#define glTexBuffer halo_glTexBuffer
 #define glCreateShader halo_glCreateShader
 #define glShaderSource halo_glShaderSource
 #define glCompileShader halo_glCompileShader
@@ -506,6 +531,7 @@ pointers, sees the declarations without these aliases */
 #define glGetUniformLocation halo_glGetUniformLocation
 #define glUniform1i halo_glUniform1i
 #define glUniform1iv halo_glUniform1iv
+#define glUniform4iv halo_glUniform4iv
 #define glUniform1f halo_glUniform1f
 #define glUniform4fv halo_glUniform4fv
 #define glUniform2f halo_glUniform2f

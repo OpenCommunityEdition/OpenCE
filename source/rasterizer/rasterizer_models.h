@@ -46,6 +46,10 @@ void rasterizer_model_transparent_geometry_submit(
 	long dynamic_vertex_buffer_index,
 	union real_point3d const *centroid,
 	struct render_sort_filth *sort_filth);
+/* port: draws the opaque model parts queued (display.batch_models): before
+anything is drawn that is to be drawn over them */
+void rasterizer_model_batch_flush(
+	void);
 void rasterizer_debug_model_vertices(
 	long object_index,
 	struct render_skinning const *skinning,

@@ -149,6 +149,9 @@ static void glEndQuery(GLenum target) { }
 /* (the screen's pixels: a sample a game pixel) */
 static float target_scale[2] = { 1.0f, 1.0f };
 static int target_samples = 1;
+/* (the models' draws kept to be drawn grouped, drawn before a test begins:
+none here) */
+#define instances_flush_pending()
 
 static void platform_log(const char *format, ...)
 {

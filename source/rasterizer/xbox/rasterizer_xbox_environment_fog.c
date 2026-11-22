@@ -455,6 +455,17 @@ void rasterizer_environment_fog_screen_dispose(
 	return;
 }
 
+/* port: how far ahead of the camera the window's fog screen takes models (0:
+there is none); port/linux/game/shader_precompile.c draws its models past
+it, as the far ones are drawn */
+real rasterizer_environment_fog_screen_far_distance(
+	void)
+{
+	struct fog_screen const *screen = global_window_parameters.fog.screen;
+
+	return screen ? screen->far_distance : 0.0f;
+}
+
 boolean rasterizer_environment_fog_screen_model_begin(
 	struct rasterizer_model_begin_parameters const *parameters)
 {

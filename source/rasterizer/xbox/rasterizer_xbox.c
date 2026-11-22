@@ -1177,11 +1177,54 @@ void rasterizer_set_model_lighting_distant_light(
 	return;
 }
 
+/* port: rasterizer_set_model_lighting's constants, without setting them */
+static void model_lighting_constants(
+	struct render_lighting const *lighting,
+	struct rasterizer_model_lighting_constants *constants);
+
 void rasterizer_set_model_lighting(
 	struct render_lighting const *lighting)
 {
 	struct rasterizer_model_lighting_constants lighting_constants;
+
+	model_lighting_constants(lighting, &lighting_constants);
+	D3DDevice_SetVertexShaderConstant(
+		-79,
+		&lighting_constants,
+		NUMBER_OF_MODEL_LIGHTING_CONSTANTS);
+	if (rasterizer_debug_options.statistics_mode)
+		rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes +=
+			sizeof(lighting_constants);
+	return;
+}
+
+typedef char model_lighting_constant_count[
+	sizeof(struct rasterizer_model_lighting_constants) == NUMBER_OF_MODEL_LIGHTING_CONSTANTS * 4 * sizeof(real) &&
+	NUMBER_OF_MODEL_LIGHTING_CONSTANTS == RASTERIZER_MODEL_LIGHTING_CONSTANTS ? 1 : -1];
+
+/* port: (display.batch_models) a model's lighting constants, worked out as
+it is queued and set as each of its parts is drawn */
+void rasterizer_model_lighting_constants(
+	struct render_lighting const *lighting,
+	real (*constants)[4])
+{
+	struct rasterizer_model_lighting_constants lighting_constants;
+
+	model_lighting_constants(lighting, &lighting_constants);
+	csmemcpy(constants, &lighting_constants, sizeof(lighting_constants));
+	return;
+}
+
+static void model_lighting_constants(
+	struct render_lighting const *lighting,
+	struct rasterizer_model_lighting_constants *constants)
+{
+	struct rasterizer_model_lighting_constants lighting_constants;
 	short light_index;
+
+	/* port: the pads zeroed (left as they were on the stack, they made one
+	model's constants differ from another's alike, display.batch_models) */
+	csmemset(&lighting_constants, 0, sizeof(lighting_constants));
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox.c",
@@ -1219,13 +1262,7 @@ void rasterizer_set_model_lighting(
 				&lighting_constants);
 		lighting_constants.ambient_color = lighting->ambient_color;
 	}
-	D3DDevice_SetVertexShaderConstant(
-		-79,
-		&lighting_constants,
-		NUMBER_OF_MODEL_LIGHTING_CONSTANTS);
-	if (rasterizer_debug_options.statistics_mode)
-		rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes +=
-			sizeof(lighting_constants);
+	*constants = lighting_constants;
 	return;
 }
 
@@ -1295,6 +1332,57 @@ void rasterizer_set_model_skinning(
 	if (rasterizer_debug_options.statistics_mode)
 		rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes +=
 			skinning->node_matrix_count * sizeof(vsh_constants__nodematrices[0]);
+	return;
+}
+
+/* port: (display.batch_models) a model's skinning constants, worked out as
+it is queued and set as each of its parts is drawn: how many there are, or 0
+for one that rasterizer_set_model_skinning skins a part at a time */
+short rasterizer_model_skinning_constants(
+	struct render_skinning const *skinning,
+	real (*constants)[4])
+{
+	short node_index;
+
+	if (skinning->node_matrix_count <= 0 ||
+		skinning->node_matrix_count >= RASTERIZER_MAXIMUM_NODES_PER_MODEL ||
+		!skinning->node_matrices)
+	{
+		return 0;
+	}
+	for (node_index = 0; node_index < skinning->node_matrix_count; node_index++)
+		node_matrix_constants(&constants[node_index * 3], &skinning->node_matrices[node_index]);
+	return (short)(skinning->node_matrix_count * 3);
+}
+
+/* port: (display.batch_models, rasterizer_xbox_models.c) a replayed model's
+lighting and skinning constants, as setting them at c[-79] and c[-36] would
+(no skinning constants: its skinning set already), kept by d3d8_gl.c once
+for all its parts' draws (model_index its own, the constants unchanged, until
+the replay ends) */
+void d3d8_gl_instances_model(int key, void const *lighting, void const *skinning, int skinning_count);
+
+void rasterizer_set_model_constants_batched(
+	long model_index,
+	real const (*lighting)[4],
+	real const (*skinning)[4],
+	short skinning_count)
+{
+	if (skinning_count > 0)
+	{
+		many_node_matrices = NULL;
+		many_node_matrix_count = 0;
+	}
+	d3d8_gl_instances_model(model_index, lighting, skinning_count > 0 ? skinning : NULL,
+		skinning_count > 0 ? skinning_count : 0);
+	if (rasterizer_debug_options.statistics_mode)
+	{
+		rasterizer_frame_statistics.vertex_shader_lighting_constant_bytes +=
+			NUMBER_OF_MODEL_LIGHTING_CONSTANTS * 4 * sizeof(real);
+		if (skinning_count > 0)
+			rasterizer_frame_statistics.vertex_shader_skinning_constant_bytes +=
+				skinning_count * 4 * sizeof(real);
+	}
 	return;
 }
 

@@ -1665,6 +1665,7 @@ void SetRenderStateSmart(
 	{
 		D3DDevice_SetRenderState_Simple(D3DSIMPLERENDERSTATEENCODE[state], value);
 		D3D__RenderState[state]= value;
+		d3d8_gl_state_changes++; /* port: xdk_d3d8.h */
 	}
 	else if (state < D3DRS_DEFERRED_MAX)
 	{

@@ -79,6 +79,7 @@ void _rasterizer_hud_motion_sensor_blip_draw(real_point2d const *center, real sc
 	real_rgb_color const *color, boolean large);
 void _rasterizer_hud_motion_sensor_blip_end(real_point2d const *center, real scale);
 void rasterizer_environment_fog_screen_window_begin(void);
+real rasterizer_environment_fog_screen_far_distance(void);
 void _rasterizer_models_begin(boolean sky);
 /* structure_render.c */
 void structure_render_fog_screen(void);
@@ -269,9 +270,18 @@ static void shader_precompile_models(long light_index, short point_light_count)
 	struct render_model_effect effect;
 	struct tag_iterator iterator;
 	real_point3d centroid = global_window_parameters.camera.position;
+	real fog_screen_distance = rasterizer_environment_fog_screen_far_distance();
 	long model_index;
 	short i;
 
+	/* (past the window's fog screen, which takes the models nearer: those
+	are drawn each at once, and the far ones with display.batch_models
+	batched; shader_precompile_fog_screen_models draws the near ones) */
+	if (fog_screen_distance > 0.0f)
+	{
+		point_from_line3d(&global_window_parameters.camera.position, &global_window_parameters.camera.forward,
+			fog_screen_distance + 1.0f, &centroid);
+	}
 	tag_iterator_new(&iterator, MODELS_GROUP_TAG);
 	while ((model_index = tag_iterator_next(&iterator)) != NONE)
 	{

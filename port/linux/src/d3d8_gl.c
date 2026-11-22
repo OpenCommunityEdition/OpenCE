@@ -35,6 +35,7 @@ Conventions carried over from the Xbox:
 
 #include <SDL3/SDL.h>
 
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -507,6 +508,7 @@ long halo_screen_ui_offset_current(void)
 
 DWORD D3D__RenderState[D3DRS_MAX];
 DWORD D3D__TextureState[D3DTSS_MAXSTAGES][D3DTSS_MAX];
+unsigned long d3d8_gl_state_changes;
 WORD *D3D__IndexData;
 BYTE D3D__StateBlockDirty[1024];
 
@@ -554,6 +556,11 @@ struct vertex_shader_object
 	and 2 and 3): one that failed stays 0 and is not compiled again at each
 	draw */
 	unsigned char shaders_tried;
+	/* shader[0] and lit_shader[0] drawing several of a draw at once, each
+	with registers of its own (instances_flush: vertex_shader_instanced), and
+	which have been compiled (bits 0 and 1), as shaders_tried */
+	GLuint instanced_shaders[2];
+	unsigned char instanced_tried;
 };
 
 /* ---------- programs */
@@ -616,6 +623,13 @@ struct program_entry
 	constants_serial at their last upload */
 	GLint model_lights;
 	unsigned long long model_lights_serial;
+	/* an instanced draw's (instances_flush): where among an instance's
+	registers each register is (instances.slots), where in the instances'
+	buffer the first's start and how many each has, its model's skinning
+	registers, whether it has a model, and each instance's vectors in its
+	block (instance_blocks_fill) */
+	GLint instance_slot, instance_stride, instance_base, instance_skinning, instance_has_model;
+	GLint instance_block_stride;
 
 	/* the vertex constants c[0..constant_count) the program uses; with
 	consecutive locations, a changed range is uploaded by itself */
@@ -628,6 +642,14 @@ struct program_entry
 	/* what the program's other uniforms hold (all ones: unknown) */
 	struct draw_uniforms uniforms;
 };
+
+/* the texture unit an instanced draw reads its instances' registers from
+(instances_flush) */
+#define INSTANCE_TEXTURE_UNIT 15
+/* the uniform blocks its pixel shader reads the instances' own pixel shader
+constants and lights from, and their models' lights (instance_blocks_fill) */
+#define INSTANCE_BLOCK_BINDING 1
+#define INSTANCE_MODEL_BLOCK_BINDING 2
 
 #define FRAGMENT_BUCKETS 1024
 #define PROGRAM_BUCKETS 1024
@@ -1235,12 +1257,23 @@ static float dword_to_float(DWORD value)
 	return u.f;
 }
 
+/* each byte of a color as a float, 0 to 1 (filled the first time: the same
+floats as dividing, without four divides each color) */
+static float color_byte_values[256];
+
 static void color_to_vec4(D3DCOLOR color, float *out)
 {
-	out[0] = ((color >> 16) & 0xff) / 255.0f;
-	out[1] = ((color >> 8) & 0xff) / 255.0f;
-	out[2] = (color & 0xff) / 255.0f;
-	out[3] = ((color >> 24) & 0xff) / 255.0f;
+	if (color_byte_values[255] == 0.0f)
+	{
+		int value;
+
+		for (value = 0; value < 256; value++)
+			color_byte_values[value] = value / 255.0f;
+	}
+	out[0] = color_byte_values[(color >> 16) & 0xff];
+	out[1] = color_byte_values[(color >> 8) & 0xff];
+	out[2] = color_byte_values[color & 0xff];
+	out[3] = color_byte_values[(color >> 24) & 0xff];
 }
 
 /* ---------- debugging settings, read once (gl_initialize) */
@@ -2777,6 +2810,10 @@ drew with what it last uploaded (another object's node matrices: vertices
 flung across the screen for a frame). */
 static unsigned long long constant_serials[XGPU_VERTEX_CONSTANT_COUNT];
 static unsigned long long constants_serial;
+/* and their low 32 bits, for instances_add's look over all of them (one
+compare each, four at a time; one wrapped round only makes it compare a
+register's value that has not changed) */
+static unsigned int constant_serials_low[XGPU_VERTEX_CONSTANT_COUNT];
 /* the register each of the latest serials changed, so a program that is
 only a little behind finds its changed registers without a full scan */
 #define CONSTANT_LOG_SIZE 1024
@@ -2789,28 +2826,48 @@ serial, which then took only the checkpoint's registers). */
 static unsigned long long constants_checkpoint_serial;
 static unsigned long constants_checkpoint_first = XGPU_VERTEX_CONSTANT_COUNT, constants_checkpoint_last;
 
+/* whether two registers differ (inline: a call to memcmp for each cost more
+than the comparing) */
+static __inline BOOL register_differs(const float *a, const float *b)
+{
+	const DWORD *x = (const DWORD *)a, *y = (const DWORD *)b;
+
+	return ((x[0] ^ y[0]) | (x[1] ^ y[1]) | (x[2] ^ y[2]) | (x[3] ^ y[3])) != 0;
+}
+
 static void constants_store(unsigned long first, const void *data, unsigned long count)
 {
 	const float (*values)[4] = data;
-	unsigned long index;
+	unsigned long long serial = constants_serial;
+	unsigned long index, lowest = XGPU_VERTEX_CONSTANT_COUNT, highest = 0;
 
 	for (index = 0; index < count; index++)
 	{
-		if (memcmp(device.constants[first + index], values[index], sizeof(device.constants[0])))
+		unsigned long reg = first + index;
+
+		if (register_differs(device.constants[reg], values[index]))
 		{
-			memcpy(device.constants[first + index], values[index], sizeof(device.constants[0]));
-			constant_serials[first + index] = ++constants_serial;
-			constant_log[constants_serial % CONSTANT_LOG_SIZE] = (unsigned char)(first + index);
-			if (constants_checkpoint_first > first + index)
-				constants_checkpoint_first = first + index;
-			if (constants_checkpoint_last < first + index)
-				constants_checkpoint_last = first + index;
+			memcpy(device.constants[reg], values[index], sizeof(device.constants[0]));
+			constant_serials[reg] = ++serial;
+			constant_serials_low[reg] = (unsigned int)serial;
+			constant_log[(unsigned int)serial % CONSTANT_LOG_SIZE] = (unsigned char)reg;
+			if (lowest > reg)
+				lowest = reg;
+			highest = reg;
 		}
 	}
+	if (serial == constants_serial)
+		return;
+	constants_serial = serial;
+	if (constants_checkpoint_first > lowest)
+		constants_checkpoint_first = lowest;
+	if (constants_checkpoint_last < highest)
+		constants_checkpoint_last = highest;
 }
 
 static void viewport_update_constants(void)
 {
+	d3d8_gl_state_changes++;
 	/* Direct3D's reserved constants c[-38] and c[-37] map clip space to
 	the screen; zscale is the depth buffer's range */
 	float zscale = 16777215.0f;
@@ -3149,9 +3206,12 @@ HRESULT WINAPI D3DDevice_GetDepthStencilSurface(D3DSurface **result)
 }
 
 static BOOL trace_frame(void);
+static void instances_flush_pending(void);
+static void instances_model_registers_set(unsigned long first, unsigned long count);
 
 void WINAPI D3DDevice_SetRenderTarget(D3DSurface *render_target, D3DSurface *depth_stencil)
 {
+	instances_flush_pending();
 	if (trace_frame())
 		platform_log("set render target %08lx depth %08lx", render_target ? (unsigned long)render_target->Data : 0,
 			depth_stencil ? (unsigned long)depth_stencil->Data : 0);
@@ -3324,6 +3384,7 @@ static BOOL visibility_readback_gl_ok(const char *phase)
 
 void WINAPI D3DDevice_BeginVisibilityTest(void)
 {
+	instances_flush_pending();
 	if (!device.gl_ready || device.visibility_test_active)
 		return;
 	/* the test's slot is given only when it ends */
@@ -3506,10 +3567,30 @@ void D3DFASTCALL D3DDevice_SetRenderState_Simple(DWORD method, DWORD value)
 	(void)value;
 }
 
+/* a render state set, the change counted (d3d8_gl_state_changes) */
+static void render_state_set(D3DRENDERSTATETYPE state, DWORD value)
+{
+	if ((unsigned long)state < D3DRS_MAX && D3D__RenderState[state] != value)
+	{
+		D3D__RenderState[state] = value;
+		if (!D3D_PIXEL_CONSTANT_STATE(state))
+			d3d8_gl_state_changes++;
+	}
+}
+
+/* (a run of them, none a pixel shader constant) */
+static void render_states_set(D3DRENDERSTATETYPE first, const void *values, size_t size)
+{
+	if (memcmp(&D3D__RenderState[first], values, size))
+	{
+		memcpy(&D3D__RenderState[first], values, size);
+		d3d8_gl_state_changes++;
+	}
+}
+
 void D3DFASTCALL D3DDevice_SetRenderState_Deferred(D3DRENDERSTATETYPE state, DWORD value)
 {
-	if ((unsigned long)state < D3DRS_MAX)
-		D3D__RenderState[state] = value;
+	render_state_set(state, value);
 }
 
 void WINAPI D3DDevice_SetRenderState_ZBias(DWORD value);
@@ -3518,8 +3599,8 @@ void WINAPI D3DDevice_SetRenderStateNotInline(D3DRENDERSTATETYPE state, DWORD va
 {
 	if (state == D3DRS_ZBIAS)
 		D3DDevice_SetRenderState_ZBias(value);
-	else if ((unsigned long)state < D3DRS_MAX)
-		D3D__RenderState[state] = value;
+	else
+		render_state_set(state, value);
 }
 
 /* As the Xbox's D3D8 does it: a z bias is a polygon offset of -bias depth
@@ -3530,18 +3611,20 @@ void WINAPI D3DDevice_SetRenderState_ZBias(DWORD value)
 {
 	float offset = -(float)value;
 	float slope = offset * 0.25f;
-	DWORD enable = value != 0;
+	DWORD enable = value != 0, bits;
 
-	memcpy(&D3D__RenderState[D3DRS_POLYGONOFFSETZSLOPESCALE], &slope, sizeof(slope));
-	memcpy(&D3D__RenderState[D3DRS_POLYGONOFFSETZOFFSET], &offset, sizeof(offset));
-	D3D__RenderState[D3DRS_POINTOFFSETENABLE] = enable;
-	D3D__RenderState[D3DRS_WIREFRAMEOFFSETENABLE] = enable;
-	D3D__RenderState[D3DRS_SOLIDOFFSETENABLE] = enable;
-	D3D__RenderState[D3DRS_ZBIAS] = value;
+	memcpy(&bits, &slope, sizeof(bits));
+	render_state_set(D3DRS_POLYGONOFFSETZSLOPESCALE, bits);
+	memcpy(&bits, &offset, sizeof(bits));
+	render_state_set(D3DRS_POLYGONOFFSETZOFFSET, bits);
+	render_state_set(D3DRS_POINTOFFSETENABLE, enable);
+	render_state_set(D3DRS_WIREFRAMEOFFSETENABLE, enable);
+	render_state_set(D3DRS_SOLIDOFFSETENABLE, enable);
+	render_state_set(D3DRS_ZBIAS, value);
 }
 
 #define COMPLEX_RENDER_STATE(name, state) \
-	void WINAPI D3DDevice_SetRenderState_##name(DWORD value) { D3D__RenderState[state] = value; }
+	void WINAPI D3DDevice_SetRenderState_##name(DWORD value) { render_state_set(state, value); }
 
 COMPLEX_RENDER_STATE(PSTextureModes, D3DRS_PSTEXTUREMODES)
 COMPLEX_RENDER_STATE(VertexBlend, D3DRS_VERTEXBLEND)
@@ -3571,40 +3654,48 @@ COMPLEX_RENDER_STATE(RopZCmpAlwaysRead, D3DRS_ROPZCMPALWAYSREAD)
 COMPLEX_RENDER_STATE(RopZRead, D3DRS_ROPZREAD)
 COMPLEX_RENDER_STATE(DoNotCullUncompressed, D3DRS_DONOTCULLUNCOMPRESSED)
 
+/* a texture stage state set, the change counted (d3d8_gl_state_changes) */
+static void texture_state_set(DWORD stage, D3DTEXTURESTAGESTATETYPE type, DWORD value)
+{
+	if (stage < D3DTSS_MAXSTAGES && (unsigned long)type < D3DTSS_MAX && D3D__TextureState[stage][type] != value)
+	{
+		D3D__TextureState[stage][type] = value;
+		d3d8_gl_state_changes++;
+	}
+}
+
 void D3DFASTCALL D3DDevice_SetTextureState_Deferred(DWORD stage, D3DTEXTURESTAGESTATETYPE type, DWORD value)
 {
-	if (stage < D3DTSS_MAXSTAGES && (unsigned long)type < D3DTSS_MAX)
-		D3D__TextureState[stage][type] = value;
+	texture_state_set(stage, type, value);
 }
 
 void WINAPI D3DDevice_SetTextureState_TexCoordIndex(DWORD stage, DWORD value)
 {
-	if (stage < D3DTSS_MAXSTAGES)
-		D3D__TextureState[stage][D3DTSS_TEXCOORDINDEX] = value;
+	texture_state_set(stage, D3DTSS_TEXCOORDINDEX, value);
 }
 
 void WINAPI D3DDevice_SetTextureState_BorderColor(DWORD stage, DWORD value)
 {
-	if (stage < D3DTSS_MAXSTAGES)
-		D3D__TextureState[stage][D3DTSS_BORDERCOLOR] = value;
+	texture_state_set(stage, D3DTSS_BORDERCOLOR, value);
 }
 
 void WINAPI D3DDevice_SetTextureState_ColorKeyColor(DWORD stage, DWORD value)
 {
-	if (stage < D3DTSS_MAXSTAGES)
-		D3D__TextureState[stage][D3DTSS_COLORKEYCOLOR] = value;
+	texture_state_set(stage, D3DTSS_COLORKEYCOLOR, value);
 }
 
 void WINAPI D3DDevice_SetTextureState_BumpEnv(DWORD stage, D3DTEXTURESTAGESTATETYPE type, DWORD value)
 {
-	if (stage < D3DTSS_MAXSTAGES && (unsigned long)type < D3DTSS_MAX)
-		D3D__TextureState[stage][type] = value;
+	texture_state_set(stage, type, value);
 }
 
 void WINAPI D3DDevice_SetTexture(DWORD stage, D3DBaseTexture *texture)
 {
-	if (stage < D3DTSS_MAXSTAGES)
+	if (stage < D3DTSS_MAXSTAGES && device.textures[stage] != texture)
+	{
 		device.textures[stage] = texture;
+		d3d8_gl_state_changes++;
+	}
 }
 
 #ifdef HALO_ANDROID
@@ -3615,6 +3706,7 @@ void android_ce_texture_unbind(const void *resource)
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 		if ((const void *)device.textures[stage] == resource)
 			device.textures[stage] = NULL;
+	d3d8_gl_state_changes++;
 	xgpu_gl_state_invalidate();
 }
 #endif
@@ -3626,12 +3718,16 @@ void xgpu_mcc_texture_unbind(DWORD const *resource)
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 		if ((DWORD const *)device.textures[stage] == resource)
 			device.textures[stage] = NULL;
+	d3d8_gl_state_changes++;
 }
 
 void WINAPI D3DDevice_SetPalette(DWORD stage, D3DPalette *palette)
 {
-	if (stage < D3DTSS_MAXSTAGES)
+	if (stage < D3DTSS_MAXSTAGES && device.palettes[stage] != palette)
+	{
 		device.palettes[stage] = palette;
+		d3d8_gl_state_changes++;
+	}
 }
 
 void WINAPI D3DDevice_SetPixelShaderProgram(D3DPIXELSHADERDEF *definition)
@@ -3639,21 +3735,21 @@ void WINAPI D3DDevice_SetPixelShaderProgram(D3DPIXELSHADERDEF *definition)
 	/* the definition's members are the pixel shader render states */
 	if (!definition)
 		return;
-	memcpy(&D3D__RenderState[D3DRS_PSALPHAINPUTS0], definition->PSAlphaInputs, sizeof(definition->PSAlphaInputs));
-	D3D__RenderState[D3DRS_PSFINALCOMBINERINPUTSABCD] = definition->PSFinalCombinerInputsABCD;
-	D3D__RenderState[D3DRS_PSFINALCOMBINERINPUTSEFG] = definition->PSFinalCombinerInputsEFG;
+	render_states_set(D3DRS_PSALPHAINPUTS0, definition->PSAlphaInputs, sizeof(definition->PSAlphaInputs));
+	render_state_set(D3DRS_PSFINALCOMBINERINPUTSABCD, definition->PSFinalCombinerInputsABCD);
+	render_state_set(D3DRS_PSFINALCOMBINERINPUTSEFG, definition->PSFinalCombinerInputsEFG);
 	memcpy(&D3D__RenderState[D3DRS_PSCONSTANT0_0], definition->PSConstant0, sizeof(definition->PSConstant0));
 	memcpy(&D3D__RenderState[D3DRS_PSCONSTANT1_0], definition->PSConstant1, sizeof(definition->PSConstant1));
-	memcpy(&D3D__RenderState[D3DRS_PSALPHAOUTPUTS0], definition->PSAlphaOutputs, sizeof(definition->PSAlphaOutputs));
-	memcpy(&D3D__RenderState[D3DRS_PSRGBINPUTS0], definition->PSRGBInputs, sizeof(definition->PSRGBInputs));
-	D3D__RenderState[D3DRS_PSCOMPAREMODE] = definition->PSCompareMode;
+	render_states_set(D3DRS_PSALPHAOUTPUTS0, definition->PSAlphaOutputs, sizeof(definition->PSAlphaOutputs));
+	render_states_set(D3DRS_PSRGBINPUTS0, definition->PSRGBInputs, sizeof(definition->PSRGBInputs));
+	render_state_set(D3DRS_PSCOMPAREMODE, definition->PSCompareMode);
 	D3D__RenderState[D3DRS_PSFINALCOMBINERCONSTANT0] = definition->PSFinalCombinerConstant0;
 	D3D__RenderState[D3DRS_PSFINALCOMBINERCONSTANT1] = definition->PSFinalCombinerConstant1;
-	memcpy(&D3D__RenderState[D3DRS_PSRGBOUTPUTS0], definition->PSRGBOutputs, sizeof(definition->PSRGBOutputs));
-	D3D__RenderState[D3DRS_PSCOMBINERCOUNT] = definition->PSCombinerCount;
-	D3D__RenderState[D3DRS_PSTEXTUREMODES] = definition->PSTextureModes;
-	D3D__RenderState[D3DRS_PSDOTMAPPING] = definition->PSDotMapping;
-	D3D__RenderState[D3DRS_PSINPUTTEXTURE] = definition->PSInputTexture;
+	render_states_set(D3DRS_PSRGBOUTPUTS0, definition->PSRGBOutputs, sizeof(definition->PSRGBOutputs));
+	render_state_set(D3DRS_PSCOMBINERCOUNT, definition->PSCombinerCount);
+	render_state_set(D3DRS_PSTEXTUREMODES, definition->PSTextureModes);
+	render_state_set(D3DRS_PSDOTMAPPING, definition->PSDotMapping);
+	render_state_set(D3DRS_PSINPUTTEXTURE, definition->PSInputTexture);
 }
 
 /* ---------- vertex shaders */
@@ -3846,6 +3942,7 @@ void WINAPI D3DDevice_SetVertexShaderConstant(INT reg, CONST void *constant_data
 		return;
 	if (first + (long)constant_count > XGPU_VERTEX_CONSTANT_COUNT)
 		constant_count = XGPU_VERTEX_CONSTANT_COUNT - first;
+	instances_model_registers_set((unsigned long)first, constant_count);
 	constants_store((unsigned long)first, constant_data, constant_count);
 }
 
@@ -3968,6 +4065,8 @@ static GLuint vertex_shader_get(struct vertex_shader_object *program, BOOL immed
 
 typedef char pixel_shader_key_size_assert[sizeof(struct nv2a_pixel_shader_key) % 4 == 0 ? 1 : -1];
 
+static char *instanced_fragment_source(const char *source, BOOL lit);
+
 static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 {
 	/* consecutive draws mostly use one of a few pixel shaders (an object's
@@ -4014,6 +4113,22 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 		return entry->shader;
 	}
 	source = nv2a_pixel_shader_to_glsl(key);
+	if (key->instanced)
+	{
+		char *instanced = instanced_fragment_source(source, key->per_pixel_lighting != 0);
+
+		free(source);
+		source = instanced;
+		if (!source)
+		{
+			/* (one that cannot be instanced: its draws drawn a draw at a
+			time, instances_flush) */
+			entry->shader = 0;
+			entry->next = *bucket;
+			*bucket = entry;
+			return 0;
+		}
+	}
 	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
 	shader_hash_set(entry->shader, source);
 	if (debug_settings.dump_shaders)
@@ -4089,6 +4204,24 @@ static void program_uniforms_find(struct program_entry *entry)
 	entry->depth_bias = glGetUniformLocation(entry->program, "depth_bias");
 	entry->blend_constant = glGetUniformLocation(entry->program, "blend_constant");
 	entry->model_lights = glGetUniformLocation(entry->program, "model_lights");
+	entry->instance_slot = glGetUniformLocation(entry->program, "instance_slot");
+	entry->instance_base = glGetUniformLocation(entry->program, "instance_base");
+	entry->instance_stride = glGetUniformLocation(entry->program, "instance_stride");
+	entry->instance_skinning = glGetUniformLocation(entry->program, "instance_skinning");
+	entry->instance_has_model = glGetUniformLocation(entry->program, "instance_has_model");
+	entry->instance_block_stride = glGetUniformLocation(entry->program, "instance_block_stride");
+	if (entry->instance_slot >= 0)
+	{
+		GLuint block;
+
+		glUniform1i(glGetUniformLocation(entry->program, "instance_constants"), INSTANCE_TEXTURE_UNIT);
+		block = glGetUniformBlockIndex(entry->program, "instance_pixel_block");
+		if (block != GL_INVALID_INDEX)
+			glUniformBlockBinding(entry->program, block, INSTANCE_BLOCK_BINDING);
+		block = glGetUniformBlockIndex(entry->program, "instance_model_block");
+		if (block != GL_INVALID_INDEX)
+			glUniformBlockBinding(entry->program, block, INSTANCE_MODEL_BLOCK_BINDING);
+	}
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		char name[8];
@@ -5052,6 +5185,11 @@ shader's noise coordinate, rasterizer_xbox_plasma_energy.c). A scale of zero
 turns it off, as it is for every other draw. */
 void d3d8_gl_set_height_fade(float inverse_softness, float height, float offset, float scale)
 {
+	if (height_fade_value[0] != inverse_softness || height_fade_value[1] != height ||
+		height_fade_value[2] != offset || height_fade_value[3] != scale)
+	{
+		d3d8_gl_state_changes++;
+	}
 	height_fade_value[0] = inverse_softness;
 	height_fade_value[1] = height;
 	height_fade_value[2] = offset;
@@ -5217,18 +5355,2332 @@ int d3d_gl_shader_precompile(int on)
 	return precompiling;
 }
 
+/* ---------- instanced draws (d3d8_gl_instances_begin)
+
+With many objects alike (network co-op's extra enemies) a frame is
+thousands of draws, most of them the same part of another object of the
+same model: everything the same but the vertex shader's registers, where
+each object's node matrices and lighting are. Preparing each costs as much
+as the GPU spends drawing it. Between d3d8_gl_instances_begin and _end
+(rasterizer_xbox_models.c, display.batch_models: the parts of one model
+drawn with one shader for every object in turn) an indexed draw is kept
+instead, with a copy of the registers: with any draw kept before it whose
+state is all the same, or as a new group (a part's passes differ, and take
+turns). At the end (or anything else to be drawn first) each group is drawn
+as one instanced draw: the registers that differ among its draws go into a
+buffer, and an instanced vertex shader (instanced_source) reads them from
+it, each instance its own, and the others from the uniforms as before; its
+pixel shader reads each instance's pixel shader constants and lights from
+uniform blocks (instance_blocks_fill). A group's passes are drawn in turn for
+all its draws, not each draw's in turn: opaque parts in the depth buffer,
+the same picture. */
+#define INSTANCE_GROUP_BUCKETS 1024
+/* an instance's registers: the vertex shader's, then its pixel shader's
+constants (each object's colors), ps_c0[8], ps_c1[8], ps_final_c0 and
+ps_final_c1 (instanced_fragment_source) */
+#define INSTANCE_PIXEL_FIRST XGPU_VERTEX_CONSTANT_COUNT
+#define INSTANCE_PIXEL_CONSTANTS 18
+#define INSTANCE_REGISTERS (INSTANCE_PIXEL_FIRST + INSTANCE_PIXEL_CONSTANTS)
+/* instance_register's table, four registers to an ivec4 (the number is in its
+GLSL too: INSTANCE_UNIFORMS_VERTEX and INSTANCE_UNIFORMS_PIXEL) */
+#define INSTANCE_SLOT_VECTORS 53
+typedef char instance_slot_vectors_check[INSTANCE_SLOT_VECTORS * 4 >= INSTANCE_REGISTERS &&
+	(INSTANCE_SLOT_VECTORS - 1) * 4 < INSTANCE_REGISTERS ? 1 : -1];
+/* the bytes of a store of the instances' registers (a segment, in the
+desktop's ring), and of a segment of the desktop's ring of blocks: twice as
+large as the most a frame has written of late (b30's landing with 32 times
+the enemies, 1.1 MB of registers and 0.8 MB of blocks; with the usual
+enemies, 0.1 and 0.3 MB), from INSTANCE_STORE_LEAST to INSTANCE_STORE_MOST, a
+budget (room for frames seven times that landing's, in a scene that needs
+it), lowered where the GPU has no memory for more. A frame writing more
+than a segment goes on into the next (on the desktop, once the GPU has done
+with it) (instance_store_frame) */
+#define INSTANCE_STORE_LEAST (256ul * 1024ul)
+#define INSTANCE_STORE_MOST (16ul * 1024ul * 1024ul)
+/* (the milliseconds after which a store larger than it need be is made
+smaller: a time, not a count of frames, so that it waits as long at 20
+frames a second as at 300; not of ticks either, which stop in the menus
+and while paused, where a store left large should be made smaller) */
+#define INSTANCE_STORE_SHRINK_MILLISECONDS 30000ul
+struct instance_store_size
+{
+	/* its bytes, and those it is to have when next made (0: as they are);
+	the most it may have; the bytes written this frame, and the most a frame
+	has written since the time counted from (milliseconds) */
+	unsigned long size, wanted, ceiling;
+	unsigned long frame, most, since;
+};
+static struct instance_store_size instance_rows_size = { INSTANCE_STORE_LEAST, 0, INSTANCE_STORE_MOST };
+static struct instance_store_size instance_blocks_size = { INSTANCE_STORE_LEAST, 0, INSTANCE_STORE_MOST };
+
+/* bytes as a store's: twice those, in steps of INSTANCE_STORE_LEAST, to its
+ceiling */
+static unsigned long instance_store_bytes(const struct instance_store_size *store, unsigned long bytes)
+{
+	bytes = (bytes * 2 + INSTANCE_STORE_LEAST - 1) & ~(INSTANCE_STORE_LEAST - 1);
+	if (bytes < INSTANCE_STORE_LEAST)
+		bytes = INSTANCE_STORE_LEAST;
+	return bytes < store->ceiling ? bytes : store->ceiling;
+}
+
+/* a frame's end, now milliseconds on a steady clock: a store made larger
+where the frame wrote more than half of it, smaller where for
+INSTANCE_STORE_SHRINK_MILLISECONDS no frame wrote a quarter (when next made:
+instances_buffer_ready, instance_block_ring_place) */
+static void instance_store_frame(struct instance_store_size *store, unsigned long now)
+{
+	if (store->frame > store->most)
+		store->most = store->frame;
+	if (store->frame * 2 > store->size && store->size < store->ceiling)
+		store->wanted = instance_store_bytes(store, store->frame);
+	else if (now - store->since >= INSTANCE_STORE_SHRINK_MILLISECONDS)
+	{
+		if (store->most * 4 < store->size && store->size > INSTANCE_STORE_LEAST)
+			store->wanted = instance_store_bytes(store, store->most);
+		store->since = now;
+		store->most = 0;
+	}
+	store->frame = 0;
+}
+/* the slot (instance_register's table) of a pixel shader constant each
+draw has its own of: in its block, not its row, INSTANCE_IN_BLOCK less its
+place there (instances_layout) */
+#define INSTANCE_IN_BLOCK (-1000)
+/* a uniform block's vectors (the draws' and their models'): as many as the
+GPU's largest holds, to INSTANCE_BLOCK_VECTORS */
+#define INSTANCE_BLOCK_VECTORS 4096
+
+static int instance_block_vectors(void)
+{
+	static int vectors;
+
+	if (!vectors)
+	{
+		GLint size = 0;
+
+		glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &size);
+		vectors = size / 16 > INSTANCE_BLOCK_VECTORS ? INSTANCE_BLOCK_VECTORS : size / 16;
+	}
+	return vectors;
+}
+
+/* everything a draw's preparation reads, but the vertex shader's registers */
+struct instance_state
+{
+	DWORD render_state[D3DRS_MAX];
+	DWORD texture_state[D3DTSS_MAXSTAGES][D3DTSS_MAX];
+	D3DBaseTexture *textures[D3DTSS_MAXSTAGES];
+	D3DPalette *palettes[D3DTSS_MAXSTAGES];
+	struct vertex_shader_object *vertex_shader;
+	struct vertex_shader_object *program_slot;
+	unsigned long program_address;
+	D3DSurface *render_target;
+	D3DSurface *depth_stencil;
+	D3DVIEWPORT8 viewport;
+	float viewport_scale[4];
+	float viewport_offset[4];
+	DWORD stream_data[16];
+	UINT stream_stride[16];
+	UINT base_vertex_index;
+	float attributes[XGPU_VERTEX_ATTRIBUTE_COUNT][4];
+	float height_fade[4];
+	DWORD shader_constant_mode;
+	DWORD primitive_type;
+	DWORD vertex_count;
+	const WORD *index_data;
+};
+
+struct instance_group
+{
+	struct instance_state state;
+	/* d3d8_gl_state_changes when its state was last found the device's */
+	unsigned long state_changes;
+	unsigned long hash;
+	/* the next older group in its bucket, or -1 */
+	int next;
+	unsigned long count;
+	/* its draws, in their order (instances_flush) */
+	unsigned int *instances;
+	/* (instance_blocks_fill) whether its draws read a block (lit for each
+	pixel, or pixel shader constants that differ among them), and whether
+	theirs is placed and written; each draw's vectors in it; whether their
+	lights 1 on are their models' in the models' block; its ranges
+	(instance_block_ranges: the first, and how many), and where in the flush's
+	blocks the first begins */
+	BOOL block_read;
+	BOOL block_ready;
+	BOOL block_models;
+	int block_stride;
+	unsigned long block_range_first, block_range_count, block_first;
+	/* constants_serial when its first draw was kept (its registers in
+	instance_group_constants): a register no serial of which is later is
+	every later draw's too */
+	unsigned long long serial;
+	/* constants_serial when its latest draw was kept: a register not changed
+	since, and not one of differs, is as its first draw's */
+	unsigned long long last_serial;
+	/* its first draw's pixel shader constants as set */
+	DWORD pixel_states[INSTANCE_PIXEL_CONSTANTS];
+	/* the registers some draw of it has its own of */
+	DWORD differs[(INSTANCE_REGISTERS + 31) / 32];
+	/* its draws' models' skinning registers, or -1 where they have no model
+	(d3d8_gl_instances_model), and the registers their models have */
+	int model_skinning;
+	DWORD model_mask[XGPU_VERTEX_CONSTANT_COUNT / 32];
+	/* (instances_upload) its draws' registers in the buffer: put there, from
+	where, so many to a draw, and each register's place among them */
+	BOOL packed;
+	unsigned long base;
+	int stride;
+	int *slots;
+};
+
+static struct
+{
+	/* d3d8_gl_instances_begin's, less _end's */
+	int depth;
+	BOOL flushing;
+	/* the instances the draw being made draws (0: one, uninstanced; 1 or
+	more, instanced), the registers each has its own of, and where in the
+	buffer they start */
+	unsigned long drawing;
+	int stride;
+	/* its model's skinning registers (instance_register reads them straight
+	from the model's, not by the slot table), or 0 */
+	int skinning;
+	/* its draws have a model (instanced_fragment_source's lights) */
+	int has_model;
+	/* (and its draws' vectors each in their block) */
+	int block_stride;
+	/* each register's place among an instance's own, or -1 where it is the
+	uniform's (instance_register) */
+	int slots[INSTANCE_SLOT_VECTORS * 4];
+	unsigned long base;
+	/* the draw being made could not be drawn instanced */
+	BOOL draw_failed;
+	/* (grown as needed, as are the arrays of the draws kept: instances_room) */
+	struct instance_group *groups;
+	int group_count;
+	/* the newest group of each hash, or -1 */
+	int buckets[INSTANCE_GROUP_BUCKETS];
+	/* the group the object's latest draw went into (d3d8_gl_instances_next):
+	its next goes into a later one, drawn after it */
+	int object_group;
+	/* the group the latest draw kept went into */
+	int last_group;
+	unsigned long used;
+	GLuint buffer, texture;
+	unsigned long buffer_offset;
+	BOOL unavailable;
+	/* the model whose draws are being kept (d3d8_gl_instances_model), or -1:
+	its registers not yet the device's, or set since by another than it */
+	int model;
+	BOOL model_pending;
+	BOOL model_overridden;
+	/* d3d8_gl_instances_begin's outermost (the models named since), and
+	instances_upload's (the models in the buffer for it) */
+	unsigned long model_generation, model_upload;
+	/* the buffer's store (or ring segment) uploads write into, counted: a
+	model written into an earlier one is not there for a draw's reading */
+	unsigned long model_store;
+	/* (debug.gpu_stats) */
+	unsigned long kept, instanced_draws, instances_drawn, groups_drawn;
+} instances = { .object_group = -1, .last_group = -1, .model = -1 };
+/* a model's registers (d3d8_gl_instances_model): its lighting's, then its
+skinning's, set once for all its draws, not each draw's own; each instanced
+draw of one reads them from the buffer (instances_upload puts them there once
+an upload), where its row's first register says, the others its own */
+#define INSTANCE_MODEL_LIGHTING (XGPU_VERTEX_CONSTANT_BIAS - 79)
+#define INSTANCE_MODEL_LIGHTING_COUNT 11
+#define INSTANCE_MODEL_SKINNING (XGPU_VERTEX_CONSTANT_BIAS - 36)
+/* (instance_register's GLSL has these numbers: skinning register i is the
+model's INSTANCE_MODEL_LIGHTING_COUNT + i - INSTANCE_MODEL_SKINNING, its row
+2 before) */
+typedef char instance_model_skinning_glsl[INSTANCE_MODEL_SKINNING == 60 &&
+	2 + INSTANCE_MODEL_LIGHTING_COUNT - INSTANCE_MODEL_SKINNING == -47 ? 1 : -1];
+typedef char instance_model_registers_apart[
+	INSTANCE_MODEL_LIGHTING + INSTANCE_MODEL_LIGHTING_COUNT <= INSTANCE_MODEL_SKINNING ? 1 : -1];
+struct instance_model
+{
+	const float (*lighting)[4];
+	const float (*skinning)[4];
+	int skinning_count;
+	unsigned long generation;
+	/* the upload it is in the buffer for, and where (texels) */
+	unsigned long upload;
+	unsigned long base;
+	/* written by an upload of its batch, into which store */
+	BOOL written;
+	unsigned long store;
+	/* its lights in the models' block (instance_block_model_place): the
+	flush they were last put there for, their window, and its place there */
+	unsigned long block_stamp, block_window, block_place;
+};
+/* (by key, as many as have been named: d3d8_gl_instances_model) */
+static struct instance_model *instance_models;
+static int instance_model_capacity;
+/* the models instances_upload puts in the buffer */
+static int *instance_upload_models;
+/* each kept draw's model, or -1 */
+static int *instance_draw_models;
+/* each kept draw's group, and the draws by group */
+static unsigned int *instance_groups;
+static unsigned int *instance_order;
+/* each group's first draw's registers; each later draw's that differ from
+them, its patches; and the ones of a group's that differ packed for the
+buffer (from the heap on the first draw kept, the Android guest's image
+having 64 MB in all) */
+struct instance_patch
+{
+	int reg;
+	float value[4];
+};
+static float (*instance_group_constants)[INSTANCE_REGISTERS][4];
+static int (*instance_group_slots)[INSTANCE_SLOT_VECTORS * 4];
+static struct instance_patch *instance_patches;
+static unsigned long instance_patch_count;
+static unsigned long *instance_patch_first;
+static unsigned short *instance_patch_counts;
+static float (*instance_packed)[4];
+/* and its pixel shader constants as set (instance_pixel_constants) */
+static DWORD (*instance_pixel_states)[INSTANCE_PIXEL_CONSTANTS];
+/* how many draws, patches, groups and packed registers they have room for */
+static unsigned long instance_capacity, instance_patch_capacity, instance_packed_capacity;
+static int instance_group_capacity;
+/* the registers one upload puts in the buffer at most: a store's (or a
+ring segment's) worth */
+#define INSTANCE_UPLOAD_MAXIMUM (instance_rows_size.size / 16)
+
+/* an array grown to so many of its elements, or left as it was (FALSE)
+where there is no memory for them */
+#define INSTANCE_GROW(array, count) \
+	((grown = realloc((array), (size_t)(count) * sizeof(*(array)))) != NULL ? ((array) = grown, TRUE) : FALSE)
+
+/* room for one more draw, its patches as many as it may have; FALSE where
+there is no memory for it (the draws kept drawn first, then it alone) */
+static BOOL instances_room(void)
+{
+	void *grown;
+	unsigned long count;
+
+	if (instances.used >= instance_capacity)
+	{
+		count = instance_capacity ? instance_capacity * 2 : 1024;
+		if (!INSTANCE_GROW(instance_draw_models, count) || !INSTANCE_GROW(instance_groups, count) ||
+			!INSTANCE_GROW(instance_order, count) || !INSTANCE_GROW(instance_patch_first, count) ||
+			!INSTANCE_GROW(instance_patch_counts, count) || !INSTANCE_GROW(instance_pixel_states, count))
+			return FALSE;
+		instance_capacity = count;
+	}
+	if (instance_patch_count + INSTANCE_REGISTERS > instance_patch_capacity)
+	{
+		count = instance_patch_capacity ? instance_patch_capacity * 2 : 64 * 1024;
+		if (!INSTANCE_GROW(instance_patches, count))
+			return FALSE;
+		instance_patch_capacity = count;
+	}
+	return TRUE;
+}
+
+/* room for one more group */
+static BOOL instances_group_room(void)
+{
+	void *grown;
+	int count;
+
+	if (instances.group_count < instance_group_capacity)
+		return TRUE;
+	count = instance_group_capacity ? instance_group_capacity * 2 : 256;
+	if (!INSTANCE_GROW(instances.groups, count) || !INSTANCE_GROW(instance_group_constants, count) ||
+		!INSTANCE_GROW(instance_group_slots, count))
+		return FALSE;
+	instance_group_capacity = count;
+	return TRUE;
+}
+
+/* room for the model of a key (d3d8_gl_instances_model), its entries new
+unset */
+static BOOL instances_model_room(int key)
+{
+	void *grown;
+	int count = instance_model_capacity ? instance_model_capacity : 256;
+
+	if (key < instance_model_capacity)
+		return TRUE;
+	while (count <= key)
+		count *= 2;
+	if (!INSTANCE_GROW(instance_models, count) || !INSTANCE_GROW(instance_upload_models, count))
+		return FALSE;
+	memset(instance_models + instance_model_capacity, 0,
+		(size_t)(count - instance_model_capacity) * sizeof(*instance_models));
+	instance_model_capacity = count;
+	return TRUE;
+}
+
+/* the render states of the pixel shader's constants, in the order of the
+instance's registers */
+static D3DRENDERSTATETYPE instance_pixel_state(int index)
+{
+	return index < 8 ? (D3DRENDERSTATETYPE)(D3DRS_PSCONSTANT0_0 + index) :
+		index < 16 ? (D3DRENDERSTATETYPE)(D3DRS_PSCONSTANT1_0 + index - 8) :
+		index == 16 ? D3DRS_PSFINALCOMBINERCONSTANT0 : D3DRS_PSFINALCOMBINERCONSTANT1;
+}
+
+/* the render states of the pixel shader's constants, in that order: two runs
+of them (instance_pixel_states_order) */
+static void instance_pixel_states_read(DWORD *states)
+{
+	memcpy(states, &D3D__RenderState[D3DRS_PSCONSTANT0_0], 16 * sizeof(*states));
+	memcpy(states + 16, &D3D__RenderState[D3DRS_PSFINALCOMBINERCONSTANT0], 2 * sizeof(*states));
+}
+
+static void draw_indexed(D3DPRIMITIVETYPE primitive_type, UINT vertex_count, CONST WORD *index_data);
+
+/* (instanced: its pixel shader's constants left out, each instance's own) */
+static void instance_state_take(struct instance_state *state, DWORD primitive_type, DWORD vertex_count,
+	const WORD *index_data, BOOL instanced)
+{
+	int stream;
+
+	memset(state, 0, sizeof(*state));
+	memcpy(state->render_state, D3D__RenderState, sizeof(state->render_state));
+	for (stream = 0; instanced && stream < INSTANCE_PIXEL_CONSTANTS; stream++)
+		state->render_state[instance_pixel_state(stream)] = 0;
+	memcpy(state->texture_state, D3D__TextureState, sizeof(state->texture_state));
+	memcpy(state->textures, device.textures, sizeof(state->textures));
+	memcpy(state->palettes, device.palettes, sizeof(state->palettes));
+	state->vertex_shader = device.vertex_shader;
+	state->program_address = device.program_address;
+	state->program_slot = device.program_address < VERTEX_PROGRAM_SLOTS ?
+		device.program_slots[device.program_address] : NULL;
+	state->render_target = device.render_target;
+	state->depth_stencil = device.depth_stencil;
+	state->viewport = device.viewport;
+	memcpy(state->viewport_scale, device.viewport_scale, sizeof(state->viewport_scale));
+	memcpy(state->viewport_offset, device.viewport_offset, sizeof(state->viewport_offset));
+	for (stream = 0; stream < 16; stream++)
+	{
+		state->stream_data[stream] = device.streams[stream].data;
+		state->stream_stride[stream] = device.streams[stream].stride;
+	}
+	state->base_vertex_index = device.base_vertex_index;
+	memcpy(state->attributes, device.attributes, sizeof(state->attributes));
+	memcpy(state->height_fade, height_fade_value, sizeof(state->height_fade));
+	state->shader_constant_mode = (DWORD)device.shader_constant_mode;
+	state->primitive_type = primitive_type;
+	state->vertex_count = vertex_count;
+	state->index_data = index_data;
+}
+
+static void instance_state_restore(const struct instance_state *state)
+{
+	int stream;
+
+	d3d8_gl_state_changes++;
+	memcpy(D3D__RenderState, state->render_state, sizeof(state->render_state));
+	memcpy(D3D__TextureState, state->texture_state, sizeof(state->texture_state));
+	memcpy(device.textures, state->textures, sizeof(state->textures));
+	memcpy(device.palettes, state->palettes, sizeof(state->palettes));
+	device.vertex_shader = state->vertex_shader;
+	device.program_address = state->program_address;
+	if (state->program_address < VERTEX_PROGRAM_SLOTS)
+		device.program_slots[state->program_address] = state->program_slot;
+	device.render_target = state->render_target;
+	device.depth_stencil = state->depth_stencil;
+	device.viewport = state->viewport;
+	memcpy(device.viewport_scale, state->viewport_scale, sizeof(state->viewport_scale));
+	memcpy(device.viewport_offset, state->viewport_offset, sizeof(state->viewport_offset));
+	for (stream = 0; stream < 16; stream++)
+	{
+		device.streams[stream].data = state->stream_data[stream];
+		device.streams[stream].stride = state->stream_stride[stream];
+	}
+	device.base_vertex_index = state->base_vertex_index;
+	memcpy(device.attributes, state->attributes, sizeof(state->attributes));
+	memcpy(height_fade_value, state->height_fade, sizeof(state->height_fade));
+	device.shader_constant_mode = (D3DSHADERCONSTANTMODE)state->shader_constant_mode;
+}
+
+/* source with declaration replaced by functions, and each read of the array
+name[i] after it by function(i) */
+static char *source_reads_replaced(const char *source, const char *declaration, const char *functions,
+	const char *name, const char *function, const char *in_main)
+{
+	const char *at = strstr(source, declaration), *in;
+	size_t name_length = strlen(name);
+	char *result, *out;
+	char brackets[32];
+	int depth = 0;
+
+	if (!at)
+		return NULL;
+	/* (function( is at most twice as long as name[) */
+	result = malloc(2 * strlen(source) + strlen(functions) + strlen(in_main) + 1);
+	if (!result)
+		return NULL;
+	memcpy(result, source, (size_t)(at - source));
+	out = result + (at - source);
+	memcpy(out, functions, strlen(functions));
+	out += strlen(functions);
+	for (in = at + strlen(declaration); *in; in++)
+	{
+		if (!strncmp(in, name, name_length) && in[name_length] == '[' &&
+			!(isalnum((unsigned char)in[-1]) || in[-1] == '_'))
+		{
+			if (depth == (int)sizeof(brackets) || strlen(function) > 2 * name_length)
+			{
+				free(result);
+				return NULL;
+			}
+			brackets[depth++] = ')';
+			memcpy(out, function, strlen(function));
+			out += strlen(function);
+			*out++ = '(';
+			in += name_length;
+			continue;
+		}
+		if (*in == '[')
+		{
+			if (depth == (int)sizeof(brackets))
+			{
+				free(result);
+				return NULL;
+			}
+			brackets[depth++] = ']';
+		}
+		else if (*in == ']' && depth > 0)
+		{
+			*out++ = brackets[--depth];
+			continue;
+		}
+		*out++ = *in;
+	}
+	*out = '\0';
+	if (*in_main)
+	{
+		/* (what main begins with) */
+		char *main_at = strstr(result, "void main()\n{\n");
+
+		if (!main_at)
+		{
+			free(result);
+			return NULL;
+		}
+		main_at += strlen("void main()\n{\n");
+		memmove(main_at + strlen(in_main), main_at, strlen(main_at) + 1);
+		memcpy(main_at, in_main, strlen(in_main));
+	}
+	return result;
+}
+
+/* an instanced pixel shader's (instanced_fragment_source): its instance,
+its model's place among the models' block's, and the slot table */
+#define INSTANCE_UNIFORMS_PIXEL \
+	"flat in int xInstance;\n" \
+	"flat in int xModel;\n" \
+	"uniform int instance_has_model;\n" \
+	"uniform ivec4 instance_slot[53];\n" \
+	"uniform int instance_block_stride;\n"
+/* (the instances' store's declaration and instance_fetch, which reads its
+register n, before it: instance_fetch_source) the vertex shader's: its
+model's registers from where its row's first says, read once a vertex
+(instanced_source), not once a register */
+#define INSTANCE_UNIFORMS_VERTEX \
+	"uniform ivec4 instance_slot[53];\n" \
+	"uniform int instance_stride;\n" \
+	"uniform int instance_base;\n" \
+	"uniform int instance_skinning;\n" \
+	"int instance_model;\n" \
+	"flat out int xModel;\n" \
+	"vec4 instance_register(int i, int instance, vec4 uniform_value)\n" \
+	"{\n" \
+	"\tint slot;\n" \
+	"\n" \
+	"\tif (i >= 60 && i < 60 + instance_skinning)\n" \
+	"\t\treturn instance_fetch(instance_model + i - 47);\n" \
+	"\tslot = instance_slot[i >> 2][i & 3];\n" \
+	"\tif (slot == -1)\n" \
+	"\t\treturn uniform_value;\n" \
+	"\tif (slot >= 0)\n" \
+	"\t\treturn instance_fetch(instance_base + instance * instance_stride + slot);\n" \
+	"\treturn instance_fetch(instance_model - slot);\n" \
+	"}\n"
+
+#ifdef HALO_GLES
+/* ES: the shaders are GLSL "310 es" (gl_initialize), where a texture buffer
+is an extension's; the one the context has, or NULL (instances_store_kind) */
+static const char *instances_es_extension(void)
+{
+	static const char *extension;
+	static BOOL looked;
+
+	if (!looked)
+	{
+		looked = TRUE;
+		if (host_gl_has_extension("GL_EXT_texture_buffer"))
+			extension = "GL_EXT_texture_buffer";
+		else if (host_gl_has_extension("GL_OES_texture_buffer"))
+			extension = "GL_OES_texture_buffer";
+	}
+	return extension;
+}
+#endif
+
+/* where an instanced draw's shaders read its instances' registers: a
+texture buffer; where there are none (WebGL 2, and ES 3.0 and 3.1 drivers
+without the extension), a 2D texture INSTANCE_TEXTURE_WIDTH texels wide,
+register n at (n % width, n / width); or nowhere, the models drawn a draw at
+a time */
+enum instances_store
+{
+	_instances_store_unknown,
+	_instances_store_buffer,
+	_instances_store_texture,
+	_instances_store_none
+};
+
+/* (2048, the least GL_MAX_TEXTURE_SIZE of ES 3.0; as many rows as a store
+of so many bytes needs) */
+#define INSTANCE_TEXTURE_WIDTH_BITS 11
+#define INSTANCE_TEXTURE_WIDTH (1ul << INSTANCE_TEXTURE_WIDTH_BITS)
+#define INSTANCE_TEXTURE_HEIGHT(bytes) (((bytes) / 16 + INSTANCE_TEXTURE_WIDTH - 1) / INSTANCE_TEXTURE_WIDTH)
+
+static enum instances_store instances_store_kind(void)
+{
+	static enum instances_store kind = _instances_store_unknown;
+	GLint texels = 0, size = 0;
+
+	if (kind != _instances_store_unknown)
+		return kind;
+	kind = _instances_store_none;
+#ifdef HALO_GLES
+	/* (draws with a base vertex drawn instanced by its instanced draw, and
+	those without, WebGL 2's, by glDrawElementsInstanced) */
+	if (xgpu_capabilities.base_vertex ? !halo_glDrawElementsInstancedBaseVertex : !halo_glDrawElementsInstanced)
+	{
+		platform_log("GPU: no instanced draws: the models are drawn a draw at a time");
+		return kind;
+	}
+	if (halo_glTexBuffer && halo_glDrawElementsInstancedBaseVertex && instances_es_extension())
+		glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
+#else
+	glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
+#endif
+	if (texels >= (GLint)(INSTANCE_STORE_MOST / 16))
+	{
+		kind = _instances_store_buffer;
+		return kind;
+	}
+	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &size);
+	if (size >= (GLint)INSTANCE_TEXTURE_WIDTH && size >= (GLint)INSTANCE_TEXTURE_HEIGHT(INSTANCE_STORE_MOST))
+	{
+		platform_log("GPU: texture buffers of %d texels: the models' instances are read from a 2D texture",
+			(int)texels);
+		kind = _instances_store_texture;
+		return kind;
+	}
+	platform_log("GPU: texture buffers of %d texels and textures of %d: the models are drawn a draw at a time",
+		(int)texels, (int)size);
+	return kind;
+}
+
+/* the store's target */
+static GLenum instances_store_target(void)
+{
+	return instances_store_kind() == _instances_store_texture ? GL_TEXTURE_2D : GL_TEXTURE_BUFFER;
+}
+
+/* an instanced shader's declaration of the store, and instance_fetch */
+static const char *instance_fetch_source(void)
+{
+	if (instances_store_kind() == _instances_store_texture)
+	{
+		return
+			"uniform highp sampler2D instance_constants;\n"
+			"vec4 instance_fetch(int n)\n"
+			"{\n"
+			"\treturn texelFetch(instance_constants, ivec2(n & 2047, n >> 11), 0);\n"
+			"}\n";
+	}
+	return
+		"uniform samplerBuffer instance_constants;\n"
+		"vec4 instance_fetch(int n)\n"
+		"{\n"
+		"\treturn texelFetch(instance_constants, n);\n"
+		"}\n";
+}
+
+/* an instanced shader's source as the store asks: on ES, a texture
+buffer's extension, and the precision ES asks of a samplerBuffer, after its
+#version line; NULL where there is no store. The source is freed */
+static char *instanced_store_source(char *source)
+{
+#ifdef HALO_GLES
+	char header[96], *line_end, *result;
+#endif
+
+	if (source && instances_store_kind() == _instances_store_none)
+	{
+		free(source);
+		return NULL;
+	}
+#ifdef HALO_GLES
+	if (!source || instances_store_kind() != _instances_store_buffer)
+		return source;
+	if (!(line_end = strchr(source, '\n')))
+	{
+		free(source);
+		return NULL;
+	}
+	snprintf(header, sizeof(header), "#extension %s : require\nprecision highp samplerBuffer;\n",
+		instances_es_extension());
+	result = malloc(strlen(source) + strlen(header) + 1);
+	if (result)
+	{
+		size_t version = (size_t)(line_end + 1 - source);
+
+		memcpy(result, source, version);
+		strcpy(result + version, header);
+		strcat(result, source + version);
+	}
+	free(source);
+	return result;
+#else
+	return source;
+#endif
+}
+
+/* the vertex shader's GLSL with each of its registers c[i] read by cI(i):
+from the instances' buffer for the registers each instance has its own of,
+else the uniform as before; and which instance it is, and its model's place
+among the models' block's, handed on to the pixel shader
+(instanced_fragment_source) */
+static char *instanced_source(const char *source)
+{
+	static const char functions[] =
+		"uniform vec4 c[192];\n"
+		INSTANCE_UNIFORMS_VERTEX
+		"flat out int xInstance;\n"
+		"vec4 cI(int i)\n"
+		"{\n"
+		"\treturn instance_register(i, gl_InstanceID, c[i]);\n"
+		"}\n";
+	/* (its row's first register: where its model's registers are, 2 more,
+	and its model's place among the models' block's; read whether it has one
+	or not, a group with none reading none of them) */
+	static const char in_main[] =
+		"\tvec4 instance_row = instance_fetch(instance_base + gl_InstanceID * instance_stride);\n"
+		"\n"
+		"\tinstance_model = int(instance_row.x) - 2;\n"
+		"\txInstance = gl_InstanceID;\n"
+		"\txModel = int(instance_row.y);\n";
+	struct xgpu_text declarations = { 0 };
+	char *result;
+
+	xgpu_text_append(&declarations, "%s%s", instance_fetch_source(), functions);
+	result = declarations.buffer ?
+		source_reads_replaced(source, "uniform vec4 c[192];\n", declarations.buffer, "c", "cI", in_main) : NULL;
+	free(declarations.buffer);
+	return instanced_store_source(result);
+}
+
+/* an instanced draw's pixel shader, its constants ps_c0[i], ps_c1[i],
+ps_final_c0 and ps_final_c1 read by PC0(i), PC1(i), PF0() and PF1(): the
+instance's own, from its draw's block, where they differ among its group's
+draws (the slot table says where), else the uniforms as before; and lit for
+each pixel, its lights model_lights[i] by ML(i): light 0 from the draw's
+block, lights 1 on (its model's lighting registers) from the models' block
+where the draws have a model, else from the draw's block too */
+static char *instanced_fragment_source(const char *source, BOOL lit)
+{
+	static const char final_constant[] = "uniform vec4 ps_final_c1;\n";
+	static const char defines[] = "#define ps_final_c0 PF0()\n#define ps_final_c1 PF1()\n";
+	struct xgpu_text functions = { 0 };
+	char declaration[64], lights[1024];
+	char *constants0, *constants1, *result;
+	int set;
+
+	if (!source)
+		return NULL;
+	xgpu_text_append(&functions, "%s" INSTANCE_UNIFORMS_PIXEL
+		"layout(std140) uniform instance_pixel_block\n{\n\tvec4 instance_pixels[%d];\n};\n",
+		final_constant, instance_block_vectors());
+	for (set = 0; set < 2; set++)
+	{
+		xgpu_text_append(&functions,
+			"vec4 PC%d(int i)\n{\n\tint slot = instance_slot[(%d + i) >> 2][(%d + i) & 3];\n\n\tif (slot == -1)\n"
+			"\t\treturn ps_c%d[i];\n\treturn instance_pixels[xInstance * instance_block_stride - %d - slot];\n}\n",
+			set, INSTANCE_PIXEL_FIRST + set * 8, INSTANCE_PIXEL_FIRST + set * 8, set, -INSTANCE_IN_BLOCK);
+	}
+	for (set = 0; set < 2; set++)
+	{
+		int reg = INSTANCE_PIXEL_FIRST + 16 + set;
+
+		xgpu_text_append(&functions,
+			"vec4 PF%d()\n{\n\tint slot = instance_slot[%d][%d];\n\n\tif (slot == -1)\n\t\treturn ps_final_c%d;\n"
+			"\treturn instance_pixels[xInstance * instance_block_stride - %d - slot];\n}\n",
+			set, reg >> 2, reg & 3, set, -INSTANCE_IN_BLOCK);
+	}
+	xgpu_text_append(&functions, "%s", defines);
+	constants0 = functions.buffer ? source_reads_replaced(source, final_constant, functions.buffer, "ps_c0", "PC0", "") : NULL;
+	free(functions.buffer);
+	constants1 = constants0 ? source_reads_replaced(constants0, defines, defines, "ps_c1", "PC1", "") : NULL;
+	free(constants0);
+	if (!lit || !constants1)
+		return constants1;
+	snprintf(declaration, sizeof(declaration), "uniform vec4 model_lights[%d];\n", XGPU_MODEL_LIGHT_COUNT);
+	snprintf(lights, sizeof(lights), "%s"
+		"layout(std140) uniform instance_model_block\n{\n\tvec4 instance_model_lights[%d];\n};\n"
+		"vec4 ML(int light)\n{\n"
+		"\tif (light > 0 && instance_has_model != 0)\n"
+		"\t\treturn instance_model_lights[xModel * %d + light - 1];\n"
+		"\treturn instance_pixels[xInstance * instance_block_stride + light];\n}\n",
+		declaration, instance_block_vectors(), INSTANCE_MODEL_LIGHTING_COUNT);
+	result = source_reads_replaced(constants1, declaration, lights, "model_lights", "ML", "");
+	free(constants1);
+	return result;
+}
+
+/* the vertex shader's instanced shader, unlit or lit for each pixel */
+static GLuint vertex_shader_instanced(struct vertex_shader_object *program, BOOL lit)
+{
+	int which = lit ? 1 : 0;
+	char *source, *instanced;
+
+	if (program->instanced_tried & (1 << which))
+		return program->instanced_shaders[which];
+	program->instanced_tried |= (unsigned char)(1 << which);
+	source = nv2a_vertex_shader_to_glsl(program->instructions, program->instruction_count,
+		device.vertex_shader->packed_mask, lit ? &program->lighting : NULL);
+	instanced = source ? instanced_source(source) : NULL;
+	if (instanced)
+	{
+		program->instanced_shaders[which] = xgpu_compile_shader(GL_VERTEX_SHADER, instanced, "instanced vertex");
+		shader_hash_set(program->instanced_shaders[which], instanced);
+	}
+	else
+	{
+		platform_log("GPU: vertex shader %lu cannot be instanced: drawn a draw at a time", program->id);
+	}
+	free(instanced);
+	free(source);
+	return program->instanced_shaders[which];
+}
+
+/* whether this indexed draw can be kept to be drawn with others */
+static BOOL instances_eligible(D3DPRIMITIVETYPE primitive_type)
+{
+	struct vertex_shader_object *program;
+
+	if (!instances.depth || instances.flushing || instances.unavailable || !device.gl_ready ||
+		device.fixed_function || !device.vertex_shader || primitive_type == D3DPT_QUADLIST ||
+		device.visibility_test_active || trace_frame())
+	{
+		return FALSE;
+	}
+	program = current_program();
+	if (!program || !program->instructions)
+		return FALSE;
+	return TRUE;
+}
+
+/* whether the device's tables are a group's: its render states but the
+pixel shader's constants, texture states, textures, palettes, viewport,
+attributes and height fade */
+static BOOL instance_state_tables_current(const struct instance_state *state)
+{
+	return words_equal(state->render_state, D3D__RenderState, D3DRS_PSCONSTANT0_0 * sizeof(DWORD)) &&
+		words_equal(state->render_state + D3DRS_PSCONSTANT1_7 + 1, D3D__RenderState + D3DRS_PSCONSTANT1_7 + 1,
+			(D3DRS_PSFINALCOMBINERCONSTANT0 - D3DRS_PSCONSTANT1_7 - 1) * sizeof(DWORD)) &&
+		words_equal(state->render_state + D3DRS_PSFINALCOMBINERCONSTANT1 + 1,
+			D3D__RenderState + D3DRS_PSFINALCOMBINERCONSTANT1 + 1,
+			(D3DRS_MAX - D3DRS_PSFINALCOMBINERCONSTANT1 - 1) * sizeof(DWORD)) &&
+		words_equal(state->texture_state, D3D__TextureState, sizeof(state->texture_state)) &&
+		words_equal(state->textures, device.textures, sizeof(state->textures)) &&
+		words_equal(state->palettes, device.palettes, sizeof(state->palettes)) &&
+		words_equal(&state->viewport, &device.viewport, sizeof(state->viewport)) &&
+		words_equal(state->viewport_scale, device.viewport_scale, sizeof(state->viewport_scale)) &&
+		words_equal(state->viewport_offset, device.viewport_offset, sizeof(state->viewport_offset)) &&
+		words_equal(state->attributes, device.attributes, sizeof(state->attributes)) &&
+		words_equal(state->height_fade, height_fade_value, sizeof(state->height_fade));
+}
+
+/* whether the device's state is a group's (instance_state_take), but for
+the pixel shader's constants; unchanged, its tables are (found the device's
+when d3d8_gl_state_changes was as it is: none of them has changed since),
+and only the rest is compared */
+static BOOL instance_state_current(const struct instance_state *state, DWORD primitive_type, DWORD vertex_count,
+	const WORD *index_data, BOOL unchanged)
+{
+	int stream;
+
+	if (state->index_data != index_data || state->vertex_count != vertex_count ||
+		state->primitive_type != primitive_type || state->vertex_shader != device.vertex_shader ||
+		state->program_address != device.program_address ||
+		state->program_slot != (device.program_address < VERTEX_PROGRAM_SLOTS ?
+			device.program_slots[device.program_address] : NULL) ||
+		state->render_target != device.render_target || state->depth_stencil != device.depth_stencil ||
+		state->base_vertex_index != device.base_vertex_index ||
+		state->shader_constant_mode != (DWORD)device.shader_constant_mode)
+	{
+		return FALSE;
+	}
+	for (stream = 0; stream < 16; stream++)
+	{
+		if (state->stream_data[stream] != device.streams[stream].data ||
+			state->stream_stride[stream] != device.streams[stream].stride)
+		{
+			return FALSE;
+		}
+	}
+	return unchanged || instance_state_tables_current(state);
+}
+
+/* the groups' hash: what sets them apart most */
+static unsigned long instance_state_hash(DWORD primitive_type, DWORD vertex_count, const WORD *index_data)
+{
+	unsigned long hash = (unsigned long)(size_t)index_data * 2654435761UL;
+
+	hash ^= (vertex_count + primitive_type * 65599UL) * 40503UL;
+	hash ^= (unsigned long)(size_t)device.textures[0] * 2246822519UL;
+	hash ^= (unsigned long)(size_t)device.textures[1] * 3266489917UL;
+	hash ^= (unsigned long)(size_t)device.vertex_shader * 668265263UL;
+	return hash ^ (hash >> 15);
+}
+
+typedef char instance_pixel_states_order[D3DRS_PSCONSTANT1_0 == D3DRS_PSCONSTANT0_7 + 1 &&
+	D3DRS_PSFINALCOMBINERCONSTANT1 == D3DRS_PSFINALCOMBINERCONSTANT0 + 1 &&
+	D3DRS_PSCONSTANT1_7 < D3DRS_PSFINALCOMBINERCONSTANT0 ? 1 : -1];
+
+/* a register's place among a model's (lighting's, then skinning's), or -1 */
+static int instance_model_place(int reg, int skinning_count)
+{
+	if (reg >= INSTANCE_MODEL_LIGHTING && reg < INSTANCE_MODEL_LIGHTING + INSTANCE_MODEL_LIGHTING_COUNT)
+		return reg - INSTANCE_MODEL_LIGHTING;
+	if (reg >= INSTANCE_MODEL_SKINNING && reg < INSTANCE_MODEL_SKINNING + skinning_count)
+		return INSTANCE_MODEL_LIGHTING_COUNT + reg - INSTANCE_MODEL_SKINNING;
+	return -1;
+}
+
+/* the model's registers the device's, where they are not yet */
+static void instances_model_apply(void)
+{
+	const struct instance_model *model;
+
+	if (!instances.model_pending)
+		return;
+	instances.model_pending = FALSE;
+	model = &instance_models[instances.model];
+	constants_store(INSTANCE_MODEL_LIGHTING, model->lighting, INSTANCE_MODEL_LIGHTING_COUNT);
+	if (model->skinning_count)
+		constants_store(INSTANCE_MODEL_SKINNING, model->skinning, (unsigned long)model->skinning_count);
+}
+
+/* registers set (D3DDevice_SetVertexShaderConstant): the model's set since
+by another than it, its draws from then on keep the device's as any other
+draw's */
+static void instances_model_registers_set(unsigned long first, unsigned long count)
+{
+	int skinning_count;
+
+	if (instances.model < 0 || instances.model_overridden)
+		return;
+	skinning_count = instance_models[instances.model].skinning_count;
+	if ((first < INSTANCE_MODEL_LIGHTING + INSTANCE_MODEL_LIGHTING_COUNT && first + count > INSTANCE_MODEL_LIGHTING) ||
+		(skinning_count && first < (unsigned long)(INSTANCE_MODEL_SKINNING + skinning_count) &&
+			first + count > INSTANCE_MODEL_SKINNING))
+	{
+		instances_model_apply();
+		instances.model_overridden = TRUE;
+	}
+}
+
+/* keeps the draw, with a group of the same state; FALSE if there is no
+more room */
+static BOOL instances_add(D3DPRIMITIVETYPE primitive_type, UINT vertex_count, const WORD *index_data)
+{
+	struct instance_group *group = NULL;
+	unsigned long hash;
+	int index, reg, *bucket;
+	int model = instances.model >= 0 && !instances.model_overridden ? instances.model : -1;
+	int model_skinning = model >= 0 ? instance_models[model].skinning_count : -1;
+	DWORD pixel_states[INSTANCE_PIXEL_CONSTANTS];
+
+	if (!instances_room())
+		return FALSE;
+	if (!instances.group_count)
+		memset(instances.buckets, 0xff, sizeof(instances.buckets));
+	instance_pixel_states_read(pixel_states);
+	hash = instance_state_hash(primitive_type, vertex_count, index_data);
+	bucket = &instances.buckets[hash % INSTANCE_GROUP_BUCKETS];
+	for (index = *bucket; index > instances.object_group; index = instances.groups[index].next)
+	{
+		if (instances.groups[index].hash == hash &&
+			instances.groups[index].model_skinning == model_skinning &&
+			instance_state_current(&instances.groups[index].state, primitive_type, vertex_count, index_data,
+				instances.groups[index].state_changes == d3d8_gl_state_changes))
+		{
+			group = &instances.groups[index];
+			group->state_changes = d3d8_gl_state_changes;
+			break;
+		}
+	}
+	instance_patch_first[instances.used] = instance_patch_count;
+	instance_patch_counts[instances.used] = 0;
+	if (!group)
+	{
+		float (*first)[4];
+
+		if (!instances_group_room())
+			return FALSE;
+		index = instances.group_count++;
+		group = &instances.groups[index];
+		instance_state_take(&group->state, primitive_type, vertex_count, index_data, TRUE);
+		group->state_changes = d3d8_gl_state_changes;
+		group->hash = hash;
+		group->count = 0;
+		group->next = *bucket;
+		*bucket = index;
+		/* (its first draw's registers, whole) */
+		first = instance_group_constants[index];
+		memcpy(first, device.constants, sizeof(device.constants));
+		memcpy(group->pixel_states, pixel_states, sizeof(pixel_states));
+		for (reg = 0; reg < INSTANCE_PIXEL_CONSTANTS; reg++)
+			color_to_vec4(pixel_states[reg], first[INSTANCE_PIXEL_FIRST + reg]);
+		group->last_serial = constants_serial;
+		group->serial = constants_serial;
+		memset(group->differs, 0, sizeof(group->differs));
+		group->model_skinning = model_skinning;
+		group->block_read = group->block_ready = FALSE;
+		memset(group->model_mask, 0, sizeof(group->model_mask));
+		for (reg = 0; model_skinning >= 0 && reg < XGPU_VERTEX_CONSTANT_COUNT; reg++)
+		{
+			if (instance_model_place(reg, model_skinning) >= 0)
+				group->model_mask[reg >> 5] |= 1u << (reg & 31);
+		}
+	}
+	else
+	{
+		/* (a later one's: the registers changed since the first's, where
+		they differ from it) */
+		const float (*first)[4] = (const float (*)[4])instance_group_constants[index];
+		unsigned int serial = (unsigned int)group->serial;
+		struct instance_patch *patch = &instance_patches[instance_patch_count];
+		unsigned long long since = constants_serial - group->last_serial;
+
+		/* (as many changes as the log holds; after another group's draws,
+		fewer than a look at every register costs) */
+		if (since <= CONSTANT_LOG_SIZE && (instances.last_group == index || since <= XGPU_VERTEX_CONSTANT_COUNT))
+		{
+			/* (the registers changed since the group's latest draw, and the
+			ones its draws already differ in: the only ones that can) */
+			DWORD candidates[XGPU_VERTEX_CONSTANT_COUNT / 32];
+			unsigned int changes = (unsigned int)since;
+			unsigned int at = (unsigned int)group->last_serial;
+			int word;
+
+			memcpy(candidates, group->differs, sizeof(candidates));
+			for (; changes; changes--)
+			{
+				int changed = constant_log[++at % CONSTANT_LOG_SIZE];
+
+				candidates[changed >> 5] |= 1u << (changed & 31);
+			}
+			for (word = 0; word < XGPU_VERTEX_CONSTANT_COUNT / 32; word++)
+			{
+				/* (not its model's, which its row names) */
+				DWORD bits = candidates[word] & ~group->model_mask[word];
+
+				while (bits)
+				{
+					reg = word * 32 + __builtin_ctz(bits);
+					bits &= bits - 1;
+					if (register_differs(device.constants[reg], first[reg]))
+					{
+						patch->reg = reg;
+						memcpy(patch->value, device.constants[reg], sizeof(patch->value));
+						patch++;
+						group->differs[word] |= 1u << (reg & 31);
+					}
+				}
+			}
+		}
+		else
+		{
+			for (reg = 0; reg < XGPU_VERTEX_CONSTANT_COUNT; reg++)
+			{
+				if ((int)(constant_serials_low[reg] - serial) > 0 &&
+					!(group->model_mask[reg >> 5] & (1u << (reg & 31))) &&
+					register_differs(device.constants[reg], first[reg]))
+				{
+					patch->reg = reg;
+					memcpy(patch->value, device.constants[reg], sizeof(patch->value));
+					patch++;
+					group->differs[reg >> 5] |= 1u << (reg & 31);
+				}
+			}
+		}
+		for (reg = 0; reg < INSTANCE_PIXEL_CONSTANTS; reg++)
+		{
+			DWORD value = pixel_states[reg];
+
+			if (value != group->pixel_states[reg])
+			{
+				patch->reg = INSTANCE_PIXEL_FIRST + reg;
+				color_to_vec4(value, patch->value);
+				patch++;
+				group->differs[(INSTANCE_PIXEL_FIRST + reg) >> 5] |= 1u << ((INSTANCE_PIXEL_FIRST + reg) & 31);
+			}
+		}
+		instance_patch_counts[instances.used] = (unsigned short)(patch - &instance_patches[instance_patch_count]);
+		instance_patch_count += instance_patch_counts[instances.used];
+	}
+	instance_groups[instances.used] = (unsigned int)index;
+	instance_draw_models[instances.used] = model;
+	instances.object_group = index;
+	instances.last_group = index;
+	group->last_serial = constants_serial;
+	memcpy(instance_pixel_states[instances.used], pixel_states, sizeof(pixel_states));
+	group->count++;
+	instances.used++;
+	instances.kept++;
+	return TRUE;
+}
+
+/* (desktop) the buffer mapped once and written a segment at a time, each
+segment fenced once left and waited for before it is written again: no map,
+unmap or new store a flush, each of which made NVIDIA's threaded driver wait
+for its worker thread (a flush's registers, 1.6 MB on average in a 32-times
+co-op fight, fit a segment whatever their count) */
+#define INSTANCE_RING_SEGMENTS 3
+static char *instance_ring;
+static GLsync instance_ring_fences[INSTANCE_RING_SEGMENTS];
+static int instance_ring_segment;
+
+#ifndef HALO_GLES
+/* a ring segment's fence waited for (where the GPU has not yet passed it:
+the commands before it sent on first) and done with */
+static void instance_ring_fence_wait(GLsync *fence)
+{
+	if (!*fence)
+		return;
+	if (glClientWaitSync(*fence, 0, 0) == GL_TIMEOUT_EXPIRED)
+		glClientWaitSync(*fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+	glDeleteSync(*fence);
+	*fence = NULL;
+}
+#endif
+
+/* the store given up, to be made again (at its new size) */
+static void instances_store_drop(void)
+{
+#ifndef HALO_GLES
+	int segment;
+
+	for (segment = 0; segment < INSTANCE_RING_SEGMENTS; segment++)
+	{
+		if (instance_ring_fences[segment])
+		{
+			glDeleteSync(instance_ring_fences[segment]);
+			instance_ring_fences[segment] = NULL;
+		}
+	}
+	/* (deleting the buffer unmaps it; the GL keeps its store for the draws
+	still reading it) */
+	instance_ring = NULL;
+	instance_ring_segment = 0;
+#endif
+	glDeleteTextures(1, &instances.texture);
+	instances.texture = 0;
+	if (instances.buffer)
+	{
+		glDeleteBuffers(1, &instances.buffer);
+		instances.buffer = 0;
+	}
+}
+
+static BOOL instances_buffer_ready(void)
+{
+	GLint texels = 0;
+#ifdef HALO_GLES
+	/* (ES's buffer: given a store of an upload's size each upload) */
+	BOOL fixed = instances_store_kind() == _instances_store_texture;
+#else
+	BOOL fixed = TRUE;
+#endif
+
+	if (instance_rows_size.wanted)
+	{
+		/* (made again at its new size) */
+		if (instances.texture && fixed)
+			instances_store_drop();
+		instance_rows_size.size = instance_rows_size.wanted;
+		instance_rows_size.wanted = 0;
+	}
+	if (instances.texture)
+		return TRUE;
+	if (instances.unavailable)
+		return FALSE;
+	switch (instances_store_kind())
+	{
+	case _instances_store_buffer:
+		break;
+	case _instances_store_texture:
+		/* (as large as an upload at most, written from its start each time:
+		instances_texture_write) */
+		glGenTextures(1, &instances.texture);
+		glActiveTexture(GL_TEXTURE0 + INSTANCE_TEXTURE_UNIT);
+		glBindTexture(GL_TEXTURE_2D, instances.texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, (GLsizei)INSTANCE_TEXTURE_WIDTH,
+			(GLsizei)INSTANCE_TEXTURE_HEIGHT(instance_rows_size.size), 0,
+			GL_RGBA, GL_FLOAT, NULL);
+		glActiveTexture(gl_state.active_texture ? gl_state.active_texture : GL_TEXTURE0);
+		instances.buffer_offset = 0;
+		instances.model_store++;
+		return TRUE;
+	default:
+		instances.unavailable = TRUE;
+		return FALSE;
+	}
+	glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE, &texels);
+	glGenBuffers(1, &instances.buffer);
+	glBindBuffer(GL_TEXTURE_BUFFER, instances.buffer);
+#ifndef HALO_GLES
+	while ((unsigned long)texels / INSTANCE_RING_SEGMENTS >= instance_rows_size.size / 16)
+	{
+		GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+		GLsizeiptr size = (GLsizeiptr)(INSTANCE_RING_SEGMENTS * instance_rows_size.size);
+
+		glBufferStorage(GL_TEXTURE_BUFFER, size, NULL, flags);
+		instance_ring = glMapBufferRange(GL_TEXTURE_BUFFER, 0, size, flags);
+		if (instance_ring)
+			break;
+		/* (one that cannot be made or mapped: a smaller one, no larger ever
+		after; at the least, a buffer of the usual kind instead, written by
+		glBufferSubData, this one's store being fixed) */
+		gl_check_errors("instance ring");
+		glDeleteBuffers(1, &instances.buffer);
+		glGenBuffers(1, &instances.buffer);
+		glBindBuffer(GL_TEXTURE_BUFFER, instances.buffer);
+		if (instance_rows_size.size <= INSTANCE_STORE_LEAST)
+			break;
+		instance_rows_size.ceiling = instance_rows_size.size / 2 > INSTANCE_STORE_LEAST ?
+			(instance_rows_size.size / 2) & ~(INSTANCE_STORE_LEAST - 1) : INSTANCE_STORE_LEAST;
+		instance_rows_size.size = instance_rows_size.ceiling;
+	}
+	if (!instance_ring)
+#endif
+	glBufferData(GL_TEXTURE_BUFFER, (GLsizeiptr)instance_rows_size.size, NULL, GL_STREAM_DRAW);
+	glGenTextures(1, &instances.texture);
+	glActiveTexture(GL_TEXTURE0 + INSTANCE_TEXTURE_UNIT);
+	glBindTexture(GL_TEXTURE_BUFFER, instances.texture);
+	glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, instances.buffer);
+	glActiveTexture(gl_state.active_texture ? gl_state.active_texture : GL_TEXTURE0);
+	instances.buffer_offset = 0;
+	instances.model_store++;
+	return TRUE;
+}
+
+/* ---------- the instances' blocks
+
+An instanced draw's pixel shader reads the registers each of its instances
+has its own of from uniform blocks, not from the instances' buffer: fetched
+from that once a pixel, they cost more GPU time than batching saved. Each
+draw's vectors are a row of the draws' block: lit for each pixel, its lights
+(light 0 alone where its model's are in the models' block, else all of
+them), then its pixel shader constants that differ among its group's draws
+(instances_layout gives them their places). A group's draws are drawn in
+ranges, each as many as a block holds, of one window of models, bound as
+the block (and its window as the models') for an instanced draw of them; the
+models' lighting registers are in the models' block, each model's once a
+flush. instance_blocks_fill places the ranges and writes the models', and
+instances_pack writes each draw's vectors in the walk that writes its row:
+on the desktop straight into a persistently mapped buffer, a segment at a
+time (as instance_ring: no map, unmap or new store a flush); else into
+memory, each range given the GL as it is drawn, in a store of its own (as
+instances_upload's on ES). */
+struct instance_block_range
+{
+	/* its draws, its vectors (aligned for binding), and the window of
+	models it reads, or -1 */
+	unsigned long count, size;
+	long window;
+};
+
+static struct instance_block_range *instance_block_ranges;
+static unsigned long instance_block_range_capacity;
+/* where the flush's blocks are written (NULL: nowhere), the alignment of a
+range bound, in vectors, and the flushes counted */
+static float (*instance_block_to)[4];
+static unsigned long instance_block_align, instance_block_stamp;
+/* (in memory: the blocks, and the buffers a range and a window are given) */
+static float (*instance_block_data)[4];
+static unsigned long instance_block_capacity;
+static GLuint instance_block_buffer, instance_model_block_buffer;
+/* the models whose lights are in the models' block, in order; each window's
+first vector and models; and the window bound */
+static int *instance_block_window_models;
+static unsigned long instance_block_window_model_capacity, instance_block_window_model_count;
+static unsigned long *instance_block_window_firsts, *instance_block_window_counts;
+static unsigned long instance_block_window_capacity, instance_block_windows;
+static long instance_block_bound_window;
+/* (the desktop's ring: its segments, of so many vectors each; whether it
+could be made (-1: not tried); and, where the flush's blocks are in it, at
+which vector they start) */
+#define INSTANCE_BLOCK_RING_SEGMENTS 3
+#define INSTANCE_BLOCK_RING_SEGMENT (instance_blocks_size.size / 16)
+static int instance_block_ring_made = -1;
+static GLuint instance_block_ring_buffer;
+static float (*instance_block_ring)[4];
+static GLsync instance_block_ring_fences[INSTANCE_BLOCK_RING_SEGMENTS];
+static int instance_block_ring_segment;
+static unsigned long instance_block_ring_offset, instance_block_ring_base;
+static BOOL instance_block_ring_used;
+
+/* an array grown to hold need elements (twice as large each time), or left
+as it was (FALSE) where there is no memory */
+static BOOL instance_block_grow(void **array, unsigned long *capacity, unsigned long need, size_t size)
+{
+	unsigned long count = *capacity ? *capacity : 256;
+	void *grown;
+
+	if (need <= *capacity)
+		return TRUE;
+	while (count < need)
+		count *= 2;
+	grown = realloc(*array, count * size);
+	if (!grown)
+		return FALSE;
+	*array = grown;
+	*capacity = count;
+	return TRUE;
+}
+
+static unsigned long instance_block_aligned(unsigned long vectors)
+{
+	return (vectors + instance_block_align - 1) / instance_block_align * instance_block_align;
+}
+
+/* whether a group's draws are lit for each pixel (as prepare_draw lights
+them) */
+static BOOL instance_block_lit(const struct instance_group *group)
+{
+	const struct vertex_shader_object *program = group->state.program_slot ? group->state.program_slot :
+		group->state.vertex_shader;
+
+	return program && program->lighting.lights && !program->lighting_failed && per_pixel_lighting();
+}
+
+/* the vectors of a group's draws' lights in their block: none, unlit; light
+0 alone where their models' are in the models' block; or all of them */
+static int instance_block_light_vectors(const struct instance_group *group)
+{
+	if (!instance_block_lit(group))
+		return 0;
+	return group->model_skinning >= 0 ? 1 : XGPU_MODEL_LIGHT_COUNT;
+}
+
+/* the pixel shader constants that differ among a group's draws (their
+places among the instance's), so many */
+static int instance_block_pixel_list(const struct instance_group *group, int *list)
+{
+	int index, count = 0;
+
+	for (index = 0; index < INSTANCE_PIXEL_CONSTANTS; index++)
+	{
+		int reg = INSTANCE_PIXEL_FIRST + index;
+
+		if (group->differs[reg >> 5] & (1u << (reg & 31)))
+			list[count++] = index;
+	}
+	return count;
+}
+
+/* a model's lights given a place in a window of the models' block, where
+they have none yet this flush; FALSE where there is no memory */
+static BOOL instance_block_model_place(struct instance_model *model, int key)
+{
+	unsigned long per = (unsigned long)instance_block_vectors() / INSTANCE_MODEL_LIGHTING_COUNT;
+
+	if (model->block_stamp == instance_block_stamp)
+		return TRUE;
+	if (!instance_block_windows || instance_block_window_counts[instance_block_windows - 1] >= per)
+	{
+		/* (the firsts grown as the counts are, before them) */
+		unsigned long capacity = instance_block_window_capacity;
+
+		if (!instance_block_grow((void **)&instance_block_window_firsts, &capacity, instance_block_windows + 1,
+				sizeof(*instance_block_window_firsts)) ||
+			!instance_block_grow((void **)&instance_block_window_counts, &instance_block_window_capacity,
+				instance_block_windows + 1, sizeof(*instance_block_window_counts)))
+		{
+			return FALSE;
+		}
+		instance_block_window_counts[instance_block_windows++] = 0;
+	}
+	if (!instance_block_grow((void **)&instance_block_window_models, &instance_block_window_model_capacity,
+		instance_block_window_model_count + 1, sizeof(*instance_block_window_models)))
+	{
+		return FALSE;
+	}
+	model->block_stamp = instance_block_stamp;
+	model->block_window = instance_block_windows - 1;
+	model->block_place = instance_block_window_counts[instance_block_windows - 1]++;
+	instance_block_window_models[instance_block_window_model_count++] = key;
+	return TRUE;
+}
+
+/* a group's ranges (as many draws as a block holds, of one window of models
+where they read the models' block), the first after used vectors, which
+grows by theirs; FALSE where there is no memory */
+static BOOL instance_block_group_ranges(struct instance_group *group, unsigned long *ranges, unsigned long *used)
+{
+	unsigned long per = (unsigned long)instance_block_vectors() / (unsigned long)group->block_stride, start, count;
+
+	group->block_first = *used;
+	group->block_range_first = *ranges;
+	for (start = 0; start < group->count; start += count)
+	{
+		struct instance_block_range *range;
+		long window = -1;
+
+		for (count = 0; start + count < group->count && count < per; count++)
+		{
+			if (group->block_models)
+			{
+				int key = instance_draw_models[group->instances[start + count]];
+				struct instance_model *model = &instance_models[key];
+
+				if (!instance_block_model_place(model, key))
+					return FALSE;
+				if (count && (long)model->block_window != window)
+					break;
+				window = (long)model->block_window;
+			}
+		}
+		if (!instance_block_grow((void **)&instance_block_ranges, &instance_block_range_capacity, *ranges + 1,
+			sizeof(*instance_block_ranges)))
+		{
+			return FALSE;
+		}
+		range = &instance_block_ranges[(*ranges)++];
+		range->count = count;
+		range->size = instance_block_aligned(count * (unsigned long)group->block_stride);
+		range->window = window;
+		*used += range->size;
+	}
+	group->block_range_count = *ranges - group->block_range_first;
+	return TRUE;
+}
+
+/* (the desktop) room for a flush's blocks, need vectors, in the ring's
+segment being written, or the next once the GPU is done with it; NULL where
+there is no ring, or the blocks are larger than a segment (written in
+memory instead) */
+static float (*instance_block_ring_place(unsigned long need))[4]
+{
+#ifndef HALO_GLES
+	if (instance_blocks_size.wanted)
+	{
+		/* (made again at its new size) */
+		if (instance_block_ring_made > 0)
+		{
+			int segment;
+
+			for (segment = 0; segment < INSTANCE_BLOCK_RING_SEGMENTS; segment++)
+			{
+				if (instance_block_ring_fences[segment])
+				{
+					glDeleteSync(instance_block_ring_fences[segment]);
+					instance_block_ring_fences[segment] = NULL;
+				}
+			}
+			glDeleteBuffers(1, &instance_block_ring_buffer);
+			instance_block_ring_buffer = 0;
+			instance_block_ring = NULL;
+			instance_block_ring_made = -1;
+		}
+		instance_blocks_size.size = instance_blocks_size.wanted;
+		instance_blocks_size.wanted = 0;
+	}
+	while (instance_block_ring_made < 0)
+	{
+		GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+		GLsizeiptr size = (GLsizeiptr)(INSTANCE_BLOCK_RING_SEGMENTS * instance_blocks_size.size);
+
+		glGenBuffers(1, &instance_block_ring_buffer);
+		glBindBuffer(GL_UNIFORM_BUFFER, instance_block_ring_buffer);
+		glBufferStorage(GL_UNIFORM_BUFFER, size, NULL, flags);
+		instance_block_ring = glMapBufferRange(GL_UNIFORM_BUFFER, 0, size, flags);
+		instance_block_ring_segment = 0;
+		instance_block_ring_offset = 0;
+		if (instance_block_ring)
+		{
+			instance_block_ring_made = 1;
+			break;
+		}
+		/* (one that cannot be made or mapped: a smaller one, no larger ever
+		after; at the least, the blocks written in memory) */
+		gl_check_errors("instance block ring");
+		glDeleteBuffers(1, &instance_block_ring_buffer);
+		instance_block_ring_buffer = 0;
+		if (instance_blocks_size.size <= INSTANCE_STORE_LEAST)
+		{
+			instance_block_ring_made = 0;
+			break;
+		}
+		instance_blocks_size.ceiling = instance_blocks_size.size / 2 > INSTANCE_STORE_LEAST ?
+			(instance_blocks_size.size / 2) & ~(INSTANCE_STORE_LEAST - 1) : INSTANCE_STORE_LEAST;
+		instance_blocks_size.size = instance_blocks_size.ceiling;
+	}
+	if (!instance_block_ring_made || need > INSTANCE_BLOCK_RING_SEGMENT)
+		return NULL;
+	need = instance_block_aligned(need);
+	if (instance_block_ring_offset + need > (unsigned long)(instance_block_ring_segment + 1) * INSTANCE_BLOCK_RING_SEGMENT)
+	{
+		instance_block_ring_fences[instance_block_ring_segment] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+		instance_block_ring_segment = (instance_block_ring_segment + 1) % INSTANCE_BLOCK_RING_SEGMENTS;
+		instance_ring_fence_wait(&instance_block_ring_fences[instance_block_ring_segment]);
+		instance_block_ring_offset = (unsigned long)instance_block_ring_segment * INSTANCE_BLOCK_RING_SEGMENT;
+	}
+	instance_block_ring_base = instance_block_ring_offset;
+	instance_block_ring_offset += need;
+	return &instance_block_ring[instance_block_ring_base];
+#else
+	(void)need;
+	return NULL;
+#endif
+}
+
+/* the flush's blocks: each group's ranges placed, then the windows of
+models, the models' lights written, before instances_upload packs the rows
+and with them the draws' vectors. A group whose draws read a block is drawn
+instanced only where it is ready (none is, where there is no memory) */
+static void instance_blocks_fill(void)
+{
+	unsigned long used = 0, need, ranges = 0, window, index;
+	float (*to)[4];
+	int group_index;
+
+	if (!instance_block_align)
+	{
+		GLint align = 0;
+
+		glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &align);
+		instance_block_align = align > 16 ? (unsigned long)(align + 15) / 16 : 1;
+	}
+	instance_block_to = NULL;
+	instance_block_ring_used = FALSE;
+	instance_block_stamp++;
+	instance_block_windows = 0;
+	instance_block_window_model_count = 0;
+	instance_block_bound_window = -1;
+	for (group_index = 0; group_index < instances.group_count; group_index++)
+	{
+		struct instance_group *group = &instances.groups[group_index];
+		int pixel_list[INSTANCE_PIXEL_CONSTANTS];
+		BOOL lit = group->count > 1 && instance_block_lit(group);
+		int pixels = group->count > 1 ? instance_block_pixel_list(group, pixel_list) : 0;
+
+		group->block_read = lit || pixels > 0;
+		group->block_ready = FALSE;
+		group->block_models = lit && group->model_skinning >= 0;
+		group->block_stride = (lit ? instance_block_light_vectors(group) : 0) + pixels;
+	}
+	for (group_index = 0; group_index < instances.group_count; group_index++)
+	{
+		struct instance_group *group = &instances.groups[group_index];
+
+		if (group->block_read && !instance_block_group_ranges(group, &ranges, &used))
+			return;
+	}
+	/* (the windows of models after the ranges, and room for the last range
+	bound whole) */
+	for (window = 0; window < instance_block_windows; window++)
+	{
+		instance_block_window_firsts[window] = used;
+		used += instance_block_aligned(instance_block_window_counts[window] * INSTANCE_MODEL_LIGHTING_COUNT);
+	}
+	need = used + (unsigned long)instance_block_vectors();
+	instance_blocks_size.frame += need * sizeof(*to);
+	to = instance_block_ring_place(need);
+	instance_block_ring_used = to != NULL;
+	if (!to)
+	{
+		if (!instance_block_grow((void **)&instance_block_data, &instance_block_capacity, need,
+			sizeof(*instance_block_data)))
+		{
+			return;
+		}
+		to = instance_block_data;
+	}
+	/* (each model's lights once, in order) */
+	for (index = 0; index < instance_block_window_model_count; index++)
+	{
+		const struct instance_model *model = &instance_models[instance_block_window_models[index]];
+
+		memcpy(to[instance_block_window_firsts[model->block_window] + model->block_place * INSTANCE_MODEL_LIGHTING_COUNT],
+			model->lighting, INSTANCE_MODEL_LIGHTING_COUNT * sizeof(*to));
+	}
+	instance_block_to = to;
+	for (group_index = 0; group_index < instances.group_count; group_index++)
+		instances.groups[group_index].block_ready = instances.groups[group_index].block_read;
+}
+
+/* a window of the models' block bound, where it is not already */
+static void instance_block_window_bind(long window)
+{
+	GLsizeiptr size = (GLsizeiptr)((unsigned long)instance_block_vectors() * sizeof(*instance_block_data));
+	unsigned long first;
+
+	if (window < 0 || window == instance_block_bound_window)
+		return;
+	instance_block_bound_window = window;
+	first = instance_block_window_firsts[window];
+	if (instance_block_ring_used)
+	{
+		glBindBufferRange(GL_UNIFORM_BUFFER, INSTANCE_MODEL_BLOCK_BINDING, instance_block_ring_buffer,
+			(GLintptr)((instance_block_ring_base + first) * sizeof(*instance_block_data)), size);
+		return;
+	}
+	if (!instance_model_block_buffer)
+		glGenBuffers(1, &instance_model_block_buffer);
+	glBindBuffer(GL_UNIFORM_BUFFER, instance_model_block_buffer);
+	glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STREAM_DRAW);
+	glBufferSubData(GL_UNIFORM_BUFFER, 0,
+		(GLsizeiptr)(instance_block_window_counts[window] * INSTANCE_MODEL_LIGHTING_COUNT * sizeof(*instance_block_data)),
+		instance_block_data[first]);
+	glBindBufferBase(GL_UNIFORM_BUFFER, INSTANCE_MODEL_BLOCK_BINDING, instance_model_block_buffer);
+}
+
+/* a group's draws drawn instanced (instances_flush having set the rest):
+where they read a block, a range of it at a time, each bound with its
+window of models */
+static void instance_block_draw(const struct instance_group *group, D3DPRIMITIVETYPE primitive_type)
+{
+	GLsizeiptr size = (GLsizeiptr)((unsigned long)instance_block_vectors() * sizeof(*instance_block_data));
+	unsigned long start = 0, at = group->block_first, range;
+
+	if (!group->block_read)
+	{
+		draw_indexed(primitive_type, group->state.vertex_count, group->state.index_data);
+		return;
+	}
+	for (range = group->block_range_first; range < group->block_range_first + group->block_range_count; range++)
+	{
+		unsigned long count = instance_block_ranges[range].count;
+
+		instance_block_window_bind(instance_block_ranges[range].window);
+		if (instance_block_ring_used)
+		{
+			glBindBufferRange(GL_UNIFORM_BUFFER, INSTANCE_BLOCK_BINDING, instance_block_ring_buffer,
+				(GLintptr)((instance_block_ring_base + at) * sizeof(*instance_block_data)), size);
+		}
+		else
+		{
+			if (!instance_block_buffer)
+				glGenBuffers(1, &instance_block_buffer);
+			glBindBuffer(GL_UNIFORM_BUFFER, instance_block_buffer);
+			glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STREAM_DRAW);
+			glBufferSubData(GL_UNIFORM_BUFFER, 0,
+				(GLsizeiptr)(count * (unsigned long)group->block_stride * sizeof(*instance_block_data)),
+				instance_block_data[at]);
+			glBindBufferBase(GL_UNIFORM_BUFFER, INSTANCE_BLOCK_BINDING, instance_block_buffer);
+		}
+		instances.base = group->base + start * (unsigned long)group->stride;
+		instances.drawing = count;
+		instances.block_stride = group->block_stride;
+		draw_indexed(primitive_type, group->state.vertex_count, group->state.index_data);
+		at += instance_block_ranges[range].size;
+		start += count;
+	}
+}
+
+/* the registers that differ among a group's draws in their rows (regs, in
+order), and each register's place among a draw's own: in its row, or a
+pixel shader constant's in its block (INSTANCE_IN_BLOCK less its place
+there, after its lights); how many a row has */
+static int instances_layout(struct instance_group *group, int *regs)
+{
+	int *slots = instance_group_slots[group - instances.groups];
+	int reg, word, registers = 0, place = instance_block_light_vectors(group);
+
+	for (reg = 0; reg < INSTANCE_SLOT_VECTORS * 4; reg++)
+		slots[reg] = -1;
+	/* (its draws' models': read where the row's first register says, -2
+	less their place among the model's) */
+	if (group->model_skinning >= 0)
+	{
+		for (reg = 0; reg < XGPU_VERTEX_CONSTANT_COUNT; reg++)
+		{
+			int model_place = instance_model_place(reg, group->model_skinning);
+
+			if (model_place >= 0)
+				slots[reg] = -2 - model_place;
+		}
+		regs[registers++] = -1;
+	}
+	for (word = 0; word < (INSTANCE_REGISTERS + 31) / 32; word++)
+	{
+		DWORD bits = group->differs[word];
+
+		while (bits)
+		{
+			reg = word * 32 + __builtin_ctz(bits);
+			bits &= bits - 1;
+			if (reg >= INSTANCE_PIXEL_FIRST)
+			{
+				slots[reg] = INSTANCE_IN_BLOCK - place++;
+				continue;
+			}
+			slots[reg] = registers;
+			regs[registers++] = reg;
+		}
+	}
+	if (!registers)
+	{
+		slots[0] = 0;
+		regs[registers++] = 0;
+	}
+	group->slots = slots;
+	group->stride = registers;
+	return registers;
+}
+
+/* a group's draws' registers that differ among them, each written once, in
+order (into the mapped buffer, write-combined memory, where a slot written
+twice or out of order costs): a draw's own where it has one (its patches are
+in the registers' order), its group's first draw's elsewhere; and, its block
+ready (instance_blocks_fill), its vectors there, in the same walk of its
+patches */
+static void instances_pack(const struct instance_group *group, const int *regs, float (*to)[4])
+{
+	/* (the row's registers and the block's merged in the registers' order:
+	each one's place in the row and in the block, or -1) */
+	int merged_reg[INSTANCE_REGISTERS + XGPU_MODEL_LIGHT_COUNT + 2];
+	int merged_row[INSTANCE_REGISTERS + XGPU_MODEL_LIGHT_COUNT + 2];
+	int merged_block[INSTANCE_REGISTERS + XGPU_MODEL_LIGHT_COUNT + 2];
+	int block_reg[XGPU_MODEL_LIGHT_COUNT + INSTANCE_PIXEL_CONSTANTS];
+	int block_place[XGPU_MODEL_LIGHT_COUNT + INSTANCE_PIXEL_CONSTANTS];
+	int pixel_list[INSTANCE_PIXEL_CONSTANTS];
+	const float (*first)[4] = (const float (*)[4])instance_group_constants[group - instances.groups];
+	/* (a row's first register is its model's place where regs says -1) */
+	int registers = group->stride, model_row = regs[0] < 0, blocks = 0, merged = 0, k, b = 0;
+	unsigned long index, range = group->block_range_first, in_range = 0, at = group->block_first;
+
+	if (group->block_ready)
+	{
+		int light_vectors = instance_block_light_vectors(group);
+		int pixel_count = instance_block_pixel_list(group, pixel_list);
+
+		/* (its lights' registers, in the registers' order) */
+		for (k = 0; k < light_vectors; k++, blocks++)
+		{
+			int reg = (int)model_light_register(k), j;
+
+			for (j = blocks; j > 0 && block_reg[j - 1] > reg; j--)
+			{
+				block_reg[j] = block_reg[j - 1];
+				block_place[j] = block_place[j - 1];
+			}
+			block_reg[j] = reg;
+			block_place[j] = k;
+		}
+		for (k = 0; k < pixel_count; k++, blocks++)
+		{
+			block_reg[blocks] = INSTANCE_PIXEL_FIRST + pixel_list[k];
+			block_place[blocks] = light_vectors + k;
+		}
+	}
+	k = model_row;
+	while (k < registers || b < blocks)
+	{
+		if (b >= blocks || (k < registers && regs[k] < block_reg[b]))
+		{
+			merged_reg[merged] = regs[k];
+			merged_row[merged] = k++;
+			merged_block[merged++] = -1;
+		}
+		else if (k >= registers || block_reg[b] < regs[k])
+		{
+			merged_reg[merged] = block_reg[b];
+			merged_row[merged] = -1;
+			merged_block[merged++] = block_place[b++];
+		}
+		else
+		{
+			merged_reg[merged] = regs[k];
+			merged_row[merged] = k++;
+			merged_block[merged++] = block_place[b++];
+		}
+	}
+	for (index = 0; index < group->count; index++, to += registers)
+	{
+		unsigned long instance = group->instances[index];
+		const struct instance_patch *patch = &instance_patches[instance_patch_first[instance]];
+		const struct instance_patch *end = patch + instance_patch_counts[instance];
+		float (*vectors)[4] = NULL;
+		int m;
+
+		if (group->block_ready)
+		{
+			if (in_range == instance_block_ranges[range].count)
+			{
+				at += instance_block_ranges[range].size;
+				range++;
+				in_range = 0;
+			}
+			vectors = &instance_block_to[at + in_range++ * (unsigned long)group->block_stride];
+		}
+		if (model_row)
+		{
+			/* (where its model's registers are in the buffer, and its
+			lights in the models' block) */
+			const struct instance_model *model = &instance_models[instance_draw_models[instance]];
+			float place[4];
+
+			place[0] = (float)model->base;
+			place[1] = (float)model->block_place;
+			place[2] = place[3] = 0.0f;
+			memcpy(to[0], place, sizeof(*to));
+		}
+		for (m = 0; m < merged; m++)
+		{
+			int reg = merged_reg[m];
+			const float *value;
+
+			while (patch < end && patch->reg < reg)
+				patch++;
+			value = patch < end && patch->reg == reg ? patch->value : first[reg];
+			if (merged_row[m] >= 0)
+				memcpy(to[merged_row[m]], value, sizeof(*to));
+			if (merged_block[m] >= 0)
+				memcpy(vectors[merged_block[m]], value, sizeof(*to));
+		}
+	}
+}
+
+/* where in an upload, after its draws' rows (so many texels), each model of
+the draws of groups first to end that have one goes, each once
+(instance_upload_models, so many): none, if reusing, an earlier upload of its
+batch wrote into the store still written into (a batch of more draws than an
+upload holds, split, its models not written again); the texels in all, and
+how many models were reused */
+static unsigned long instances_upload_models_place(int first, int end, unsigned long packed, BOOL reuse,
+	unsigned long *models, unsigned long *reused)
+{
+	int index;
+
+	*models = 0;
+	*reused = 0;
+	instances.model_upload++;
+	for (index = first; index < end; index++)
+	{
+		const struct instance_group *group = &instances.groups[index];
+		unsigned long instance;
+
+		if (group->count < 2 || group->model_skinning < 0)
+			continue;
+		for (instance = 0; instance < group->count; instance++)
+		{
+			struct instance_model *model = &instance_models[instance_draw_models[group->instances[instance]]];
+
+			if (model->upload == instances.model_upload)
+				continue;
+			model->upload = instances.model_upload;
+			if (reuse && model->written && model->store == instances.model_store)
+			{
+				(*reused)++;
+				continue;
+			}
+			model->base = packed;
+			packed += INSTANCE_MODEL_LIGHTING_COUNT + (unsigned long)model->skinning_count;
+			instance_upload_models[(*models)++] = (int)(model - instance_models);
+		}
+	}
+	return packed;
+}
+
+/* (the 2D texture) an upload's registers, from instance_packed: its rows
+whole, the last one's end whatever is there (instances_upload makes room for
+it) */
+static void instances_texture_write(unsigned long count)
+{
+	GLsizei height = (GLsizei)((count + INSTANCE_TEXTURE_WIDTH - 1) / INSTANCE_TEXTURE_WIDTH);
+
+	glActiveTexture(GL_TEXTURE0 + INSTANCE_TEXTURE_UNIT);
+	glBindTexture(GL_TEXTURE_2D, instances.texture);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, (GLsizei)INSTANCE_TEXTURE_WIDTH, height, GL_RGBA, GL_FLOAT, instance_packed);
+	glActiveTexture(gl_state.active_texture ? gl_state.active_texture : GL_TEXTURE0);
+}
+
+/* the registers of the groups from first on of more than one draw into the
+buffer at once, before any of them is drawn: one upload for as many as it
+holds (all, once it has grown to the frames': instance_store_frame), where the GPU reads none
+(one a group made each a wait for the draws before it, NVIDIA's GPU doing
+more waiting than drawing); the group after the last put there (a group too
+large for an upload on its own not put there: drawn a draw at a time) */
+static int instances_upload(int first)
+{
+	static int regs[INSTANCE_REGISTERS + 1];
+	unsigned long packed = 0, bound = 0, size, base, models = 0, model_index, rows, reused = 0;
+#ifndef HALO_GLES
+	unsigned long store;
+#endif
+	struct instance_model *model_written;
+	float (*to)[4];
+	int index, end;
+	BOOL texture = instances_store_kind() == _instances_store_texture;
+
+	for (index = first; index < instances.group_count; index++)
+		instances.groups[index].packed = FALSE;
+	if (!instances_buffer_ready())
+		return instances.group_count;
+	/* (as many groups as an upload holds: their rows, and their draws'
+	models, each counted as if no other draw had it) */
+	for (end = first; end < instances.group_count; end++)
+	{
+		struct instance_group *group = &instances.groups[end];
+		unsigned long group_rows, need, instance;
+
+		if (group->count < 2)
+			continue;
+		group_rows = group->count * (unsigned long)instances_layout(group, regs);
+		need = group_rows;
+		for (instance = 0; group->model_skinning >= 0 && instance < group->count; instance++)
+			need += INSTANCE_MODEL_LIGHTING_COUNT +
+				(unsigned long)instance_models[instance_draw_models[group->instances[instance]]].skinning_count;
+		if (bound + need > INSTANCE_UPLOAD_MAXIMUM)
+		{
+			if (end == first)
+				return first + 1;
+			break;
+		}
+		bound += need;
+		group->base = packed;
+		packed += group_rows;
+	}
+	if (!packed)
+		return end;
+	rows = packed;
+#ifndef HALO_GLES
+	store = instances.model_store;
+	packed = instances_upload_models_place(first, end, rows, !texture, &models, &reused);
+#else
+	/* (ES: a store of its own each upload, none kept) */
+	packed = instances_upload_models_place(first, end, rows, FALSE, &models, &reused);
+#endif
+	size = packed * sizeof(instance_packed[0]);
+	to = NULL;
+#ifndef HALO_GLES
+	if (!texture)
+	{
+		if (instance_ring)
+		{
+			/* (the next segment, once the GPU has done with it, where this one
+			has no room left) */
+			if (instances.buffer_offset + size > (unsigned long)(instance_ring_segment + 1) * instance_rows_size.size)
+			{
+				instance_ring_fences[instance_ring_segment] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+				instance_ring_segment = (instance_ring_segment + 1) % INSTANCE_RING_SEGMENTS;
+				instance_ring_fence_wait(&instance_ring_fences[instance_ring_segment]);
+				instances.buffer_offset = (unsigned long)instance_ring_segment * instance_rows_size.size;
+				instances.model_store++;
+			}
+		}
+		else
+		{
+			glBindBuffer(GL_TEXTURE_BUFFER, instances.buffer);
+			if (instances.buffer_offset + size > instance_rows_size.size)
+			{
+				/* (a new store: the draws still reading the old keep it) */
+				glBufferData(GL_TEXTURE_BUFFER, (GLsizeiptr)instance_rows_size.size, NULL, GL_STREAM_DRAW);
+				instances.buffer_offset = 0;
+				instances.model_store++;
+			}
+		}
+		/* (models of the batch an upload into the last store wrote: written
+		again, in this one, where there is room for all of it from its start) */
+		if (reused && instances.model_store != store)
+		{
+			packed = instances_upload_models_place(first, end, rows, FALSE, &models, &reused);
+			size = packed * sizeof(instance_packed[0]);
+		}
+		if (instance_ring)
+			to = (float (*)[4])(instance_ring + instances.buffer_offset);
+	}
+	else
+#endif
+	{
+		/* (ES, and the 2D texture: a store of its own each time, below) */
+		instances.buffer_offset = 0;
+		instances.model_store++;
+	}
+	/* (written here first, then the buffer given it: as large as that, to
+	the end of the 2D texture's last row) */
+	if (!to)
+	{
+		unsigned long room = (packed + INSTANCE_TEXTURE_WIDTH - 1) & ~(INSTANCE_TEXTURE_WIDTH - 1);
+
+		if (room > instance_packed_capacity)
+		{
+			void *grown;
+			unsigned long count = instance_packed_capacity ? instance_packed_capacity : 64 * 1024;
+
+			while (count < room)
+				count *= 2;
+			if (!INSTANCE_GROW(instance_packed, count))
+				return end;
+			instance_packed_capacity = count;
+		}
+		to = instance_packed;
+	}
+	base = instances.buffer_offset / sizeof(instance_packed[0]);
+	instance_rows_size.frame += size;
+	/* (the rows, then the models, each in order: write-combined memory) */
+	for (model_index = 0; model_index < models; model_index++)
+		instance_models[instance_upload_models[model_index]].base += base;
+	for (index = first; index < end; index++)
+	{
+		struct instance_group *group = &instances.groups[index];
+
+		if (group->count > 1)
+		{
+			instances_layout(group, regs);
+			instances_pack(group, regs, to + group->base);
+		}
+	}
+	for (model_index = 0; model_index < models; model_index++)
+	{
+		const struct instance_model *model = &instance_models[instance_upload_models[model_index]];
+		float (*at)[4] = to + (model->base - base);
+
+		model_written = &instance_models[instance_upload_models[model_index]];
+		model_written->written = TRUE;
+		model_written->store = instances.model_store;
+		memcpy(at, model->lighting, INSTANCE_MODEL_LIGHTING_COUNT * sizeof(*at));
+		if (model->skinning_count)
+			memcpy(at + INSTANCE_MODEL_LIGHTING_COUNT, model->skinning, model->skinning_count * sizeof(*at));
+	}
+	if (texture)
+		instances_texture_write(packed);
+#ifndef HALO_GLES
+	else if (!instance_ring)
+		glBufferSubData(GL_TEXTURE_BUFFER, (GLintptr)instances.buffer_offset, (GLsizeiptr)size, instance_packed);
+#else
+	else
+	{
+		glBindBuffer(GL_TEXTURE_BUFFER, instances.buffer);
+		/* (ES: a store of its own each time, as a part of one the GPU may
+		still be reading is copied whole first by Mali's drivers) */
+		glBufferData(GL_TEXTURE_BUFFER, (GLsizeiptr)size, instance_packed, GL_STREAM_DRAW);
+		/* (and the texture given the new store: Mali's keeps the old one's) */
+		glActiveTexture(GL_TEXTURE0 + INSTANCE_TEXTURE_UNIT);
+		glBindTexture(GL_TEXTURE_BUFFER, instances.texture);
+		glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, instances.buffer);
+		glActiveTexture(gl_state.active_texture ? gl_state.active_texture : GL_TEXTURE0);
+	}
+#endif
+	for (index = first; index < end; index++)
+	{
+		struct instance_group *group = &instances.groups[index];
+
+		if (group->count > 1)
+		{
+			group->base += base;
+			group->packed = TRUE;
+		}
+	}
+	instances.buffer_offset += size;
+	return end;
+}
+
+/* the instanced draw's uniforms, its program bound (prepare_draw); FALSE
+if its program is not the instanced one */
+static BOOL instances_bind(const struct program_entry *entry)
+{
+	if (entry->instance_slot < 0)
+		return FALSE;
+	glUniform4iv(entry->instance_slot, INSTANCE_SLOT_VECTORS, instances.slots);
+	glUniform1i(entry->instance_stride, instances.stride);
+	if (entry->instance_skinning >= 0)
+		glUniform1i(entry->instance_skinning, instances.skinning);
+	if (entry->instance_has_model >= 0)
+		glUniform1i(entry->instance_has_model, instances.has_model);
+	if (entry->instance_block_stride >= 0)
+		glUniform1i(entry->instance_block_stride, instances.block_stride);
+	glUniform1i(entry->instance_base, (GLint)instances.base);
+	glActiveTexture(GL_TEXTURE0 + INSTANCE_TEXTURE_UNIT);
+	glBindTexture(instances_store_target(), instances.texture);
+	glActiveTexture(gl_state.active_texture ? gl_state.active_texture : GL_TEXTURE0);
+	return TRUE;
+}
+
+/* an instance's registers and pixel shader constants, as its draw had them */
+static void instance_restore(const struct instance_group *group, unsigned long instance)
+{
+	const struct instance_patch *patch = &instance_patches[instance_patch_first[instance]];
+	unsigned long patches = instance_patch_counts[instance];
+	int index;
+
+	const float (*first)[4] = (const float (*)[4])instance_group_constants[group - instances.groups];
+	int reg;
+
+	/* (the first draw's, where they have changed since) */
+	for (reg = 0; reg < XGPU_VERTEX_CONSTANT_COUNT; reg++)
+	{
+		if (constant_serials[reg] > group->serial)
+			constants_store((unsigned long)reg, first[reg], 1);
+	}
+	for (; patches; patches--, patch++)
+	{
+		if (patch->reg < XGPU_VERTEX_CONSTANT_COUNT)
+			constants_store((unsigned long)patch->reg, patch->value, 1);
+	}
+	/* (and its model's, which its group's first draw's are not) */
+	if (group->model_skinning >= 0)
+	{
+		const struct instance_model *model = &instance_models[instance_draw_models[instance]];
+
+		constants_store(INSTANCE_MODEL_LIGHTING, model->lighting, INSTANCE_MODEL_LIGHTING_COUNT);
+		if (model->skinning_count)
+			constants_store(INSTANCE_MODEL_SKINNING, model->skinning, (unsigned long)model->skinning_count);
+	}
+	for (index = 0; index < INSTANCE_PIXEL_CONSTANTS; index++)
+		D3D__RenderState[instance_pixel_state(index)] = instance_pixel_states[instance][index];
+}
+
+/* draws the kept draws, each group at once, then puts back the state */
+static void instances_flush(void)
+{
+	static struct instance_state now;
+	static float saved[XGPU_VERTEX_CONSTANT_COUNT][4];
+	int index, uploaded = 0;
+
+	if (!instances.group_count)
+		return;
+	/* (the state put back after: the model's registers the device's) */
+	instances_model_apply();
+	instances.flushing = TRUE;
+	instance_state_take(&now, 0, 0, NULL, FALSE);
+	memcpy(saved, device.constants, sizeof(saved));
+	{
+		unsigned long start = 0, kept;
+
+		for (index = 0; index < instances.group_count; index++)
+		{
+			instances.groups[index].instances = &instance_order[start];
+			start += instances.groups[index].count;
+			instances.groups[index].count = 0;
+		}
+		for (kept = 0; kept < instances.used; kept++)
+		{
+			struct instance_group *group = &instances.groups[instance_groups[kept]];
+
+			group->instances[group->count++] = (unsigned int)kept;
+		}
+	}
+	/* (the blocks placed before the rows are packed, with their vectors) */
+	if (!precompiling && instances_store_kind() != _instances_store_none)
+		instance_blocks_fill();
+	for (index = 0; index < instances.group_count; index++)
+	{
+		const struct instance_group *group = &instances.groups[index];
+		D3DPRIMITIVETYPE primitive_type = (D3DPRIMITIVETYPE)group->state.primitive_type;
+		unsigned long instance;
+		BOOL drawn = FALSE;
+
+		if (!group->count)
+			continue;
+		/* (the groups from here on as many as an upload holds: all) */
+		if (!precompiling && index >= uploaded)
+			uploaded = instances_upload(index);
+		instance_state_restore(&group->state);
+		instance_restore(group, group->instances[0]);
+		if (precompiling)
+		{
+			/* (the programs the group's draws would be drawn with: one
+			at a time, and as one, were there more of them) */
+			draw_indexed(primitive_type, group->state.vertex_count, group->state.index_data);
+			if (instances_store_kind() != _instances_store_none)
+			{
+				instances.drawing = 2;
+				draw_indexed(primitive_type, group->state.vertex_count, group->state.index_data);
+				instances.drawing = 0;
+			}
+			instances.groups_drawn++;
+			continue;
+		}
+		/* (instanced where its rows are in the buffer, and its block ready
+		where its draws read one) */
+		if (group->count > 1 && group->packed && (!group->block_read || group->block_ready))
+		{
+			memcpy(instances.slots, group->slots, sizeof(instances.slots));
+			instances.stride = group->stride;
+			instances.skinning = group->model_skinning > 0 ? group->model_skinning : 0;
+			instances.has_model = group->model_skinning >= 0;
+			instances.base = group->base;
+			instances.drawing = group->count;
+			instances.draw_failed = FALSE;
+			instance_block_draw(group, primitive_type);
+			drawn = !instances.draw_failed;
+			instances.drawing = 0;
+			if (drawn)
+			{
+				instances.instanced_draws++;
+				instances.instances_drawn += group->count;
+			}
+		}
+		/* (one, or one that cannot be drawn instanced: a draw at a time) */
+		for (instance = 0; !drawn && instance < group->count; instance++)
+		{
+			instance_restore(group, group->instances[instance]);
+			draw_indexed(primitive_type, group->state.vertex_count, group->state.index_data);
+		}
+		instances.groups_drawn++;
+	}
+	instance_state_restore(&now);
+	constants_store(0, saved, XGPU_VERTEX_CONSTANT_COUNT);
+	instances.group_count = 0;
+	instances.object_group = -1;
+	instances.last_group = -1;
+	instances.used = 0;
+	instance_patch_count = 0;
+	instances.flushing = FALSE;
+}
+
+static void instances_flush_pending(void)
+{
+	if (instances.group_count && !instances.flushing)
+		instances_flush();
+}
+
+/* the indexed draws until d3d8_gl_instances_end can be drawn grouped: none
+of them depends on another's being drawn first (opaque, in the depth
+buffer), and nothing else is drawn among them (drawn after them if it is) */
+void d3d8_gl_instances_begin(void)
+{
+	if (!instances.depth++)
+		instances.model_generation++;
+}
+
+/* the model whose draws follow: its lighting's registers (c[-79] on, 11) and
+its skinning's (c[-36] on, so many), set as D3DDevice_SetVertexShaderConstant
+would, but kept once for all its draws (instances_upload), not each draw's
+own; the key its own until d3d8_gl_instances_end, the values unchanged till
+then */
+void d3d8_gl_instances_model(int key, const void *lighting, const void *skinning, int skinning_count)
+{
+	struct instance_model *model;
+	int previous_skinning = instances.model_pending ? instance_models[instances.model].skinning_count : 0;
+
+	if (!instances.depth || instances.flushing || instances.unavailable || key < 0 || !instances_model_room(key) ||
+		skinning_count < 0 || INSTANCE_MODEL_SKINNING + skinning_count > XGPU_VERTEX_CONSTANT_COUNT)
+	{
+		instances_model_apply();
+		instances.model = -1;
+		constants_store(INSTANCE_MODEL_LIGHTING, lighting, INSTANCE_MODEL_LIGHTING_COUNT);
+		if (skinning_count > 0)
+		{
+			if (INSTANCE_MODEL_SKINNING + skinning_count > XGPU_VERTEX_CONSTANT_COUNT)
+				skinning_count = XGPU_VERTEX_CONSTANT_COUNT - INSTANCE_MODEL_SKINNING;
+			constants_store(INSTANCE_MODEL_SKINNING, skinning, (unsigned long)skinning_count);
+		}
+		return;
+	}
+	/* (the last model's skinning registers past this one's, as setting them
+	would have left them) */
+	if (previous_skinning > skinning_count)
+	{
+		const struct instance_model *previous = &instance_models[instances.model];
+
+		constants_store((unsigned long)(INSTANCE_MODEL_SKINNING + skinning_count), previous->skinning + skinning_count,
+			(unsigned long)(previous_skinning - skinning_count));
+	}
+	model = &instance_models[key];
+	if (model->generation != instances.model_generation)
+	{
+		model->generation = instances.model_generation;
+		model->upload = 0;
+		model->written = FALSE;
+	}
+	model->lighting = (const float (*)[4])lighting;
+	model->skinning = (const float (*)[4])skinning;
+	model->skinning_count = skinning_count;
+	instances.model = key;
+	instances.model_pending = TRUE;
+	instances.model_overridden = FALSE;
+}
+
+/* the draws that follow are another object's: drawn in their order among
+themselves (a part's passes), not after the last object's */
+void d3d8_gl_instances_next(void)
+{
+	instances.object_group = -1;
+}
+
+void d3d8_gl_instances_end(void)
+{
+	if (instances.depth > 0 && --instances.depth == 0)
+	{
+		instances_model_apply();
+		instances.model = -1;
+		instances_flush_pending();
+	}
+}
+
+/* the texture a stage has (rasterizer_xbox_models.c: a shader's textures
+set again without being looked up) */
+void *d3d8_gl_texture(unsigned long stage)
+{
+	return stage < D3DTSS_MAXSTAGES ? device.textures[stage] : NULL;
+}
+
+#ifdef HALO_GLES
+/* an indexed draw without a base vertex (WebGL 2), instanced if it is to be
+(instances_flush) */
+static void draw_elements(GLenum mode, GLsizei count, const void *offset)
+{
+	if (instances.drawing)
+	{
+		glDrawElementsInstanced(mode, count, GL_UNSIGNED_SHORT, offset, (GLsizei)instances.drawing);
+		return;
+	}
+	glDrawElements(mode, count, GL_UNSIGNED_SHORT, offset);
+}
+#endif
+
+/* an indexed draw, instanced if it is to be (instances_flush) */
+static void draw_elements_base_vertex(GLenum mode, GLsizei count, const void *offset, GLint base_vertex)
+{
+	if (instances.drawing)
+	{
+		glDrawElementsInstancedBaseVertex(mode, count, GL_UNSIGNED_SHORT, offset, (GLsizei)instances.drawing,
+			base_vertex);
+		return;
+	}
+	glDrawElementsBaseVertex(mode, count, GL_UNSIGNED_SHORT, offset, base_vertex);
+}
+
 static struct program_entry *prepare_draw(BOOL immediate)
 {
-	/* (the fixed-function program compiled only with OpenGL there: not by
-	the null renderer) */
-	struct vertex_shader_object *program = !device.gl_ready ? NULL :
-		device.fixed_function ? fixed_function_program() : current_program();
+	struct vertex_shader_object *program;
 	struct nv2a_pixel_shader_key key;
 	struct program_entry *entry;
 	struct draw_uniforms uniforms;
 	BOOL has_depth = FALSE;
 	int stage;
 
+	/* (a draw made now: the model's registers the device's,
+	d3d8_gl_instances_model) */
+	instances_model_apply();
+	/* (the fixed-function program compiled only with OpenGL there: not by
+	the null renderer) */
+	program = !device.gl_ready ? NULL : device.fixed_function ? fixed_function_program() : current_program();
 	/* (the fixed-function pipeline's draws: immediate mode's only) */
 	if (!device.gl_ready || !program || !(device.vertex_shader || device.fixed_function) || !program->instructions ||
 		(device.fixed_function && !immediate))
@@ -5284,6 +7736,7 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		key.alpha_test_samples = (unsigned char)target_samples;
 #endif
 	key.fog_enable = D3D__RenderState[D3DRS_FOGENABLE] != 0;
+	key.instanced = instances.drawing && !immediate;
 	key.source_blend = source_blend_in_shader();
 	key.fog_table_mode = (unsigned char)D3D__RenderState[D3DRS_FOGTABLEMODE];
 #ifdef HALO_GLES
@@ -5294,7 +7747,18 @@ static struct program_entry *prepare_draw(BOOL immediate)
 	if (program->lighting.lights && !program->lighting_failed && per_pixel_lighting())
 	{
 		key.per_pixel_lighting = (unsigned char)program->lighting.lights;
-		entry = program_get(vertex_shader_get(program, immediate, TRUE), fragment_shader_get(&key));
+		if (instances.drawing && !immediate)
+		{
+			GLuint fragment_shader = fragment_shader_get(&key);
+			GLuint vertex_shader = vertex_shader_instanced(program, TRUE);
+
+			/* (not drawn: drawn a draw at a time instead, instances_flush) */
+			entry = vertex_shader ? program_get(vertex_shader, fragment_shader) : NULL;
+			if (!entry)
+				return NULL;
+		}
+		else
+			entry = program_get(vertex_shader_get(program, immediate, TRUE), fragment_shader_get(&key));
 		if (!entry)
 		{
 			/* drawn as the vertex shader lights it instead (not at all,
@@ -5306,7 +7770,12 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		}
 	}
 	if (!entry)
-		entry = program_get(vertex_shader_get(program, immediate, FALSE), fragment_shader_get(&key));
+	{
+		GLuint fragment_shader = fragment_shader_get(&key);
+
+		entry = program_get(instances.drawing && !immediate ? vertex_shader_instanced(program, FALSE) :
+			vertex_shader_get(program, immediate, FALSE), fragment_shader);
+	}
 	if (!entry)
 	{
 		stats.skipped_link++;
@@ -6897,6 +9366,7 @@ void WINAPI D3DDevice_SetIndices(D3DIndexBuffer *index_data, UINT base_vertex_in
 
 void WINAPI D3DDevice_DrawVertices(D3DPRIMITIVETYPE primitive_type, UINT start_vertex, UINT vertex_count)
 {
+	instances_flush_pending();
 	if (!vertex_count || !prepare_draw(FALSE))
 		return;
 	trace_draw("draw", primitive_type, vertex_count, NULL);
@@ -7099,15 +9569,46 @@ static BOOL index_cache_get(const WORD *indices, unsigned long count, unsigned l
 }
 #endif
 
+/* (kept to be drawn with others alike where it can be: instances_add; with
+no room for it, the draws kept drawn first, then it, kept again, or drawn
+alone) */
 void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT vertex_count, CONST WORD *index_data)
+{
+	if (vertex_count && index_data && instances_eligible(primitive_type))
+	{
+		if (!instances_add(primitive_type, vertex_count, index_data))
+		{
+			instances_flush();
+			if (!instances_add(primitive_type, vertex_count, index_data))
+				draw_indexed(primitive_type, vertex_count, index_data);
+		}
+		return;
+	}
+	instances_flush_pending();
+	draw_indexed(primitive_type, vertex_count, index_data);
+}
+
+/* an indexed draw made now (instanced where instances.drawing says) */
+static void draw_indexed(D3DPRIMITIVETYPE primitive_type, UINT vertex_count, CONST WORD *index_data)
 {
 	unsigned long minimum, maximum, index, count, generation = 0, index_offset = 0;
 	WORD *indices = NULL;
 	const WORD *source = index_data;
 	GLuint index_buffer = 0;
 	BOOL mirrored;
+	struct program_entry *entry;
 
-	if (!vertex_count || !index_data || !prepare_draw(FALSE))
+	if (!vertex_count || !index_data)
+		return;
+	entry = prepare_draw(FALSE);
+	/* (an instanced draw that cannot be drawn so: drawn a draw at a time,
+	instances_flush) */
+	if (instances.drawing && (!entry || !instances_bind(entry)))
+	{
+		instances.draw_failed = TRUE;
+		return;
+	}
+	if (!entry)
 		return;
 	/* quads are drawn as triangles, from indices made for the draw */
 	mirrored = primitive_type != D3DPT_QUADLIST &&
@@ -7131,7 +9632,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		trace_draw("indexed", primitive_type, vertex_count, NULL);
 		setup_streams(device.base_vertex_index + minimum, maximum - minimum + 1);
 		state_element_array_buffer(index_cache.buffers[device.buffer_ring]);
-		glDrawElements(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT, (const void *)index_offset);
+		draw_elements(primitive_mode(primitive_type), (GLsizei)vertex_count, (const void *)index_offset);
 		return;
 	}
 #endif
@@ -7143,7 +9644,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 	{
 		/* the attributes start at vertex minimum */
 		state_element_array_buffer(index_buffer);
-		glDrawElementsBaseVertex(primitive_mode(primitive_type), (GLsizei)vertex_count, GL_UNSIGNED_SHORT,
+		draw_elements_base_vertex(primitive_mode(primitive_type), (GLsizei)vertex_count,
 			(const void *)index_offset, -(GLint)minimum);
 		return;
 	}
@@ -7169,7 +9670,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 		}
 		for (index = 0; index < count; index++)
 			rebased[index] = (WORD)(source[index] - minimum);
-		glDrawElements(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
+		draw_elements(primitive_mode(primitive_type), (GLsizei)count,
 			(const void *)index_upload(rebased, count * sizeof(WORD)));
 		free(rebased);
 		free(indices);
@@ -7177,7 +9678,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 	}
 #endif
 	(void)index;
-	glDrawElementsBaseVertex(primitive_mode(primitive_type), (GLsizei)count, GL_UNSIGNED_SHORT,
+	draw_elements_base_vertex(primitive_mode(primitive_type), (GLsizei)count,
 		(const void *)index_upload(source, count * sizeof(WORD)), -(GLint)minimum);
 	free(indices);
 }
@@ -7186,6 +9687,7 @@ void WINAPI D3DDevice_DrawIndexedVertices(D3DPRIMITIVETYPE primitive_type, UINT 
 
 void WINAPI D3DDevice_Begin(D3DPRIMITIVETYPE primitive_type)
 {
+	instances_flush_pending();
 	device.immediate_active = TRUE;
 	device.immediate_type = primitive_type;
 	device.immediate_count = 0;
@@ -7412,6 +9914,11 @@ static void set_attribute(INT reg, float a, float b, float c, float d)
 	}
 	if (reg < 0 || reg >= XGPU_VERTEX_ATTRIBUTE_COUNT)
 		return;
+	if (device.attributes[reg][0] != a || device.attributes[reg][1] != b || device.attributes[reg][2] != c ||
+		device.attributes[reg][3] != d)
+	{
+		d3d8_gl_state_changes++;
+	}
 	device.attributes[reg][0] = a;
 	device.attributes[reg][1] = b;
 	device.attributes[reg][2] = c;
@@ -7473,6 +9980,7 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	BOOL has_depth = FALSE;
 	DWORD index;
 
+	instances_flush_pending();
 	/* (precompiling: nothing is drawn, nor cleared; no target is bound) */
 	if (!device.gl_ready || precompiling || !bind_targets(&has_depth))
 		return;
@@ -8144,6 +10652,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 {
 	static long screenshot_every = -1;
 
+	instances_flush_pending();
 	(void)source_rectangle;
 	(void)destination_rectangle;
 	(void)unused;
@@ -8273,6 +10782,15 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 	}
 	device.frame++;
 	stats.presents++;
+	{
+		struct timespec now;
+		unsigned long milliseconds;
+
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		milliseconds = (unsigned long)now.tv_sec * 1000ul + (unsigned long)(now.tv_nsec / 1000000);
+		instance_store_frame(&instance_rows_size, milliseconds);
+		instance_store_frame(&instance_blocks_size, milliseconds);
+	}
 	if (debug_settings.statistics)
 	{
 		static struct timespec last_present;
@@ -8301,6 +10819,15 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 			stats.target_changes / stats.presents, stats.skipped_no_program, stats.skipped_no_target, stats.skipped_link,
 			stats.mirrored_bytes / stats.presents / 1024, stats.streamed_bytes / stats.presents / 1024,
 			stats.texture_uploads, stats.texture_upload_bytes / 1024, stats.most_draws, stats.slowest_frame);
+		if (instances.kept)
+		{
+			platform_log("batched draws: %lu a frame kept, drawn in %lu groups, %lu of them instanced (%lu draws); "
+				"stores of %lu KB of registers and %lu KB of blocks (0: in memory, a range at a time)",
+				instances.kept / stats.presents, instances.groups_drawn / stats.presents,
+				instances.instanced_draws / stats.presents, instances.instances_drawn / stats.presents,
+				instance_rows_size.size / 1024, instance_block_ring_made > 0 ? instance_blocks_size.size / 1024 : 0);
+		}
+		instances.kept = instances.groups_drawn = instances.instanced_draws = instances.instances_drawn = 0;
 		memset(&stats, 0, sizeof(stats));
 #ifndef HALO_GLES
 		{
