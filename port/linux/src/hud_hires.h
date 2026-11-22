@@ -107,5 +107,13 @@ int hud_hires_override_point_threshold(long asset);
 long hud_hires_upscale_at(unsigned long address, long width, long height);
 unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
 	unsigned long height, long kind, unsigned long *levels);
+/* A line-art sheet's upscale started on a thread of its own: a job (0 when
+ * it is upscaled at once instead: another kind, or no thread), which then
+ * owns bgra (malloc'd). hud_hires_upscale_finish gives its texture once
+ * done (0 with *pending while not done); hud_hires_upscale_cancel drops a
+ * job not finished, for a texture gone. */
+long hud_hires_upscale_begin(unsigned char *bgra, unsigned long width, unsigned long height, long kind);
+unsigned int hud_hires_upscale_finish(long job, unsigned long *levels, int *pending);
+void hud_hires_upscale_cancel(long job);
 
 #endif

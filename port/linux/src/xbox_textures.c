@@ -1257,6 +1257,8 @@ struct texture_entry
 	GLuint hud_upscale;
 	unsigned long hud_upscale_levels;
 	BOOL hud_upscale_checked;
+	/* its upscale on hud_hires.c's thread, until done (0: none) */
+	long hud_upscale_job;
 	/* the newest generation of its pages (memory_watch_generation) as of the
 	memory watch serial read before it was found: the same while no watched
 	page has been written since (0: never found) */
@@ -1336,6 +1338,7 @@ void android_ce_texture_gpu_forget(const void *resource)
 			glDeleteTextures(1, &entry->texture);
 			if (entry->hud_upscale)
 				glDeleteTextures(1, &entry->hud_upscale);
+			hud_hires_upscale_cancel(entry->hud_upscale_job);
 			texture_drop_serial++;
 			free(entry);
 		}
@@ -1446,9 +1449,30 @@ static GLuint texture_entry_result(struct texture_entry *entry, GLenum *target,
 				unsigned long *pixels = malloc(entry->description.width * entry->description.height * 4);
 
 				if (pixels && decode_level(&entry->description, 0, (const unsigned char *)entry->address, NULL, pixels))
-					entry->hud_upscale = hud_hires_upscale_texture((const unsigned char *)pixels,
-						entry->description.width, entry->description.height, kind, &entry->hud_upscale_levels);
+				{
+					/* (a line-art sheet on hud_hires.c's thread, which then owns
+					the pixels: drawn from the map's texels until it is done,
+					not held up for its upscale) */
+					entry->hud_upscale_job = hud_hires_upscale_begin((unsigned char *)pixels,
+						entry->description.width, entry->description.height, kind);
+					if (entry->hud_upscale_job)
+						pixels = NULL;
+					else
+						entry->hud_upscale = hud_hires_upscale_texture((const unsigned char *)pixels,
+							entry->description.width, entry->description.height, kind, &entry->hud_upscale_levels);
+				}
 				free(pixels);
+			}
+		}
+		if (entry->hud_upscale_job)
+		{
+			int pending;
+			GLuint texture = hud_hires_upscale_finish(entry->hud_upscale_job, &entry->hud_upscale_levels, &pending);
+
+			if (!pending)
+			{
+				entry->hud_upscale_job = 0;
+				entry->hud_upscale = texture;
 			}
 		}
 		if (entry->hud_upscale)
@@ -1627,6 +1651,8 @@ GLuint xgpu_texture_get(const DWORD *resource, const D3DCOLOR *palette, GLenum *
 			xgpu_gl_state_invalidate();
 		}
 		entry->hud_upscale_checked = FALSE;
+		hud_hires_upscale_cancel(entry->hud_upscale_job);
+		entry->hud_upscale_job = 0;
 		entry->override = -1;
 		if (entry->size && !palettized && !entry->description.cube_map && entry->description.depth == 1)
 		{
@@ -1727,6 +1753,7 @@ void xgpu_texture_cache_begin_frame(void)
 				glDeleteTextures(1, &entry->texture);
 				if (entry->hud_upscale)
 					glDeleteTextures(1, &entry->hud_upscale);
+				hud_hires_upscale_cancel(entry->hud_upscale_job);
 				xgpu_gl_state_invalidate();
 				texture_drop_serial++;
 				free(entry);

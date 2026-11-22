@@ -335,7 +335,26 @@ int hud_hires_override_point_threshold(long asset)
 
 /* Catmull-Rom interpolation of the map's original texels. No font, sprite
  * rectangle, registration point or animation frame is substituted. Keeping
- * the input centres at (x + .5) also keeps the original HUD alignment. */
+ * the input centres at (x + .5) also keeps the original HUD alignment.
+ *
+ * The message icons' sheets and the crosshair warnings' (kind 1: the
+ * weapons' outlines the pickup prompt shows, the buttons and sticks, their
+ * words) are line art a texel or two wide, which interpolation alone leaves
+ * soft at a screen of 1080 lines and more (the HUD's 480 lines drawn 2.25
+ * times or larger). They are drawn UPSCALE_LINE_ART_FACTOR times their
+ * size, their coverage then sharpened by an unsharp mask
+ * (upscale_sharpen_alpha): its edges steepened to about a pixel of the
+ * texture at the screen's scale, its flat parts (the sticks' tinted
+ * insides) as they were. */
+#define UPSCALE_FACTOR 4
+#define UPSCALE_LINE_ART_FACTOR 8
+/* the unsharp mask's blur, in the upscaled texture's texels (half a texel
+of the map's), and how much of the difference from it is added */
+#define UPSCALE_SHARPEN_SIGMA 4.0f
+#define UPSCALE_SHARPEN_AMOUNT 1.5f
+/* exp(-1 / (2 UPSCALE_SHARPEN_SIGMA^2)): a tap's weight is this to the
+power of its distance squared */
+#define UPSCALE_SHARPEN_STEP 0.96923323f
 static void upscale_weights(float t, float *weights)
 {
 	float square = t * t, cube = square * t;
@@ -347,26 +366,27 @@ static void upscale_weights(float t, float *weights)
 }
 
 static unsigned char *upscale_pixels(const unsigned char *bgra, unsigned long width, unsigned long height,
-	unsigned long maximum)
+	unsigned long maximum, unsigned long factor)
 {
 	unsigned char *out;
 	unsigned long x, y, channel;
+	float step = 1.0f / (float)factor;
 
 	if (!bgra || !width || !height || width > maximum || height > maximum)
 		return NULL;
-	out = malloc(width * height * 16 * 4);
+	out = malloc(width * height * factor * factor * 4);
 	if (!out)
 		return NULL;
-	for (y = 0; y < height * 4; y++)
+	for (y = 0; y < height * factor; y++)
 	{
-		float sy = (y + 0.5f) * 0.25f - 0.5f, wy[4];
+		float sy = (y + 0.5f) * step - 0.5f, wy[4];
 		long iy = (long)sy;
 
 		if (sy < iy) iy--;
 		upscale_weights(sy - iy, wy);
-		for (x = 0; x < width * 4; x++)
+		for (x = 0; x < width * factor; x++)
 		{
-			float sx = (x + 0.5f) * 0.25f - 0.5f, wx[4];
+			float sx = (x + 0.5f) * step - 0.5f, wx[4];
 			long ix = (long)sx;
 
 			if (sx < ix) ix--;
@@ -392,7 +412,7 @@ static unsigned char *upscale_pixels(const unsigned char *bgra, unsigned long wi
 						value += bgra[(py * width + px) * 4 + source_channel] * wy[row] * wx[column];
 					}
 				}
-				out[(y * width * 4 + x) * 4 + channel] =
+				out[(y * width * factor + x) * 4 + channel] =
 					(unsigned char)(value < 0 ? 0 : value > 255 ? 255 : value + 0.5f);
 			}
 		}
@@ -400,9 +420,92 @@ static unsigned char *upscale_pixels(const unsigned char *bgra, unsigned long wi
 	return out;
 }
 
+/* one pass of a Gaussian blur of the coverage (alpha, in from, out to),
+along rows (horizontal) or columns, its edges taken as continuing */
+static void upscale_blur_pass(const float *from, float *to, unsigned long width, unsigned long height,
+	const float *kernel, long radius, int horizontal)
+{
+	unsigned long x, y;
+
+	for (y = 0; y < height; y++)
+	{
+		for (x = 0; x < width; x++)
+		{
+			float sum = 0.0f;
+			long tap;
+
+			for (tap = -radius; tap <= radius; tap++)
+			{
+				long sx = horizontal ? (long)x + tap : (long)x;
+				long sy = horizontal ? (long)y : (long)y + tap;
+
+				if (sx < 0) sx = 0;
+				if (sx >= (long)width) sx = (long)width - 1;
+				if (sy < 0) sy = 0;
+				if (sy >= (long)height) sy = (long)height - 1;
+				sum += from[sy * width + sx] * kernel[tap + radius];
+			}
+			to[y * width + x] = sum;
+		}
+	}
+}
+
+/* the upscaled RGBA texels' coverage (alpha) sharpened: each texel's
+difference from its neighbourhood's (a Gaussian blur) added again,
+UPSCALE_SHARPEN_AMOUNT of it, so that an edge is steeper and a flat part
+is as it was. Left as it is if memory runs out */
+static void upscale_sharpen_alpha(unsigned char *pixels, unsigned long width, unsigned long height)
+{
+	float kernel[64];
+	long radius = (long)(3.0f * UPSCALE_SHARPEN_SIGMA + 0.5f), tap;
+	float total = 0.0f;
+	float *alpha, *across, *blurred;
+	unsigned long index, count = width * height;
+
+	if (radius * 2 + 1 > (long)(sizeof(kernel) / sizeof(kernel[0])))
+		return;
+	alpha = malloc(count * sizeof(float));
+	across = malloc(count * sizeof(float));
+	blurred = malloc(count * sizeof(float));
+	if (!alpha || !across || !blurred)
+	{
+		free(alpha);
+		free(across);
+		free(blurred);
+		return;
+	}
+	/* (each tap's weight exp(-tap^2 / (2 sigma^2)), as a power of
+	UPSCALE_SHARPEN_STEP, without the system's maths) */
+	for (tap = 0; tap <= radius; tap++)
+	{
+		float weight = 1.0f;
+		long power;
+
+		for (power = 0; power < tap * tap; power++)
+			weight *= UPSCALE_SHARPEN_STEP;
+		kernel[radius + tap] = kernel[radius - tap] = weight;
+		total += tap ? 2.0f * weight : weight;
+	}
+	for (tap = 0; tap <= radius * 2; tap++)
+		kernel[tap] /= total;
+	for (index = 0; index < count; index++)
+		alpha[index] = pixels[index * 4 + 3];
+	upscale_blur_pass(alpha, across, width, height, kernel, radius, 1);
+	upscale_blur_pass(across, blurred, width, height, kernel, radius, 0);
+	for (index = 0; index < count; index++)
+	{
+		float value = alpha[index] + UPSCALE_SHARPEN_AMOUNT * (alpha[index] - blurred[index]);
+
+		pixels[index * 4 + 3] = (unsigned char)(value < 0.0f ? 0 : value > 255.0f ? 255 : value + 0.5f);
+	}
+	free(alpha);
+	free(across);
+	free(blurred);
+}
+
 unsigned char *hud_hires_upscale_pixels(const unsigned char *bgra, unsigned long width, unsigned long height)
 {
-	return upscale_pixels(bgra, width, height, 256);
+	return upscale_pixels(bgra, width, height, 256, UPSCALE_FACTOR);
 }
 
 static unsigned char *png_decode(const unsigned char *data, unsigned long size,
@@ -453,33 +556,244 @@ static void upscale_outline(unsigned char *pixels, const unsigned char *bgra,
 	}
 }
 
-unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
-	unsigned long height, long kind, unsigned long *levels)
+/* the upscaled texels of a sheet of that kind (no GL: any thread), and the
+factor they are upscaled by; NULL if the sheet is too large or memory runs out */
+static unsigned char *upscale_compute(const unsigned char *bgra, unsigned long width, unsigned long height,
+	long kind, unsigned long *factor)
 {
 	unsigned char *pixels;
+
+	*factor = kind == 1 ? UPSCALE_LINE_ART_FACTOR : UPSCALE_FACTOR;
+	pixels = upscale_pixels(bgra, width, height, kind == 4 ? 512 : 256, *factor);
+	if (!pixels)
+		return NULL;
+	upscale_outline(pixels, bgra, width, height, kind);
+	if (kind == 1)
+		upscale_sharpen_alpha(pixels, width * *factor, height * *factor);
+	return pixels;
+}
+
+/* the upscaled texels as a mipmapped texture (the GL thread), freed */
+static unsigned int upscale_upload(unsigned char *pixels, unsigned long width, unsigned long height,
+	unsigned long factor, unsigned long *levels)
+{
 	unsigned long largest;
 	GLuint texture;
 
-	if (!xgpu_gl_ready())
-		return 0;
-	pixels = kind == 4 ? upscale_pixels(bgra, width, height, 512) : hud_hires_upscale_pixels(bgra, width, height);
-	if (!pixels)
-		return 0;
-	upscale_outline(pixels, bgra, width, height, kind);
 	*levels = 1;
-	for (largest = (width > height ? width : height) * 4; largest > 1; largest >>= 1)
+	for (largest = (width > height ? width : height) * factor; largest > 1; largest >>= 1)
 		(*levels)++;
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, (GLint)*levels - 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)width * 4, (GLsizei)height * 4,
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, (GLsizei)(width * factor), (GLsizei)(height * factor),
 		0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	xgpu_gl_state_invalidate();
 	free(pixels);
 	return texture;
+}
+
+/* ---------- upscaling in the background */
+
+/* A line-art sheet (kind 1: the message icons, the weapons the pickup
+prompt shows, the crosshair's warnings) is upscaled 8 times and sharpened,
+some 70 ms of work for a 128x128 sheet, which on the GL thread held up the
+frame the sheet was first drawn in: the game stuttered as the player came
+near a weapon and its prompt showed. It is upscaled on a thread of its own
+(hud_hires_upscale_begin); until it is done the sheet is drawn from the
+map's own texels, as with display.high_res_hud off. Android and the web
+upscale it at once, as before. */
+#ifdef HUD_HIRES_DECODE_AHEAD
+#define MAXIMUM_UPSCALE_JOBS 8
+
+enum
+{
+	_upscale_job_free,
+	_upscale_job_queued,
+	_upscale_job_working,
+	_upscale_job_done,
+};
+
+static struct
+{
+	int state;
+	/* (its entry gone while it was worked on: freed when done) */
+	int cancelled;
+	/* the map's texels (the job's), and the upscaled ones once done */
+	unsigned char *source;
+	unsigned char *pixels;
+	unsigned long width, height, factor;
+	long kind;
+} upscale_jobs[MAXIMUM_UPSCALE_JOBS];
+static pthread_mutex_t upscale_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t upscale_queued = PTHREAD_COND_INITIALIZER;
+static int upscale_thread_running;
+
+static void *upscale_thread_main(void *unused)
+{
+	(void)unused;
+	pthread_mutex_lock(&upscale_lock);
+	for (;;)
+	{
+		long job;
+
+		for (job = 0; job < MAXIMUM_UPSCALE_JOBS && upscale_jobs[job].state != _upscale_job_queued; job++)
+		{
+		}
+		if (job == MAXIMUM_UPSCALE_JOBS)
+		{
+			pthread_cond_wait(&upscale_queued, &upscale_lock);
+			continue;
+		}
+		upscale_jobs[job].state = _upscale_job_working;
+		pthread_mutex_unlock(&upscale_lock);
+		{
+			unsigned long factor;
+			unsigned char *pixels = upscale_compute(upscale_jobs[job].source, upscale_jobs[job].width,
+				upscale_jobs[job].height, upscale_jobs[job].kind, &factor);
+
+			pthread_mutex_lock(&upscale_lock);
+			free(upscale_jobs[job].source);
+			upscale_jobs[job].source = NULL;
+			if (upscale_jobs[job].cancelled)
+			{
+				free(pixels);
+				upscale_jobs[job].state = _upscale_job_free;
+			}
+			else
+			{
+				upscale_jobs[job].pixels = pixels;
+				upscale_jobs[job].factor = factor;
+				upscale_jobs[job].state = _upscale_job_done;
+			}
+		}
+	}
+	return NULL;
+}
+#endif
+
+long hud_hires_upscale_begin(unsigned char *bgra, unsigned long width, unsigned long height, long kind)
+{
+#ifdef HUD_HIRES_DECODE_AHEAD
+	long job;
+
+	if (kind != 1 || !bgra || !xgpu_gl_ready())
+		return 0;
+	pthread_mutex_lock(&upscale_lock);
+	for (job = 0; job < MAXIMUM_UPSCALE_JOBS && upscale_jobs[job].state != _upscale_job_free; job++)
+	{
+	}
+	if (job < MAXIMUM_UPSCALE_JOBS && !upscale_thread_running)
+	{
+		pthread_t thread;
+
+		if (pthread_create(&thread, NULL, upscale_thread_main, NULL) == 0)
+		{
+			pthread_detach(thread);
+			upscale_thread_running = 1;
+		}
+	}
+	if (job == MAXIMUM_UPSCALE_JOBS || !upscale_thread_running)
+	{
+		pthread_mutex_unlock(&upscale_lock);
+		return 0;
+	}
+	upscale_jobs[job].state = _upscale_job_queued;
+	upscale_jobs[job].cancelled = 0;
+	upscale_jobs[job].source = bgra;
+	upscale_jobs[job].pixels = NULL;
+	upscale_jobs[job].width = width;
+	upscale_jobs[job].height = height;
+	upscale_jobs[job].kind = kind;
+	pthread_cond_signal(&upscale_queued);
+	pthread_mutex_unlock(&upscale_lock);
+	return job + 1;
+#else
+	(void)bgra;
+	(void)width;
+	(void)height;
+	(void)kind;
+	return 0;
+#endif
+}
+
+unsigned int hud_hires_upscale_finish(long job, unsigned long *levels, int *pending)
+{
+#ifdef HUD_HIRES_DECODE_AHEAD
+	unsigned char *pixels;
+	unsigned long width, height, factor;
+
+	*pending = 0;
+	if (job < 1 || job > MAXIMUM_UPSCALE_JOBS)
+		return 0;
+	job--;
+	pthread_mutex_lock(&upscale_lock);
+	if (upscale_jobs[job].state != _upscale_job_done)
+	{
+		*pending = upscale_jobs[job].state == _upscale_job_queued || upscale_jobs[job].state == _upscale_job_working;
+		pthread_mutex_unlock(&upscale_lock);
+		return 0;
+	}
+	pixels = upscale_jobs[job].pixels;
+	width = upscale_jobs[job].width;
+	height = upscale_jobs[job].height;
+	factor = upscale_jobs[job].factor;
+	upscale_jobs[job].pixels = NULL;
+	upscale_jobs[job].state = _upscale_job_free;
+	pthread_mutex_unlock(&upscale_lock);
+	return pixels ? upscale_upload(pixels, width, height, factor, levels) : 0;
+#else
+	(void)job;
+	(void)levels;
+	*pending = 0;
+	return 0;
+#endif
+}
+
+void hud_hires_upscale_cancel(long job)
+{
+#ifdef HUD_HIRES_DECODE_AHEAD
+	if (job < 1 || job > MAXIMUM_UPSCALE_JOBS)
+		return;
+	job--;
+	pthread_mutex_lock(&upscale_lock);
+	switch (upscale_jobs[job].state)
+	{
+	case _upscale_job_queued:
+		free(upscale_jobs[job].source);
+		upscale_jobs[job].source = NULL;
+		upscale_jobs[job].state = _upscale_job_free;
+		break;
+	case _upscale_job_working:
+		upscale_jobs[job].cancelled = 1;
+		break;
+	case _upscale_job_done:
+		free(upscale_jobs[job].pixels);
+		upscale_jobs[job].pixels = NULL;
+		upscale_jobs[job].state = _upscale_job_free;
+		break;
+	}
+	pthread_mutex_unlock(&upscale_lock);
+#else
+	(void)job;
+#endif
+}
+
+unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
+	unsigned long height, long kind, unsigned long *levels)
+{
+	unsigned char *pixels;
+	unsigned long factor;
+
+	if (!xgpu_gl_ready())
+		return 0;
+	pixels = upscale_compute(bgra, width, height, kind, &factor);
+	if (!pixels)
+		return 0;
+	return upscale_upload(pixels, width, height, factor, levels);
 }
 
 static unsigned long big_endian_long(const unsigned char *bytes)

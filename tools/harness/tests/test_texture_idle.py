@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run
 
-CASES = ['fast', 'steady', 'late']
+CASES = ['fast', 'steady', 'late', 'job']
 SOURCE = 'port/linux/src/xbox_textures.c'
 
 
@@ -40,6 +40,8 @@ def test_case(case):
       '\tidle_since = texture_sweep_frames[texture_sweep_count % TEXTURE_SWEEP_COUNT];\n'), 'fast'),
     # the sweeps not counted: the one before taken each time
     (('\ttexture_sweep_count++;\n', '\n'), 'late'),
+    # a dropped texture's pending HUD upscale left running
+    (('\t\t\t\thud_hires_upscale_cancel(entry->hud_upscale_job);\n', ''), 'job'),
 ])
 def test_negative_control(fault, case):
     status, output = run(build('texture_idle', generated(fault)), case)
