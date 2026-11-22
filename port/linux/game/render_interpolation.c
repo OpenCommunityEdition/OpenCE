@@ -125,6 +125,15 @@ struct interpolated_object
 	/* ... the two snapshots' rotations, found when first blended */
 	struct interpolation_rotation *rotations;
 	boolean rotations_valid[2];
+	/* at the latest snapshot: whether the object was hidden, and what it was
+	attached to, and at which node (render_interpolation_tick: neither is
+	blended from) */
+	boolean hidden;
+	long parent_object_index;
+	short parent_node_index;
+	/* shown, or put in a hand, at the latest snapshot: drawn on that node
+	as its parent is drawn (render_interpolation_followed_nodes) */
+	boolean follows_parent;
 };
 
 struct interpolated_camera
@@ -434,6 +443,8 @@ void render_interpolation_tick(void)
 		struct interpolated_object *record;
 		short node_count = (short)(object->object.node_matrices.size / (short)sizeof(real_matrix4x3));
 		boolean continuing;
+		boolean same_object;
+		boolean hidden = TEST_FLAG(object->object.flags, _object_invisible_bit);
 
 		if (absolute_index >= MAXIMUM_INTERPOLATED_OBJECTS)
 			continue;
@@ -464,9 +475,19 @@ void render_interpolation_tick(void)
 			record->node_capacity = node_count;
 			record->object_index = NONE; /* the old snapshots moved */
 		}
-		continuing = record->object_index == iterator.index &&
+		/* (not from a snapshot taken hidden: a weapon in a unit's inventory is
+		left hidden where it was put away, and readied, it slid from there to
+		the hand, up to a snap's distance, as a quick swap while moving showed;
+		nor an item put in another's hand, picked up from the ground or
+		readied. Each is drawn on what holds it, as that is drawn:
+		render_interpolation_followed_nodes) */
+		same_object = record->object_index == iterator.index &&
 			record->node_count == node_count &&
 			record->tick == previous_tick;
+		continuing = same_object &&
+			!record->hidden &&
+			(!TEST_FLAG(_object_mask_item, object->object.type) ||
+				record->parent_object_index == object->object.parent_object_index);
 		if (continuing)
 		{
 			record->latest ^= 1;
@@ -482,6 +503,10 @@ void render_interpolation_tick(void)
 			object_get_node_matrices(iterator.index),
 			node_count * sizeof(real_matrix4x3));
 		record->rotations_valid[record->latest] = FALSE;
+		record->hidden = hidden;
+		record->parent_object_index = object->object.parent_object_index;
+		record->parent_node_index = object->object.parent_node_index;
+		record->follows_parent = same_object && !continuing && object->object.parent_object_index != NONE;
 		record->object_index = iterator.index;
 		record->node_count = node_count;
 		record->tick = interpolation_tick;
@@ -528,6 +553,55 @@ real render_interpolation_fraction(void)
 	return interpolation_rendering ? interpolation_fraction : 1.0f;
 }
 
+real_matrix4x3 *render_interpolation_object_node_matrices(long object_index);
+
+/* an object shown or put in a hand at the latest tick (a weapon readied or
+picked up: render_interpolation_tick), drawn on the node of what holds it,
+as that node is drawn: not blended from where it was before, and not a
+tick's move ahead of the hand, as the tick's own pose would be beside a
+blended holder (a passenger's in a fast vehicle, a world unit or more).
+NULL, drawn as the tick has it, when the holder is not blended either. */
+static real_matrix4x3 *render_interpolation_followed_nodes(struct interpolated_object *record, long object_index)
+{
+	struct object_datum *object = object_get(object_index);
+	long parent_index = object->object.parent_object_index;
+	struct object_datum *parent;
+	real_matrix4x3 const *parent_drawn;
+	real_matrix4x3 const *parent_simulated;
+	real_matrix4x3 const *latest;
+	real_matrix4x3 *followed;
+	real_matrix4x3 inverse;
+	real_matrix4x3 carry;
+	long parent_node_count;
+	short node_index;
+
+	followed = record->nodes + 2 * record->node_capacity;
+	if (record->blended_frame == interpolation_frame)
+		return followed;
+	if (parent_index == NONE || parent_index != record->parent_object_index ||
+		!(parent = object_try_and_get(parent_index)))
+	{
+		return NULL;
+	}
+	parent_node_count = parent->object.node_matrices.size / (long)sizeof(real_matrix4x3);
+	if (record->parent_node_index < 0 || record->parent_node_index >= parent_node_count)
+		return NULL;
+	parent_drawn = render_interpolation_object_node_matrices(parent_index);
+	if (!parent_drawn)
+		return NULL;
+	/* (never object_get_node_matrices: it asks for the drawn pose) */
+	parent_simulated = object_header_block_get(parent_index, &parent->object.node_matrices);
+	if (parent_simulated[record->parent_node_index].scale == 0.0f)
+		return NULL;
+	matrix4x3_inverse(&parent_simulated[record->parent_node_index], &inverse);
+	matrix4x3_multiply(&parent_drawn[record->parent_node_index], &inverse, &carry);
+	latest = record->nodes + record->latest * record->node_capacity;
+	for (node_index = 0; node_index < record->node_count; node_index++)
+		matrix4x3_multiply(&carry, &latest[node_index], &followed[node_index]);
+	record->blended_frame = interpolation_frame;
+	return followed;
+}
+
 real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 {
 	struct interpolated_object *record;
@@ -539,8 +613,10 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 	if (absolute_index >= MAXIMUM_INTERPOLATED_OBJECTS)
 		return NULL;
 	record = &interpolated_objects[absolute_index];
-	if (record->object_index != object_index || record->tick != interpolation_tick || !record->has_previous)
+	if (record->object_index != object_index || record->tick != interpolation_tick)
 		return NULL;
+	if (!record->has_previous)
+		return record->follows_parent ? render_interpolation_followed_nodes(record, object_index) : NULL;
 	if (record->blended_frame != interpolation_frame)
 	{
 		real_matrix4x3 const *previous = record->nodes + (record->latest ^ 1) * record->node_capacity;
