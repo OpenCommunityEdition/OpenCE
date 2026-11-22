@@ -284,6 +284,7 @@ symbols in this file:
 #include "units/vehicle_definitions.h"
 #include "units/vehicles.h"
 #include "mcc_seats.h" /* port: port/linux/game/mcc_seats.c */
+#include "campaign_carry.h" /* port: port/linux/game/campaign_carry.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1521,6 +1522,12 @@ static void player_spawn(
 									0,
 									TRUE);
 							}
+							/* port: in its place, the weapons carried from the
+							level won before, with game.carry_weapons
+							(port/linux/game/campaign_carry.c) */
+							campaign_carry_give(
+								player2->unit_index,
+								player2->local_player_index);
 						}
 					}
 				}
