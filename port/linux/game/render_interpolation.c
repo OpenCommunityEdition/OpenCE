@@ -475,17 +475,19 @@ void render_interpolation_tick(void)
 			record->node_capacity = node_count;
 			record->object_index = NONE; /* the old snapshots moved */
 		}
-		/* (not from a snapshot taken hidden: a weapon in a unit's inventory is
-		left hidden where it was put away, and readied, it slid from there to
-		the hand, up to a snap's distance, as a quick swap while moving showed;
-		nor an item put in another's hand, picked up from the ground or
-		readied. Each is drawn on what holds it, as that is drawn:
-		render_interpolation_followed_nodes) */
+		/* (not from a snapshot an object is shown from, taken hidden: a weapon in
+		a unit's inventory is left hidden where it was put away, and readied, it
+		slid from there to the hand, up to a snap's distance, as a quick swap
+		while moving showed; nor an item put in another's hand, picked up from
+		the ground or readied. Each is drawn on what holds it, as that is drawn:
+		render_interpolation_followed_nodes. An object hidden in both is blended
+		as before: a projectile drawn only by what hangs off it (a plasma bolt's
+		glow, light and contrail) is hidden while it flies) */
 		same_object = record->object_index == iterator.index &&
 			record->node_count == node_count &&
 			record->tick == previous_tick;
 		continuing = same_object &&
-			!record->hidden &&
+			!(record->hidden && !hidden) &&
 			(!TEST_FLAG(_object_mask_item, object->object.type) ||
 				record->parent_object_index == object->object.parent_object_index);
 		if (continuing)

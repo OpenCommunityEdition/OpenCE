@@ -187,5 +187,19 @@ int main(int argc, char **argv)
 		tick(FALSE);
 		CHECK(drawn_at(OTHER, 0.5f) != NULL, "shown object not blended a tick on");
 	}
+	/* an object hidden throughout (a projectile drawn only by its glow,
+	light and contrail) moving: blended between the ticks as before */
+	CASE("stays hidden")
+	{
+		real_matrix4x3 const *drawn;
+
+		object_get(OTHER)->object.flags = 1L << _object_invisible_bit;
+		tick(FALSE);
+		nodes[OTHER & 0xFFFF].position.x += 2.0f;
+		tick(FALSE);
+		drawn = drawn_at(OTHER, 0.5f);
+		CHECK(drawn && fabs(drawn->position.x - (nodes[OTHER & 0xFFFF].position.x - 1.0f)) < 1e-4f,
+			"hidden object not blended halfway along its move");
+	}
 	return 0;
 }

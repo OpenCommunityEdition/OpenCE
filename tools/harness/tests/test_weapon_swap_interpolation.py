@@ -12,10 +12,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure
 from harness.riding import engine
 
-CASES = ['held', 'readied', 'picked up', 'shown']
+CASES = ['held', 'readied', 'picked up', 'shown', 'stays hidden']
 CONTROLS = [
     # (a snapshot taken hidden blended from: a shown object slid from where it was hidden)
-    ('!record->hidden &&', 'TRUE &&', 'shown'),
+    ('!(record->hidden && !hidden) &&', 'TRUE &&', 'shown'),
+    # (any snapshot taken hidden not blended from: a projectile drawn by its effects stepped a tick at a time)
+    ('!(record->hidden && !hidden) &&', '!record->hidden &&', 'stays hidden'),
     # (an item's change of parent blended across: a weapon slid from the ground into the hand)
     ('record->parent_object_index == object->object.parent_object_index', 'TRUE', 'picked up'),
     # (a readied weapon drawn as its tick has it, a tick's move ahead of the blended hand)
