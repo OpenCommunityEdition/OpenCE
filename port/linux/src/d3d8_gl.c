@@ -6602,7 +6602,7 @@ instances_pack writes each draw's vectors in the walk that writes its row:
 on the desktop straight into a persistently mapped buffer, a segment at a
 time (as instance_ring: no map, unmap or new store a flush); else into
 memory, all given the GL at once after an upload has written its groups', in
-a store of their own, and bound a range at a time as the ring's are (a store
+a buffer of their own, and bound a range at a time as the ring's are (a store
 a range, on the web, cost more than the instancing saved: 8 ms a frame at
 b30's landing) (instance_blocks_give). */
 struct instance_block_range
@@ -6620,10 +6620,18 @@ range bound, in vectors, and the flushes counted */
 static float (*instance_block_to)[4];
 static unsigned long instance_block_align, instance_block_stamp;
 /* (in memory: the blocks, so many vectors of them this flush, and the
-buffer they are given) */
+buffer they were last given; and the buffers they are given, a set a frame in
+turn, as the ring's segments are: one an upload, given again only in its
+set's next turn. Chrome's WebGL drew a range bound before its buffer was given
+again with what the buffer was given after: parts of the marines went
+missing at b30's landing) */
 static float (*instance_block_data)[4];
 static unsigned long instance_block_capacity, instance_block_data_count;
 static GLuint instance_block_buffer;
+static GLuint *instance_block_buffers[INSTANCE_RING_SEGMENTS];
+static unsigned long instance_block_buffer_counts[INSTANCE_RING_SEGMENTS],
+	instance_block_buffer_capacities[INSTANCE_RING_SEGMENTS], instance_block_buffers_used;
+static int instance_block_buffer_set;
 /* the models whose lights are in the models' block, in order; each window's
 first vector and models; and the window bound */
 static int *instance_block_window_models;
@@ -6936,14 +6944,30 @@ static void instance_blocks_fill(void)
 }
 
 /* (in memory) the flush's blocks given the GL, once an upload has written
-its groups' vectors (all of them, in a store of their own: the draws before
-keep theirs) */
+its groups' vectors (all of them, in a buffer not given any since its set's
+last turn: the draws before keep theirs). Where there is no memory for
+another, the groups are drawn a draw at a time */
 static void instance_blocks_give(void)
 {
+	int set = instance_block_buffer_set;
+
 	if (!instance_block_to || instance_block_ring_used)
 		return;
-	if (!instance_block_buffer)
-		glGenBuffers(1, &instance_block_buffer);
+	if (instance_block_buffers_used == instance_block_buffer_counts[set])
+	{
+		int group_index;
+
+		if (!instance_block_grow((void **)&instance_block_buffers[set], &instance_block_buffer_capacities[set],
+			instance_block_buffers_used + 1, sizeof(**instance_block_buffers)))
+		{
+			for (group_index = 0; group_index < instances.group_count; group_index++)
+				instances.groups[group_index].block_ready = FALSE;
+			instance_block_to = NULL;
+			return;
+		}
+		glGenBuffers(1, &instance_block_buffers[set][instance_block_buffer_counts[set]++]);
+	}
+	instance_block_buffer = instance_block_buffers[set][instance_block_buffers_used++];
 	glBindBuffer(GL_UNIFORM_BUFFER, instance_block_buffer);
 	glBufferData(GL_UNIFORM_BUFFER, (GLsizeiptr)(instance_block_data_count * sizeof(*instance_block_data)),
 		instance_block_data, GL_STREAM_DRAW);
@@ -6960,6 +6984,13 @@ static void instance_block_bind(GLuint binding, unsigned long first)
 		first += instance_block_ring_base;
 	glBindBufferRange(GL_UNIFORM_BUFFER, binding, instance_block_ring_used ? instance_block_ring_buffer :
 		instance_block_buffer, (GLintptr)(first * sizeof(*instance_block_data)), size);
+}
+
+/* (in memory) the next set of buffers the blocks are given, a frame on */
+static void instance_blocks_frame(void)
+{
+	instance_block_buffer_set = (instance_block_buffer_set + 1) % INSTANCE_RING_SEGMENTS;
+	instance_block_buffers_used = 0;
 }
 
 /* a window of the models' block bound, where it is not already */
@@ -10792,6 +10823,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		instance_store_frame(&instance_rows_size, milliseconds);
 		instance_store_frame(&instance_blocks_size, milliseconds);
 	}
+	instance_blocks_frame();
 	if (debug_settings.statistics)
 	{
 		static struct timespec last_present;
