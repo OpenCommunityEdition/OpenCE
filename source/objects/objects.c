@@ -62,6 +62,8 @@ OBJECTS.C
 #include "units/bipeds.h" /* port: vehicle riding */
 /* port: object_bounds_cache.c's */
 void object_bounds_cache_update(long object_index, real_point3d const *center, real radius);
+/* port: object_reach_grid.c's */
+extern struct cluster_partition *object_reach_grid_partition;
 /* port: port/linux/game/first_person_legs.c's */
 void first_person_legs_reset(void);
 
@@ -1106,6 +1108,8 @@ void objects_initialize(
 	object_name_list_allocate();
 	cluster_partition_new(&collideable_object_cluster_partition, "collideable object");
 	cluster_partition_new(&noncollideable_object_cluster_partition, "noncollideable object");
+	/* port: whose lists object_reach_grid.c notes */
+	object_reach_grid_partition = &collideable_object_cluster_partition;
 
 	return;
 }

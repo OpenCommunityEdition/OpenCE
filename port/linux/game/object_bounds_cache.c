@@ -25,6 +25,10 @@ struct object_bounds
 static struct object_bounds object_bounds[MAXIMUM_OBJECTS_PER_MAP];
 static long object_bounds_epoch = 1;
 
+/* object_reach_grid.c's: the same spheres, by where they are */
+void object_reach_grid_update(long object_index, real_point3d const *center, real radius);
+void object_reach_grid_invalidate(void);
+
 void object_bounds_cache_update(
 	long object_index,
 	real_point3d const *center,
@@ -36,12 +40,14 @@ void object_bounds_cache_update(
 	bounds->epoch = object_bounds_epoch;
 	bounds->center = *center;
 	bounds->radius = radius;
+	object_reach_grid_update(object_index, center, radius);
 }
 
 void object_bounds_cache_invalidate(
 	void)
 {
 	object_bounds_epoch++;
+	object_reach_grid_invalidate();
 }
 
 /* whether the object's bounding sphere is known to be out of the reach of

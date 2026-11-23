@@ -92,6 +92,11 @@ void reference_list_copy(
 static long *cluster_partition_get_first_reference(
 	struct cluster_partition *partition,
 	short cluster_index);
+/* port: object_reach_grid.c's, told where the references are */
+void object_reach_grid_reference_added(struct cluster_partition const *partition, long reference_index,
+	short cluster_index, long object_index);
+void object_reach_grid_reference_removed(struct cluster_partition const *partition, long reference_index);
+void object_reach_grid_forget(struct cluster_partition const *partition);
 static void cluster_partition_port_forget(
 	struct cluster_partition *partition);
 static long cluster_partition_port_add(
@@ -437,6 +442,8 @@ void cluster_partition_reconnect(
 			partition->port_previous_references);
 
 		partition->port_modification_count++;
+		if (data_reference_index != NONE)
+			object_reach_grid_reference_added(partition, data_reference_index, cluster_index, datum_index);
 		if (cluster_reference_index != NONE && partition->port_cluster_data_references)
 		{
 			partition->port_cluster_data_references[DATUM_INDEX_TO_ABSOLUTE_INDEX(cluster_reference_index)] =
@@ -508,6 +515,7 @@ static void cluster_partition_port_forget(
 	struct cluster_partition *partition)
 {
 	partition->port_modification_count++;
+	object_reach_grid_forget(partition);
 	if (partition->port_previous_references)
 		csmemset(partition->port_previous_references, 0xFF, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES * sizeof(long));
 	if (partition->port_cluster_data_references)
@@ -608,6 +616,7 @@ static void cluster_partition_port_remove(
 		return;
 	}
 	partition->port_modification_count++;
+	object_reach_grid_reference_removed(partition, reference_index);
 	reference = (struct data_reference *)datum_get(array, reference_index);
 	next_index = reference->next_reference_index;
 	datum_delete(array, reference_index);
