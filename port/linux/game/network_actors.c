@@ -239,6 +239,15 @@ static byte host_event_number;
 static struct client_actor client_actors[MAXIMUM_NETWORK_ACTORS];
 static short client_actor_count;
 
+/* where a unit's entry was last seen in each table, by the unit's absolute
+index: a unit's entry is found each time its actor drives it (host) or an
+entry for it comes (client), every tick for every AI unit, and the tables
+hold hundreds with many enemies. Only a hint: an entry counts only when it
+holds the same unit, and the table is searched as before when it doesn't
+(a unit's first entry), so the same entry is found. */
+static short host_actor_slots[MAXIMUM_OBJECTS_PER_MAP];
+static short client_actor_slots[MAXIMUM_OBJECTS_PER_MAP];
+
 /* ---------- private code */
 
 static void angles_pack(
@@ -271,17 +280,59 @@ static byte next_event_number(
 	return host_event_number;
 }
 
+/* that the unit's entry is at the index of its table (host_actor_slots,
+client_actor_slots) */
+static void actor_slot_set(
+	short *slots,
+	long unit_index,
+	short index)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(unit_index);
+
+	if (absolute_index < MAXIMUM_OBJECTS_PER_MAP)
+		slots[absolute_index] = index;
+}
+
+/* the index of the unit's entry in a table of entries that each start with
+their unit's index (host_actors, client_actors), NONE if it has none: where
+it was last seen if it is still there, else the first entry for it */
+static short actor_table_find(
+	void const *table,
+	long entry_size,
+	short count,
+	short *slots,
+	long unit_index)
+{
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(unit_index);
+	short index;
+
+#define ACTOR_TABLE_UNIT(index) (*(long const *)((byte const *)table + (index) * entry_size))
+	if (absolute_index < MAXIMUM_OBJECTS_PER_MAP)
+	{
+		index = slots[absolute_index];
+		if (index >= 0 && index < count && ACTOR_TABLE_UNIT(index) == unit_index)
+			return index;
+	}
+	for (index = 0; index < count; index++)
+	{
+		if (ACTOR_TABLE_UNIT(index) == unit_index)
+		{
+			actor_slot_set(slots, unit_index, index);
+			return index;
+		}
+	}
+#undef ACTOR_TABLE_UNIT
+	return NONE;
+}
+
 /* the unit's entry, adding one if needed; NULL if the table is full */
 static struct host_actor *host_actor_for(
 	long unit_index)
 {
-	short index;
+	short index = actor_table_find(host_actors, sizeof(host_actors[0]), host_actor_count, host_actor_slots, unit_index);
 
-	for (index = 0; index < host_actor_count; index++)
-	{
-		if (host_actors[index].unit_index == unit_index)
-			return &host_actors[index];
-	}
+	if (index != NONE)
+		return &host_actors[index];
 	if (host_actor_count >= MAXIMUM_NETWORK_ACTORS)
 		return NULL;
 	csmemset(&host_actors[host_actor_count], 0, sizeof(host_actors[0]));
@@ -289,19 +340,17 @@ static struct host_actor *host_actor_for(
 	host_actors[host_actor_count].impulse = NONE;
 	host_actors[host_actor_count].speech_sound = NONE;
 	host_actors[host_actor_count].user_animation_graph = NONE;
+	actor_slot_set(host_actor_slots, unit_index, host_actor_count);
 	return &host_actors[host_actor_count++];
 }
 
 static struct client_actor *client_actor_for(
 	long unit_index)
 {
-	short index;
+	short index = actor_table_find(client_actors, sizeof(client_actors[0]), client_actor_count, client_actor_slots, unit_index);
 
-	for (index = 0; index < client_actor_count; index++)
-	{
-		if (client_actors[index].unit_index == unit_index)
-			return &client_actors[index];
-	}
+	if (index != NONE)
+		return &client_actors[index];
 	if (client_actor_count >= MAXIMUM_NETWORK_ACTORS)
 		return NULL;
 	csmemset(&client_actors[client_actor_count], 0, sizeof(client_actors[0]));
@@ -309,7 +358,24 @@ static struct client_actor *client_actor_for(
 	client_actors[client_actor_count].impulse = NONE;
 	client_actors[client_actor_count].speech_sound = NONE;
 	client_actors[client_actor_count].user_animation_graph = NONE;
+	actor_slot_set(client_actor_slots, unit_index, client_actor_count);
 	return &client_actors[client_actor_count++];
+}
+
+/* the entry at the index taken out of the table, the last one put in its
+place */
+static void host_actor_remove(
+	short index)
+{
+	host_actors[index] = host_actors[--host_actor_count];
+	actor_slot_set(host_actor_slots, host_actors[index].unit_index, index);
+}
+
+static void client_actor_remove(
+	short index)
+{
+	client_actors[index] = client_actors[--client_actor_count];
+	actor_slot_set(client_actor_slots, client_actors[index].unit_index, index);
 }
 
 /* whether the unit exists, is alive, and isn't a player's */
@@ -750,7 +816,7 @@ void network_actors_host_tick(
 			(!vehicle_riding_enabled() || unit_get(actor->unit_index)->object.parent_object_index == NONE ||
 			unit_get(actor->unit_index)->unit.parent_seat_index == NONE)))
 		{
-			host_actors[index--] = host_actors[--host_actor_count];
+			host_actor_remove(index--);
 			continue;
 		}
 		actor_state_from_unit(actor, &states[state_count]);
@@ -863,7 +929,7 @@ void network_actors_drive(
 		{
 			if (actor->driven && object_try_and_get_and_verify_type(actor->unit_index, _object_mask_unit))
 				unit_set_actively_controlled(actor->unit_index, FALSE);
-			client_actors[index--] = client_actors[--client_actor_count];
+			client_actor_remove(index--);
 			continue;
 		}
 		/* vehicles follow the host's transform instead (network_objects.c) */
