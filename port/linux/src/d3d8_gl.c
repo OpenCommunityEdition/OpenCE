@@ -6601,8 +6601,10 @@ flush. instance_blocks_fill places the ranges and writes the models', and
 instances_pack writes each draw's vectors in the walk that writes its row:
 on the desktop straight into a persistently mapped buffer, a segment at a
 time (as instance_ring: no map, unmap or new store a flush); else into
-memory, each range given the GL as it is drawn, in a store of its own (as
-instances_upload's on ES). */
+memory, all given the GL at once after an upload has written its groups', in
+a store of their own, and bound a range at a time as the ring's are (a store
+a range, on the web, cost more than the instancing saved: 8 ms a frame at
+b30's landing) (instance_blocks_give). */
 struct instance_block_range
 {
 	/* its draws, its vectors (aligned for binding), and the window of
@@ -6617,10 +6619,11 @@ static unsigned long instance_block_range_capacity;
 range bound, in vectors, and the flushes counted */
 static float (*instance_block_to)[4];
 static unsigned long instance_block_align, instance_block_stamp;
-/* (in memory: the blocks, and the buffers a range and a window are given) */
+/* (in memory: the blocks, so many vectors of them this flush, and the
+buffer they are given) */
 static float (*instance_block_data)[4];
-static unsigned long instance_block_capacity;
-static GLuint instance_block_buffer, instance_model_block_buffer;
+static unsigned long instance_block_capacity, instance_block_data_count;
+static GLuint instance_block_buffer;
 /* the models whose lights are in the models' block, in order; each window's
 first vector and models; and the window bound */
 static int *instance_block_window_models;
@@ -6917,6 +6920,7 @@ static void instance_blocks_fill(void)
 			return;
 		}
 		to = instance_block_data;
+		instance_block_data_count = need;
 	}
 	/* (each model's lights once, in order) */
 	for (index = 0; index < instance_block_window_model_count; index++)
@@ -6931,30 +6935,40 @@ static void instance_blocks_fill(void)
 		instances.groups[group_index].block_ready = instances.groups[group_index].block_read;
 }
 
+/* (in memory) the flush's blocks given the GL, once an upload has written
+its groups' vectors (all of them, in a store of their own: the draws before
+keep theirs) */
+static void instance_blocks_give(void)
+{
+	if (!instance_block_to || instance_block_ring_used)
+		return;
+	if (!instance_block_buffer)
+		glGenBuffers(1, &instance_block_buffer);
+	glBindBuffer(GL_UNIFORM_BUFFER, instance_block_buffer);
+	glBufferData(GL_UNIFORM_BUFFER, (GLsizeiptr)(instance_block_data_count * sizeof(*instance_block_data)),
+		instance_block_data, GL_STREAM_DRAW);
+	instance_block_bound_window = -1;
+}
+
+/* the vectors of a block from first bound to binding: in the ring, or in
+the store the flush's blocks were given (instance_blocks_give) */
+static void instance_block_bind(GLuint binding, unsigned long first)
+{
+	GLsizeiptr size = (GLsizeiptr)((unsigned long)instance_block_vectors() * sizeof(*instance_block_data));
+
+	if (instance_block_ring_used)
+		first += instance_block_ring_base;
+	glBindBufferRange(GL_UNIFORM_BUFFER, binding, instance_block_ring_used ? instance_block_ring_buffer :
+		instance_block_buffer, (GLintptr)(first * sizeof(*instance_block_data)), size);
+}
+
 /* a window of the models' block bound, where it is not already */
 static void instance_block_window_bind(long window)
 {
-	GLsizeiptr size = (GLsizeiptr)((unsigned long)instance_block_vectors() * sizeof(*instance_block_data));
-	unsigned long first;
-
 	if (window < 0 || window == instance_block_bound_window)
 		return;
 	instance_block_bound_window = window;
-	first = instance_block_window_firsts[window];
-	if (instance_block_ring_used)
-	{
-		glBindBufferRange(GL_UNIFORM_BUFFER, INSTANCE_MODEL_BLOCK_BINDING, instance_block_ring_buffer,
-			(GLintptr)((instance_block_ring_base + first) * sizeof(*instance_block_data)), size);
-		return;
-	}
-	if (!instance_model_block_buffer)
-		glGenBuffers(1, &instance_model_block_buffer);
-	glBindBuffer(GL_UNIFORM_BUFFER, instance_model_block_buffer);
-	glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STREAM_DRAW);
-	glBufferSubData(GL_UNIFORM_BUFFER, 0,
-		(GLsizeiptr)(instance_block_window_counts[window] * INSTANCE_MODEL_LIGHTING_COUNT * sizeof(*instance_block_data)),
-		instance_block_data[first]);
-	glBindBufferBase(GL_UNIFORM_BUFFER, INSTANCE_MODEL_BLOCK_BINDING, instance_model_block_buffer);
+	instance_block_bind(INSTANCE_MODEL_BLOCK_BINDING, instance_block_window_firsts[window]);
 }
 
 /* a group's draws drawn instanced (instances_flush having set the rest):
@@ -6962,7 +6976,6 @@ where they read a block, a range of it at a time, each bound with its
 window of models */
 static void instance_block_draw(const struct instance_group *group, D3DPRIMITIVETYPE primitive_type)
 {
-	GLsizeiptr size = (GLsizeiptr)((unsigned long)instance_block_vectors() * sizeof(*instance_block_data));
 	unsigned long start = 0, at = group->block_first, range;
 
 	if (!group->block_read)
@@ -6975,22 +6988,7 @@ static void instance_block_draw(const struct instance_group *group, D3DPRIMITIVE
 		unsigned long count = instance_block_ranges[range].count;
 
 		instance_block_window_bind(instance_block_ranges[range].window);
-		if (instance_block_ring_used)
-		{
-			glBindBufferRange(GL_UNIFORM_BUFFER, INSTANCE_BLOCK_BINDING, instance_block_ring_buffer,
-				(GLintptr)((instance_block_ring_base + at) * sizeof(*instance_block_data)), size);
-		}
-		else
-		{
-			if (!instance_block_buffer)
-				glGenBuffers(1, &instance_block_buffer);
-			glBindBuffer(GL_UNIFORM_BUFFER, instance_block_buffer);
-			glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STREAM_DRAW);
-			glBufferSubData(GL_UNIFORM_BUFFER, 0,
-				(GLsizeiptr)(count * (unsigned long)group->block_stride * sizeof(*instance_block_data)),
-				instance_block_data[at]);
-			glBindBufferBase(GL_UNIFORM_BUFFER, INSTANCE_BLOCK_BINDING, instance_block_buffer);
-		}
+		instance_block_bind(INSTANCE_BLOCK_BINDING, at);
 		instances.base = group->base + start * (unsigned long)group->stride;
 		instances.drawing = count;
 		instances.block_stride = group->block_stride;
@@ -7498,7 +7496,10 @@ static void instances_flush(void)
 			continue;
 		/* (the groups from here on as many as an upload holds: all) */
 		if (!precompiling && index >= uploaded)
+		{
 			uploaded = instances_upload(index);
+			instance_blocks_give();
+		}
 		instance_state_restore(&group->state);
 		instance_restore(group, group->instances[0]);
 		if (precompiling)
@@ -10822,7 +10823,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		if (instances.kept)
 		{
 			platform_log("batched draws: %lu a frame kept, drawn in %lu groups, %lu of them instanced (%lu draws); "
-				"stores of %lu KB of registers and %lu KB of blocks (0: in memory, a range at a time)",
+				"stores of %lu KB of registers and %lu KB of blocks (0: in memory, given the GL each upload)",
 				instances.kept / stats.presents, instances.groups_drawn / stats.presents,
 				instances.instanced_draws / stats.presents, instances.instances_drawn / stats.presents,
 				instance_rows_size.size / 1024, instance_block_ring_made > 0 ? instance_blocks_size.size / 1024 : 0);
