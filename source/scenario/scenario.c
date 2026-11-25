@@ -833,15 +833,19 @@ struct scenario_leaf_cache_entry
 	long leaf_index;
 };
 
-static struct scenario_leaf_cache_entry scenario_leaf_cache[SCENARIO_LEAF_CACHE_SIZE];
+static __thread struct scenario_leaf_cache_entry scenario_leaf_cache[SCENARIO_LEAF_CACHE_SIZE];
 /* (the entry of its cube's a point found next replaces) */
-static unsigned long scenario_leaf_cache_next_way;
+static __thread unsigned long scenario_leaf_cache_next_way;
+/* port: incremented on bsp switch so every thread clears its own cache on its
+next lookup (safe for concurrent collision walks without locks or sharing) */
+static unsigned long scenario_leaf_cache_generation = 1;
+static __thread unsigned long scenario_leaf_cache_local_generation;
 
 /* port: the bsp's leaves change with it (scenario_switch_structure_bsp) */
 static void scenario_leaf_cache_clear(
 	void)
 {
-	csmemset(scenario_leaf_cache, 0, sizeof(scenario_leaf_cache));
+	__atomic_add_fetch(&scenario_leaf_cache_generation, 1, __ATOMIC_RELEASE);
 
 	return;
 }
@@ -863,8 +867,14 @@ number) */
 static struct scenario_leaf_cache_entry *scenario_leaf_cache_cube(
 	const real_point3d *point)
 {
+	unsigned long generation = __atomic_load_n(&scenario_leaf_cache_generation, __ATOMIC_ACQUIRE);
 	unsigned long hash;
 
+	if (scenario_leaf_cache_local_generation != generation)
+	{
+		csmemset(scenario_leaf_cache, 0, sizeof(scenario_leaf_cache));
+		scenario_leaf_cache_local_generation = generation;
+	}
 	if (!(fabs(point->x) < 1.0e6f && fabs(point->y) < 1.0e6f && fabs(point->z) < 1.0e6f))
 		return NULL;
 

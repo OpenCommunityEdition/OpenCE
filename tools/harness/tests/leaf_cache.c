@@ -20,6 +20,13 @@ sources (config.inc, under_test.inc).
 #include <limits.h>
 #include <math.h>
 #include "harness.h"
+#ifdef _WIN32
+#include <process.h>
+__declspec(dllimport) unsigned long __stdcall WaitForSingleObject(void *handle, unsigned long milliseconds);
+__declspec(dllimport) int __stdcall CloseHandle(void *handle);
+#else
+#include <pthread.h>
+#endif
 
 struct tag_block { long count; void *address; void const *definition; };
 typedef struct { real_vector3d n; real d; } real_plane3d;
@@ -337,6 +344,132 @@ static real moving_vectors(void)
 	return (real)kept / (real)vectors;
 }
 
+enum { CONCURRENT_THREADS = 4, CONCURRENT_POINTS = 512 };
+static real_point3d concurrent_points[CONCURRENT_POINTS];
+static real_vector3d concurrent_vectors[CONCURRENT_POINTS];
+static long concurrent_expected_leaves[CONCURRENT_POINTS];
+static long concurrent_expected_vec_count[CONCURRENT_POINTS];
+static long concurrent_expected_vec_leaf0[CONCURRENT_POINTS];
+static long concurrent_ready;
+static long concurrent_go;
+static long concurrent_failures;
+
+static void concurrent_leaf_worker(long thread_id)
+{
+	unsigned long flags = FLAG(_collision_test_front_facing_surfaces_bit) | FLAG(_collision_test_back_facing_surfaces_bit);
+	long pass, step;
+
+	__atomic_fetch_add(&concurrent_ready, 1, __ATOMIC_ACQ_REL);
+	while (!__atomic_load_n(&concurrent_go, __ATOMIC_ACQUIRE))
+	{
+	}
+	for (pass = 0; pass < 4; pass++)
+	{
+		for (step = 0; step < CONCURRENT_POINTS; step++)
+		{
+			long index = (step * (thread_id * 2 + 1) + thread_id * 13) & (CONCURRENT_POINTS - 1);
+			struct collision_bsp_test_vector_result result;
+			long leaf = scenario_leaf_index_from_point_cached(&concurrent_points[index]);
+
+			if (leaf != concurrent_expected_leaves[index])
+				__atomic_fetch_add(&concurrent_failures, 1, __ATOMIC_RELAXED);
+			collision_bsp_test_vector(flags, global_collision_bsp, 0, NULL, &concurrent_points[index],
+				&concurrent_vectors[index], 1.0f, &result);
+			if (result.leaf_count != concurrent_expected_vec_count[index] ||
+				(result.leaf_count > 0 && result.leaf_indices[0] != concurrent_expected_vec_leaf0[index]))
+			{
+				__atomic_fetch_add(&concurrent_failures, 1, __ATOMIC_RELAXED);
+			}
+		}
+	}
+}
+
+#ifdef _WIN32
+static unsigned __stdcall concurrent_leaf_entry(void *argument)
+{
+	concurrent_leaf_worker((long)(size_t)argument);
+	return 0;
+}
+#else
+static void *concurrent_leaf_entry(void *argument)
+{
+	concurrent_leaf_worker((long)(size_t)argument);
+	return NULL;
+}
+#endif
+
+static void case_concurrent(void)
+{
+	unsigned long flags = FLAG(_collision_test_front_facing_surfaces_bit) | FLAG(_collision_test_back_facing_surfaces_bit);
+	long round, index, thread_id;
+
+	make_bsp(&first_bsp, 11);
+	make_bsp(&second_bsp, 22);
+	random_seed = 77;
+	for (index = 0; index < CONCURRENT_POINTS; index++)
+	{
+		/* pack points densely into a few cubes so workers hammer the same ways */
+		concurrent_points[index].x = random_range(-2.0f, 2.0f);
+		concurrent_points[index].y = random_range(-2.0f, 2.0f);
+		concurrent_points[index].z = random_range(-2.0f, 2.0f);
+		concurrent_vectors[index].i = random_range(-0.3f, 0.3f);
+		concurrent_vectors[index].j = random_range(-0.3f, 0.3f);
+		concurrent_vectors[index].k = random_range(-0.3f, 0.3f);
+	}
+	concurrent_failures = 0;
+	for (round = 0; round < 6; round++)
+	{
+		struct test_bsp *active = (round & 1) ? &second_bsp : &first_bsp;
+#ifdef _WIN32
+		void *threads[CONCURRENT_THREADS];
+#else
+		pthread_t threads[CONCURRENT_THREADS];
+#endif
+		current_bsp = &active->bsp.bsp3d;
+		global_collision_bsp = NULL;
+		for (index = 0; index < CONCURRENT_POINTS; index++)
+		{
+			struct collision_bsp_test_vector_result walked;
+
+			concurrent_expected_leaves[index] = bsp3d_test_point(current_bsp, 0, &concurrent_points[index]);
+			collision_bsp_test_vector(flags, &active->bsp, 0, NULL, &concurrent_points[index],
+				&concurrent_vectors[index], 1.0f, &walked);
+			concurrent_expected_vec_count[index] = walked.leaf_count;
+			concurrent_expected_vec_leaf0[index] = walked.leaf_count > 0 ? walked.leaf_indices[0] : NONE;
+		}
+		global_collision_bsp = &active->bsp;
+		scenario_leaf_cache_clear();
+		__atomic_store_n(&concurrent_ready, 0, __ATOMIC_RELAXED);
+		__atomic_store_n(&concurrent_go, 0, __ATOMIC_RELAXED);
+		for (thread_id = 0; thread_id < CONCURRENT_THREADS; thread_id++)
+		{
+#ifdef _WIN32
+			uintptr_t handle = _beginthreadex(NULL, 0, concurrent_leaf_entry, (void *)(size_t)thread_id, 0, NULL);
+			CHECK(handle != 0, "cannot start worker thread");
+			threads[thread_id] = (void *)handle;
+#else
+			CHECK(pthread_create(&threads[thread_id], NULL, concurrent_leaf_entry, (void *)(size_t)thread_id) == 0,
+				"cannot start worker thread");
+#endif
+		}
+		while (__atomic_load_n(&concurrent_ready, __ATOMIC_ACQUIRE) < CONCURRENT_THREADS)
+		{
+		}
+		__atomic_store_n(&concurrent_go, 1, __ATOMIC_RELEASE);
+		for (thread_id = 0; thread_id < CONCURRENT_THREADS; thread_id++)
+		{
+#ifdef _WIN32
+			WaitForSingleObject(threads[thread_id], 0xFFFFFFFFUL);
+			CloseHandle(threads[thread_id]);
+#else
+			pthread_join(threads[thread_id], NULL);
+#endif
+		}
+	}
+	global_collision_bsp = NULL;
+	CHECK(concurrent_failures == 0, "%ld concurrent leaf cache mismatches", concurrent_failures);
+}
+
 int main(int argc, char **argv)
 {
 	char const *name = argc > 1 ? argv[1] : "";
@@ -443,6 +576,10 @@ int main(int argc, char **argv)
 		CHECK(scenario_leaf_index_from_point_cached(&origin) == bsp3d_test_point(current_bsp, 0, &origin),
 			"the origin: leaf %ld, the bsp gives %ld",
 			scenario_leaf_index_from_point_cached(&origin), bsp3d_test_point(current_bsp, 0, &origin));
+	}
+	else if (!strcmp(name, "concurrent"))
+	{
+		case_concurrent();
 	}
 	else
 	{

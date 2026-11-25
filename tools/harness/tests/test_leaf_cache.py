@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, enum_with, function, mutated, read, run, structure  # noqa: E402
 
-CASES = ["same-leaf", "reuses", "vectors", "vectors-without-walk", "new-bsp", "empty-entry", "malformed-bsp"]
+CASES = ["same-leaf", "reuses", "vectors", "vectors-without-walk", "new-bsp", "empty-entry", "malformed-bsp", "concurrent"]
 
 # a fault in the code and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -27,7 +27,7 @@ NEGATIVE_CONTROLS = {
     # a vector given without the walk given no leaf
     "no-leaf-given": (("result->leaf_count = 1;", "result->leaf_count = 0;"), "vectors"),
     # the leaves of the old bsp kept
-    "kept-across-bsps": (("csmemset(scenario_leaf_cache, 0, sizeof(scenario_leaf_cache));", ""), "new-bsp"),
+    "kept-across-bsps": (("__atomic_add_fetch(&scenario_leaf_cache_generation, 1, __ATOMIC_RELEASE);", ""), "new-bsp"),
     # an entry with nothing kept giving its leaf 0 to a point where it lies
     "empty-entry-used": (("< entry->clearance * entry->clearance", "<= entry->clearance * entry->clearance"),
                          "empty-entry"),
@@ -53,8 +53,10 @@ def generated(fault=None):
     collision_bsp_header = read("source/physics/collision_bsp.h")
     collision_bsp_definitions = read("source/physics/collision_bsp_definitions.h")
     collisions_header = read("source/physics/collisions.h")
-    cache = re.search(r"^static struct scenario_leaf_cache_entry scenario_leaf_cache\[[^;]*;", scenario, re.M)
-    next_way = re.search(r"^static unsigned long scenario_leaf_cache_next_way;", scenario, re.M)
+    cache = re.search(r"^static __thread struct scenario_leaf_cache_entry scenario_leaf_cache\[[^;]*;", scenario, re.M)
+    next_way = re.search(r"^static __thread unsigned long scenario_leaf_cache_next_way;", scenario, re.M)
+    generation = re.search(r"^static unsigned long scenario_leaf_cache_generation[^;]*;", scenario, re.M)
+    local_generation = re.search(r"^static __thread unsigned long scenario_leaf_cache_local_generation;", scenario, re.M)
     config = "\n".join([
         enum_with(bsp3d_header, "MAXIMUM_BSP3D_TRAVERSAL_DEPTH"),
         structure(bsp3d_header, "bsp3d"),
@@ -63,6 +65,8 @@ def generated(fault=None):
         structure(scenario, "scenario_leaf_cache_entry"),
         cache.group(0),
         next_way.group(0),
+        generation.group(0),
+        local_generation.group(0),
         enum_with(collisions_header, "_collision_test_front_facing_surfaces_bit"),
         enum_with(collision_bsp, "_collision_surface_invisible_bit"),
         enum_with(collision_bsp, "_collision_leaf_contains_two_sided_bit"),
