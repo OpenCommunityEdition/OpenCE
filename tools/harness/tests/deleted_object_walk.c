@@ -11,6 +11,13 @@ answers are not an old map's.
 
 #include <stddef.h>
 #include "harness.h"
+#ifdef _WIN32
+#include <process.h>
+unsigned long __stdcall WaitForSingleObject(void *, unsigned long);
+int __stdcall CloseHandle(void *);
+#else
+#include <pthread.h>
+#endif
 
 #define NUMBER_OF_OBJECT_TYPES 12
 #define MAXIMUM_CHILDREN_PER_OBJECT_TYPE_DEFINITION 4
@@ -158,7 +165,7 @@ static boolean unit_set_or_test_seat_and_weapon_label(long unit_index, char cons
 	char const *weapon_label, boolean set)
 {
 	CHECK(!set, "a test, not a set");
-	tests_by_name++;
+	__atomic_add_fetch(&tests_by_name, 1, __ATOMIC_RELAXED);
 	return label_answer(unit_definitions[units[unit_index].definition_index].object.animation_graph.index,
 		seat_label, weapon_label);
 }
@@ -267,6 +274,101 @@ static void case_new_map(void)
 	CHECK(tests_by_name > 0, "the new map's tests made by name");
 }
 
+enum { CONCURRENT_THREADS = 4, CONCURRENT_QUERIES = 50000 };
+struct label_worker_state
+{
+	unsigned long seed;
+	long failures;
+};
+
+static void label_worker_run(struct label_worker_state *state)
+{
+	unsigned long s = state->seed;
+	long query;
+
+	for (query = 0; query < CONCURRENT_QUERIES; query++)
+	{
+		long unit_index;
+		long weapon_index;
+		boolean expected;
+
+		s = s * 1103515245UL + 12345UL;
+		unit_index = (long)(((s >> 8) & 0xFFFFFF) % UNIT_COUNT);
+		s = s * 1103515245UL + 12345UL;
+		weapon_index = (long)(((s >> 8) & 0xFFFFFF) % WEAPON_COUNT);
+		expected = label_answer(
+			unit_definitions[units[unit_index].definition_index].object.animation_graph.index,
+			units[unit_index].seat_label,
+			weapons[weapon_index].label);
+		if (unit_can_use_weapon(unit_index, weapon_index) != expected)
+		{
+			state->failures++;
+			return;
+		}
+	}
+}
+
+#ifdef _WIN32
+static unsigned __stdcall label_worker_entry(void *arg)
+{
+	label_worker_run((struct label_worker_state *)arg);
+	return 0;
+}
+#else
+static void *label_worker_entry(void *arg)
+{
+	label_worker_run((struct label_worker_state *)arg);
+	return NULL;
+}
+#endif
+
+static void case_labels_concurrent(void)
+{
+	int phase;
+
+	for (phase = 0; phase < 2; phase++)
+	{
+		struct label_worker_state workers[CONCURRENT_THREADS];
+		int index;
+#ifdef _WIN32
+		void *threads[CONCURRENT_THREADS];
+#else
+		pthread_t threads[CONCURRENT_THREADS];
+#endif
+
+		map_serial++;
+		units_initialize_for_new_map();
+		tests_by_name = 0;
+		if (phase == 0)
+			make_units(6, 5, 10);
+		else
+			make_units(GRAPH_COUNT, SEAT_LABEL_COUNT, WEAPON_LABEL_COUNT);
+
+		for (index = 0; index < CONCURRENT_THREADS; index++)
+		{
+			workers[index].seed = 1000UL * (unsigned long)(phase + 1) + (unsigned long)(index * 137 + 17);
+			workers[index].failures = 0;
+#ifdef _WIN32
+			threads[index] = (void *)_beginthreadex(NULL, 0, label_worker_entry, &workers[index], 0, NULL);
+			CHECK(threads[index] != NULL, "_beginthreadex failed");
+#else
+			CHECK(pthread_create(&threads[index], NULL, label_worker_entry, &workers[index]) == 0,
+				"pthread_create failed");
+#endif
+		}
+		for (index = 0; index < CONCURRENT_THREADS; index++)
+		{
+#ifdef _WIN32
+			WaitForSingleObject(threads[index], 0xFFFFFFFFUL);
+			CloseHandle(threads[index]);
+#else
+			pthread_join(threads[index], NULL);
+#endif
+			CHECK(workers[index].failures == 0, "phase %d thread %d saw wrong label answer", phase, index);
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
 	const char *case_name = argc > 1 ? argv[1] : "";
@@ -280,6 +382,7 @@ int main(int argc, char **argv)
 	CASE("walk") case_walk();
 	else CASE("labels") case_labels();
 	else CASE("new-map") case_new_map();
+	else CASE("labels-concurrent") case_labels_concurrent();
 	else
 	{
 		fprintf(stderr, "unknown case %s\n", case_name);

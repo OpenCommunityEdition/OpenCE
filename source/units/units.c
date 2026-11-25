@@ -1022,10 +1022,10 @@ into it, or at a constant), so it is the same answer each time. */
 
 struct unit_port_label_test
 {
+	long state;
 	long animation_graph_index;
 	char const *seat_label;
 	char const *weapon_label;
-	boolean used;
 	boolean result;
 };
 
@@ -2479,43 +2479,52 @@ boolean unit_can_use_weapon(
 		long animation_graph_index = unit_definition_get(unit->definition_index)->object.animation_graph.index;
 		unsigned long hash = (unsigned long)animation_graph_index * 2654435761UL ^
 			(unsigned long)(size_t)seat_label * 40503UL ^ (unsigned long)(size_t)weapon_label * 69069UL;
-		struct unit_port_label_test *test = NULL;
+		struct unit_port_label_test *empty = NULL;
+		boolean found = FALSE;
 		short probe;
 
 		hash ^= hash >> 15;
 		for (probe = 0; probe < UNIT_PORT_LABEL_TEST_PROBES; probe++)
 		{
 			struct unit_port_label_test *entry = &unit_port_label_tests[(hash + probe) % UNIT_PORT_LABEL_TEST_COUNT];
+			long state = __atomic_load_n(&entry->state, __ATOMIC_ACQUIRE);
 
-			if (!entry->used ||
-				(entry->animation_graph_index == animation_graph_index &&
+			if (state == 2 &&
+				entry->animation_graph_index == animation_graph_index &&
 				entry->seat_label == seat_label &&
-				entry->weapon_label == weapon_label))
+				entry->weapon_label == weapon_label)
 			{
-				test = entry;
+				can_use_weapon = entry->result;
+				found = TRUE;
+				break;
+			}
+			if (state == 0 && !empty)
+			{
+				empty = entry;
 				break;
 			}
 		}
-		if (test && test->used)
-		{
-			can_use_weapon = test->result;
-		}
-		else
+		if (!found)
 		{
 			can_use_weapon = unit_set_or_test_seat_and_weapon_label(
 				unit_index,
 				seat_label,
 				weapon_label,
 				FALSE);
-			if (!test)
+			if (empty)
 			{
-				test = &unit_port_label_tests[hash % UNIT_PORT_LABEL_TEST_COUNT];
+				long expected = 0;
+
+				if (__atomic_compare_exchange_n(&empty->state, &expected, 1, FALSE,
+					__ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+				{
+					empty->animation_graph_index = animation_graph_index;
+					empty->seat_label = seat_label;
+					empty->weapon_label = weapon_label;
+					empty->result = can_use_weapon;
+					__atomic_store_n(&empty->state, 2, __ATOMIC_RELEASE);
+				}
 			}
-			test->animation_graph_index = animation_graph_index;
-			test->seat_label = seat_label;
-			test->weapon_label = weapon_label;
-			test->used = TRUE;
-			test->result = can_use_weapon;
 		}
 	}
 

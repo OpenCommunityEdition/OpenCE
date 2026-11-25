@@ -446,19 +446,21 @@ void objects_fix_for_deleted_object(
 	object. The others' umbrella shield is passed over with them: nothing
 	sets one but to NONE (object_new), which no deleted object's index is. */
 	static unsigned long handling_types;
+	unsigned long mask = __atomic_load_n(&handling_types, __ATOMIC_ACQUIRE);
 	short object_type;
 
-	if (!handling_types)
+	if (!mask)
 	{
 		for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
 		{
 			if (object_type_port_handles_deleted_objects(object_type))
 			{
-				SET_FLAG(handling_types, object_type, TRUE);
+				SET_FLAG(mask, object_type, TRUE);
 			}
 		}
+		__atomic_store_n(&handling_types, mask, __ATOMIC_RELEASE);
 	}
-	object_iterator_new(&iterator, handling_types, 0);
+	object_iterator_new(&iterator, mask, 0);
 
 	for (object = (struct object_datum *)object_iterator_next(&iterator);
 		object;

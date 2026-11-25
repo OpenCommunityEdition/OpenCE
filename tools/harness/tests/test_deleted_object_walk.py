@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run
 
-CASES = ['walk', 'labels', 'new-map']
+CASES = ['walk', 'labels', 'new-map', 'labels-concurrent']
 
 
 def generated(fault=None):
@@ -42,8 +42,8 @@ def test_case(case):
       'for (i = 0; definition->part_definitions[i] && i < 1; i++)\n\t\t{\n\t\t\tif (definition->part_definitions[i]->handle_deleted_object)'),
      'walk'),
     # a remembered test found by its seat label alone
-    (('\t\t\t\tentry->seat_label == seat_label &&\n\t\t\t\tentry->weapon_label == weapon_label))',
-      '\t\t\t\tentry->seat_label == seat_label))'), 'labels'),
+    (('\t\t\t\tentry->seat_label == seat_label &&\n\t\t\t\tentry->weapon_label == weapon_label)',
+      '\t\t\t\tentry->seat_label == seat_label)'), 'labels'),
     # the remembered tests kept from the last map
     (('\tmemset(unit_port_label_tests, 0, sizeof(unit_port_label_tests));\n', '\n'), 'new-map'),
 ])
