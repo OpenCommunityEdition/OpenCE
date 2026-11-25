@@ -84,16 +84,24 @@ static unsigned long reference_time;
 /* by cluster, its list's references whose object's bounding sphere is not
 held */
 static long cluster_references_unheld[MAXIMUM_CLUSTERS_PER_STRUCTURE];
-/* the notes are to be read again from the lists before they are used */
-static boolean references_unknown = TRUE;
+/* the notes' state: unknown (to be read again from the lists), reading (one
+thread is reading them; concurrent queries fall back to NONE), or ready */
+enum
+{
+	REACH_GRID_REFERENCES_UNKNOWN = 0,
+	REACH_GRID_REFERENCES_READING = 1,
+	REACH_GRID_REFERENCES_READY = 2,
+};
+static long references_state = REACH_GRID_REFERENCES_UNKNOWN;
 /* the grid is empty, not yet made so */
 static boolean grid_made;
 
-/* a query's clusters' places in its order, and the objects it met */
-static unsigned long query_mark;
-static unsigned long query_cluster_marks[MAXIMUM_CLUSTERS_PER_STRUCTURE];
-static short cluster_places[MAXIMUM_CLUSTERS_PER_STRUCTURE];
-static unsigned long query_object_marks[MAXIMUM_OBJECTS_PER_MAP];
+/* a query's clusters' places in its order, and the objects it met (per thread
+so concurrent queries do not contend on shared scratch arrays) */
+static __thread unsigned short query_mark;
+static __thread unsigned short query_cluster_marks[MAXIMUM_CLUSTERS_PER_STRUCTURE];
+static __thread short cluster_places[MAXIMUM_CLUSTERS_PER_STRUCTURE];
+static __thread unsigned short query_object_marks[MAXIMUM_OBJECTS_PER_MAP];
 
 /* ---------- private code */
 
@@ -224,7 +232,7 @@ static void reach_grid_count_unheld(
 	}
 }
 
-static void reach_grid_note(
+static boolean reach_grid_note(
 	long reference_index,
 	short cluster_index,
 	long object_index,
@@ -236,12 +244,11 @@ static void reach_grid_note(
 	/* (a cluster without a list of its own keeps none: cluster_partitions.c's
 	cluster_partition_get_first_reference) */
 	if (cluster_index < 0 || cluster_index >= MAXIMUM_CLUSTERS_PER_STRUCTURE)
-		return;
+		return TRUE;
 	if (reference < 0 || reference >= REACH_GRID_MAXIMUM_REFERENCES ||
 		absolute_index < 0 || absolute_index >= MAXIMUM_OBJECTS_PER_MAP)
 	{
-		references_unknown = TRUE;
-		return;
+		return FALSE;
 	}
 	reference_clusters[reference] = cluster_index;
 	reference_objects[reference] = object_index;
@@ -253,6 +260,7 @@ static void reach_grid_note(
 	object_first_references[absolute_index] = reference;
 	if (grid_objects[absolute_index] != object_index)
 		cluster_references_unheld[cluster_index]++;
+	return TRUE;
 }
 
 /* the notes, read again from the lists: within each cluster's list, the
@@ -271,7 +279,6 @@ static boolean reach_grid_read_references(
 	csmemset(object_first_references, 0xFF, sizeof(object_first_references));
 	csmemset(cluster_references_unheld, 0, sizeof(cluster_references_unheld));
 	reference_time = 0;
-	references_unknown = FALSE;
 	for (cluster_index = 0; cluster_index < MAXIMUM_CLUSTERS_PER_STRUCTURE; cluster_index++)
 	{
 		long count = 0;
@@ -285,7 +292,6 @@ static boolean reach_grid_read_references(
 		}
 		if (count > REACH_GRID_MAXIMUM_REFERENCES)
 		{
-			references_unknown = TRUE;
 			return FALSE;
 		}
 		for (reference_index = partition->cluster_first_data_references[cluster_index];
@@ -295,12 +301,13 @@ static boolean reach_grid_read_references(
 			struct data_reference const *reference =
 				(struct data_reference const *)datum_get(partition->data_reference_data, reference_index);
 
-			reach_grid_note(reference_index, cluster_index, reference->datum_index, reference_time + (unsigned long)count);
+			if (!reach_grid_note(reference_index, cluster_index, reference->datum_index, reference_time + (unsigned long)count))
+				return FALSE;
 			reference_index = reference->next_reference_index;
 		}
 		reference_time += REACH_GRID_MAXIMUM_REFERENCES;
 	}
-	return !references_unknown;
+	return TRUE;
 }
 
 /* ---------- public code */
@@ -313,8 +320,8 @@ void object_reach_grid_invalidate(
 	csmemset(grid_objects, 0xFF, sizeof(grid_objects));
 	csmemset(grid_buckets, 0xFF, sizeof(grid_buckets));
 	grid_large_first = NONE;
-	grid_made = TRUE;
-	references_unknown = TRUE;
+	__atomic_store_n(&grid_made, TRUE, __ATOMIC_RELEASE);
+	__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);
 }
 
 /* an object's bounding sphere, as object_bounds_cache_update holds it */
@@ -328,7 +335,7 @@ void object_reach_grid_update(
 	boolean large = !reach_grid_in_limit(center, radius);
 	short x0 = 0, y0 = 0, x1 = 0, y1 = 0;
 
-	if (!grid_made)
+	if (!__atomic_load_n(&grid_made, __ATOMIC_ACQUIRE))
 		object_reach_grid_invalidate();
 	held = grid_objects[absolute_index];
 	if (!large)
@@ -347,7 +354,7 @@ void object_reach_grid_update(
 	{
 		return;
 	}
-	if (held != object_index && !references_unknown)
+	if (held != object_index && __atomic_load_n(&references_state, __ATOMIC_ACQUIRE) == REACH_GRID_REFERENCES_READY)
 	{
 		/* (its references' objects held and no longer held) */
 		reach_grid_count_unheld(absolute_index, object_index, -1);
@@ -365,14 +372,18 @@ void object_reach_grid_reference_added(
 	short cluster_index,
 	long object_index)
 {
-	if (partition != object_reach_grid_partition || references_unknown)
-		return;
-	if (reference_time >= 0x7FFFFFF0UL)
+	if (partition != object_reach_grid_partition ||
+		__atomic_load_n(&references_state, __ATOMIC_ACQUIRE) != REACH_GRID_REFERENCES_READY)
 	{
-		references_unknown = TRUE;
 		return;
 	}
-	reach_grid_note(reference_index, cluster_index, object_index, ++reference_time);
+	if (reference_time >= 0x7FFFFFF0UL)
+	{
+		__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);
+		return;
+	}
+	if (!reach_grid_note(reference_index, cluster_index, object_index, ++reference_time))
+		__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);
 }
 
 /* a reference taken out of a cluster's list of the partition */
@@ -384,11 +395,14 @@ void object_reach_grid_reference_removed(
 	long absolute_index;
 	long next, previous;
 
-	if (partition != object_reach_grid_partition || references_unknown)
+	if (partition != object_reach_grid_partition ||
+		__atomic_load_n(&references_state, __ATOMIC_ACQUIRE) != REACH_GRID_REFERENCES_READY)
+	{
 		return;
+	}
 	if (reference < 0 || reference >= REACH_GRID_MAXIMUM_REFERENCES)
 	{
-		references_unknown = TRUE;
+		__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);
 		return;
 	}
 	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(reference_objects[reference]);
@@ -409,7 +423,7 @@ void object_reach_grid_forget(
 	struct cluster_partition const *partition)
 {
 	if (partition == object_reach_grid_partition)
-		references_unknown = TRUE;
+		__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);
 }
 
 /* The objects of the clusters' lists (the partition's, in that order) in
@@ -424,17 +438,34 @@ long object_reach_grid_objects_in_reach(
 	long *object_indices,
 	long maximum_count)
 {
-	static long places[256];
-	static unsigned long times[256];
+	long places[256];
+	unsigned long times[256];
 	long count = 0;
 	long index;
+	long state;
 	short x0, y0, x1, y1, x, y;
 	real reach = radius + REACH_GRID_MARGIN;
 
-	if (!grid_made)
-		object_reach_grid_invalidate();
-	if (references_unknown && !reach_grid_read_references())
+	if (!__atomic_load_n(&grid_made, __ATOMIC_ACQUIRE))
 		return NONE;
+	state = __atomic_load_n(&references_state, __ATOMIC_ACQUIRE);
+	if (state != REACH_GRID_REFERENCES_READY)
+	{
+		long expected = REACH_GRID_REFERENCES_UNKNOWN;
+
+		if (state == REACH_GRID_REFERENCES_READING ||
+			!__atomic_compare_exchange_n(&references_state, &expected, REACH_GRID_REFERENCES_READING, FALSE,
+				__ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+		{
+			return NONE;
+		}
+		if (!reach_grid_read_references())
+		{
+			__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);
+			return NONE;
+		}
+		__atomic_store_n(&references_state, REACH_GRID_REFERENCES_READY, __ATOMIC_RELEASE);
+	}
 	if (!reach_grid_in_limit(center, radius) || maximum_count > NUMBEROF(places))
 		return NONE;
 	x0 = reach_grid_square(center->x - reach);
@@ -444,7 +475,12 @@ long object_reach_grid_objects_in_reach(
 	if ((long)(x1 - x0 + 1) * (y1 - y0 + 1) > REACH_GRID_QUERY_SQUARES)
 		return NONE;
 
-	query_mark++;
+	if (++query_mark == 0)
+	{
+		csmemset(query_cluster_marks, 0, sizeof(query_cluster_marks));
+		csmemset(query_object_marks, 0, sizeof(query_object_marks));
+		query_mark = 1;
+	}
 	for (index = 0; index < cluster_count; index++)
 	{
 		short cluster_index = cluster_indices[index];

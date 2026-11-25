@@ -13,7 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, inline, mutated, read, run, structure  # noqa: E402
 
-CASES = ["moving", "unheld", "replaced", "full"]
+CASES = ["moving", "unheld", "replaced", "full", "concurrent"]
 
 # faults in the grid (each a before and an after), and the case that must catch them
 NEGATIVE_CONTROLS = {
@@ -25,8 +25,9 @@ NEGATIVE_CONTROLS = {
     # a cluster whose list holds an object not in the grid answered from the grid
     "ignores-unheld": ([("if (cluster_references_unheld[cluster_index] != 0)\n\t\t\t\treturn NONE;", "")], "unheld"),
     # a replaced game state's lists not read again
-    "keeps-replaced-notes": ([("if (partition == object_reach_grid_partition)\n\t\treferences_unknown = TRUE;", ""),
-                              ("\tgrid_made = TRUE;\n\treferences_unknown = TRUE;", "\tgrid_made = TRUE;")], "replaced"),
+    "keeps-replaced-notes": ([("if (partition == object_reach_grid_partition)\n\t\t__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);", ""),
+                              ("\t__atomic_store_n(&grid_made, TRUE, __ATOMIC_RELEASE);\n\t__atomic_store_n(&references_state, REACH_GRID_REFERENCES_UNKNOWN, __ATOMIC_RELEASE);",
+                               "\t__atomic_store_n(&grid_made, TRUE, __ATOMIC_RELEASE);")], "replaced"),
 }
 
 ENUMS = [("source/objects/object_types.h", "_object_type_biped"), ("source/objects/objects.h", "_object_invisible_bit"),
@@ -70,7 +71,7 @@ def under_test(faults=()):
     text += hooks[:hooks.index("\n\n")] + "\n"
     text += "".join(function(partitions, name) + "\n" for name in PARTITION_FUNCTIONS)
     # the grid's answers counted, or the lists gone through (the test's going_through)
-    text += ("static long grid_counted(long count) { if (count != NONE) grid_answers++; return count; }\n"
+    text += ("static long grid_counted(long count) { if (count != NONE) __atomic_add_fetch(&grid_answers, 1, __ATOMIC_RELAXED); return count; }\n"
              "#define object_reach_grid_objects_in_reach(a, b, c, d, e, f) \\\n"
              "\t(going_through ? NONE : grid_counted(object_reach_grid_objects_in_reach(a, b, c, d, e, f)))\n")
     collisions = read("source/physics/collisions.c")

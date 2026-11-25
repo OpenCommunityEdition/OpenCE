@@ -13,6 +13,13 @@ and the game state is replaced. test_object_reach_grid.py takes the enums
 
 #include "harness.h"
 #include <limits.h>
+#ifdef _WIN32
+#include <process.h>
+unsigned long __stdcall WaitForSingleObject(void *, unsigned long);
+int __stdcall CloseHandle(void *);
+#else
+#include <pthread.h>
+#endif
 #include "enums.inc"
 
 #define csmemset memset
@@ -391,6 +398,116 @@ static void load_game_state(void)
 	memcpy(salts, saved.salts, sizeof(salts));
 }
 
+enum { CONCURRENT_THREADS = 4, CONCURRENT_QUERIES = 4000 };
+struct reach_worker_state
+{
+	unsigned long seed;
+	long hits;
+	long failures;
+};
+
+static unsigned long worker_next(unsigned long *state)
+{
+	*state = *state * 1103515245UL + 12345UL;
+	return (*state >> 8) & 0xFFFFFF;
+}
+
+static real worker_real(unsigned long *state, real low, real high)
+{
+	return low + (high - low) * (real)(worker_next(state) & 0xFFFF) / 65535.0f;
+}
+
+static void reach_worker_run(struct reach_worker_state *state)
+{
+	unsigned long s = state->seed;
+	long query;
+
+	for (query = 0; query < CONCURRENT_QUERIES; query++)
+	{
+		real_point3d point;
+		real extent = query % 3 ? 4.0f : 20.0f;
+		real radius = worker_real(&s, 0.3f, 2.5f);
+		short touched[CLUSTERS];
+		short ordered[CLUSTERS];
+		short cluster_count;
+		long turn = (long)(worker_next(&s) % CLUSTERS);
+		long got[128];
+		long expected[128];
+		long got_count;
+		long expected_count = 0;
+		boolean seen[OBJECTS];
+		long index;
+
+		point.x = worker_real(&s, 15.0f - extent, 15.0f + extent);
+		point.y = worker_real(&s, 15.0f - extent, 15.0f + extent);
+		point.z = worker_real(&s, 0.0f, 2.0f);
+		cluster_count = clusters_touched(&point, radius, CLUSTERS, touched);
+		if (cluster_count <= 0)
+			continue;
+		for (index = 0; index < cluster_count; index++)
+			ordered[index] = touched[(index + turn) % cluster_count];
+
+		got_count = object_reach_grid_objects_in_reach(ordered, cluster_count, &point, radius, got, NUMBEROF(got));
+		if (got_count == NONE)
+			continue;
+		state->hits++;
+
+		memset(seen, 0, sizeof(seen));
+		for (index = 0; index < cluster_count; index++)
+		{
+			long reference_index;
+			long object_index;
+
+			for (object_index = cluster_get_first_collideable_object(&reference_index, ordered[index]);
+				object_index != NONE;
+				object_index = cluster_get_next_collideable_object(&reference_index))
+			{
+				long abs_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
+
+				if (seen[abs_index])
+					continue;
+				seen[abs_index] = TRUE;
+				if (!object_bounds_cache_out_of_reach(object_index, &point, radius))
+				{
+					if (expected_count >= NUMBEROF(expected))
+					{
+						state->failures++;
+						return;
+					}
+					expected[expected_count++] = object_index;
+				}
+			}
+		}
+		if (got_count != expected_count)
+		{
+			state->failures++;
+			return;
+		}
+		for (index = 0; index < got_count; index++)
+		{
+			if (got[index] != expected[index])
+			{
+				state->failures++;
+				return;
+			}
+		}
+	}
+}
+
+#ifdef _WIN32
+static unsigned __stdcall reach_worker_entry(void *arg)
+{
+	reach_worker_run((struct reach_worker_state *)arg);
+	return 0;
+}
+#else
+static void *reach_worker_entry(void *arg)
+{
+	reach_worker_run((struct reach_worker_state *)arg);
+	return NULL;
+}
+#endif
+
 int main(int argc, char **argv)
 {
 	const char *case_name = argc > 1 ? argv[1] : "";
@@ -464,6 +581,73 @@ int main(int argc, char **argv)
 		CHECK(lists_full > 1000, "only %lu references did not fit: the lists were not full", lists_full);
 		CHECK(grid_answers * 10 > queries_compared * 8, "the grid answered %lu of %lu queries: too few to compare",
 			grid_answers, queries_compared);
+		return 0;
+	}
+	/* concurrent queries racing on cold reference rebuilds and steady-state reads */
+	CASE("concurrent")
+	{
+		long total_hits = 0;
+
+		build_world(TRUE, HALO_PORT_MAXIMUM_CLUSTER_REFERENCES);
+		save_game_state();
+		for (round = 0; round < 6; round++)
+		{
+			struct reach_worker_state workers[CONCURRENT_THREADS];
+#ifdef _WIN32
+			void *threads[CONCURRENT_THREADS];
+#else
+			pthread_t threads[CONCURRENT_THREADS];
+#endif
+
+			if (round == 0 || round == 2)
+			{
+				/* race all threads on the cold lazy reach_grid_read_references() rebuild */
+				cluster_partition_port_forget(&partition);
+			}
+			else if (round == 3)
+			{
+				tick(0);
+			}
+			else if (round == 4)
+			{
+				load_game_state();
+				cluster_partition_port_forget(&partition);
+				object_bounds_cache_invalidate();
+				for (index = 0; index < OBJECTS; index++)
+					tell_cache(index);
+			}
+			else if (round == 5)
+			{
+				tick(0);
+				cluster_partition_port_forget(&partition);
+			}
+
+			for (index = 0; index < CONCURRENT_THREADS; index++)
+			{
+				workers[index].seed = 777UL * (unsigned long)(round + 1) + (unsigned long)(index * 919 + 31);
+				workers[index].hits = 0;
+				workers[index].failures = 0;
+#ifdef _WIN32
+				threads[index] = (void *)_beginthreadex(NULL, 0, reach_worker_entry, &workers[index], 0, NULL);
+				CHECK(threads[index] != NULL, "_beginthreadex failed");
+#else
+				CHECK(pthread_create(&threads[index], NULL, reach_worker_entry, &workers[index]) == 0,
+					"pthread_create failed");
+#endif
+			}
+			for (index = 0; index < CONCURRENT_THREADS; index++)
+			{
+#ifdef _WIN32
+				WaitForSingleObject(threads[index], 0xFFFFFFFFUL);
+				CloseHandle(threads[index]);
+#else
+				pthread_join(threads[index], NULL);
+#endif
+				CHECK(workers[index].failures == 0, "round %ld thread %ld disagreed with cluster lists", round, index);
+				total_hits += workers[index].hits;
+			}
+		}
+		CHECK(total_hits > 10000, "only %ld concurrent grid answers: too few to validate", total_hits);
 		return 0;
 	}
 	fprintf(stderr, "unknown case: %s\n", case_name);
