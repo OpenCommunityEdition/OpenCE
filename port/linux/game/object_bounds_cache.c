@@ -31,8 +31,6 @@ does not change either.
 #include "physics/collisions.h"
 #include "structures/structures.h"
 
-#include <stdlib.h>
-
 struct object_bounds
 {
 	long object_index;
@@ -45,6 +43,9 @@ struct object_bounds
 static struct object_bounds object_bounds[MAXIMUM_OBJECTS_PER_MAP];
 static long object_bounds_epoch = 1;
 
+#define CLUSTER_OBJECTS_LISTS 2
+#define CLUSTER_OBJECTS_CAPACITY 256
+
 struct cluster_objects
 {
 	long epoch;
@@ -52,17 +53,20 @@ struct cluster_objects
 	/* the object types listed (_collision_test_objects_all_types_flags's
 	bits) */
 	unsigned long types;
-	/* when last asked for (cluster_objects_asked) */
-	unsigned long asked;
+	/* NONE when more than CLUSTER_OBJECTS_CAPACITY objects matched */
 	long count;
-	long capacity;
-	long *objects;
+	long objects[CLUSTER_OBJECTS_CAPACITY];
 };
 
-#define CLUSTER_OBJECTS_LISTS 2
+struct cluster_objects_slot
+{
+	/* odd while a thread is rebuilding one of this cluster's lists */
+	unsigned long sequence;
+	unsigned long next_list;
+	struct cluster_objects lists[CLUSTER_OBJECTS_LISTS];
+};
 
-static struct cluster_objects cluster_objects[MAXIMUM_CLUSTERS_PER_STRUCTURE][CLUSTER_OBJECTS_LISTS];
-static unsigned long cluster_objects_asked;
+static struct cluster_objects_slot cluster_objects[MAXIMUM_CLUSTERS_PER_STRUCTURE];
 
 void object_bounds_cache_update(
 	long object_index,
@@ -82,7 +86,11 @@ void object_bounds_cache_update(
 void object_bounds_cache_invalidate(
 	void)
 {
-	object_bounds_epoch++;
+	long epoch = __atomic_load_n(&object_bounds_epoch, __ATOMIC_RELAXED) + 1;
+
+	if (epoch <= 0)
+		epoch = 1;
+	__atomic_store_n(&object_bounds_epoch, epoch, __ATOMIC_RELEASE);
 }
 
 /* whether the object's bounding sphere is known to be out of the reach of
@@ -117,81 +125,138 @@ boolean object_bounds_cache_missed_by_vector(
 			!fast_vector_intersects_sphere(point, vector, &bounds->center, bounds->radius));
 }
 
-/* the cluster's collideable objects that are not bipeds, in its list's order,
-for a vector that tests for no bipeds (count set); NULL when the vector tests
-for bipeds, or the list is not to be had (the cluster's list walked then) */
-long const *object_bounds_cache_cluster_objects(
+/* copies the cluster's collideable objects that are not bipeds, in its list's
+order, into object_indices[0..maximum_count-1], returning how many were copied;
+NONE when the vector tests for bipeds, or the list is not to be had or does not
+fit (the cluster's list walked then). Readers copy out under a per-cluster
+seqlock with no shared writes on a hit, and fall back to NONE if another thread
+is rebuilding the cluster's list. */
+long object_bounds_cache_cluster_objects(
 	short cluster_index,
 	unsigned long flags,
-	long *count)
+	long *object_indices,
+	long maximum_count)
 {
-	struct cluster_objects *entry;
+	struct cluster_objects_slot *slot;
+	long epoch;
 	unsigned long changes;
 	unsigned long types = flags & _collision_test_objects_all_types_flags;
-	long list;
+	int attempt;
 
 	if (TEST_FLAG(flags, _collision_test_objects_bipeds_bit) ||
-		cluster_index < 0 || cluster_index >= MAXIMUM_CLUSTERS_PER_STRUCTURE)
+		cluster_index < 0 || cluster_index >= MAXIMUM_CLUSTERS_PER_STRUCTURE ||
+		!object_indices || maximum_count <= 0)
 	{
-		return NULL;
+		return NONE;
 	}
-	/* (the list of these types, or the one asked for longest ago) */
-	entry = &cluster_objects[cluster_index][0];
-	for (list = 0; list < CLUSTER_OBJECTS_LISTS; list++)
-	{
-		if (cluster_objects[cluster_index][list].types == types)
-		{
-			entry = &cluster_objects[cluster_index][list];
-			break;
-		}
-		if (cluster_objects[cluster_index][list].asked < entry->asked)
-			entry = &cluster_objects[cluster_index][list];
-	}
-	entry->asked = ++cluster_objects_asked;
+	slot = &cluster_objects[cluster_index];
+	epoch = __atomic_load_n(&object_bounds_epoch, __ATOMIC_ACQUIRE);
 	changes = cluster_port_collideable_object_changes(cluster_index);
-	if (entry->epoch != object_bounds_epoch || entry->changes != changes || entry->types != types || !entry->objects)
+
+	for (attempt = 0; attempt < 8; attempt++)
 	{
-		long reference_index;
-		long object_index;
+		unsigned long sequence = __atomic_load_n(&slot->sequence, __ATOMIC_ACQUIRE);
+		long list;
 
-		entry->count = 0;
-		entry->types = types;
-		for (object_index = cluster_get_first_collideable_object(&reference_index, cluster_index);
-			object_index != NONE;
-			object_index = cluster_get_next_collideable_object(&reference_index))
+		if (sequence & 1)
+			return NONE;
+
+		for (list = 0; list < CLUSTER_OBJECTS_LISTS; list++)
 		{
-			short type = object_get(object_index)->object.type;
+			struct cluster_objects const *entry = &slot->lists[list];
+			long entry_epoch = __atomic_load_n(&entry->epoch, __ATOMIC_RELAXED);
+			unsigned long entry_changes = __atomic_load_n(&entry->changes, __ATOMIC_RELAXED);
+			unsigned long entry_types = __atomic_load_n(&entry->types, __ATOMIC_RELAXED);
 
-			/* (a type the vector does not test for: object_test_vector
-			tests neither the object nor what is attached to it) */
-			if (type == _object_type_biped ||
-				!TEST_FLAG(types, type + _collision_test_objects_first_type_bit))
-				continue;
-			if (entry->count >= entry->capacity)
+			if (entry_epoch == epoch && entry_changes == changes && entry_types == types)
 			{
-				long capacity = entry->capacity ? 2 * entry->capacity : 64;
-				long *objects = (long *)realloc(entry->objects, capacity * sizeof(long));
+				long count = __atomic_load_n(&entry->count, __ATOMIC_RELAXED);
+				long index;
 
-				if (!objects)
+				if (count >= 0 && count <= CLUSTER_OBJECTS_CAPACITY && count <= maximum_count)
 				{
-					entry->epoch = 0;
-					return NULL;
+					for (index = 0; index < count; index++)
+						object_indices[index] = __atomic_load_n(&entry->objects[index], __ATOMIC_RELAXED);
 				}
-				entry->objects = objects;
-				entry->capacity = capacity;
+				else
+				{
+					count = NONE;
+				}
+				__atomic_thread_fence(__ATOMIC_ACQUIRE);
+				if (__atomic_load_n(&slot->sequence, __ATOMIC_RELAXED) == sequence)
+					return count;
+				goto retry;
 			}
-			entry->objects[entry->count++] = object_index;
 		}
-		if (!entry->objects)
+
+		/* miss: claim this cluster's sequence (even -> odd) to rebuild one list */
+		if (__atomic_compare_exchange_n(&slot->sequence, &sequence, sequence + 1, FALSE,
+			__ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
 		{
-			entry->objects = (long *)malloc(64 * sizeof(long));
-			if (!entry->objects)
-				return NULL;
-			entry->capacity = 64;
+			struct cluster_objects *entry = NULL;
+			long reference_index;
+			long object_index;
+			long count = 0;
+
+			/* (prefer a list already holding these types, else a stale one, else round-robin) */
+			for (list = 0; list < CLUSTER_OBJECTS_LISTS; list++)
+			{
+				if (slot->lists[list].types == types)
+				{
+					entry = &slot->lists[list];
+					break;
+				}
+			}
+			if (!entry)
+			{
+				for (list = 0; list < CLUSTER_OBJECTS_LISTS; list++)
+				{
+					if (slot->lists[list].epoch != epoch || slot->lists[list].changes != changes)
+					{
+						entry = &slot->lists[list];
+						break;
+					}
+				}
+			}
+			if (!entry)
+			{
+				entry = &slot->lists[slot->next_list % CLUSTER_OBJECTS_LISTS];
+				slot->next_list++;
+			}
+
+			/* order the odd sequence store before any relaxed writes to entry */
+			__atomic_thread_fence(__ATOMIC_RELEASE);
+
+			for (object_index = cluster_get_first_collideable_object(&reference_index, cluster_index);
+				object_index != NONE;
+				object_index = cluster_get_next_collideable_object(&reference_index))
+			{
+				short type = object_get(object_index)->object.type;
+
+				/* (a type the vector does not test for: object_test_vector
+				tests neither the object nor what is attached to it) */
+				if (type == _object_type_biped ||
+					!TEST_FLAG(types, type + _collision_test_objects_first_type_bit))
+					continue;
+				if (count >= CLUSTER_OBJECTS_CAPACITY)
+				{
+					count = NONE;
+					break;
+				}
+				__atomic_store_n(&entry->objects[count], object_index, __ATOMIC_RELAXED);
+				if (count < maximum_count)
+					object_indices[count] = object_index;
+				count++;
+			}
+			__atomic_store_n(&entry->count, count, __ATOMIC_RELAXED);
+			__atomic_store_n(&entry->types, types, __ATOMIC_RELAXED);
+			__atomic_store_n(&entry->changes, changes, __ATOMIC_RELAXED);
+			__atomic_store_n(&entry->epoch, epoch, __ATOMIC_RELAXED);
+			__atomic_store_n(&slot->sequence, sequence + 2, __ATOMIC_RELEASE);
+			return count != NONE && count <= maximum_count ? count : NONE;
 		}
-		entry->epoch = object_bounds_epoch;
-		entry->changes = changes;
+	retry:
+		;
 	}
-	*count = entry->count;
-	return entry->objects;
+	return NONE;
 }

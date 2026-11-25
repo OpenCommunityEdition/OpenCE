@@ -116,7 +116,7 @@ symbols in this file:
 /* port: object_bounds_cache.c's */
 boolean object_bounds_cache_out_of_reach(long object_index, real_point3d const *point, real radius);
 boolean object_bounds_cache_missed_by_vector(long object_index, unsigned long flags, real_point3d const *point, real_vector3d const *vector);
-long const *object_bounds_cache_cluster_objects(short cluster_index, unsigned long flags, long *count);
+long object_bounds_cache_cluster_objects(short cluster_index, unsigned long flags, long *object_indices, long maximum_count);
 
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 
@@ -667,15 +667,16 @@ boolean collision_test_vector(
 					/* port: a vector that tests for no bipeds goes through
 					the cluster's other objects, in the list's order, from
 					a list of them (object_bounds_cache.c) */
-					long cached_count = 0;
+					long cached[256];
 					long cached_next = 0;
-					long const *cached = object_bounds_cache_cluster_objects((short)cluster_index, flags, &cached_count);
+					long cached_count = object_bounds_cache_cluster_objects(
+						(short)cluster_index, flags, cached, NUMBEROF(cached));
 
-					for (object_index = cached ?
+					for (object_index = cached_count != NONE ?
 							(cached_count > 0 ? cached[0] : NONE) :
 							cluster_get_first_collideable_object(&reference_index, cluster_index);
 						object_index != NONE;
-						object_index = cached ?
+						object_index = cached_count != NONE ?
 							(++cached_next < cached_count ? cached[cached_next] : NONE) :
 							cluster_get_next_collideable_object(&reference_index))
 					{

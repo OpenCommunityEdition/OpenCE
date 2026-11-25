@@ -13,7 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, constant, enum_with, function, inline, mutated, read, run  # noqa: E402
 
 CASES = ["identical", "moving", "detects-stale", "invalidated", "far-unread", "vector-misses",
-         "cluster-lists", "cluster-lists-deleted", "cluster-lists-invalidated", "cluster-lists-detect-stale"]
+         "cluster-lists", "cluster-lists-deleted", "cluster-lists-invalidated", "cluster-lists-detect-stale",
+         "cluster-lists-concurrent"]
 
 # a fault in the cache, and the case that must catch it
 NEGATIVE_CONTROLS = {
@@ -22,9 +23,9 @@ NEGATIVE_CONTROLS = {
     "drops-the-query-radius": (("bounds->radius + radius", "bounds->radius"), "identical"),
     "narrows-the-sphere-for-vectors": (("&bounds->center, bounds->radius)", "&bounds->center, 0.5f * bounds->radius)"),
                                        "vector-misses"),
-    "lists-ignore-changes": (("entry->changes != changes || ", ""), "cluster-lists"),
-    "lists-ignore-invalidation": (("entry->epoch != object_bounds_epoch || ", ""), "cluster-lists-invalidated"),
-    "lists-ignore-types": (("entry->types != types || ", ""), "cluster-lists"),
+    "lists-ignore-changes": ((" && entry_changes == changes", ""), "cluster-lists"),
+    "lists-ignore-invalidation": (("entry_epoch == epoch && ", ""), "cluster-lists-invalidated"),
+    "lists-ignore-types": ((" && entry_types == types", ""), "cluster-lists"),
 }
 
 

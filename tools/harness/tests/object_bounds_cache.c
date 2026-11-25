@@ -9,6 +9,13 @@ same. test_object_bounds_cache.py takes the enums (enums.inc) and the code
 
 #include "harness.h"
 #include <limits.h>
+#ifdef _WIN32
+#include <process.h>
+unsigned long __stdcall WaitForSingleObject(void *, unsigned long);
+int __stdcall CloseHandle(void *);
+#else
+#include <pthread.h>
+#endif
 #include "enums.inc"
 
 /* objects: the members the loop reads */
@@ -331,40 +338,46 @@ static void move_some_uncounted(void)
 /* each cluster's list from the cache against its objects of the types asked
 for, bipeds not, in order: for three sets of types in turn (a cluster keeps
 two: the lists remade), or two (kept), and none when bipeds are tested */
+static unsigned long const cluster_list_type_sets[] = {
+	FLAG(_collision_test_objects_scenery_bit) | FLAG(_collision_test_objects_machines_bit),
+	FLAG(_collision_test_objects_vehicles_bit) | FLAG(_collision_test_objects_scenery_bit) |
+		FLAG(_collision_test_objects_machines_bit),
+	_collision_test_objects_all_types_flags & ~FLAG(_collision_test_objects_bipeds_bit),
+};
 static long listed;
+static boolean cluster_list_matches_world(int cluster, unsigned long flags, long const *list, long count)
+{
+	long expected = 0, place;
+
+	for (place = 0; place < world_counts[cluster]; place++)
+	{
+		short type = object_get(world_objects[cluster][place])->object.type;
+
+		if (type == _object_type_biped || !TEST_FLAG(flags, type + _collision_test_objects_first_type_bit))
+			continue;
+		if (expected >= count || list[expected] != world_objects[cluster][place])
+			return FALSE;
+		expected++;
+	}
+	return expected == count;
+}
 static boolean cluster_lists_match(int sets)
 {
-	static unsigned long const type_sets[] = {
-		FLAG(_collision_test_objects_scenery_bit) | FLAG(_collision_test_objects_machines_bit),
-		FLAG(_collision_test_objects_vehicles_bit) | FLAG(_collision_test_objects_scenery_bit) |
-			FLAG(_collision_test_objects_machines_bit),
-		_collision_test_objects_all_types_flags & ~FLAG(_collision_test_objects_bipeds_bit),
-	};
 	int set, cluster;
 
 	for (set = 0; set < sets * 2; set++)
 	{
-		unsigned long flags = FLAG(_collision_test_objects_bit) | type_sets[set % sets];
+		unsigned long flags = FLAG(_collision_test_objects_bit) | cluster_list_type_sets[set % sets];
 
 		for (cluster = 0; cluster < CLUSTERS; cluster++)
 		{
-			long count = -1, expected = 0, place;
-			long const *list = object_bounds_cache_cluster_objects((short)cluster, flags, &count);
+			long list[CLUSTER_OBJECTS_CAPACITY];
+			long count = object_bounds_cache_cluster_objects((short)cluster, flags, list, CLUSTER_OBJECTS_CAPACITY);
 
-			CHECK(!object_bounds_cache_cluster_objects((short)cluster, flags | FLAG(_collision_test_objects_bipeds_bit),
-				&count), "a list for a vector that tests for bipeds");
-			CHECK(list, "no list for cluster %d", cluster);
-			for (place = 0; place < world_counts[cluster]; place++)
-			{
-				short type = object_get(world_objects[cluster][place])->object.type;
-
-				if (type == _object_type_biped || !TEST_FLAG(flags, type + _collision_test_objects_first_type_bit))
-					continue;
-				if (expected >= count || list[expected] != world_objects[cluster][place])
-					return FALSE;
-				expected++;
-			}
-			if (expected != count)
+			CHECK(object_bounds_cache_cluster_objects((short)cluster, flags | FLAG(_collision_test_objects_bipeds_bit),
+				list, CLUSTER_OBJECTS_CAPACITY) == NONE, "a list for a vector that tests for bipeds");
+			CHECK(count != NONE, "no list for cluster %d", cluster);
+			if (!cluster_list_matches_world(cluster, flags, list, count))
 				return FALSE;
 			listed += count;
 		}
@@ -372,8 +385,75 @@ static boolean cluster_lists_match(int sets)
 	return TRUE;
 }
 
+enum { CONCURRENT_THREADS = 4, CONCURRENT_ROUNDS = 200 };
+struct concurrent_worker_state
+{
+	int thread_index;
+	long hits;
+	long failures;
+};
+
+static void concurrent_worker_run(struct concurrent_worker_state *state)
+{
+	int round, set, cluster;
+
+	for (round = 0; round < CONCURRENT_ROUNDS; round++)
+	{
+		for (set = 0; set < 3; set++)
+		{
+			unsigned long flags = FLAG(_collision_test_objects_bit) |
+				cluster_list_type_sets[(set + state->thread_index + round) % 3];
+
+			for (cluster = 0; cluster < CLUSTERS; cluster++)
+			{
+				long list[CLUSTER_OBJECTS_CAPACITY];
+				long count = object_bounds_cache_cluster_objects(
+					(short)cluster, flags, list, CLUSTER_OBJECTS_CAPACITY);
+
+				if (object_bounds_cache_cluster_objects(
+					(short)cluster, flags | FLAG(_collision_test_objects_bipeds_bit),
+					list, CLUSTER_OBJECTS_CAPACITY) != NONE)
+				{
+					state->failures++;
+					return;
+				}
+				if (count == NONE)
+					continue;
+				state->hits++;
+				if (!cluster_list_matches_world(cluster, flags, list, count))
+				{
+					state->failures++;
+					return;
+				}
+			}
+		}
+	}
+}
+
+#ifdef _WIN32
+static unsigned __stdcall concurrent_worker_entry(void *arg)
+{
+	concurrent_worker_run((struct concurrent_worker_state *)arg);
+	return 0;
+}
+#else
+static void *concurrent_worker_entry(void *arg)
+{
+	concurrent_worker_run((struct concurrent_worker_state *)arg);
+	return NULL;
+}
+#endif
+
 static double seconds(unsigned long (*queries)(void))
 {
+#ifdef _WIN32
+	clock_t start = clock();
+	int round;
+
+	for (round = 0; round < 10; round++)
+		queries();
+	return (double)(clock() - start) / (double)CLOCKS_PER_SEC;
+#else
 	struct timespec start, end;
 	int round;
 
@@ -382,6 +462,7 @@ static double seconds(unsigned long (*queries)(void))
 		queries();
 	clock_gettime(CLOCK_MONOTONIC, &end);
 	return (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / 1e9;
+#endif
 }
 
 int main(int argc, char **argv)
@@ -543,6 +624,62 @@ int main(int argc, char **argv)
 		move_some_uncounted();
 		tell_cache();
 		CHECK(!cluster_lists_match(2), "stale lists matched: the comparison sees nothing");
+		return 0;
+	}
+	/* concurrent readers and rebuilds across clusters, type sets, moves, and invalidations */
+	CASE("cluster-lists-concurrent")
+	{
+		int phase;
+		long total_hits = 0;
+
+		tell_cache();
+		for (phase = 0; phase < 4; phase++)
+		{
+			struct concurrent_worker_state workers[CONCURRENT_THREADS];
+			int index;
+#ifdef _WIN32
+			void *threads[CONCURRENT_THREADS];
+#else
+			pthread_t threads[CONCURRENT_THREADS];
+#endif
+
+			if (phase == 1)
+				move_some(TRUE);
+			else if (phase == 2)
+			{
+				move_some_uncounted();
+				object_bounds_cache_invalidate();
+				tell_cache();
+			}
+			else if (phase == 3)
+				move_some(TRUE);
+
+			for (index = 0; index < CONCURRENT_THREADS; index++)
+			{
+				workers[index].thread_index = index;
+				workers[index].hits = 0;
+				workers[index].failures = 0;
+#ifdef _WIN32
+				threads[index] = (void *)_beginthreadex(NULL, 0, concurrent_worker_entry, &workers[index], 0, NULL);
+				CHECK(threads[index] != NULL, "_beginthreadex failed");
+#else
+				CHECK(pthread_create(&threads[index], NULL, concurrent_worker_entry, &workers[index]) == 0,
+					"pthread_create failed");
+#endif
+			}
+			for (index = 0; index < CONCURRENT_THREADS; index++)
+			{
+#ifdef _WIN32
+				WaitForSingleObject(threads[index], 0xFFFFFFFFUL);
+				CloseHandle(threads[index]);
+#else
+				pthread_join(threads[index], NULL);
+#endif
+				CHECK(workers[index].failures == 0, "phase %d thread %d saw corrupted cluster list", phase, index);
+				total_hits += workers[index].hits;
+			}
+		}
+		CHECK(total_hits > 10000, "only %ld concurrent list hits: too few to validate", total_hits);
 		return 0;
 	}
 	/* not a check: how long the queries take without and with the cache */
