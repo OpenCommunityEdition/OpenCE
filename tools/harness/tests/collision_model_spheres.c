@@ -14,6 +14,13 @@ test_collision_model_spheres.py takes the code from the sources.
 #include "harness.h"
 #include <float.h>
 #include <math.h>
+#ifdef _WIN32
+#include <process.h>
+__declspec(dllimport) unsigned long __stdcall WaitForSingleObject(void *handle, unsigned long milliseconds);
+__declspec(dllimport) int __stdcall CloseHandle(void *handle);
+#else
+#include <pthread.h>
+#endif
 
 typedef struct { long long QuadPart; } LARGE_INTEGER;
 typedef struct { real_vector3d n; real d; } real_plane3d;
@@ -371,6 +378,120 @@ static void case_invalidated(void)
 	}
 }
 
+/* concurrent lookups on a freshly invalidated cache: every worker must see
+the exact sphere each bsp's vertices give, with no torn or wrong entries */
+enum { CONCURRENT_BSPS = 256, CONCURRENT_THREADS = 4 };
+static struct collision_bsp concurrent_bsps[CONCURRENT_BSPS];
+static boolean concurrent_expected_valid[CONCURRENT_BSPS];
+static real_point3d concurrent_expected_center[CONCURRENT_BSPS];
+static real concurrent_expected_radius[CONCURRENT_BSPS];
+static long concurrent_ready;
+static long concurrent_go;
+static long concurrent_failures;
+
+static void concurrent_worker_run(long thread_id)
+{
+	long pass, step;
+
+	__atomic_fetch_add(&concurrent_ready, 1, __ATOMIC_ACQ_REL);
+	while (!__atomic_load_n(&concurrent_go, __ATOMIC_ACQUIRE))
+	{
+	}
+	for (pass = 0; pass < 4; pass++)
+	{
+		for (step = 0; step < CONCURRENT_BSPS; step++)
+		{
+			long index = (step * (thread_id * 2 + 1) + thread_id * 17) & (CONCURRENT_BSPS - 1);
+			real_point3d center = { 0.0f, 0.0f, 0.0f };
+			real radius = 0.0f;
+			boolean valid = collision_bsp_bounds_cache_sphere(&concurrent_bsps[index], &center, &radius);
+
+			if (valid != concurrent_expected_valid[index] ||
+				(valid && (center.x != concurrent_expected_center[index].x ||
+					center.y != concurrent_expected_center[index].y ||
+					center.z != concurrent_expected_center[index].z ||
+					radius != concurrent_expected_radius[index])))
+			{
+				__atomic_fetch_add(&concurrent_failures, 1, __ATOMIC_RELAXED);
+			}
+		}
+	}
+}
+
+#ifdef _WIN32
+static unsigned __stdcall concurrent_thread_entry(void *argument)
+{
+	concurrent_worker_run((long)(size_t)argument);
+	return 0;
+}
+#else
+static void *concurrent_thread_entry(void *argument)
+{
+	concurrent_worker_run((long)(size_t)argument);
+	return NULL;
+}
+#endif
+
+static void case_concurrent(void)
+{
+	long index, round, thread_id;
+
+	for (index = 0; index < CONCURRENT_BSPS; index++)
+	{
+		real_point3d offset = { (real)(index * 3 - 200), (real)((index % 17) * 5), (real)((index % 7) - 3) };
+
+		make_bsp(&concurrent_bsps[index], &offset);
+		concurrent_bsps[index].vertices.count = index % 13 == 0 ? 0 : VERTICES;
+		concurrent_bsps[index].bsp3d.nodes.count = 1;
+	}
+	object_bounds_cache_invalidate();
+	for (index = 0; index < CONCURRENT_BSPS; index++)
+	{
+		concurrent_expected_valid[index] = collision_bsp_bounds_cache_sphere(
+			&concurrent_bsps[index],
+			&concurrent_expected_center[index],
+			&concurrent_expected_radius[index]);
+	}
+
+	concurrent_failures = 0;
+	for (round = 0; round < 32; round++)
+	{
+#ifdef _WIN32
+		void *threads[CONCURRENT_THREADS];
+#else
+		pthread_t threads[CONCURRENT_THREADS];
+#endif
+		object_bounds_cache_invalidate();
+		__atomic_store_n(&concurrent_ready, 0, __ATOMIC_RELAXED);
+		__atomic_store_n(&concurrent_go, 0, __ATOMIC_RELAXED);
+		for (thread_id = 0; thread_id < CONCURRENT_THREADS; thread_id++)
+		{
+#ifdef _WIN32
+			uintptr_t handle = _beginthreadex(NULL, 0, concurrent_thread_entry, (void *)(size_t)thread_id, 0, NULL);
+			CHECK(handle != 0, "cannot start worker thread");
+			threads[thread_id] = (void *)handle;
+#else
+			CHECK(pthread_create(&threads[thread_id], NULL, concurrent_thread_entry, (void *)(size_t)thread_id) == 0,
+				"cannot start worker thread");
+#endif
+		}
+		while (__atomic_load_n(&concurrent_ready, __ATOMIC_ACQUIRE) < CONCURRENT_THREADS)
+		{
+		}
+		__atomic_store_n(&concurrent_go, 1, __ATOMIC_RELEASE);
+		for (thread_id = 0; thread_id < CONCURRENT_THREADS; thread_id++)
+		{
+#ifdef _WIN32
+			WaitForSingleObject(threads[thread_id], 0xFFFFFFFFUL);
+			CloseHandle(threads[thread_id]);
+#else
+			pthread_join(threads[thread_id], NULL);
+#endif
+		}
+	}
+	CHECK(concurrent_failures == 0, "%ld concurrent sphere mismatches", concurrent_failures);
+}
+
 int main(int argc, char **argv)
 {
 	const char *case_name = argc > 1 ? argv[1] : "";
@@ -379,6 +500,7 @@ int main(int argc, char **argv)
 	else CASE("grazing") case_grazing();
 	else CASE("short") case_short();
 	else CASE("invalidated") case_invalidated();
+	else CASE("concurrent") case_concurrent();
 	else
 	{
 		fprintf(stderr, "unknown case %s\n", case_name);

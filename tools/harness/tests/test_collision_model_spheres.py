@@ -8,7 +8,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, build, function, mutated, read, run, structure
 
-CASES = ['random', 'grazing', 'short', 'invalidated']
+CASES = ['random', 'grazing', 'short', 'invalidated', 'concurrent']
 SPHERE_TEST = ('if (instance->matrices[node_index].scale > 0.f &&\n'
                '\t\t\t\t\t\tcollision_bsp_bounds_cache_sphere(')
 
@@ -58,7 +58,7 @@ def test_case(case):
     # the sphere drawn tighter than the bsp's vertices
     (('1.001f * (real)sqrt(largest) + 0.01f', '0.97f * (real)sqrt(largest)'), 'grazing'),
     # a bsp's sphere kept across an invalidation
-    (('if (entry->epoch == object_bounds_epoch && entry->bsp == bsp)', 'if (entry->bsp == bsp)'), 'invalidated'),
+    (('if (entry_epoch == epoch && entry->bsp == bsp)', 'if (entry->bsp == bsp)'), 'invalidated'),
 ])
 def test_negative_control(fault, case):
     status, output = run(build('collision_model_spheres', generated(fault)), case)

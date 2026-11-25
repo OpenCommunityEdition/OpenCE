@@ -50,7 +50,10 @@ void object_bounds_cache_update(
 void object_bounds_cache_invalidate(
 	void)
 {
-	object_bounds_epoch++;
+	if (++object_bounds_epoch <= 0)
+	{
+		object_bounds_epoch = 1;
+	}
 }
 
 /* whether the object's bounding sphere is known to be out of the reach of
@@ -93,21 +96,29 @@ struct collision_bsp_bounds
 static struct collision_bsp_bounds collision_bsp_bounds[COLLISION_BSP_BOUNDS_COUNT];
 
 /* a sphere around all of the bsp's vertices (so around each of its surfaces),
-with a margin for the bsp's own tolerances; FALSE when there is none to use */
+with a margin for the bsp's own tolerances; FALSE when there is none to use.
+Wait-free for concurrent readers: misses compute on the stack and claim a slot
+with -epoch before publishing epoch with release ordering; hits acquire-load
+epoch with no writes. */
 boolean collision_bsp_bounds_cache_sphere(
 	struct collision_bsp const *bsp,
 	real_point3d *center,
 	real *radius)
 {
 	unsigned long hash = ((unsigned long)bsp >> 4) * 2654435761UL;
+	long epoch = __atomic_load_n(&object_bounds_epoch, __ATOMIC_RELAXED);
+	boolean computed = FALSE;
+	real_point3d computed_center = { 0.f, 0.f, 0.f };
+	real computed_radius = -1.f;
 	long probe;
 
 	for (probe = 0; probe < COLLISION_BSP_BOUNDS_PROBES; probe++)
 	{
 		struct collision_bsp_bounds *entry =
 			&collision_bsp_bounds[(hash + probe) % COLLISION_BSP_BOUNDS_COUNT];
+		long entry_epoch = __atomic_load_n(&entry->epoch, __ATOMIC_ACQUIRE);
 
-		if (entry->epoch == object_bounds_epoch && entry->bsp == bsp)
+		if (entry_epoch == epoch && entry->bsp == bsp)
 		{
 			if (entry->radius < 0.f)
 				return FALSE;
@@ -115,50 +126,68 @@ boolean collision_bsp_bounds_cache_sphere(
 			*radius = entry->radius;
 			return TRUE;
 		}
-		if (entry->epoch != object_bounds_epoch)
+		if (entry_epoch != epoch && entry_epoch != -epoch)
 		{
-			long count = bsp->vertices.count;
-			long i;
-			real_point3d low, high;
-			real largest = 0.f;
-
-			entry->bsp = bsp;
-			entry->epoch = object_bounds_epoch;
-			entry->radius = -1.f;
-			if (count <= 0)
-				return FALSE;
-			low = high = TAG_BLOCK_GET_ELEMENT(&bsp->vertices, 0, struct collision_vertex)->point;
-			for (i = 1; i < count; i++)
+			if (!computed)
 			{
-				real_point3d const *point = &TAG_BLOCK_GET_ELEMENT(&bsp->vertices, i, struct collision_vertex)->point;
+				long count = bsp->vertices.count;
+				long i;
+				real_point3d low, high;
+				real largest = 0.f;
 
-				low.x = point->x < low.x ? point->x : low.x;
-				low.y = point->y < low.y ? point->y : low.y;
-				low.z = point->z < low.z ? point->z : low.z;
-				high.x = point->x > high.x ? point->x : high.x;
-				high.y = point->y > high.y ? point->y : high.y;
-				high.z = point->z > high.z ? point->z : high.z;
+				computed = TRUE;
+				if (count > 0)
+				{
+					low = high = TAG_BLOCK_GET_ELEMENT(&bsp->vertices, 0, struct collision_vertex)->point;
+					for (i = 1; i < count; i++)
+					{
+						real_point3d const *point = &TAG_BLOCK_GET_ELEMENT(&bsp->vertices, i, struct collision_vertex)->point;
+
+						low.x = point->x < low.x ? point->x : low.x;
+						low.y = point->y < low.y ? point->y : low.y;
+						low.z = point->z < low.z ? point->z : low.z;
+						high.x = point->x > high.x ? point->x : high.x;
+						high.y = point->y > high.y ? point->y : high.y;
+						high.z = point->z > high.z ? point->z : high.z;
+					}
+					computed_center.x = 0.5f * (low.x + high.x);
+					computed_center.y = 0.5f * (low.y + high.y);
+					computed_center.z = 0.5f * (low.z + high.z);
+					for (i = 0; i < count; i++)
+					{
+						real_point3d const *point = &TAG_BLOCK_GET_ELEMENT(&bsp->vertices, i, struct collision_vertex)->point;
+						real dx = point->x - computed_center.x;
+						real dy = point->y - computed_center.y;
+						real dz = point->z - computed_center.z;
+						real distance_squared = dx * dx + dy * dy + dz * dz;
+
+						largest = distance_squared > largest ? distance_squared : largest;
+					}
+					if (largest >= 0.f && largest < 1.0e12f)
+					{
+						computed_radius = 1.001f * (real)sqrt(largest) + 0.01f;
+					}
+				}
 			}
-			entry->center.x = 0.5f * (low.x + high.x);
-			entry->center.y = 0.5f * (low.y + high.y);
-			entry->center.z = 0.5f * (low.z + high.z);
-			for (i = 0; i < count; i++)
+			if (__atomic_compare_exchange_n(&entry->epoch, &entry_epoch, -epoch, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
 			{
-				real_point3d const *point = &TAG_BLOCK_GET_ELEMENT(&bsp->vertices, i, struct collision_vertex)->point;
-				real dx = point->x - entry->center.x;
-				real dy = point->y - entry->center.y;
-				real dz = point->z - entry->center.z;
-				real distance_squared = dx * dx + dy * dy + dz * dz;
-
-				largest = distance_squared > largest ? distance_squared : largest;
+				entry->bsp = bsp;
+				entry->center = computed_center;
+				entry->radius = computed_radius;
+				__atomic_store_n(&entry->epoch, epoch, __ATOMIC_RELEASE);
+				if (computed_radius < 0.f)
+					return FALSE;
+				*center = computed_center;
+				*radius = computed_radius;
+				return TRUE;
 			}
-			if (!(largest >= 0.f && largest < 1.0e12f))
-				return FALSE;
-			entry->radius = 1.001f * (real)sqrt(largest) + 0.01f;
-			*center = entry->center;
-			*radius = entry->radius;
-			return TRUE;
 		}
+	}
+	if (computed && computed_radius >= 0.f)
+	{
+		*center = computed_center;
+		*radius = computed_radius;
+		return TRUE;
 	}
 	return FALSE;
 }
