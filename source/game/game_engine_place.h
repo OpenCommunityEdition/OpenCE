@@ -1,7 +1,3 @@
-/*
-GAME_ENGINE_PLACE.H
-*/
-
 #ifndef __GAME_ENGINE_PLACE_H
 #define __GAME_ENGINE_PLACE_H
 #pragma once

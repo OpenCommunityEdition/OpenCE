@@ -1,9 +1,3 @@
-/*
-PARTICLE_SYSTEMS.H
-
-header included in hcex build.
-*/
-
 #ifndef __PARTICLE_SYSTEMS_H
 #define __PARTICLE_SYSTEMS_H
 #pragma once

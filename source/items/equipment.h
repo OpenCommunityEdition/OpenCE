@@ -1,9 +1,3 @@
-/*
-EQUIPMENT.H
-
-header included in hcex build.
-*/
-
 #ifndef __EQUIPMENT_H
 #define __EQUIPMENT_H
 #pragma once

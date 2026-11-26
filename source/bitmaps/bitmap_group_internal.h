@@ -1,6 +1,4 @@
 /*
-BITMAP_GROUP_INTERNAL.H
-
 Narrow cross-translation-unit interface owned by BITMAP_GROUP.C.
 */
 

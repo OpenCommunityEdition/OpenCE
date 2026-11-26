@@ -1,7 +1,3 @@
-/*
-PLACEHOLDER_DEFINITIONS.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

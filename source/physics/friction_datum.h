@@ -1,7 +1,3 @@
-/*
-FRICTION_DATUM.H
-*/
-
 #ifndef __FRICTION_DATUM_H
 #define __FRICTION_DATUM_H
 #pragma once

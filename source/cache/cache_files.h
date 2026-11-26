@@ -1,9 +1,3 @@
-/*
-CACHE_FILES.H
-
-header included in hcex build.
-*/
-
 #ifndef __CACHE_FILES_H
 #define __CACHE_FILES_H
 #pragma once

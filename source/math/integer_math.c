@@ -1,7 +1,3 @@
-/*
-INTEGER_MATH.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

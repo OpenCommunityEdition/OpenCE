@@ -1,7 +1,3 @@
-/*
-RASTERIZER_MODELS.H
-*/
-
 #ifndef __RASTERIZER_MODELS_H
 #define __RASTERIZER_MODELS_H
 #pragma once

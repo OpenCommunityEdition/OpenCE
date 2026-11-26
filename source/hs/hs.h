@@ -1,9 +1,3 @@
-/*
-HS.H
-
-header included in hcex build.
-*/
-
 #ifndef __HS_H
 #define __HS_H
 #pragma once

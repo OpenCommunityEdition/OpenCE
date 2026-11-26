@@ -1,9 +1,3 @@
-/*
-FONT_GROUP.H
-
-header included in hcex build.
-*/
-
 #ifndef __FONT_GROUP_H
 #define __FONT_GROUP_H
 #pragma once

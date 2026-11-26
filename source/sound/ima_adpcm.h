@@ -1,9 +1,3 @@
-/*
-IMA_ADPCM.H
-
-header included in hcex build.
-*/
-
 #ifndef __IMA_ADPCM_H
 #define __IMA_ADPCM_H
 #pragma once

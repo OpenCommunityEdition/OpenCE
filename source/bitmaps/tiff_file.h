@@ -1,7 +1,3 @@
-/*
-TIFF_FILE.H
-*/
-
 #ifndef __TIFF_FILE_H
 #define __TIFF_FILE_H
 #pragma once

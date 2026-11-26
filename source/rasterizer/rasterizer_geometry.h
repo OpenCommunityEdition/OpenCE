@@ -1,9 +1,3 @@
-/*
-RASTERIZER_GEOMETRY.H
-
-header included in hcex build.
-*/
-
 #ifndef __RASTERIZER_GEOMETRY_H
 #define __RASTERIZER_GEOMETRY_H
 #pragma once

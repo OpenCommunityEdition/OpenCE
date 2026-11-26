@@ -1,7 +1,3 @@
-/*
-RASTERIZER_LIGHTS.H
-*/
-
 #ifndef __RASTERIZER_LIGHTS_H
 #define __RASTERIZER_LIGHTS_H
 #pragma once

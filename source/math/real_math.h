@@ -1,6 +1,4 @@
 /*
-REAL_MATH.H
-
 file has inline function assertions.
 */
 

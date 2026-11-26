@@ -1,7 +1,3 @@
-/*
-ERRORS.H
-*/
-
 #ifndef __ERRORS_H
 #define __ERRORS_H
 #pragma once

@@ -1,9 +1,3 @@
-/*
-GAME_STATE.H
-
-header included in hcex build.
-*/
-
 #ifndef __GAME_STATE_H
 #define __GAME_STATE_H
 #pragma once

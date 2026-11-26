@@ -1,7 +1,3 @@
-/*
-INTEGER_MATH.H
-*/
-
 #ifndef __INTEGER_MATH_H
 #define __INTEGER_MATH_H
 #pragma once

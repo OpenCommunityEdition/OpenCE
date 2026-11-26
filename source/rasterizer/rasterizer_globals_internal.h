@@ -1,6 +1,4 @@
 /*
-RASTERIZER_GLOBALS_INTERNAL.H
-
 Narrow cross-translation-unit interface owned by RASTERIZER.C.
 */
 

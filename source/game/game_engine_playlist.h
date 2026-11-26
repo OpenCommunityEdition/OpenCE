@@ -1,7 +1,3 @@
-/*
-GAME_ENGINE_PLAYLIST.H
-*/
-
 #ifndef __GAME_ENGINE_PLAYLIST_H
 #define __GAME_ENGINE_PLAYLIST_H
 #pragma once

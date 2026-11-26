@@ -1,9 +1,3 @@
-/*
-EDITOR_FLYING_CAMERA.H
-
-header included in hcex build.
-*/
-
 #ifndef __EDITOR_FLYING_CAMERA_H
 #define __EDITOR_FLYING_CAMERA_H
 #pragma once

@@ -1,6 +1,4 @@
 /*
-RASTERIZER_GEOMETRY_ENVIRONMENT.H
-
 Narrow cross-translation-unit environment-vertex interface owned by
 RASTERIZER_GEOMETRY.C.
 */

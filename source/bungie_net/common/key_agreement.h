@@ -1,7 +1,3 @@
-/*
-KEY_AGREEMENT.H
-*/
-
 #ifndef __KEY_AGREEMENT_H
 #define __KEY_AGREEMENT_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-MAIN.H
-*/
-
 #ifndef __MAIN_H
 #define __MAIN_H
 #pragma once

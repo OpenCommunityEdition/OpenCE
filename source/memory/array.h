@@ -1,9 +1,3 @@
-/*
-ARRAY.H
-
-header included in hcex build.
-*/
-
 #ifndef __ARRAY_H
 #define __ARRAY_H
 #pragma once

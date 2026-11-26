@@ -1,9 +1,3 @@
-/*
-COLLISION_MODELS.H
-
-header included in hcex build.
-*/
-
 #ifndef __COLLISION_MODELS_H
 #define __COLLISION_MODELS_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-GAME_ENGINE_SLAYER.H
-*/
-
 #ifndef __GAME_ENGINE_SLAYER_H
 #define __GAME_ENGINE_SLAYER_H
 #pragma once

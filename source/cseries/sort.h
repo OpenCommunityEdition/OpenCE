@@ -1,7 +1,3 @@
-/*
-SORT.H
-*/
-
 #ifndef __SORT_H
 #define __SORT_H
 #pragma once

@@ -1,7 +1,3 @@
-/*
-RASTERIZER_XBOX_DEBUG.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

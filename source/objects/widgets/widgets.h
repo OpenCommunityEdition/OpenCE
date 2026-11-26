@@ -1,9 +1,3 @@
-/*
-WIDGETS.H
-
-header included in hcex build.
-*/
-
 #ifndef __WIDGETS_H
 #define __WIDGETS_H
 #pragma once

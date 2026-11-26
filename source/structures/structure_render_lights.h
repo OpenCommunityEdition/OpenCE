@@ -1,6 +1,4 @@
 /*
-STRUCTURE_RENDER_LIGHTS.H
-
 Narrow cross-translation-unit light-rendering interface owned by
 STRUCTURE_RENDER.C.
 */

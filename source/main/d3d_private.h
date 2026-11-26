@@ -1,7 +1,3 @@
-/*
-D3D_PRIVATE.H
-*/
-
 #ifndef __D3D_PRIVATE_H
 #define __D3D_PRIVATE_H
 #pragma once

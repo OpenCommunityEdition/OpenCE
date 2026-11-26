@@ -1,9 +1,3 @@
-/*
-PLAYLIST_PROFILE.H
-
-header included in hcex build.
-*/
-
 #ifndef __PLAYLIST_PROFILE_H
 #define __PLAYLIST_PROFILE_H
 #pragma once

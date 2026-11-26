@@ -1,9 +1,3 @@
-/*
-RASTERIZER.H
-
-header included in hcex build.
-*/
-
 #ifndef __RASTERIZER_H
 #define __RASTERIZER_H
 #pragma once

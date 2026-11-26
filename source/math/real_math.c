@@ -1,7 +1,3 @@
-/*
-REAL_MATH.C
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

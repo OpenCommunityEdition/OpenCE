@@ -1,7 +1,3 @@
-/*
-UNIT_CONTROL_DATA.H
-*/
-
 #ifndef __UNIT_CONTROL_DATA_H
 #define __UNIT_CONTROL_DATA_H
 #pragma once

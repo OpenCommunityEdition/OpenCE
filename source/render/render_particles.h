@@ -1,9 +1,3 @@
-/*
-RENDER_PARTICLES.H
-
-header included in hcex build.
-*/
-
 #ifndef __RENDER_PARTICLES_H
 #define __RENDER_PARTICLES_H
 #pragma once

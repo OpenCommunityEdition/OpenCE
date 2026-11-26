@@ -1,9 +1,3 @@
-/*
-PHYSICS.H
-
-header included in hcex build.
-*/
-
 #ifndef __PHYSICS_H
 #define __PHYSICS_H
 #pragma once

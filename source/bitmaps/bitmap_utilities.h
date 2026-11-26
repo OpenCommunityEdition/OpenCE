@@ -1,6 +1,4 @@
 /*
-BITMAP_UTILITIES.H
-
 Recovered public interface additions owned by BITMAP_UTILITIES.C.
 */
 

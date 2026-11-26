@@ -1,9 +1,3 @@
-/*
-RASTERIZER_CINEMATICS.H
-
-header included in hcex build.
-*/
-
 #ifndef __RASTERIZER_CINEMATICS_H
 #define __RASTERIZER_CINEMATICS_H
 #pragma once

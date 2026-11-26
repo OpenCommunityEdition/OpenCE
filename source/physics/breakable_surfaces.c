@@ -1,8 +1,3 @@
-/*
-BREAKABLE_SURFACES.C
-
-*/
-
 /* ---------- headers */
 
 #include "cseries.h"

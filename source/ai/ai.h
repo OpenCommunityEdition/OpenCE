@@ -1,9 +1,3 @@
-/*
-AI.H
-
-header included in hcex build.
-*/
-
 #ifndef __AI_H
 #define __AI_H
 #pragma once

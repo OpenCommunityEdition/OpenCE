@@ -1,9 +1,3 @@
-/*
-SOUND_SCENERY.H
-
-header included in hcex build.
-*/
-
 #ifndef __SOUND_SCENERY_H
 #define __SOUND_SCENERY_H
 #pragma once
