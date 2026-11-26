@@ -606,6 +606,11 @@ def pause_art(art):
         lines.append(art.port_picture(f"pause/pausebox_{piece}", [
             (port_settings.pause_box_svg(piece, height), 4 if piece == "center" else 16, 256) for height in heights]))
     for piece in ("left", "center", "right"):
+        # the choose team screen's own box: two frames, as the files teambox_<piece>__0 and __1
+        team_svg = port_settings.pause_box_svg(piece, port_settings.pause_box_height(3))
+        lines.append(art.port_picture(f"pause/teambox_{piece}", [
+            (team_svg, 4 if piece == "center" else 16, 256)] * 2))
+    for piece in ("left", "center", "right"):
         lines.append(art.port_picture(f"pause/objectives_{piece}", [
             (port_settings.pause_box_svg(piece, height, header=True), 4 if piece == "center" else 16, 256)
             for height in port_settings.PAUSE_BOX_EXTRA_HEIGHTS]))

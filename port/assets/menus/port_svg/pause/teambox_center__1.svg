@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="4"
+   height="256"
+   viewBox="0 0 4 256"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="teambox_center__1.svg">
+  <metadata
+     id="metadata30">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="2560"
+     inkscape:window-height="1017"
+     id="namedview28"
+     showgrid="false"
+     inkscape:zoom="2.8284271"
+     inkscape:cx="-129.82086"
+     inkscape:cy="136.89059"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <defs
+     id="defs4">
+    <clipPath
+       id="body-area">
+      <rect
+         x="-16"
+         y="0"
+         width="48"
+         height="201"
+         id="rect7" />
+    </clipPath>
+    <clipPath
+       id="strip">
+      <rect
+         x="-16"
+         y="2"
+         width="30"
+         height="225"
+         rx="7.5"
+         id="rect25" />
+    </clipPath>
+    <linearGradient
+       id="body-0"
+       gradientUnits="userSpaceOnUse"
+       x1="0"
+       y1="2"
+       x2="0"
+       y2="201">
+      <stop
+         offset="0"
+         stop-color="#0a2649"
+         id="stop12-2" />
+      <stop
+         offset="1"
+         stop-color="#050d1c"
+         id="stop14-3" />
+    </linearGradient>
+    <clipPath
+       id="body-area-3">
+      <rect
+         x="-16"
+         y="0"
+         width="48"
+         height="201"
+         id="rect7-6" />
+    </clipPath>
+  </defs>
+  <defs
+     id="defs9">
+    <linearGradient
+       id="body"
+       gradientUnits="userSpaceOnUse"
+       x1="0"
+       y1="2"
+       x2="0"
+       y2="201">
+      <stop
+         offset="0"
+         stop-color="#0a2649"
+         id="stop12" />
+      <stop
+         offset="1"
+         stop-color="#050d1c"
+         id="stop14" />
+    </linearGradient>
+  </defs>
+  <rect
+     x="0"
+     y="2"
+     width="4"
+     height="225"
+     clip-path="url(#body-area)"
+     id="rect16"
+     style="fill:url(#body);fill-opacity:0.75"
+     transform="matrix(1,0,0,0.56699309,0,0.86601383)" />
+  <rect
+     x="0"
+     y="0"
+     width="4"
+     height="2"
+     id="rect18"
+     fill="#2896ff" />
+  <rect
+     x="0"
+     y="140.71875"
+     width="4"
+     height="2"
+     id="rect20"
+     style="fill:#2896ff" />
+  <g
+     id="g22"
+     transform="translate(0,-86.28125)">
+    <rect
+       x="0"
+       y="201"
+       width="4"
+       height="26"
+       id="rect24"
+       style="fill:#000000;fill-opacity:0.75" />
+    <rect
+       x="0"
+       y="201"
+       width="4"
+       height="0.75"
+       id="rect26"
+       style="fill:#2896ff" />
+  </g>
+</svg>

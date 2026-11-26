@@ -134,6 +134,7 @@ symbols in this file:
 
 #include "editor/editor_stubs.h"
 #include "game/game.h" /* port: game_connection */
+#include "game/game_engine.h"
 #include "game/players.h"
 #include "input/input.h"
 #include "main/console.h"
@@ -765,7 +766,8 @@ static void director_choose_camera_game(
 		/* port: and a network co-op player who hasn't spawned yet, waiting for
 		the level's first checkpoint, watches too */
 		boolean use_dead_camera = player->unit_index == NONE &&
-			(player->statistics.deaths > 0 || players_coop_waiting_to_start(player_index));
+			(player->statistics.deaths > 0 || players_coop_waiting_to_start(player_index) ||
+				(game_engine_running() && player->dead_unit_index != NONE));
 
 		/* (port: not a client in another's game, the host's rules: a flying
 		camera would see all of it, and one behind the player round its

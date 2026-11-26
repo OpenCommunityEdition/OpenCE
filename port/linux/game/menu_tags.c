@@ -46,6 +46,9 @@ menu gets FRIENDLY FIRE too.
 #include "mcc_cache.h"
 #include "mcc_menu_preview.h"
 #include "custom_edition_cache.h"
+#include "networking/network_game_manager.h"
+#include "game/game_engine.h"
+#include "game_modes.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -61,6 +64,7 @@ int platform_audio_devices(int recording, char (*names)[128], int maximum);
 /* the game's network server (this machine hosts: network_game_globals.c) */
 void *global_network_game_server_get(void);
 boolean network_game_is_active(void);
+struct network_game *network_game_get_game(void);
 
 /* cache_files.c's (port) */
 void *cache_files_tag_instances(long *count);
@@ -88,7 +92,8 @@ adds to */
 #define CAMPAIGN_PAUSE_SCREEN "ui\\shell\\solo_game\\pause_game\\pause_game"
 /* the tags pause_patch or pause_campaign_patch adds: two buttons and their
 texts (SETTINGS, and END GAME or FRIENDLY FIRE) */
-#define PAUSE_PATCH_TAGS 4
+#define PAUSE_PATCH_TAGS 40
+#define PAUSE_MAXIMUM_ADDED 3
 /* what a frame of ui.map's is drawn as in a game map, which has not got it */
 #define BLANK_PNG "ce/port/blank__0.png"
 #define UI_WIDGET_DEFINITION_TAG 'DeLa'
@@ -410,6 +415,7 @@ static char const *const port_function_names[] =
 	/* (a dedicated server's map vote: menu_functions.c) */
 	"port map vote open", "port map vote choose",
 	"port controller clear", "port controller cancel",
+	"port team red", "port team blue",
 };
 
 /* the PC version's game data functions that the Xbox's have not, from
@@ -612,8 +618,9 @@ static long map_tag(long group_tag, char const *name, char const *file, long lin
 {
 	long index = tag_loaded(group_tag, name);
 
-	/* (a game map has few of ui.map's: those are none) */
-	if (index == NONE && !build.game_map)
+	/* (the choose team screen's prompts and button picture are a game map's: ui.map need not have them) */
+	if (index == NONE && !build.game_map && strcmp(name, "ui\\shell\\main_menu\\button_key_sm") &&
+		strcmp(name, "ui\\shell\\bitmaps\\menu_bkds"))
 		problem(file, line, "the map has no tag", name);
 	return index;
 }
@@ -1634,40 +1641,162 @@ static void *pause_button(struct cache_file_tag_instance *instances, struct ui_w
 	button->event_handlers.address = handlers;
 	return button;
 }
+/* the PC version's functions of the choose team button (157) and restart
+(163), and the Xbox's of New Game (31): found by the function a widget runs,
+which protected maps cannot hide */
+#define PAUSE_FUNCTION_CHOOSE_TEAM 157
+#define PAUSE_FUNCTION_RESTART 163
+#define PAUSE_FUNCTION_NEW_GAME 31
+#define PAUSE_TEAM_SCREEN "pause/choose_team/choose_team_screen"
 
-/* the list's buttons: SETTINGS, and the host's END GAME or network co-op's
-FRIENDLY FIRE (whose text says the machine's choice: menu_functions.c), put
-before LEAVE GAME or REVERT TO SAVED (quit); returns how many were added, and
-how much taller the list grew for them (growth) */
+/* whether the widget, its children, or the screens its handlers open run the function */
+static boolean definition_runs(struct ui_widget_definition const *definition, long function, long depth)
+{
+	struct ui_widget_event_handler_reference const *handlers = definition->event_handlers.address;
+	struct ui_widget_child_reference const *children = definition->child_widgets.address;
+	long index;
+
+	if (depth > 5)
+		return FALSE;
+	for (index = 0; index < definition->event_handlers.count; index++)
+	{
+		long target = handlers[index].widget_tag.index;
+
+		if (TEST_FLAG(handlers[index].flags, _event_handler_run_function_bit) && handlers[index].function == function)
+			return TRUE;
+		if (TEST_FLAG(handlers[index].flags, _event_handler_open_widget_bit) && target != NONE &&
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(target) < build.first_index &&
+			definition_runs(tag_get(UI_WIDGET_DEFINITION_TAG, target), function, depth + 1))
+		{
+			return TRUE;
+		}
+	}
+	for (index = 0; index < definition->child_widgets.count; index++)
+	{
+		long child = children[index].widget_tag.index;
+
+		if (child != NONE && DATUM_INDEX_TO_ABSOLUTE_INDEX(child) < build.first_index &&
+			definition_runs(tag_get(UI_WIDGET_DEFINITION_TAG, child), function, depth + 1))
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
+/* the game's teams can be chosen: a team game, no auto balance, not Infection */
+static boolean pause_team_enabled(void)
+{
+	struct network_game *game = network_game_get_game();
+
+	return game && game->variant.universal_variant.teams && !game->variant_options.auto_team_balance &&
+		game->variant_options.mode != _game_mode_infection;
+}
+
+static void pause_widget_grey(struct ui_widget_definition *widget, long depth)
+{
+	struct ui_widget_child_reference const *children = widget->child_widgets.address;
+	long child;
+
+	if (widget->type == _widget_type_text_box)
+	{
+		widget->text_color.alpha = 0.4f;
+		widget->text_color.red = widget->text_color.green = widget->text_color.blue = 0.6f;
+	}
+	for (child = 0; depth < 3 && child < widget->child_widgets.count; child++)
+	{
+		if (children[child].widget_tag.index != NONE)
+			pause_widget_grey(tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index), depth + 1);
+	}
+}
+
+/* a button kept in its list but greyed out, taking no events */
+static void pause_button_disable(struct ui_widget_definition *button)
+{
+	button->event_handlers.count = 0;
+	pause_widget_grey(button, 0);
+}
+
+/* the list's buttons that run a function: choose team in a game that has no
+choice, restart and new game on a machine that is not the host's */
+static void pause_restrict(struct ui_widget_definition const *list, boolean host)
+{
+	struct ui_widget_child_reference const *children = list->child_widgets.address;
+	long child;
+
+	for (child = 0; child < list->child_widgets.count; child++)
+	{
+		struct ui_widget_definition *button;
+
+		if (children[child].widget_tag.index == NONE ||
+			DATUM_INDEX_TO_ABSOLUTE_INDEX(children[child].widget_tag.index) >= build.first_index)
+		{
+			continue;
+		}
+		button = tag_get(UI_WIDGET_DEFINITION_TAG, children[child].widget_tag.index);
+		if ((!pause_team_enabled() && definition_runs(button, PAUSE_FUNCTION_CHOOSE_TEAM, 0)) ||
+			(!host && (definition_runs(button, PAUSE_FUNCTION_RESTART, 0) ||
+				definition_runs(button, PAUSE_FUNCTION_NEW_GAME, 0))))
+		{
+			pause_button_disable(button);
+		}
+	}
+}
+
 static long pause_list_patch(struct cache_file_tag_instance *instances, struct ui_widget_definition *list, long quit,
 	boolean host, short *growth)
 {
 	struct ui_widget_child_reference *children = list->child_widgets.address;
-	long count = list->child_widgets.count, added = host || build.coop ? 2 : 1, child;
-	struct ui_widget_child_reference *grown = allocate((count + added) * sizeof(struct ui_widget_child_reference));
+	long count = list->child_widgets.count, added = 0, child;
+	struct ui_widget_child_reference *grown;
 	struct ui_widget_definition const *model = tag_get(UI_WIDGET_DEFINITION_TAG, children[quit].widget_tag.index);
 	long settings_widget = widget_named(PAUSE_SETTINGS_SCREEN);
 	short spacing = count >= 2 ? (short)(children[count - 1].vertical_offset - children[count - 2].vertical_offset) :
 		PAUSE_BUTTON_SPACING;
-	char const *names[2];
-	void *buttons[2];
-	long tags[2];
+	boolean inject_team = !build.campaign && !build.coop && !definition_runs(list, PAUSE_FUNCTION_CHOOSE_TEAM, 0);
+	char const *names[PAUSE_MAXIMUM_ADDED];
+	void *buttons[PAUSE_MAXIMUM_ADDED];
+	long tags[PAUSE_MAXIMUM_ADDED];
 
-	if (!grown || settings_widget == NONE || spacing <= 0)
+	if (settings_widget == NONE || spacing <= 0)
 		return 0;
-	names[0] = "pause/settings_button";
-	tags[0] = next_tag();
-	buttons[0] = pause_button(instances, model, names[0], "SETTINGS",
+	names[added] = "pause/settings_button";
+	tags[added] = next_tag();
+	buttons[added++] = pause_button(instances, model, "pause/settings_button", "SETTINGS",
 		function_index("profile set edit begin", "pause", 0), build.widget_tags[settings_widget], NULL, NONE);
-	names[1] = build.coop ? "pause/friendly_fire_button" : "pause/end_game_button";
-	tags[1] = added > 1 ? next_tag() : NONE;
-	buttons[1] = build.coop ?
-		pause_button(instances, model, names[1], "FRIENDLY FIRE ON",
+	if (inject_team && widget_named(PAUSE_TEAM_SCREEN) != NONE)
+	{
+		names[added] = "pause/choose_team_button";
+		tags[added] = next_tag();
+		buttons[added] = pause_button(instances, model, names[added], "CHOOSE TEAM",
+			function_index("unwired choose team", "pause", 0), build.widget_tags[widget_named(PAUSE_TEAM_SCREEN)],
+			NULL, NONE);
+		if (buttons[added] && !pause_team_enabled())
+			pause_button_disable(buttons[added]);
+		added++;
+	}
+	if (build.coop)
+	{
+		names[added] = "pause/friendly_fire_button";
+		tags[added] = next_tag();
+		buttons[added++] = pause_button(instances, model, "pause/friendly_fire_button", "FRIENDLY FIRE ON",
 			function_index("port coop friendly fire", "pause", 0), NONE, "FRIENDLY FIRE OFF",
-			game_data_input_index("port coop friendly fire text", "pause", 0)) :
-		host ? pause_button(instances, model, names[1], "END GAME",
-			function_index("port pause end game", "pause", 0), NONE, NULL, NONE) : NULL;
-	if (!buttons[0] || (added > 1 && !buttons[1]))
+			game_data_input_index("port coop friendly fire text", "pause", 0));
+	}
+	else if (host)
+	{
+		names[added] = "pause/end_game_button";
+		tags[added] = next_tag();
+		buttons[added++] = pause_button(instances, model, "pause/end_game_button", "END GAME",
+			function_index("port pause end game", "pause", 0), NONE, NULL, NONE);
+	}
+	for (child = 0; child < added; child++)
+	{
+		if (!buttons[child])
+			return 0;
+	}
+	grown = allocate((count + added) * sizeof(struct ui_widget_child_reference));
+	if (!grown)
 		return 0;
 	for (child = 0; child < added; child++)
 		instance_set(instances, UI_WIDGET_DEFINITION_TAG, tags[child], names[child], "", buttons[child]);
@@ -1721,7 +1850,14 @@ static boolean pause_box_stock(struct ui_widget_definition const *box)
 /* the port's box's height for the number of buttons (tools/port_settings.py's
 pause_box_height: the Xbox's of two is 159), and its footer band, the button
 key's, at its bottom */
-#define PAUSE_BOX_HEIGHT(buttons) (159 + ((buttons) - 2) * PAUSE_BUTTON_SPACING)
+/* PAUSE_BOX_TRIM: how much shorter the box is than the stock one (one button's height).
+   PAUSE_LIST_IN_BOX: how far below the top of the box the first button starts.
+   Make PAUSE_LIST_IN_BOX bigger to move the buttons down, smaller to move them up. */
+#define PAUSE_BOX_TRIM 35
+#define PAUSE_LIST_IN_BOX 25
+/* extra distance (units) the Choose Team buttons sit below the main pause buttons */
+#define PAUSE_TEAM_EXTRA 35
+#define PAUSE_BOX_HEIGHT(buttons) (159 + ((buttons) - 2) * PAUSE_BUTTON_SPACING - PAUSE_BOX_TRIM)
 #define PAUSE_BOX_FOOTER 28
 
 /* the stock box's pieces drawn with the port's taller box: its frame for
@@ -1745,12 +1881,12 @@ static short pause_box_redraw(struct ui_widget_definition const *box, long butto
 		group = bitmap_group_get(build.bitmap_tags[bitmap]);
 		sequence = group->sequences.address;
 		/* (one frame: the one for the number of buttons) */
-		sequence->first_bitmap_index = (short)PIN(buttons - PAUSE_BOX_FIRST_BUTTONS, 0, group->bitmaps.count - 1);
+		sequence->first_bitmap_index = (short)PIN(buttons - PAUSE_BOX_FIRST_BUTTONS - 1, 0, group->bitmaps.count - 1);
 		sequence->bitmap_count = 1;
 		reference_set(&definition->background_bitmap, BITMAP_GROUP_TAG, build.bitmap_tags[bitmap]);
 		/* (as high as the box: its texture's rows below it, empty, cropped,
 		as a split screen's 240 lines would squeeze the whole 256) */
-		height = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_FIRST_BUTTONS + sequence->first_bitmap_index);
+		height = (short)PAUSE_BOX_HEIGHT(PAUSE_BOX_FIRST_BUTTONS + 1 + sequence->first_bitmap_index);
 		definition->bounds.y1 = (short)(definition->bounds.y0 + height);
 	}
 	return height;
@@ -1765,13 +1901,13 @@ static void pause_box_fit(struct ui_widget_definition *screen, long box_child, l
 	short height)
 {
 	struct ui_widget_child_reference *children = screen->child_widgets.address;
-	short room = (short)(screen->bounds.y1 - screen->bounds.y0 - 4);
+	short room = (short)(screen->bounds.y1 - screen->bounds.y0);
 	short top = children[box_child].vertical_offset;
-	short up = (short)MAX(0, MIN(top - 2, top + height - room));
+	short centred = (short)MAX(2, (room - height) / 2);
 	long child;
 
-	children[box_child].vertical_offset -= up;
-	children[list_child].vertical_offset -= up;
+	children[list_child].vertical_offset = (short)(centred + PAUSE_LIST_IN_BOX);
+	children[box_child].vertical_offset = centred;
 	top = children[box_child].vertical_offset;
 	for (child = 0; child < screen->child_widgets.count; child++)
 	{
@@ -1807,9 +1943,9 @@ buttons than the port's box holds. */
 #define PAUSE_BOX_WIDTH 226
 /* (the Xbox's: the list 8 in from the box, 43 down; the key 25 in) */
 #define PAUSE_LIST_LEFT 8
-#define PAUSE_LIST_TOP 43
+#define PAUSE_LIST_TOP PAUSE_LIST_IN_BOX
 #define PAUSE_KEY_LEFT 25
-#define PAUSE_BOX_MOST_BUTTONS 4
+#define PAUSE_BOX_MOST_BUTTONS 5
 
 /* the screen's box: a widget of three pieces (the Xbox's pausebox2, Custom
 Edition's pausebox4), else NONE */
@@ -2043,7 +2179,7 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 	if (collection == NONE || quit_function == NONE)
 		return;
 	screens = tag_get('Soul', collection);
-	rebuilt = pause_rebuild(screens, quit_function, host || build.coop ? 2 : 1);
+	rebuilt = pause_rebuild(screens, quit_function, (host || build.coop ? 2 : 1) + 1);
 	for (screen = 0; screen < screens->count; screen++)
 	{
 		long screen_tag = ((struct tag_reference const *)screens->address)[screen].index;
@@ -2079,6 +2215,7 @@ static void pause_patch(struct cache_file_tag_instance *instances)
 			if (!added)
 				return;
 			buttons = list->child_widgets.count;
+			pause_restrict(list, host);
 			patched_list = children[child].widget_tag.index;
 			list_child = child;
 		}
@@ -2154,7 +2291,7 @@ from the third, and the mission objectives' box's, are the stock 159 grown by
 the 36 that five rows at this pitch add (SETTINGS), then by the 66 that six
 add (network co-op's FRIENDLY FIRE too: tools/port_settings.py) */
 #define PAUSE_CAMPAIGN_ROW_PITCH 30
-#define PAUSE_CAMPAIGN_BOX_FRAME 2
+#define PAUSE_CAMPAIGN_BOX_FRAME 3
 static short const pause_campaign_box_heights[] = { 195, 225 };
 
 /* the port box piece for one of the map's pause box pieces, else NULL */
