@@ -1,6 +1,19 @@
 """Audio fixtures use the production structures, enums and capacities."""
 
-from harness import constant, enum_with, read, structure
+import re
+
+from harness import constant, enum_with, function, read, structure
+
+
+def class_table():
+    """The game's sound class table and names (sound_classes.c), with the class enum: a fixture's
+    sound_classes[] and sound_class_names[]."""
+    source = read("source/sound/sound_classes.c")
+    macro = re.search(r"^#define SOUND_CLASS_DEFINITION\(.*?[^\\]\n", source, re.M | re.S).group(0)
+    tables = [source[source.index(start):source.index("};", source.index(start)) + 2]
+              for start in ["struct sound_class_definition sound_classes[", "char const *sound_class_names["]]
+    return "\n".join([f"#define NUMBER_OF_SOUND_CLASSES {constant(source, 'NUMBER_OF_SOUND_CLASSES')}",
+                      enum_with(read("source/sound/sound_classes.h"), "_sound_class_music"), macro, *tables])
 
 
 def manager_types():
@@ -95,3 +108,20 @@ typedef struct _DSCAPS DSCAPS;
     for name in ["voice_packet", "sdl_stream"]:
         text += structure(backend, name) + "\n"
     return text
+
+
+def permutation_picker():
+    """sound_definitions.c's pick of a pitch range's next permutation (sound_definition_next_permutation)
+    with what it calls: the played bits of a range's permutations past 32 kept apart (OpenH1 issue 1170)"""
+    picker = read("source/sound/sound_definitions.c")
+    picker = picker[picker.index("/* ---------- constants */"):]
+    names = ["try_to_reset_permutations", "sound_definitions_played_beyond_clear", "sound_pitch_range_played_beyond_release", "sound_pitch_range_played_beyond",
+             "sound_pitch_range_permutation_played", "sound_pitch_range_permutation_set_played",
+             "try_to_reset_permutations_beyond", "sound_definition_next_permutation"]
+    table = "static struct sound_played_beyond_table sound_played_beyond_table;"
+    assert table in picker, "sound_definitions.c's table of played bits past 32 is not where it was"
+    macros = "#define LONG_BITS 32\n#define LONG_BITS_BITS 5\n"
+    macros += "\n".join(line for line in read("source/cseries/cseries.h").splitlines() if line.startswith("#define BIT_VECTOR_"))
+    return "\n".join([macros, enum_with(picker, "SOUND_PLAYED_BEYOND_LONGS"), structure(picker, "sound_played_beyond"),
+                      structure(picker, "sound_played_beyond_table"), table,
+                      *(function(picker, name) for name in names)]) + "\n"

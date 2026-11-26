@@ -22,7 +22,7 @@ enum
 	MAXIMUM_PROMOTION_RULES_PER_SOUND = 4,
 	MAXIMUM_PITCH_RANGES_PER_SOUND = 8,
 	MAXIMUM_PERMUTATIONS_PER_PITCH_RANGE = 256,
-	MAXIMUM_PERMUTATIONS_PER_RANDOM_PITCH_RANGE = 32,
+	/* port: random ranges use the full permutation limit above */
 	MAXIMUM_SOUND_DATA_SIZE = 0x400000,
 	MAXIMUM_SOUND_MOUTH_DATA_SIZE = 8192,
 	SOUND_MOUTH_SAMPLES_PER_SECOND = 30,
@@ -97,7 +97,11 @@ struct sound_pitch_range
 	real natural_pitch;
 	struct real_bounds bend_bounds;
 	short actual_permutation_count;
-	short unused;
+	/* port: its played bits past played_permutation_mask's 32 (OpenH1
+	issue 1170), the entry (one on) of sound_definitions.c's
+	sound_pitch_range_played_beyond; 0 for none, NONE after an allocation
+	failure has been reported (retried on the next pick) */
+	short played_beyond_index;
 	real playback_rate;
 	unsigned long played_permutation_mask;
 	short previous_permutation_index;
@@ -221,5 +225,12 @@ short sound_definition_next_permutation(
 	struct sound_definition *definition,
 	short pitch_range_index,
 	short permutation_index);
+/* port: the played bits past 32 of the last map's pitch ranges let go
+(OpenH1 issue 1170: sound_initialize_for_new_map) */
+void sound_definitions_played_beyond_clear(
+	void);
+/* port: mod_sounds.c retires a range only after its cache users are gone */
+void sound_pitch_range_played_beyond_release(
+	struct sound_pitch_range *range);
 
 #endif // __SOUND_DEFINITIONS_H
