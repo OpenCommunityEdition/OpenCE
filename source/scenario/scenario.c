@@ -815,16 +815,192 @@ short scenario_get_structure_reference_index_from_tag_index(
 	return result;
 }
 
+/* port: the leaves of points found lately, each with the point's clearance
+(bsp3d_test_point_clearance): a point nearer than that to one is in its leaf.
+A particle that moves less than that in a frame is not sorted down the whole
+bsp again; the leaf is the one the bsp would give */
+enum
+{
+	SCENARIO_LEAF_CACHE_SIZE = 2048,
+	/* (the entries of a world unit cube: particles near each other, a cloud
+	of smoke, each keep one) */
+	SCENARIO_LEAF_CACHE_WAYS = 4
+};
+
+struct scenario_leaf_cache_entry
+{
+	real_point3d point;
+	real clearance;
+	long leaf_index;
+};
+
+static __thread struct scenario_leaf_cache_entry scenario_leaf_cache[SCENARIO_LEAF_CACHE_SIZE];
+/* (the entry of its cube's a point found next replaces) */
+static __thread unsigned long scenario_leaf_cache_next_way;
+/* port: incremented on bsp switch so every thread clears its own cache on its
+next lookup (safe for concurrent collision walks without locks or sharing) */
+static unsigned long scenario_leaf_cache_generation = 1;
+static __thread unsigned long scenario_leaf_cache_local_generation;
+
+/* port: the bsp's leaves change with it (scenario_switch_structure_bsp) */
+static void scenario_leaf_cache_clear(
+	void)
+{
+	__atomic_add_fetch(&scenario_leaf_cache_generation, 1, __ATOMIC_RELEASE);
+
+	return;
+}
+
+static boolean scenario_leaf_cache_entry_contains(
+	struct scenario_leaf_cache_entry const *entry,
+	const real_point3d *point)
+{
+	real dx = point->x - entry->point.x;
+	real dy = point->y - entry->point.y;
+	real dz = point->z - entry->point.z;
+
+	return dx * dx + dy * dy + dz * dz < entry->clearance * entry->clearance;
+}
+
+/* the first entry of the world unit cube a point is in, one of
+SCENARIO_LEAF_CACHE_WAYS; NULL for a point far outside any map (or not a
+number) */
+static struct scenario_leaf_cache_entry *scenario_leaf_cache_cube(
+	const real_point3d *point)
+{
+	unsigned long generation = __atomic_load_n(&scenario_leaf_cache_generation, __ATOMIC_ACQUIRE);
+	unsigned long hash;
+
+	if (scenario_leaf_cache_local_generation != generation)
+	{
+		csmemset(scenario_leaf_cache, 0, sizeof(scenario_leaf_cache));
+		scenario_leaf_cache_local_generation = generation;
+	}
+	if (!(fabs(point->x) < 1.0e6f && fabs(point->y) < 1.0e6f && fabs(point->z) < 1.0e6f))
+		return NULL;
+
+	hash =
+		(unsigned long)(long)floor(point->x) * 73856093UL ^
+		(unsigned long)(long)floor(point->y) * 19349663UL ^
+		(unsigned long)(long)floor(point->z) * 83492791UL;
+
+	return &scenario_leaf_cache[
+		hash % (SCENARIO_LEAF_CACHE_SIZE / SCENARIO_LEAF_CACHE_WAYS) * SCENARIO_LEAF_CACHE_WAYS];
+}
+
+/* the entry of its cube a point is within, or NULL */
+static struct scenario_leaf_cache_entry *scenario_leaf_cache_find(
+	struct scenario_leaf_cache_entry *cube,
+	const real_point3d *point)
+{
+	short way;
+
+	for (way = 0; way < SCENARIO_LEAF_CACHE_WAYS; way++)
+	{
+		if (scenario_leaf_cache_entry_contains(&cube[way], point))
+			return &cube[way];
+	}
+
+	return NULL;
+}
+
+/* the entry of its cube a point found next replaces */
+static struct scenario_leaf_cache_entry *scenario_leaf_cache_replaced(
+	struct scenario_leaf_cache_entry *cube)
+{
+	return &cube[scenario_leaf_cache_next_way++ % SCENARIO_LEAF_CACHE_WAYS];
+}
+
+/* the entry a point is within, its leaf and clearance found and kept unless
+it is within one; NULL for a point far outside any map */
+static struct scenario_leaf_cache_entry *scenario_leaf_cache_get(
+	const real_point3d *point)
+{
+	struct scenario_leaf_cache_entry *cube = scenario_leaf_cache_cube(point);
+	struct scenario_leaf_cache_entry *entry;
+
+	if (!cube)
+		return NULL;
+
+	entry = scenario_leaf_cache_find(cube, point);
+	if (!entry)
+	{
+		entry = scenario_leaf_cache_replaced(cube);
+		entry->leaf_index = bsp3d_test_point_clearance(
+			global_bsp3d_get(),
+			0,
+			point,
+			&entry->clearance);
+		entry->point = *point;
+	}
+
+	return entry;
+}
+
+static long scenario_leaf_index_from_point_cached(
+	const real_point3d *point)
+{
+	struct scenario_leaf_cache_entry const *entry = scenario_leaf_cache_get(point);
+
+	return entry ? entry->leaf_index : bsp3d_test_point(global_bsp3d_get(), 0, point);
+}
+
+/* port: whether a segment is within the clearance of a kept point, and so
+crosses no plane the bsp sorted that point by and lies in its one leaf
+(collision_bsp_test_vector). The bsp is not walked for one that is not: the
+vector's own walk keeps its start (scenario_leaf_cache_keep) */
+boolean scenario_leaf_cache_test_segment(
+	const real_point3d *point0,
+	const real_point3d *point1,
+	long *leaf_index)
+{
+	struct scenario_leaf_cache_entry const *cube = scenario_leaf_cache_cube(point0);
+	short way;
+
+	for (way = 0; cube && way < SCENARIO_LEAF_CACHE_WAYS; way++)
+	{
+		struct scenario_leaf_cache_entry const *entry = &cube[way];
+
+		if (scenario_leaf_cache_entry_contains(entry, point0) &&
+			scenario_leaf_cache_entry_contains(entry, point1))
+		{
+			*leaf_index = entry->leaf_index;
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+/* port: a point's leaf and clearance as bsp3d_test_point_clearance gives
+them, found by a walk of the bsp that sorted it (collision_bsp_test_vector) */
+void scenario_leaf_cache_keep(
+	const real_point3d *point,
+	long leaf_index,
+	real clearance)
+{
+	struct scenario_leaf_cache_entry *cube = scenario_leaf_cache_cube(point);
+
+	if (cube)
+	{
+		struct scenario_leaf_cache_entry *entry = scenario_leaf_cache_replaced(cube);
+
+		entry->point = *point;
+		entry->clearance = clearance;
+		entry->leaf_index = leaf_index;
+	}
+
+	return;
+}
+
 void scenario_location_from_point(
 	struct location *location,
 	const real_point3d *point)
 {
 	long cluster_index;
 
-	location->leaf_index = bsp3d_test_point(
-		global_bsp3d_get(),
-		0,
-		point);
+	/* port: scenario_leaf_index_from_point_cached, the same leaf */
+	location->leaf_index = scenario_leaf_index_from_point_cached(point);
 
 	if (location->leaf_index == NONE)
 	{
@@ -1158,6 +1334,8 @@ boolean scenario_switch_structure_bsp(
 				&global_structure_bsp->collision_bsp,
 				0,
 				struct collision_bsp);
+			/* port: no leaf found in the old bsp is kept */
+			scenario_leaf_cache_clear();
 			global_bsp3d = (struct bsp3d *)TAG_BLOCK_GET_ELEMENT(
 				&global_structure_bsp->collision_bsp,
 				0,

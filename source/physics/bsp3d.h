@@ -47,6 +47,9 @@ typedef char bsp3d_node_size_check[
 /* ---------- prototypes/BSP3D.C */
 
 long bsp3d_test_point(struct bsp3d const *bsp, long node_index, union real_point3d const *point);
+/* port: bsp3d.c */
+long bsp3d_test_point_clearance(struct bsp3d const *bsp, long node_index, union real_point3d const *point, real *clearance);
+real bsp3d_clearance_least(real least, real_plane3d const *plane, real distance, real point_size);
 
 /* ---------- globals */
 
