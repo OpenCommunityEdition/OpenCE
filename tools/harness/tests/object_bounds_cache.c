@@ -154,6 +154,17 @@ static real_plane3d const hit_plane = { { 0.0f, 0.0f, 1.0f }, 0.0f };
 #define collision_log_end_time(...) ((void)0)
 #define debug_collision_skip_objects FALSE
 
+/* the grid of the objects by where they are (object_reach_grid.c, which has its own test) answers nothing: collision
+goes through the clusters' lists */
+#define NUMBEROF(array) ((long)(sizeof(array) / sizeof((array)[0])))
+void object_reach_grid_update(long object_index, real_point3d const *center, real radius) {}
+void object_reach_grid_invalidate(void) {}
+long object_reach_grid_objects_in_reach(short const *cluster_indices, long cluster_count, real_point3d const *center,
+	real radius, long *object_indices, long maximum_count)
+{
+	return NONE;
+}
+
 #include "under_test.inc"
 
 static unsigned long seed = 12345;

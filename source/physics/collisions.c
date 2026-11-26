@@ -115,6 +115,9 @@ symbols in this file:
 #include "units/bipeds.h"
 /* port: object_bounds_cache.c's */
 boolean object_bounds_cache_out_of_reach(long object_index, real_point3d const *point, real radius);
+/* port: object_reach_grid.c's */
+long object_reach_grid_objects_in_reach(short const *cluster_indices, long cluster_count, real_point3d const *center,
+	real radius, long *object_indices, long maximum_count);
 boolean object_bounds_cache_missed_by_vector(long object_index, real_point3d const *point, real_vector3d const *vector);
 
 #undef REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
@@ -929,6 +932,13 @@ boolean collision_get_features_in_sphere(
 		if (objects && result.leaf_count > 0)
 		{
 			short leaf_reference_index;
+			/* port: the clusters, in order, and the objects in reach in them
+			(object_reach_grid.c) */
+			short cluster_indices[NUMBEROF(result.leaf_indices)];
+			long cluster_count = 0;
+			long reach_objects[128];
+			long reach_count;
+			long reach_index;
 
 			if (!(flags & _collision_test_objects_all_types_flags))
 			{
@@ -946,6 +956,40 @@ boolean collision_get_features_in_sphere(
 				short cluster_index = (short)collision_cluster_index_from_leaf(leaf_index);
 
 				if (structure_cluster_mark(cluster_index))
+				{
+					cluster_indices[cluster_count++] = cluster_index;
+				}
+			}
+			/* port: found from where they are, in the order the clusters'
+			lists give them; or the lists gone through as before */
+			reach_count = object_reach_grid_objects_in_reach(
+				cluster_indices,
+				cluster_count,
+				center,
+				radius,
+				reach_objects,
+				NUMBEROF(reach_objects));
+			for (reach_index = 0; reach_index < reach_count; reach_index++)
+			{
+				if (object_mark_function(reach_objects[reach_index]))
+				{
+					object_get_features_in_sphere(
+						flags,
+						reach_objects[reach_index],
+						center,
+						radius,
+						height,
+						width,
+						ignore_object_index,
+						features);
+				}
+			}
+			for (leaf_reference_index = 0;
+				reach_count == NONE && leaf_reference_index < cluster_count;
+				leaf_reference_index++)
+			{
+				short cluster_index = cluster_indices[leaf_reference_index];
+
 				{
 					long reference_index;
 					long object_index;
