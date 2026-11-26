@@ -439,7 +439,28 @@ void objects_fix_for_deleted_object(
 	struct object_datum *object;
 
 	struct object_iterator iterator;
-	object_iterator_new(&iterator, _object_mask_all, 0);
+	/* port: only the objects of the types that handle it
+	(object_type_port_handles_deleted_objects: units and projectiles), picked
+	by the headers' types without reading the others: in 32x co-op a joined
+	game deletes the host's objects one at a time, and each read every
+	object. The others' umbrella shield is passed over with them: nothing
+	sets one but to NONE (object_new), which no deleted object's index is. */
+	static unsigned long handling_types;
+	unsigned long mask = __atomic_load_n(&handling_types, __ATOMIC_ACQUIRE);
+	short object_type;
+
+	if (!mask)
+	{
+		for (object_type = 0; object_type < NUMBER_OF_OBJECT_TYPES; object_type++)
+		{
+			if (object_type_port_handles_deleted_objects(object_type))
+			{
+				SET_FLAG(mask, object_type, TRUE);
+			}
+		}
+		__atomic_store_n(&handling_types, mask, __ATOMIC_RELEASE);
+	}
+	object_iterator_new(&iterator, mask, 0);
 
 	for (object = (struct object_datum *)object_iterator_next(&iterator);
 		object;

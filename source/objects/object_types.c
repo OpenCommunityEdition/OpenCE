@@ -831,6 +831,36 @@ void object_type_handle_deleted_object(
 	return;
 }
 
+/* port: whether an object of the type has a part with handle_deleted_object
+(units and projectiles), by which objects_fix_for_deleted_object passes over
+the rest: it walks every object for each deleted one, and the b30 cutscene's
+start in 32x co-op deletes ~600 weapons at once with thousands of objects
+about */
+boolean object_type_port_handles_deleted_objects(
+	short object_type)
+{
+	static signed char handles[NUMBER_OF_OBJECT_TYPES];
+	signed char result = __atomic_load_n(&handles[object_type], __ATOMIC_ACQUIRE);
+
+	if (!result)
+	{
+		struct object_type_definition *definition = object_type_definition_get(object_type);
+		short i;
+
+		result = -1;
+		for (i = 0; definition->part_definitions[i]; i++)
+		{
+			if (definition->part_definitions[i]->handle_deleted_object)
+			{
+				result = 1;
+			}
+		}
+		__atomic_store_n(&handles[object_type], result, __ATOMIC_RELEASE);
+	}
+
+	return result > 0;
+}
+
 void object_type_handle_region_destroyed(
 	long object_index,
 	short region_index,
