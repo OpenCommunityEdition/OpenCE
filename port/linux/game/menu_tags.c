@@ -46,6 +46,7 @@ menu gets FRIENDLY FIRE too.
 #include "mcc_cache.h"
 #include "mcc_menu_preview.h"
 #include "custom_edition_cache.h"
+#include "forge_sidecar.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -2509,6 +2510,8 @@ void menu_tags_loaded(
 	boolean campaign = game_map && full_screen_campaign_map();
 	boolean coop = game_map && network_coop_campaign_map();
 
+	forge_sidecar_menu_loaded(map_name);
+
 	/* MCC owns its pause menus and uses these native Settings screens.
 	Do not patch embedded MCC campaign widgets. */
 	if (mcc_cache_tags_loaded())
@@ -2682,6 +2685,7 @@ done:
 void menu_tags_unloaded(
 	void)
 {
+	forge_sidecar_menu_unloaded();
 	mcc_menu_preview_clear();
 	if (menu_tags.loaded || menu_tags.block_count)
 		menu_tags_release();

@@ -4530,6 +4530,9 @@ static void game_engine_update_teleporter(
 		return;
 
 	unit = unit_get(player->unit_index);
+	/* port: guard against out-of-range teleporter_index in single player or after live edits */
+	if (player->teleporter_index < 0 || player->teleporter_index >= scenario->netgame_flags.count)
+		player->teleporter_index = NONE;
 	if (player->teleporter_index != NONE)
 	{
 		struct scenario_netgame_flag *previous_flag = TAG_BLOCK_GET_ELEMENT(
@@ -5042,6 +5045,19 @@ void game_engine_update(
 			break;
 		}
 	}
+	/* port: single-player teleporters and queued sounds */
+	else if (global_scenario_try_and_get() && !main_menu_is_active())
+	{
+		struct data_iterator player_iterator;
+
+		game_engine_update_multiplayer_sound();
+		data_iterator_new(&player_iterator, player_data);
+		while (data_iterator_next(&player_iterator))
+			game_engine_update_teleporter(player_iterator.datum_index);
+	}
+
+	/* port: read-only Forge sidecar runtime playback */
+	forge_sidecar_tick();
 
 	return;
 }
@@ -9196,6 +9212,9 @@ static void game_engine_update_item_spawn(
 				{
 					continue;
 				}
+				/* port: skip netgame_equipment items deleted or relocated by a Forge sidecar */
+				if (forge_sidecar_should_skip_netgame_equipment_spawn(definition_index, &equipment->position))
+					continue;
 				object_placement_data_new(
 					&placement_data,
 					definition_index,

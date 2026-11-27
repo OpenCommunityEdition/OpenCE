@@ -91,6 +91,7 @@ their handlers open opens.
 #include "mcc_ui.h"
 #include "mcc_pause.h"
 #include "custom_edition_maps.h"
+#include "forge_sidecar.h"
 #include "mcc_maps.h"
 #include "mcc_progress.h"
 #include "mcc_menu_text.h"
@@ -3842,9 +3843,9 @@ static boolean map_list_choose(struct widget_instance *list, boolean *widget_del
 	/* (a multiplayer map: the Xbox's, then the Custom Edition ones, in the
 	multiplayer maps) */
 	if (map_list.kind == MAP_KIND_MULTIPLAYER)
-		return ui_widget_port_multiplayer_map_choose(chosen);
+		return forge_sidecar_choose_multiplayer_map(chosen);
 	if (map_list.kind == MAP_KIND_CUSTOM_MULTIPLAYER)
-		return ui_widget_port_multiplayer_map_choose((short)(xbox_multiplayer_map_count(map_list.map_count) + chosen));
+		return forge_sidecar_choose_multiplayer_map((short)(xbox_multiplayer_map_count(map_list.map_count) + chosen));
 	ui_play_audio_feedback_sound(SOUND_FORWARD);
 	map_list.level = chosen;
 	map_step_open(list, MAP_STEP_DIFFICULTIES, (short)PIN(main_get_difficulty(), 0, NUMBER_OF_GAME_DIFFICULTY_LEVELS - 1));
@@ -4483,7 +4484,9 @@ static void browser_games_read(void)
 			struct advertised_game *game = &games[index];
 
 			if (network_game_client_advertised_game_is_valid(game) && !advertised_in_progress(game) == (pass == 0) &&
-				game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link))
+				game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link) &&
+				(multiplayer.mode != _multiplayer_mode_lan ||
+				 (network_game_client_advertised_game_kind(client, game) & ~0x80) != 0x46))
 			{
 				multiplayer.games[multiplayer.game_count++] = game;
 			}
@@ -5091,6 +5094,11 @@ static short lobby_browser_valid_games(struct p2p_listing *games, short count)
 		wchar_t name[P2P_LISTING_NAME_SIZE + 1];
 		short index;
 
+		if ((games[read].kind & ~0x80) == 0x46 ||
+			(games[read].gametype[0] && !_stricmp(games[read].gametype, "Forge")))
+		{
+			continue;
+		}
 		text_to_wide(games[read].name, name, NUMBEROF(name));
 		if (!player_name_clean(name, NUMBEROF(name)))
 			continue;
