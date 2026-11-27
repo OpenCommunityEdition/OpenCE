@@ -557,6 +557,10 @@ static const struct config_setting config_settings[] =
 	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
 		"Your own legs in first person, seen looking down: your body as others\n"
 		"see it, drawn from the waist down, moving as it moves." },
+	{ "display.first_person_shadow", _config_boolean, "false", "HALO_FIRST_PERSON_SHADOW", _environment_value, _platform_all,
+		"Your own body's shadow in first person, cast as others see it cast,\n"
+		"with the weapon in your hands (the stock game casts none for the player\n"
+		"whose view it is). Only what is drawn changes." },
 	{ "display.overshield_effect", _config_boolean, "false", "HALO_OVERSHIELD_EFFECT", _environment_value, _platform_all,
 		"The overshield as this machine draws it: its flare rising up the body as\n"
 		"it charges (2 seconds, 3 from a shield that was down) and staying lit,\n"
