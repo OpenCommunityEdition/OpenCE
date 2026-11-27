@@ -295,10 +295,25 @@ static unsigned short msvc_to_control_word(unsigned int value, unsigned short wo
 	return word;
 }
 
-#ifdef HALO_ARM64_GUEST
-/* AArch64: the rounding mode lives in FPCR.RMode, the sticky exception
-flags in FPSR. Precision control and exception unmasking have no
+#if defined(HALO_ARM64_GUEST) || defined(__arm__)
+/* ARM: the rounding mode lives in RMode (bits 22 and 23) of the control
+register, the sticky exception flags (bits 0 to 4 and 7) in the status
+register. AArch64 has them as FPCR and FPSR; 32-bit ARM VFP has one register,
+FPSCR, with the same bits, so a read-modify-write of either leaves the other's
+bits as they are. Precision control and exception unmasking have no
 equivalent; the rest of the MSVC control word is only remembered. */
+#ifdef HALO_ARM64_GUEST
+static unsigned long long fp_control_read(void) { return __builtin_arm_rsr64("fpcr"); }
+static void fp_control_write(unsigned long long value) { __builtin_arm_wsr64("fpcr", value); }
+static unsigned long long fp_status_read(void) { return __builtin_arm_rsr64("fpsr"); }
+static void fp_status_write(unsigned long long value) { __builtin_arm_wsr64("fpsr", value); }
+#else
+static unsigned long long fp_control_read(void) { return __builtin_arm_get_fpscr(); }
+static void fp_control_write(unsigned long long value) { __builtin_arm_set_fpscr((unsigned int)value); }
+static unsigned long long fp_status_read(void) { return __builtin_arm_get_fpscr(); }
+static void fp_status_write(unsigned long long value) { __builtin_arm_set_fpscr((unsigned int)value); }
+#endif
+
 static unsigned int msvc_control_word = CW_DEFAULT;
 
 unsigned int _control87(unsigned int new_value, unsigned int mask)
@@ -308,7 +323,7 @@ unsigned int _control87(unsigned int new_value, unsigned int mask)
 	if (mask)
 	{
 		msvc_control_word = (msvc_control_word & ~mask) | (new_value & mask);
-		fpcr = __builtin_arm_rsr64("fpcr");
+		fpcr = fp_control_read();
 		fpcr &= ~(3ULL << 22);
 		switch (msvc_control_word & _MCW_RC)
 		{
@@ -317,7 +332,7 @@ unsigned int _control87(unsigned int new_value, unsigned int mask)
 		case _RC_CHOP: fpcr |= 3ULL << 22; break;
 		default: break;
 		}
-		__builtin_arm_wsr64("fpcr", fpcr);
+		fp_control_write(fpcr);
 	}
 	return msvc_control_word;
 }
@@ -330,7 +345,7 @@ unsigned int _controlfp(unsigned int new_value, unsigned int mask)
 
 unsigned int _statusfp(void)
 {
-	unsigned long long fpsr = __builtin_arm_rsr64("fpsr");
+	unsigned long long fpsr = fp_status_read();
 	unsigned int result = 0;
 
 	/* as the x87 status word's low bits: invalid, denormal, zero divide,
@@ -348,7 +363,7 @@ unsigned int _clearfp(void)
 {
 	unsigned int status = _statusfp();
 
-	__builtin_arm_wsr64("fpsr", __builtin_arm_rsr64("fpsr") & ~0x9fULL);
+	fp_status_write(fp_status_read() & ~0x9fULL);
 	return status;
 }
 #elif defined(HALO_WEB)
@@ -742,3 +757,12 @@ long _lseek(int handle, long offset, int origin)
 {
 	return (long)lseek(handle, offset, origin);
 }
+
+#ifdef __arm__
+/* MSVC (scenario.c): a compiler barrier; clang does not make the intrinsic
+for 32-bit ARM Linux */
+void _ReadWriteBarrier(void)
+{
+	__atomic_signal_fence(__ATOMIC_SEQ_CST);
+}
+#endif

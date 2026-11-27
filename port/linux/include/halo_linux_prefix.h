@@ -10,8 +10,8 @@ byte-for-byte identical to what the matching MSVC build compiles.
 #ifndef __HALO_LINUX_PREFIX_H
 #define __HALO_LINUX_PREFIX_H
 
-#if !defined(__i386__) && !defined(HALO_ARM64_GUEST) && !defined(__wasm32__)
-#error the Linux port targets 32-bit x86: game data structures assume 32-bit pointers
+#if !defined(__i386__) && !defined(HALO_ARM64_GUEST) && !defined(__wasm32__) && !defined(__arm__)
+#error the Linux port targets 32-bit x86 or 32-bit ARM: game data structures assume 32-bit pointers
 #endif
 
 /* ---------- WebAssembly: no return addresses
