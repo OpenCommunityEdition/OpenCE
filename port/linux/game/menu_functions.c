@@ -4484,7 +4484,9 @@ static void browser_games_read(void)
 			struct advertised_game *game = &games[index];
 
 			if (network_game_client_advertised_game_is_valid(game) && !advertised_in_progress(game) == (pass == 0) &&
-				game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link))
+				game_from_peer(game) == (multiplayer.mode == _multiplayer_mode_direct_link) &&
+				(multiplayer.mode != _multiplayer_mode_lan ||
+				 (network_game_client_advertised_game_kind(client, game) & ~0x80) != 0x46))
 			{
 				multiplayer.games[multiplayer.game_count++] = game;
 			}
@@ -5092,6 +5094,11 @@ static short lobby_browser_valid_games(struct p2p_listing *games, short count)
 		wchar_t name[P2P_LISTING_NAME_SIZE + 1];
 		short index;
 
+		if ((games[read].kind & ~0x80) == 0x46 ||
+			(games[read].gametype[0] && !_stricmp(games[read].gametype, "Forge")))
+		{
+			continue;
+		}
 		text_to_wide(games[read].name, name, NUMBEROF(name));
 		if (!player_name_clean(name, NUMBEROF(name)))
 			continue;

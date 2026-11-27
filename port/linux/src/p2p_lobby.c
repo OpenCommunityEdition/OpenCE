@@ -844,8 +844,11 @@ static int listing_wanted(const unsigned char *payload, int size, int retained, 
 		return 0;
 	if (listing.version != HALO_PORT_NETWORK_VERSION)
 	{
-		if (listing.version > HALO_PORT_NETWORK_VERSION && !(listing.flags & _listing_closed))
+		if (listing.version > HALO_PORT_NETWORK_VERSION && listing.version != 0x4635 &&
+			!(listing.flags & _listing_closed))
+		{
 			newer_heard(key_hash);
+		}
 		return 0;
 	}
 	return listing_current(&listing, retained);
