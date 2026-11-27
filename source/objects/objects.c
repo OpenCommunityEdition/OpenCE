@@ -1459,6 +1459,11 @@ void object_set_visibility(
 			object_connect_lights(object_index, TRUE, FALSE);
 		}
 	}
+	else if (!visible_flag && TEST_FLAG(object_header_get(object_index)->flags, _object_header_being_deleted_bit))
+	{
+		/* port: disconnect lights on model-less light objects when deleted */
+		object_connect_lights(object_index, TRUE, FALSE);
+	}
 
 	if (!visible_flag || object_definition->object.model.index!=NONE)
 	{
@@ -2002,6 +2007,7 @@ static void object_delete_initial_recursive(
 
 	object_set_visibility(object_index, FALSE);
 	object_name_list_delete(object_index);
+	light_delete_all_for_object(object_index);
 
 	return;
 }
@@ -3521,6 +3527,8 @@ static void attachments_new(
 			if (attachment_index!=NONE)
 			{
 				SET_FLAG(object->object.flags, _object_has_attached_lights_bit, TRUE);
+				/* port: recompute attached light transforms when light-bearing objects move */
+				SET_FLAG(object->object.flags, _object_dynamic_lighting_recompute_bit, TRUE);
 			}
 			break;
 		case _object_attachment_type_looping_sound:
@@ -3596,6 +3604,14 @@ void object_set_position(
 	object_compute_node_matrices(object_index);
 	object_reconnect_to_map(object_index, NULL);
 
+	/* port: reconnect attached lights when moving objects */
+	if (TEST_FLAG(object->object.flags, _object_has_attached_lights_bit) &&
+		(!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
+		 object_definition_get(object->definition_index)->object.model.index==NONE))
+	{
+		object_connect_lights(object_index, TRUE, TRUE);
+	}
+
 	return;
 }
 
@@ -3613,7 +3629,16 @@ void object_translate(
 
 	object_disconnect_from_map(object_index);
 	object->object.position = *new_position;
+	object_compute_node_matrices(object_index);
 	object_reconnect_to_map(object_index, new_location);
+
+	/* port: reconnect attached lights when translating objects */
+	if (TEST_FLAG(object->object.flags, _object_has_attached_lights_bit) &&
+		(!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
+		 object_definition_get(object->definition_index)->object.model.index==NONE))
+	{
+		object_connect_lights(object_index, TRUE, TRUE);
+	}
 
 	return;
 }
@@ -4063,6 +4088,7 @@ static boolean object_update(
 		object_compute_change_colors(object_index);
 
 		if (
+			!TEST_FLAG(header->flags, _object_header_being_deleted_bit) &&
 			TEST_FLAG(object->object.flags, _object_dynamic_lighting_recompute_bit) &&
 			(
 				!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
@@ -4760,7 +4786,12 @@ static void object_connect_lights(
 	boolean disconnect,
 	boolean reconnect)
 {
+	struct object_header_datum *header = object_header_get(object_index);
 	struct object_datum *object = object_get(object_index);
+
+	/* port: do not reconnect lights for an object already marked for deletion */
+	if (header && TEST_FLAG(header->flags, _object_header_being_deleted_bit))
+		reconnect = FALSE;
 
 	if (TEST_FLAG(object->object.flags, _object_has_attached_lights_bit))
 	{
@@ -5251,6 +5282,9 @@ static void attachments_delete(
 			}
 		}
 	}
+
+	/* port: also delete any unattached lights owned by this object */
+	light_delete_all_for_object(object_index);
 
 	return;
 }

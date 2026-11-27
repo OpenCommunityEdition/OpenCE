@@ -144,4 +144,8 @@ middle button, R and F are held, and the wheel's notches since the last call
 (port/linux/src/xinput_sdl.c) */
 int halo_linux_debug_camera_input(int *middle, int *up, int *down, float *wheel);
 
+/* Read-only Forge sidecar runtime playback (port/linux/game/forge_sidecar.c). */
+void forge_sidecar_tick(void);
+int forge_sidecar_should_skip_netgame_equipment_spawn(long definition_index, void const *position);
+
 #endif
