@@ -168,6 +168,9 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox_pixel_shader.h"
 #include "rasterizer_xbox_draw_primitives.h"
 #include "rasterizer_xbox_internal.h"
+#include "bitmaps/bitmap_group.h" /* port: shader_precompile.c */
+#include "cache/texture_cache.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -3350,4 +3353,18 @@ static void rasterizer_environment_specular_spot_light_begin(
 		rasterizer_set_pixel_shader(&pixel_shader);
 	}
 	return;
+}
+
+/* port: shader_precompile.c (structure_render_precompile_shaders): a light's gel loaded, as
+its draws sample it (one not yet loaded has no sampler) */
+void rasterizer_environment_precompile_light_gel(void const *light_definition)
+{
+	struct point_light_definition const *definition = light_definition;
+	struct bitmap_group *group;
+
+	if (definition->gel.map.index == NONE)
+		return;
+	group = bitmap_group_get(definition->gel.map.index);
+	if (group && group->bitmaps.count > 0)
+		_texture_cache_bitmap_get_hardware_format(TAG_BLOCK_GET_ELEMENT(&group->bitmaps, 0, struct bitmap_data), TRUE, TRUE);
 }

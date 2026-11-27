@@ -99,6 +99,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "cseries/cseries_windows.h"
 #include "cseries/errors.h"
 #define REAL_MATH_EXTERNAL_POINT_FROM_LINE3D
 #include "bitmaps/bitmap_color_conversion.h"
@@ -538,6 +539,469 @@ static boolean local_reported_too_many_transparent_geometry_groups = FALSE;
 static boolean local_pixel_shader_dirty_flag = TRUE;
 extern boolean rasterizer_model_cortana_hack;
 
+/* port: the opaque parts of the models drawn grouped by shader
+(display.batch_models).
+
+The game draws the objects one at a time, each object's parts in turn, so
+that one draw's shader, textures and states are seldom the next one's: with
+many objects (network co-op's extra enemies) most of a frame went to setting
+them up again for each part. Instead, the parts of each model that are drawn
+as they are, opaque, with model shaders (the most of them), are queued with a
+copy of their model's parameters, and drawn when the models are done
+(rasterizer_models_end), or anything else is to be drawn first, sorted by
+their shader: the parts with one shader one after another, their model's
+skinning and lighting set again only as the model changes. Opaque and in the
+depth buffer, they look as they did in any order; what they are drawn under
+waits for them (an alpha-blended decal, another model's part, a widget). */
+
+/* (the queue's arrays grow as a frame needs, twice as large each time, from
+these; none is allocated until a model is queued) */
+#define MODEL_BATCH_FIRST_MODELS 256
+#define MODEL_BATCH_FIRST_DRAWS 1024
+#define MODEL_BATCH_FIRST_SKINNING_CONSTANTS 4096
+#define MODEL_BATCH_FIRST_NODE_MATRICES 256
+
+struct model_batch_model
+{
+	struct rasterizer_model_begin_parameters parameters;
+	boolean planar_fog;
+	/* its skinning's constants (so many; none for one skinned a part at a
+	time, from its matrices) and its lighting's, worked out as it was
+	queued: set again as each of its parts is drawn */
+	short skinning_constant_count;
+	real (*skinning_constants)[4];
+	real lighting_constants[RASTERIZER_MODEL_LIGHTING_CONSTANTS][4];
+	/* where its skinning constants and (skinned a part at a time) its
+	matrices are in the queue's arrays, NONE for none: the pointers above
+	set from them as the queue is drawn, the arrays having grown since */
+	long skinning_constant_index;
+	long node_matrix_index;
+};
+
+struct model_batch_draw
+{
+	struct shader *shader;
+	short shader_permutation_index;
+	long model_index;
+	struct triangle_buffer const *triangle_buffer;
+	long triangle_count;
+	struct vertex_buffer const *vertex_buffer;
+};
+
+static struct model_batch_model *model_batch_models = NULL;
+static struct model_batch_draw *model_batch_draws = NULL;
+static real_matrix4x3 *model_batch_node_matrices = NULL;
+static real (*model_batch_skinning_constants)[4] = NULL;
+static long model_batch_model_capacity = 0;
+static long model_batch_draw_capacity = 0;
+static long model_batch_node_matrix_capacity = 0;
+static long model_batch_skinning_constant_capacity = 0;
+static long model_batch_model_count = 0;
+static long model_batch_draw_count = 0;
+static long model_batch_node_matrix_count = 0;
+static long model_batch_skinning_constant_count = 0;
+/* the queued model the parts drawn now are its, or NONE (drawn at once) */
+static long local_batch_model_index = NONE;
+static boolean local_batch_replaying = FALSE;
+
+/* room in one of the queue's arrays for needed elements (the capacity
+doubled from first until there is); FALSE where there is no memory, the
+array as it was */
+#define MODEL_BATCH_ROOM(array, capacity, needed, first) \
+	((needed) <= (capacity) || \
+		((model_batch_grown = model_batch_grow((array), &(capacity), (needed), (first), sizeof(*(array)))) != NULL && \
+			((array) = model_batch_grown, TRUE)))
+
+static void *model_batch_grown;
+
+/* the array grown (capacity set), or NULL (the array and capacity as they
+were) */
+static void *model_batch_grow(
+	void *array,
+	long *capacity,
+	long needed,
+	long first,
+	long element_size)
+{
+	long count = *capacity > 0 ? *capacity : first;
+	void *grown;
+
+	while (count < needed)
+	{
+		count *= 2;
+	}
+	grown = system_realloc(array, count * element_size);
+	if (grown)
+	{
+		*capacity = count;
+	}
+
+	return grown;
+}
+
+int config_boolean(char const *name);
+/* the port's renderer draws the parts of the objects alike at once
+(d3d8_gl.c, instances_flush) */
+void d3d8_gl_instances_begin(void);
+void d3d8_gl_instances_next(void);
+void d3d8_gl_instances_end(void);
+void *d3d8_gl_texture(unsigned long stage);
+
+/* the textures each shader's parts are drawn with, as its first part drawn
+in this replay found them: the parts that follow with that shader set them
+again without looking them up (by its maps' tags, in the texture cache) */
+#define MODEL_BATCH_TEXTURE_MEMO_SIZE 512
+#define MODEL_BATCH_TEXTURE_MEMO_PROBES 8
+
+struct model_batch_texture_memo
+{
+	struct shader *shader;
+	short shader_permutation_index;
+	boolean set;
+	void *textures[4];
+};
+
+static struct model_batch_texture_memo model_batch_texture_memos[MODEL_BATCH_TEXTURE_MEMO_SIZE];
+
+/* the shader's entry (set when its textures are), or NULL if there is no
+room */
+static struct model_batch_texture_memo *model_batch_texture_memo_find(
+	struct shader *shader,
+	short shader_permutation_index)
+{
+	unsigned long hash = (((unsigned long)shader >> 4) ^ ((unsigned long)shader_permutation_index * 40503UL)) *
+		2654435761UL;
+	short probe;
+
+	for (probe = 0; probe < MODEL_BATCH_TEXTURE_MEMO_PROBES; probe++)
+	{
+		struct model_batch_texture_memo *memo =
+			&model_batch_texture_memos[(hash >> 16) + probe & (MODEL_BATCH_TEXTURE_MEMO_SIZE - 1)];
+
+		if (!memo->shader)
+		{
+			memo->shader = shader;
+			memo->shader_permutation_index = shader_permutation_index;
+			memo->set = FALSE;
+			return memo;
+		}
+		if (memo->shader == shader && memo->shader_permutation_index == shader_permutation_index)
+		{
+			return memo;
+		}
+	}
+
+	return NULL;
+}
+
+static boolean model_batch_enabled(
+	void)
+{
+	static int enabled = -1;
+
+	if (enabled < 0)
+	{
+		enabled = config_boolean("display.batch_models") != 0;
+	}
+
+	/* (queued where the GPU cannot draw them grouped too: drawn sorted, a
+	part at a time, they change shaders and textures less often) */
+	return enabled != 0;
+}
+
+static void _rasterizer_model_draw_parts(
+	struct shader *shader,
+	short shader_permutation_index,
+	struct triangle_buffer const *triangle_buffer,
+	long dynamic_triangle_buffer_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer,
+	long dynamic_vertex_buffer_index);
+
+/* the order the queued parts are drawn in: the parts alike (one shader, one
+part of one model's) one after another, in the order the first of each was
+queued, each in the order they were: the instanced draw each makes is drawn
+with the most of them (d3d8_gl.c, instances_add: a part's draws join only the
+groups after its model's last part's), and the registers that differ among
+them are fewer */
+struct model_batch_kind
+{
+	struct shader *shader;
+	struct triangle_buffer const *triangle_buffer;
+	struct vertex_buffer const *vertex_buffer;
+	long stamp;
+	long index;
+	short shader_permutation_index;
+};
+
+/* (the kinds a hash table twice as large as the draws' arrays, a power of
+two as they are; the draws' arrays grown together) */
+static struct model_batch_kind *model_batch_kinds = NULL;
+static long model_batch_kind_capacity = 0;
+static long model_batch_kind_stamp = 0;
+static long *model_batch_draw_kinds = NULL;
+static long *model_batch_kind_starts = NULL;
+static long *model_batch_order = NULL;
+
+/* room for one more queued draw; FALSE where there is no memory */
+static boolean model_batch_draw_room(
+	void)
+{
+	long needed = model_batch_draw_count + 1;
+	long capacity;
+	long kinds;
+
+	if (needed <= model_batch_draw_capacity)
+	{
+		return TRUE;
+	}
+	/* (each array its own capacity as it grows, the draws' set last: one
+	that has grown already keeps its room) */
+	capacity = model_batch_draw_capacity;
+	if (!MODEL_BATCH_ROOM(model_batch_draw_kinds, capacity, needed, MODEL_BATCH_FIRST_DRAWS))
+	{
+		return FALSE;
+	}
+	capacity = model_batch_draw_capacity;
+	if (!MODEL_BATCH_ROOM(model_batch_kind_starts, capacity, needed, MODEL_BATCH_FIRST_DRAWS))
+	{
+		return FALSE;
+	}
+	capacity = model_batch_draw_capacity;
+	if (!MODEL_BATCH_ROOM(model_batch_order, capacity, needed, MODEL_BATCH_FIRST_DRAWS))
+	{
+		return FALSE;
+	}
+	kinds = model_batch_kind_capacity;
+	if (!MODEL_BATCH_ROOM(model_batch_kinds, kinds, 2 * capacity, 2 * MODEL_BATCH_FIRST_DRAWS))
+	{
+		return FALSE;
+	}
+	if (kinds != model_batch_kind_capacity)
+	{
+		/* (a stamp of 0 is no flush's) */
+		csmemset(model_batch_kinds, 0, kinds * sizeof(*model_batch_kinds));
+		model_batch_kind_capacity = kinds;
+	}
+	if (!MODEL_BATCH_ROOM(model_batch_draws, model_batch_draw_capacity, needed, MODEL_BATCH_FIRST_DRAWS))
+	{
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+static void model_batch_sort(
+	void)
+{
+	long kind_count = 0;
+	long draw_index;
+	long start = 0;
+
+	model_batch_kind_stamp++;
+	for (draw_index = 0; draw_index < model_batch_draw_count; draw_index++)
+	{
+		struct model_batch_draw const *draw = &model_batch_draws[draw_index];
+		unsigned long slot = ((unsigned long)draw->shader >> 4) * 2654435761UL ^
+			((unsigned long)draw->vertex_buffer >> 4) * 2246822519UL ^
+			((unsigned long)draw->triangle_buffer >> 4) * 3266489917UL ^
+			(unsigned long)draw->shader_permutation_index * 668265263UL;
+		struct model_batch_kind *kind;
+
+		for (slot ^= slot >> 15; ; slot++)
+		{
+			kind = &model_batch_kinds[slot & (unsigned long)(model_batch_kind_capacity - 1)];
+			if (kind->stamp != model_batch_kind_stamp)
+			{
+				kind->shader = draw->shader;
+				kind->triangle_buffer = draw->triangle_buffer;
+				kind->vertex_buffer = draw->vertex_buffer;
+				kind->stamp = model_batch_kind_stamp;
+				kind->shader_permutation_index = draw->shader_permutation_index;
+				kind->index = kind_count;
+				model_batch_kind_starts[kind_count++] = 0;
+				break;
+			}
+			if (kind->shader == draw->shader && kind->vertex_buffer == draw->vertex_buffer &&
+				kind->triangle_buffer == draw->triangle_buffer &&
+				kind->shader_permutation_index == draw->shader_permutation_index)
+			{
+				break;
+			}
+		}
+		model_batch_draw_kinds[draw_index] = kind->index;
+		model_batch_kind_starts[kind->index]++;
+	}
+	for (draw_index = 0; draw_index < kind_count; draw_index++)
+	{
+		long count = model_batch_kind_starts[draw_index];
+
+		model_batch_kind_starts[draw_index] = start;
+		start += count;
+	}
+	for (draw_index = 0; draw_index < model_batch_draw_count; draw_index++)
+		model_batch_order[model_batch_kind_starts[model_batch_draw_kinds[draw_index]]++] = draw_index;
+
+	return;
+}
+
+/* draws the queued parts (and forgets them); a model being drawn queues no
+more: what it draws next is drawn at once, with its skinning and lighting
+set again */
+void rasterizer_model_batch_flush(
+	void)
+{
+	if (local_batch_replaying)
+	{
+		return;
+	}
+	if (model_batch_draw_count > 0)
+	{
+		struct rasterizer_model_begin_parameters const *parameters = local_parameters;
+		short model_effect_type = local_model_effect_type;
+		boolean planar_fog = local_planar_fog_flag;
+		boolean environment_fog_screen = local_environment_fog_screen_flag;
+		long last_model_index = NONE;
+		long draw_index;
+
+		/* (each model's constants and matrices where its arrays are now) */
+		for (draw_index = 0; draw_index < model_batch_model_count; draw_index++)
+		{
+			struct model_batch_model *model = &model_batch_models[draw_index];
+
+			if (model->skinning_constant_index != NONE)
+			{
+				model->skinning_constants = &model_batch_skinning_constants[model->skinning_constant_index];
+			}
+			else
+			{
+				model->skinning_constants = NULL;
+			}
+			if (model->node_matrix_index != NONE)
+			{
+				model->parameters.skinning.node_matrices = &model_batch_node_matrices[model->node_matrix_index];
+			}
+		}
+		local_batch_replaying = TRUE;
+		d3d8_gl_instances_begin();
+		csmemset(model_batch_texture_memos, 0, sizeof(model_batch_texture_memos));
+		model_batch_sort();
+		for (draw_index = 0; draw_index < model_batch_draw_count; draw_index++)
+		{
+			struct model_batch_draw const *draw = &model_batch_draws[model_batch_order[draw_index]];
+
+			if (draw->model_index != last_model_index)
+			{
+				struct model_batch_model const *model = &model_batch_models[draw->model_index];
+
+				local_parameters = &model->parameters;
+				local_model_effect_type = _render_model_effect_type_none;
+				local_planar_fog_flag = model->planar_fog;
+				local_environment_fog_screen_flag = FALSE;
+				if (model->skinning_constant_count <= 0)
+				{
+					rasterizer_set_model_skinning(&model->parameters.skinning);
+				}
+				/* (its constants kept once for all its parts' draws) */
+				rasterizer_set_model_constants_batched(
+					draw->model_index,
+					(real const (*)[4])model->lighting_constants,
+					(real const (*)[4])model->skinning_constants,
+					model->skinning_constant_count);
+				last_model_index = draw->model_index;
+			}
+			d3d8_gl_instances_next();
+			_rasterizer_model_draw_parts(
+				draw->shader,
+				draw->shader_permutation_index,
+				draw->triangle_buffer,
+				NONE,
+				draw->triangle_count,
+				draw->vertex_buffer,
+				NONE);
+		}
+		d3d8_gl_instances_end();
+		local_batch_replaying = FALSE;
+		local_parameters = parameters;
+		local_model_effect_type = model_effect_type;
+		local_planar_fog_flag = planar_fog;
+		local_environment_fog_screen_flag = environment_fog_screen;
+	}
+	model_batch_draw_count = 0;
+	model_batch_model_count = 0;
+	model_batch_node_matrix_count = 0;
+	model_batch_skinning_constant_count = 0;
+	if (local_batch_model_index != NONE)
+	{
+		local_batch_model_index = NONE;
+		rasterizer_set_model_skinning(&local_parameters->skinning);
+		rasterizer_set_model_lighting(&local_parameters->lighting);
+	}
+
+	return;
+}
+
+/* whether a model's opaque parts can wait, drawn grouped with the other
+models' (and room made for it) */
+static boolean model_batch_begin(
+	struct rasterizer_model_begin_parameters const *parameters)
+{
+	short node_count = parameters->skinning.node_matrix_count;
+	struct model_batch_model *model;
+
+	if (!model_batch_enabled() ||
+		local_batch_replaying ||
+		local_sky_flag ||
+		global_window_parameters.rasterizer_target != 0 ||
+		parameters->effect.type != _render_model_effect_type_none ||
+		(parameters->geometry_flags &
+			(FLAG(_rasterizer_geometry_first_person_bit) | FLAG(_rasterizer_geometry_no_zbuffer_bit))) ||
+		node_count < 0 ||
+		(node_count > 0 && !parameters->skinning.node_matrices))
+	{
+		return FALSE;
+	}
+	/* (room for it, as many skinning constants as it may have, and its
+	matrices; none where there is no memory: drawn at once) */
+	if (!MODEL_BATCH_ROOM(model_batch_models, model_batch_model_capacity, model_batch_model_count + 1,
+			MODEL_BATCH_FIRST_MODELS) ||
+		!MODEL_BATCH_ROOM(model_batch_skinning_constants, model_batch_skinning_constant_capacity,
+			model_batch_skinning_constant_count + node_count * 3, MODEL_BATCH_FIRST_SKINNING_CONSTANTS) ||
+		!MODEL_BATCH_ROOM(model_batch_node_matrices, model_batch_node_matrix_capacity,
+			model_batch_node_matrix_count + node_count, MODEL_BATCH_FIRST_NODE_MATRICES))
+	{
+		return FALSE;
+	}
+
+	model = &model_batch_models[model_batch_model_count];
+	model->parameters = *parameters;
+	model->skinning_constants = &model_batch_skinning_constants[model_batch_skinning_constant_count];
+	model->skinning_constant_count = rasterizer_model_skinning_constants(&parameters->skinning, model->skinning_constants);
+	model->skinning_constant_index = NONE;
+	if (model->skinning_constant_count > 0)
+	{
+		model->skinning_constant_index = model_batch_skinning_constant_count;
+		model_batch_skinning_constant_count += model->skinning_constant_count;
+	}
+	rasterizer_model_lighting_constants(&parameters->lighting, model->lighting_constants);
+	/* (the matrices of one skinned a part at a time) */
+	model->node_matrix_index = NONE;
+	if (node_count > 0 && model->skinning_constant_count <= 0)
+	{
+		csmemcpy(
+			&model_batch_node_matrices[model_batch_node_matrix_count],
+			parameters->skinning.node_matrices,
+			node_count * sizeof(real_matrix4x3));
+		model->parameters.skinning.node_matrices = &model_batch_node_matrices[model_batch_node_matrix_count];
+		model->node_matrix_index = model_batch_node_matrix_count;
+		model_batch_node_matrix_count += node_count;
+	}
+	model->planar_fog = FALSE;
+	local_batch_model_index = model_batch_model_count++;
+
+	return TRUE;
+}
+
 /* ---------- public code */
 
 void rasterizer_model_ambient_reflection_tint(
@@ -562,6 +1026,8 @@ void rasterizer_model_ambient_reflection_tint(
 void _rasterizer_models_begin(
 	boolean sky)
 {
+	/* port: (display.batch_models) */
+	rasterizer_model_batch_flush();
 	if (rasterizer_debug_options.draw_models)
 	{
 		local_pixel_shader_dirty_flag = TRUE;
@@ -582,6 +1048,8 @@ void _rasterizer_models_begin(
 void _rasterizer_models_end(
 	void)
 {
+	/* port: (display.batch_models) */
+	rasterizer_model_batch_flush();
 	if (rasterizer_debug_options.draw_models)
 	{
 		if (local_sky_flag)
@@ -620,6 +1088,8 @@ void _rasterizer_model_end(
 			rasterizer_set_frustum_z(0.0f, 0.0f);
 		}
 		local_parameters = NULL;
+		/* port: (its queued parts wait: display.batch_models) */
+		local_batch_model_index = NONE;
 	}
 
 	return;
@@ -639,6 +1109,13 @@ void _rasterizer_model_begin(
 			"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
 			587,
 			parameters);
+		/* port: one that is drawn at once is drawn after the parts queued
+		before it (display.batch_models) */
+		local_batch_model_index = NONE;
+		if (!model_batch_begin(parameters))
+		{
+			rasterizer_model_batch_flush();
+		}
 		if (TEST_FLAG(
 				parameters->geometry_flags,
 				_rasterizer_geometry_first_person_bit) &&
@@ -670,6 +1147,11 @@ void _rasterizer_model_begin(
 		{
 			local_model_effect_type =
 				_render_model_effect_type_modifier;
+		}
+		else if (local_batch_model_index != NONE)
+		{
+			/* port: set as its parts are drawn (display.batch_models) */
+			local_model_effect_type = _render_model_effect_type_none;
 		}
 		else
 		{
@@ -712,6 +1194,20 @@ void _rasterizer_model_begin(
 		else
 		{
 			local_environment_fog_screen_flag = FALSE;
+		}
+
+		/* port: (display.batch_models) one in the screen's fog submits its
+		parts to it as they are drawn: drawn at once */
+		if (local_batch_model_index != NONE)
+		{
+			if (local_environment_fog_screen_flag)
+			{
+				rasterizer_model_batch_flush();
+			}
+			else
+			{
+				model_batch_models[local_batch_model_index].planar_fog = local_planar_fog_flag;
+			}
 		}
 
 		if (rasterizer_debug_options.statistics_mode ==
@@ -1605,6 +2101,29 @@ void _rasterizer_model_draw(
 	struct vertex_buffer const *vertex_buffer,
 	long dynamic_vertex_buffer_index)
 {
+	_rasterizer_model_draw_parts(
+		shader,
+		shader_permutation_index,
+		triangle_buffer,
+		dynamic_triangle_buffer_index,
+		triangle_count,
+		vertex_buffer,
+		dynamic_vertex_buffer_index);
+
+	return;
+}
+
+/* port: _rasterizer_model_draw's own, which display.batch_models draws the
+queued parts with too */
+static void _rasterizer_model_draw_parts(
+	struct shader *shader,
+	short shader_permutation_index,
+	struct triangle_buffer const *triangle_buffer,
+	long dynamic_triangle_buffer_index,
+	long triangle_count,
+	struct vertex_buffer const *vertex_buffer,
+	long dynamic_vertex_buffer_index)
+{
 	struct shader_transparent_plasma_definition const *plasma;
 	short intensity_exponent_source;
 	struct transparent_geometry_group *group;
@@ -1628,6 +2147,8 @@ void _rasterizer_model_draw(
 	unsigned long seed;
 	real self_illumination_phase;
 	real self_illumination_animation_fraction;
+	/* port: (display.batch_models) */
+	struct model_batch_texture_memo *texture_memo;
 
 	match_assert(
 		"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
@@ -1645,7 +2166,8 @@ void _rasterizer_model_draw(
 			676,
 			shader);
 
-		if (local_parameters->effect.modifier_shader)
+		/* port: (submitted as the part was queued: display.batch_models) */
+		if (local_parameters->effect.modifier_shader && !local_batch_replaying)
 		{
 			intensity_exponent_source = NONE;
 
@@ -1713,6 +2235,32 @@ void _rasterizer_model_draw(
 		}
 		else if (local_model_effect_type == _render_model_effect_type_none)
 		{
+			/* port: the opaque parts with model shaders queued; any other
+			drawn at once, after them (display.batch_models) */
+			if (local_batch_model_index != NONE && !local_batch_replaying)
+			{
+				if (shader->base.type == _shader_type_model &&
+					!TEST_FLAG(
+						((struct shader_model_definition *)shader_get_and_verify_type(shader, _shader_type_model))->
+							model.flags,
+						_shader_model_alpha_blended_decal_bit) &&
+					triangle_buffer && vertex_buffer &&
+					dynamic_triangle_buffer_index == NONE && dynamic_vertex_buffer_index == NONE &&
+					model_batch_draw_room())
+				{
+					struct model_batch_draw *draw = &model_batch_draws[model_batch_draw_count];
+
+					draw->shader = shader;
+					draw->shader_permutation_index = shader_permutation_index;
+					draw->model_index = local_batch_model_index;
+					draw->triangle_buffer = triangle_buffer;
+					draw->triangle_count = triangle_count;
+					draw->vertex_buffer = vertex_buffer;
+					model_batch_draw_count++;
+					return;
+				}
+				rasterizer_model_batch_flush();
+			}
 			if (shader->base.type == _shader_type_environment)
 			{
 				rasterizer_model_draw_environment_shader(
@@ -1731,6 +2279,9 @@ void _rasterizer_model_draw(
 				alpha_blended_decal = (boolean)TEST_FLAG(
 					shader_model->model.flags,
 					_shader_model_alpha_blended_decal_bit);
+				texture_memo = local_batch_replaying ?
+					model_batch_texture_memo_find(shader, shader_permutation_index) :
+					NULL;
 
 				match_assert(
 					"c:\\halo\\SOURCE\\rasterizer\\xbox\\rasterizer_xbox_models.c",
@@ -1833,12 +2384,23 @@ void _rasterizer_model_draw(
 					D3DRS_ALPHAREF,
 					0x7F);
 
-				rasterizer_set_texture(
-					0,
-					0,
-					1,
-					shader_model->model.base_map.index,
-					shader_permutation_index);
+				/* port: (display.batch_models) */
+				if (texture_memo && texture_memo->set)
+				{
+					IDirect3DDevice8_SetTexture(
+						global_d3d_device,
+						0,
+						(D3DBaseTexture *)texture_memo->textures[0]);
+				}
+				else
+				{
+					rasterizer_set_texture(
+						0,
+						0,
+						1,
+						shader_model->model.base_map.index,
+						shader_permutation_index);
+				}
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device, 0, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 				IDirect3DDevice8_SetTextureStageState(
@@ -1850,12 +2412,23 @@ void _rasterizer_model_draw(
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device, 0, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
 
-				rasterizer_set_texture(
-					1,
-					0,
-					2,
-					shader_model->model.detail_map.index,
-					shader_permutation_index);
+				/* port: (display.batch_models) */
+				if (texture_memo && texture_memo->set)
+				{
+					IDirect3DDevice8_SetTexture(
+						global_d3d_device,
+						1,
+						(D3DBaseTexture *)texture_memo->textures[1]);
+				}
+				else
+				{
+					rasterizer_set_texture(
+						1,
+						0,
+						2,
+						shader_model->model.detail_map.index,
+						shader_permutation_index);
+				}
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device, 1, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 				IDirect3DDevice8_SetTextureStageState(
@@ -1867,12 +2440,23 @@ void _rasterizer_model_draw(
 				IDirect3DDevice8_SetTextureStageState(
 					global_d3d_device, 1, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
 
-				rasterizer_set_texture(
-					2,
-					0,
-					1,
-					shader_model->model.multipurpose_map.index,
-					shader_permutation_index);
+				/* port: (display.batch_models) */
+				if (texture_memo && texture_memo->set)
+				{
+					IDirect3DDevice8_SetTexture(
+						global_d3d_device,
+						2,
+						(D3DBaseTexture *)texture_memo->textures[2]);
+				}
+				else
+				{
+					rasterizer_set_texture(
+						2,
+						0,
+						1,
+						shader_model->model.multipurpose_map.index,
+						shader_permutation_index);
+				}
 				SetTextureStageStateSmart(
 					2, D3DTSS_ADDRESSU, D3DTADDRESS_WRAP);
 				SetTextureStageStateSmart(
@@ -1884,12 +2468,23 @@ void _rasterizer_model_draw(
 				SetTextureStageStateSmart(
 					2, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
 
-				rasterizer_set_texture(
-					3,
-					2,
-					0,
-					shader_model->model.reflection_cube_map.index,
-					shader_permutation_index);
+				/* port: (display.batch_models) */
+				if (texture_memo && texture_memo->set)
+				{
+					IDirect3DDevice8_SetTexture(
+						global_d3d_device,
+						3,
+						(D3DBaseTexture *)texture_memo->textures[3]);
+				}
+				else
+				{
+					rasterizer_set_texture(
+						3,
+						2,
+						0,
+						shader_model->model.reflection_cube_map.index,
+						shader_permutation_index);
+				}
 				SetTextureStageStateSmart(
 					3, D3DTSS_ADDRESSU, D3DTADDRESS_CLAMP);
 				SetTextureStageStateSmart(
@@ -1903,6 +2498,16 @@ void _rasterizer_model_draw(
 				SetTextureStageStateSmart(
 					3, D3DTSS_MIPFILTER, D3DTEXF_LINEAR);
 
+				if (texture_memo && !texture_memo->set)
+				{
+					short stage;
+
+					for (stage = 0; stage < 4; stage++)
+					{
+						texture_memo->textures[stage] = d3d8_gl_texture(stage);
+					}
+					texture_memo->set = TRUE;
+				}
 				seed = local_parameters->unique_identifier;
 				if (TEST_FLAG(
 						shader_model->model.self_illumination_flags,

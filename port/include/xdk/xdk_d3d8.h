@@ -59,6 +59,11 @@ structures themselves */
 #define IDirect3DIndexBuffer8 D3DIndexBuffer
 #define IDirect3DPalette8 D3DPalette
 
+/* port: the Data of a texture's header handed out without its pixels while
+a map's GPU programs are made (source/cache/xbox_texture_cache.c): the GL
+layer takes only the kind of texture from it (port/linux/src/d3d8_gl.c) */
+#define D3D_PORT_TEXTURE_DATA_NO_PIXELS 0xFFFFF000UL
+
 /* Direct3DCreate8's argument: the January build passes 0
 (rasterizer_initialize and rasterizer_preinitialize in cachebeta.exe) */
 #define D3D_SDK_VERSION 0
@@ -303,6 +308,14 @@ extern DWORD D3D__RenderState[D3DRS_MAX];
 extern DWORD D3D__TextureState[D3DTSS_MAXSTAGES][D3DTSS_MAX];
 extern WORD *D3D__IndexData;
 
+/* port: counts the changes to the state a draw is drawn with (the tables
+above, the textures, palettes, viewport, vertex data and the like), but the
+pixel shader's constants: where it has not moved, none of that state has
+(d3d8_gl.c's batching groups draws without comparing it all again) */
+extern unsigned long d3d8_gl_state_changes;
+#define D3D_PIXEL_CONSTANT_STATE(state) (((state) >= D3DRS_PSCONSTANT0_0 && (state) <= D3DRS_PSCONSTANT1_7) || \
+	(state) == D3DRS_PSFINALCOMBINERCONSTANT0 || (state) == D3DRS_PSFINALCOMBINERCONSTANT1)
+
 /* the push buffer method of each simple render state, which
 D3DDevice_SetRenderState passes to D3DDevice_SetRenderState_Simple: the
 January build's table (public symbol D3DSIMPLERENDERSTATEENCODE, 82 entries,
@@ -367,7 +380,12 @@ __forceinline void __stdcall D3DDevice_SetRenderState(D3DRENDERSTATETYPE state, 
 	if (state < D3DRS_SIMPLE_MAX)
 	{
 		D3DDevice_SetRenderState_Simple(D3DSIMPLERENDERSTATEENCODE[state], value);
-		D3D__RenderState[state] = value;
+		if (D3D__RenderState[state] != value)
+		{
+			D3D__RenderState[state] = value;
+			if (!D3D_PIXEL_CONSTANT_STATE(state))
+				d3d8_gl_state_changes++;
+		}
 	}
 	else if (state < D3DRS_DEFERRED_MAX)
 	{

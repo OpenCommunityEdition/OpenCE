@@ -544,6 +544,278 @@ static void texture_stage(struct xgpu_text *text, const struct nv2a_pixel_shader
 		xgpu_text_append(text, "\tif (t%d.a == 0.0) discard;\n", stage);
 }
 
+/* ---------- the canonical key */
+
+/* A pixel shader's render states hold more than its GLSL depends on: a
+combiner write nothing reads afterward (a stage the game's partial updates
+leave as an earlier draw set it), the comparisons of a stage that is no clip
+plane, the dot mapping of a stage that takes no dot product. Those are
+cleared here, so that pixel shaders that compute the same thing have the
+same key, and the programs the game can use are as few as the shaders it
+writes. */
+
+/* the register halves a live set holds: bit (register * 2) its rgb, bit
+(register * 2 + 1) its alpha */
+#define LIVE_RGB(r) (1UL << ((r) * 2))
+#define LIVE_ALPHA(r) (1UL << ((r) * 2 + 1))
+
+static BOOL tracked_register(unsigned long reg)
+{
+	return reg == _register_v0 || reg == _register_v1 || (reg >= _register_t0 && reg <= _register_r1);
+}
+
+/* what a combiner input byte reads (the alpha portion reads blue as rgb) */
+static unsigned long input_reads(unsigned long input)
+{
+	unsigned long reg = input & 0x0f;
+
+	if (!tracked_register(reg))
+		return 0;
+	return (input & 0x10) ? LIVE_ALPHA(reg) : LIVE_RGB(reg);
+}
+
+/* the same for a final combiner input, whose v1r0_sum and ef_product read
+registers of their own */
+static unsigned long final_input_reads(unsigned long input, DWORD final_efg)
+{
+	switch (input & 0x0f)
+	{
+	case _register_v1r0_sum:
+		return LIVE_RGB(_register_v1) | LIVE_RGB(_register_r0);
+	case _register_ef_product:
+		return input_reads((final_efg >> 24) & 0xff) | input_reads((final_efg >> 16) & 0xff);
+	default:
+		return input_reads(input);
+	}
+}
+
+static BOOL samples_texture(unsigned long mode)
+{
+	return mode != _mode_none && mode != _mode_passthru && mode != _mode_clipplane &&
+		mode != _mode_dot_product && mode != _mode_dot_zw;
+}
+
+static BOOL takes_dot_product(unsigned long mode)
+{
+	return mode == _mode_dot_product || mode == _mode_dot_st || mode == _mode_dot_zw ||
+		mode == _mode_dot_reflect_diffuse || mode == _mode_dot_reflect_specular ||
+		mode == _mode_dot_reflect_specular_constant || mode == _mode_dot_str_3d || mode == _mode_dot_str_cube;
+}
+
+void nv2a_pixel_shader_key_canonicalize(struct nv2a_pixel_shader_key *key)
+{
+	DWORD *state = key->combiner_state;
+	DWORD final_abcd = state[D3DRS_PSFINALCOMBINERINPUTSABCD];
+	DWORD final_efg = state[D3DRS_PSFINALCOMBINERINPUTSEFG];
+	DWORD count_word = state[D3DRS_PSCOMBINERCOUNT];
+	unsigned long combiner_count = count_word & 0xff;
+	unsigned long live = 0, compare = 0, dot_mapping = 0, input_texture = 0;
+	unsigned long modes[4];
+	BOOL reads_c0 = FALSE, reads_c1 = FALSE, mux = FALSE;
+	int stage;
+
+	/* ---- the texture stages: what each one's mode leaves unused */
+	for (stage = 0; stage < 4; stage++)
+	{
+		modes[stage] = stage_mode(key, stage);
+		/* (as texture_stage: a stage that would sample nothing is none) */
+		if (key->sampler_type[stage] == _xgpu_sampler_none && samples_texture(modes[stage]))
+			modes[stage] = _mode_none;
+	}
+	for (stage = 0; stage < 4; stage++)
+	{
+		unsigned long mode = modes[stage];
+		/* (stage 2 reflecting for the diffuse takes stage 3's dot product too) */
+		BOOL dot = takes_dot_product(mode) || (stage == 3 && modes[2] == _mode_dot_reflect_diffuse);
+
+		key->texture_modes = (key->texture_modes & ~(0x1fUL << (5 * stage))) | (mode << (5 * stage));
+		if (!samples_texture(mode))
+			key->sampler_type[stage] = _xgpu_sampler_none;
+		if (mode == _mode_none)
+		{
+			key->color_sign[stage] = 0;
+			key->alpha_kill[stage] = 0;
+		}
+		if (mode == _mode_clipplane)
+			compare |= state[D3DRS_PSCOMPAREMODE] & (0xfUL << (4 * stage));
+		if (stage >= 1 && dot)
+		{
+			unsigned long mapping = (state[D3DRS_PSDOTMAPPING] >> ((stage - 1) * 4)) & 7;
+
+			if (mapping != 0 && mapping != 1 && mapping != 3)
+				mapping = 2;
+			dot_mapping |= mapping << ((stage - 1) * 4);
+		}
+		if ((stage == 2 || stage == 3) && (dot || mode == _mode_dependent_ar || mode == _mode_dependent_gb))
+			input_texture |= state[D3DRS_PSINPUTTEXTURE] & (stage == 2 ? 0x10000UL : 0x300000UL);
+	}
+	state[D3DRS_PSCOMPAREMODE] = compare;
+	state[D3DRS_PSDOTMAPPING] = dot_mapping;
+	state[D3DRS_PSINPUTTEXTURE] = input_texture;
+
+	/* ---- the final combiner: what it reads */
+	if (combiner_count > 8)
+		combiner_count = 8;
+	if (final_abcd == 0 && final_efg == 0)
+	{
+		live = LIVE_RGB(_register_r0) | LIVE_ALPHA(_register_r0);
+	}
+	else
+	{
+		unsigned long used[5];
+		BOOL sum_used = FALSE, product_used = FALSE;
+		int i;
+
+		used[0] = (final_abcd >> 24) & 0xff;
+		used[1] = (final_abcd >> 16) & 0xff;
+		used[2] = (final_abcd >> 8) & 0xff;
+		used[3] = final_abcd & 0xff;
+		used[4] = (final_efg >> 8) & 0xff;
+		for (i = 0; i < 5; i++)
+		{
+			live |= final_input_reads(used[i], final_efg);
+			sum_used = sum_used || (used[i] & 0x0f) == _register_v1r0_sum;
+			product_used = product_used || (used[i] & 0x0f) == _register_ef_product;
+		}
+		/* (never to all zeroes, which is the shader without a final
+		combiner) */
+		if (final_abcd != 0 || (final_efg & 0xff00))
+		{
+			if (!product_used)
+				final_efg &= 0x0000ffffUL;
+			if (!sum_used)
+				final_efg &= ~0xe0UL;
+			state[D3DRS_PSFINALCOMBINERINPUTSEFG] = final_efg;
+		}
+	}
+
+	/* ---- the general combiners, last to first */
+	for (stage = 7; stage >= (int)combiner_count; stage--)
+	{
+		state[D3DRS_PSRGBINPUTS0 + stage] = state[D3DRS_PSRGBOUTPUTS0 + stage] = 0;
+		state[D3DRS_PSALPHAINPUTS0 + stage] = state[D3DRS_PSALPHAOUTPUTS0 + stage] = 0;
+	}
+	for (stage = (int)combiner_count - 1; stage >= 0; stage--)
+	{
+		DWORD *inputs[2], *outputs[2];
+		/* the halves a later write of this stage overwrites, those a kept
+		write writes, and those the kept writes' inputs read */
+		unsigned long written = 0, killed = 0, reads = 0;
+		int portion, write;
+
+		inputs[0] = &state[D3DRS_PSRGBINPUTS0 + stage];
+		outputs[0] = &state[D3DRS_PSRGBOUTPUTS0 + stage];
+		inputs[1] = &state[D3DRS_PSALPHAINPUTS0 + stage];
+		outputs[1] = &state[D3DRS_PSALPHAOUTPUTS0 + stage];
+		/* the writes in the order combiner_stage makes them, last first:
+		alpha sum, cd, ab; then rgb sum, cd (its alpha after it), ab (the
+		same). Both portions read their inputs before any is written. */
+		for (portion = 1; portion >= 0; portion--)
+		{
+			DWORD out = *outputs[portion];
+			unsigned long flags = out >> 12;
+			BOOL kept[3] = { FALSE, FALSE, FALSE };
+			BOOL keep_alpha[2] = { FALSE, FALSE };
+			BOOL mcc = !portion && key->mcc_bump_attenuation && *inputs[0] == 0x484B0A01 && (flags & 0x02);
+
+			for (write = 2; write >= 0; write--)
+			{
+				/* 0 ab, 1 cd, 2 sum */
+				unsigned long shift = write == 0 ? 4 : write == 1 ? 0 : 8;
+				unsigned long reg = (out >> shift) & 0x0f;
+				unsigned long components, extra = 0;
+
+				if (!destination_name(reg))
+					continue;
+				components = portion ? LIVE_ALPHA(reg) : LIVE_RGB(reg);
+				if (!portion && write == 0 && (flags & 0x80))
+					extra = LIVE_ALPHA(reg);
+				if (!portion && write == 1 && (flags & 0x40))
+					extra = LIVE_ALPHA(reg);
+				if (extra)
+				{
+					if (extra & live & ~written)
+					{
+						keep_alpha[write] = TRUE;
+						killed |= extra;
+					}
+					written |= extra;
+				}
+				if ((components & live & ~written) || (write < 2 && keep_alpha[write]))
+				{
+					kept[write] = TRUE;
+					killed |= components & ~written;
+				}
+				written |= components;
+			}
+			if (!kept[0] && !kept[1] && !kept[2])
+			{
+				*inputs[portion] = 0;
+				*outputs[portion] = 0;
+				continue;
+			}
+			if (!kept[0])
+				out &= ~0xf0UL;
+			if (!kept[1])
+				out &= ~0x0fUL;
+			if (!kept[2])
+				out &= ~(0xf00UL | (0x04UL << 12));
+			if (!keep_alpha[0])
+				out &= ~(0x80UL << 12);
+			if (!keep_alpha[1])
+				out &= ~(0x40UL << 12);
+			if (!mcc)
+			{
+				if (!kept[0] && !kept[2])
+				{
+					*inputs[portion] &= 0x0000ffffUL;
+					out &= ~(0x02UL << 12);
+				}
+				if (!kept[1] && !kept[2])
+				{
+					*inputs[portion] &= 0xffff0000UL;
+					out &= ~(0x01UL << 12);
+				}
+			}
+			*outputs[portion] = out;
+			{
+				DWORD in = *inputs[portion];
+				int byte;
+
+				for (byte = 0; byte < 4; byte++)
+				{
+					unsigned long input = (in >> (8 * byte)) & 0xff;
+
+					reads |= input_reads(input);
+					reads_c0 = reads_c0 || (input & 0x0f) == _register_c0;
+					reads_c1 = reads_c1 || (input & 0x0f) == _register_c1;
+				}
+			}
+			if (kept[2] && ((out >> 12) & 0x04))
+			{
+				reads |= LIVE_ALPHA(_register_r0);
+				mux = TRUE;
+			}
+		}
+		live = (live & ~killed) | reads;
+	}
+	/* trailing stages left empty: fewer stages */
+	while (combiner_count > 0 && !state[D3DRS_PSRGBINPUTS0 + combiner_count - 1] &&
+		!state[D3DRS_PSRGBOUTPUTS0 + combiner_count - 1] && !state[D3DRS_PSALPHAINPUTS0 + combiner_count - 1] &&
+		!state[D3DRS_PSALPHAOUTPUTS0 + combiner_count - 1])
+	{
+		combiner_count--;
+	}
+	count_word = (count_word & ~0xffUL) | combiner_count;
+	if (!reads_c0)
+		count_word &= ~0x1000UL;
+	if (!reads_c1)
+		count_word &= ~0x10000UL;
+	if (!mux)
+		count_word &= ~0x100UL;
+	state[D3DRS_PSCOMBINERCOUNT] = count_word;
+}
+
 /* ---------- the whole shader */
 
 static const char *comparison_operator(unsigned long function)

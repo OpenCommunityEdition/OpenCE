@@ -54,6 +54,7 @@ symbols in this file:
 #include "objects/widgets/light_volumes.h"
 #include "objects/widgets/lightning.h"
 #include "objects/widgets/widget_types.h"
+#include "rasterizer/rasterizer_models.h" /* port: rasterizer_model_batch_flush */
 #include "saved games/game_state.h"
 #include "tag_files/tag_groups.h"
 
@@ -361,6 +362,23 @@ void widgets_render(
 	struct object_datum *object = object_get(object_index);
 	long widget_index = object->object.first_widget_index;
 
+	/* port: a flag or an antenna is drawn here, over the model parts queued
+	so far (display.batch_models); the other widgets are only submitted here,
+	drawn in a later pass */
+	{
+		long index;
+
+		for (index = widget_index; index != NONE; index = widget_get(index)->next_widget_index)
+		{
+			short type = widget_get(index)->type;
+
+			if (type == _widget_type_flag || type == _widget_type_antenna)
+			{
+				rasterizer_model_batch_flush();
+				break;
+			}
+		}
+	}
 	while (widget_index != NONE)
 	{
 		struct widget_datum *widget = widget_get(widget_index);

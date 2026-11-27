@@ -177,9 +177,15 @@ struct nv2a_pixel_shader_key
 	unsigned char source_blend;
 	/* MCC environment lightmap pass only; part of the compiled shader key. */
 	unsigned char mcc_bump_attenuation;
+	/* an instanced draw's (d3d8_gl.c, instances_flush): each instance's
+	pixel shader constants, and lights where lit for each pixel, read from
+	uniform blocks (instanced_fragment_source) */
+	unsigned char instanced;
 };
 
 char *nv2a_pixel_shader_to_glsl(const struct nv2a_pixel_shader_key *key);
+/* the key with what its GLSL does not depend on cleared (nv2a_psh.c) */
+void nv2a_pixel_shader_key_canonicalize(struct nv2a_pixel_shader_key *key);
 
 #ifdef HALO_GLES
 /* ES samplers have no LOD bias of their own */

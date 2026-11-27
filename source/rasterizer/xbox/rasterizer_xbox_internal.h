@@ -21,6 +21,7 @@ struct vertex_buffer;
 struct render_distant_light;
 struct render_fog;
 struct render_lighting;
+struct render_skinning;
 struct rasterizer_frame_begin_parameters;
 struct rasterizer_model_lighting_constants;
 struct rasterizer_window_begin_parameters;
@@ -57,6 +58,20 @@ short rasterizer_get_stencil_mode(
 	void);
 void rasterizer_set_model_lighting(
 	struct render_lighting const *lighting);
+/* port: (display.batch_models) a model's constants worked out once, as it
+is queued, and set for its parts as they are drawn */
+#define RASTERIZER_MODEL_LIGHTING_CONSTANTS 11
+void rasterizer_model_lighting_constants(
+	struct render_lighting const *lighting,
+	real (*constants)[4]);
+short rasterizer_model_skinning_constants(
+	struct render_skinning const *skinning,
+	real (*constants)[4]);
+void rasterizer_set_model_constants_batched(
+	long model_index,
+	real const (*lighting)[4],
+	real const (*skinning)[4],
+	short skinning_count);
 void rasterizer_set_model_lighting_point_light(
 	long light_index,
 	short constant_index,

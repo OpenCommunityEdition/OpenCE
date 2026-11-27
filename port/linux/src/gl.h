@@ -102,6 +102,8 @@ this list to generate the guest's entry points */
 	X(glMemoryBarrier) \
 	X(glBindBufferBase) \
 	X(glBindBufferRange) \
+	X(glGetUniformBlockIndex) \
+	X(glUniformBlockBinding) \
 	X(glGenVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
@@ -113,6 +115,9 @@ this list to generate the guest's entry points */
 	X(glDrawArrays) \
 	X(glDrawElements) \
 	X(glDrawElementsBaseVertex) \
+	X(glDrawElementsInstancedBaseVertex) \
+	X(glDrawElementsInstanced) \
+	X(glTexBuffer) \
 	X(glCreateShader) \
 	X(glShaderSource) \
 	X(glCompileShader) \
@@ -125,10 +130,12 @@ this list to generate the guest's entry points */
 	X(glLinkProgram) \
 	X(glGetProgramiv) \
 	X(glGetProgramInfoLog) \
+	X(glDeleteProgram) \
 	X(glUseProgram) \
 	X(glGetUniformLocation) \
 	X(glUniform1i) \
 	X(glUniform1iv) \
+	X(glUniform4iv) \
 	X(glUniform1f) \
 	X(glUniform4fv) \
 	X(glUniform2f) \
@@ -139,10 +146,12 @@ this list to generate the guest's entry points */
 	X(glGetInternalformativ)
 /* entry points of extensions, which a driver may lack: loaded where the
 context has the extension, never required (gl_functions.c). On ES 3.0 and
-3.1 these stand in for glDrawElementsBaseVertex */
+3.1 these stand in for glDrawElementsBaseVertex; the last asks for the
+driver's threads while precompiling (d3d8_gl.c) */
 #define GL_OPTIONAL_FUNCTIONS(X) \
 	X(glDrawElementsBaseVertexEXT) \
-	X(glDrawElementsBaseVertexOES)
+	X(glDrawElementsBaseVertexOES) \
+	X(glMaxShaderCompilerThreadsKHR)
 /* ANDROID_GL_FUNCTIONS_END */
 #else
 #define GL_FUNCTIONS(X) \
@@ -219,6 +228,9 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glBufferStorage) \
 	X(glMapBufferRange) \
 	X(glBindBufferBase) \
+	X(glBindBufferRange) \
+	X(glGetUniformBlockIndex) \
+	X(glUniformBlockBinding) \
 	X(glGenVertexArrays) \
 	X(glBindVertexArray) \
 	X(glEnableVertexAttribArray) \
@@ -235,6 +247,9 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glDrawArrays) \
 	X(glDrawElements) \
 	X(glDrawElementsBaseVertex) \
+	X(glDrawElementsInstancedBaseVertex) \
+	X(glDrawElementsInstanced) \
+	X(glTexBuffer) \
 	X(glCreateShader) \
 	X(glShaderSource) \
 	X(glCompileShader) \
@@ -256,6 +271,7 @@ context has the extension, never required (gl_functions.c). On ES 3.0 and
 	X(glGetUniformLocation) \
 	X(glUniform1i) \
 	X(glUniform1iv) \
+	X(glUniform4iv) \
 	X(glUniform1f) \
 	X(glUniform4fv) \
 	X(glUniform2f) \
@@ -356,6 +372,8 @@ pointers, sees the declarations without these aliases */
 #define glMemoryBarrier halo_glMemoryBarrier
 #define glBindBufferBase halo_glBindBufferBase
 #define glBindBufferRange halo_glBindBufferRange
+#define glGetUniformBlockIndex halo_glGetUniformBlockIndex
+#define glUniformBlockBinding halo_glUniformBlockBinding
 #define glGenVertexArrays halo_glGenVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
@@ -367,6 +385,9 @@ pointers, sees the declarations without these aliases */
 #define glDrawArrays halo_glDrawArrays
 #define glDrawElements halo_glDrawElements
 #define glDrawElementsBaseVertex halo_glDrawElementsBaseVertex
+#define glDrawElementsInstancedBaseVertex halo_glDrawElementsInstancedBaseVertex
+#define glDrawElementsInstanced halo_glDrawElementsInstanced
+#define glTexBuffer halo_glTexBuffer
 #define glCreateShader halo_glCreateShader
 #define glShaderSource halo_glShaderSource
 #define glCompileShader halo_glCompileShader
@@ -379,10 +400,12 @@ pointers, sees the declarations without these aliases */
 #define glLinkProgram halo_glLinkProgram
 #define glGetProgramiv halo_glGetProgramiv
 #define glGetProgramInfoLog halo_glGetProgramInfoLog
+#define glDeleteProgram halo_glDeleteProgram
 #define glUseProgram halo_glUseProgram
 #define glGetUniformLocation halo_glGetUniformLocation
 #define glUniform1i halo_glUniform1i
 #define glUniform1iv halo_glUniform1iv
+#define glUniform4iv halo_glUniform4iv
 #define glUniform1f halo_glUniform1f
 #define glUniform4fv halo_glUniform4fv
 #define glUniform2f halo_glUniform2f
@@ -465,6 +488,9 @@ pointers, sees the declarations without these aliases */
 #define glBufferStorage halo_glBufferStorage
 #define glMapBufferRange halo_glMapBufferRange
 #define glBindBufferBase halo_glBindBufferBase
+#define glBindBufferRange halo_glBindBufferRange
+#define glGetUniformBlockIndex halo_glGetUniformBlockIndex
+#define glUniformBlockBinding halo_glUniformBlockBinding
 #define glGenVertexArrays halo_glGenVertexArrays
 #define glBindVertexArray halo_glBindVertexArray
 #define glEnableVertexAttribArray halo_glEnableVertexAttribArray
@@ -481,6 +507,9 @@ pointers, sees the declarations without these aliases */
 #define glDrawArrays halo_glDrawArrays
 #define glDrawElements halo_glDrawElements
 #define glDrawElementsBaseVertex halo_glDrawElementsBaseVertex
+#define glDrawElementsInstancedBaseVertex halo_glDrawElementsInstancedBaseVertex
+#define glDrawElementsInstanced halo_glDrawElementsInstanced
+#define glTexBuffer halo_glTexBuffer
 #define glCreateShader halo_glCreateShader
 #define glShaderSource halo_glShaderSource
 #define glCompileShader halo_glCompileShader
@@ -502,6 +531,7 @@ pointers, sees the declarations without these aliases */
 #define glGetUniformLocation halo_glGetUniformLocation
 #define glUniform1i halo_glUniform1i
 #define glUniform1iv halo_glUniform1iv
+#define glUniform4iv halo_glUniform4iv
 #define glUniform1f halo_glUniform1f
 #define glUniform4fv halo_glUniform4fv
 #define glUniform2f halo_glUniform2f

@@ -274,6 +274,11 @@ static const struct config_setting config_settings[] =
 		"Keep the GPU programs the game links under the save root (shader_cache),\n"
 		"and load them from there next time instead of linking them again, which\n"
 		"stalls a frame on some drivers; false links each every run." },
+	{ "display.shader_precompile", _config_boolean, "true", "HALO_SHADER_PRECOMPILE", _environment_value, _platform_all,
+		"Make every GPU program a map can draw with when its first view is drawn\n"
+		"(with display.shader_cache, loaded from there), instead of in the frame\n"
+		"that first draws with it, which stalls that frame on some drivers;\n"
+		"false makes each when it is first drawn with." },
 	{ "display.mcc_texture_prepare_mb", _config_integer, "0", "HALO_MCC_TEXTURE_PREPARE_MB", _environment_value, _platform_desktop,
 		"MCC only: prepare large non-paletted textures during loading, within\n"
 		"this estimated GPU memory budget in MiB (0 disables, maximum 512).\n"
@@ -296,6 +301,11 @@ static const struct config_setting config_settings[] =
 		"facing away, 8 smaller groups, 16 nearer rooms first; 0 walks them as\n"
 		"the Xbox does. The console's structure_culling changes it until the\n"
 		"game quits." },
+	{ "display.batch_models", _config_boolean, "true", "HALO_BATCH_MODELS", _environment_value, _platform_all,
+		"Draws the models' opaque parts grouped by their shader, after the\n"
+		"models, rather than each object's in turn: the same picture, drawn with\n"
+		"less work when there are many objects (network co-op's extra enemies);\n"
+		"false draws them as the Xbox does." },
 	{ "display.model_detail", _config_string, "\"stock\"", "HALO_MODEL_DETAIL", _environment_value, _platform_all,
 		"Which of their levels of detail models are drawn at: \"stock\" chooses by\n"
 		"their size on the Xbox's 480 lines, at any resolution; \"native\" by their\n"
@@ -1325,6 +1335,10 @@ static const struct config_setting config_settings[] =
 		"Run without a window, drawing nothing." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_all,
 		"Report OpenGL errors in the log." },
+	{ "debug.shader_times", _config_boolean, "false", "HALO_SHADER_TIMES", _environment_value, _platform_all,
+		"A line in the log for each shader the game compiles and each program it\n"
+		"links, with how long the driver took (programs loaded from the shader\n"
+		"cache are not linked)." },
 	{ "debug.menu_open", _config_string, "\"\"", "HALO_MENU_OPEN", _environment_value, _platform_all,
 		"Start on this screen of the menus (port/assets/menus) instead of the main\n"
 		"menu, a player profile being edited; empty for the main menu." },
