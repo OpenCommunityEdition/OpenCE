@@ -492,7 +492,10 @@ Thus:
 
 If the addresses are not available, the game shows a message, and writes
 the mappings below 4 GB to `memory_map.txt` in the data folder and to the
-log.
+log. The message itself names the device, its Android version and Java
+heap, and why the addresses could not be had (each mapping in the way, and
+whether it was in use), so a screenshot of it is enough to tell the cases
+apart: newer devices do not let the Files app open `Android/data`.
 
 To test the reclaim on any device, set a system property before you start
 the game. The app then puts a stand-in for ART's large object space over
