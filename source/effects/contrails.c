@@ -132,8 +132,18 @@ enum
 
 /* ---------- structures */
 
+/* port: the tick a contrail point was made in (contrail_head_position) */
+struct contrail_point_made
+{
+	long contrail_point_index;
+	long game_time;
+};
+
 /* ---------- prototypes */
 
+/* port: (contrail_head_position) */
+static void contrail_point_made_now(
+	long contrail_point_index);
 static void contrail_next_frame(
 	struct contrail_datum *contrail);
 static short contrail_compute_new_point_count(
@@ -150,6 +160,9 @@ static void contrail_verify(
 	long contrail_index);
 
 /* ---------- globals */
+
+/* port: the tick each contrail point was made in, by its index */
+static struct contrail_point_made contrail_points_made[MAXIMUM_CONTRAIL_POINTS];
 
 /* ---------- public code */
 
@@ -217,6 +230,8 @@ void contrails_initialize_for_new_map(
 {
 	data_make_valid(contrail_data);
 	data_make_valid(contrail_point_data);
+	/* port: (no point made yet: contrail_head_position) */
+	csmemset(contrail_points_made, 0, sizeof(contrail_points_made));
 
 	return;
 }
@@ -535,6 +550,73 @@ void contrail_owner_collision(
 	contrail->expired_dt += dt;
 
 	return;
+}
+
+/* port: a point made in this tick (contrail_add_points) */
+static void contrail_point_made_now(
+	long contrail_point_index)
+{
+	struct contrail_point_made *made =
+		&contrail_points_made[DATUM_INDEX_TO_ABSOLUTE_INDEX(contrail_point_index)];
+
+	made->contrail_point_index = contrail_point_index;
+	made->game_time = game_time_get();
+}
+
+/* port: where an active contrail's newest point would be made now: on its
+object's marker as the frame draws it (render_contrails.c draws the trail's
+head there). FALSE for a contrail on no object, making no points, or whose
+object has no such marker. Points are made once a tick, on the first frame
+after it (contrails_update): through the rest of the tick the object is
+drawn gliding on (port/linux/game/render_interpolation.c) and the trail
+stopped short of it, by up to a tick's flight (a Ghost's or a plasma
+turret's bolt, three or four world units), and caught up 30 times a second.
+FALSE too in a tick its newest point was not made in: a trail making fewer
+points than ticks (a rocket's exhaust, 15 a second; a charged plasma bolt's,
+10) stays behind its object on the ticks between, as the Xbox's did */
+boolean contrail_head_position(
+	struct contrail_datum const *contrail,
+	short instance_index,
+	real_point3d *position)
+{
+	struct object_datum *object;
+	struct object_definition *object_definition;
+	struct object_marker markers[MAXIMUM_CONTRAIL_INSTANCES];
+	short marker_count;
+	long newest_index;
+	struct contrail_point_made const *made;
+
+	if (contrail->object_index == NONE ||
+		!TEST_FLAG(contrail->flags, _contrail_active_bit) ||
+		instance_index < 0 || instance_index >= MAXIMUM_CONTRAIL_INSTANCES)
+	{
+		return FALSE;
+	}
+	newest_index = contrail->first_contrail_point_indices[instance_index];
+	if (newest_index == NONE)
+		return FALSE;
+	made = &contrail_points_made[DATUM_INDEX_TO_ABSOLUTE_INDEX(newest_index)];
+	if (made->contrail_point_index != newest_index || made->game_time != game_time_get())
+		return FALSE;
+	object = object_try_and_get(contrail->object_index);
+	if (!object)
+		return FALSE;
+	object_definition = object_definition_get(object->definition_index);
+	if (!VALID_INDEX(contrail->attachment_index, object_definition->object.attachments.count))
+		return FALSE;
+	marker_count = object_get_marker_by_name(
+		contrail->object_index,
+		TAG_BLOCK_GET_ELEMENT(
+			&object_definition->object.attachments,
+			contrail->attachment_index,
+			struct object_attachment_definition)->marker_name,
+		markers,
+		NUMBEROF(markers));
+	if (instance_index >= marker_count)
+		return FALSE;
+	*position = markers[instance_index].matrix.position;
+
+	return TRUE;
 }
 
 /* ---------- private code */
@@ -957,6 +1039,8 @@ static void contrail_add_points(
 							contrail->first_contrail_point_indices[marker_index];
 						contrail->contrail_point_counts[marker_index]++;
 						contrail->first_contrail_point_indices[marker_index] = new_contrail_point_index;
+						/* port: (the tick it was made in: contrail_head_position) */
+						contrail_point_made_now(new_contrail_point_index);
 					}
 				}
 			}

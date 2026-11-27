@@ -96,6 +96,12 @@ void contrail_owner_collision(
 	long contrail_index,
 	unsigned char object_dying,
 	real dt);
+/* port: where an active contrail's newest point would be made now, on its
+object's marker as the frame draws it (contrails.c) */
+boolean contrail_head_position(
+	struct contrail_datum const *contrail,
+	short instance_index,
+	real_point3d *position);
 void contrails_update(
 	real dt);
 
