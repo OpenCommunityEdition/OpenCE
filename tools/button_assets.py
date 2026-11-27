@@ -125,7 +125,8 @@ def gameplay_control(entry: dict) -> np.ndarray:
     face = source.crop(source.getchannel("A").getbbox())
     scale = entry["scale"]
     width, height = [n * scale for n in entry["control_cell"]]
-    face.thumbnail((width - 2 * scale, height - 2 * scale), Image.Resampling.LANCZOS)
+    # Keep the original single-pass RGBA resize on Pillow 13 and later.
+    face.thumbnail((width - 2 * scale, height - 2 * scale), Image.Resampling.LANCZOS, reducing_gap=None)
     image = Image.new("RGBA", (entry["width"] * scale, entry["height"] * scale))
     image.paste(face, ((width - face.width) // 2, (height - face.height) // 2))
     # The original HUD uses ONE / INVSRCALPHA. Store premultiplied edges
@@ -133,6 +134,14 @@ def gameplay_control(entry: dict) -> np.ndarray:
     pixels = np.asarray(image).copy()
     pixels[..., :3] = (pixels[..., :3].astype(np.uint16) * pixels[..., 3:4] + 127) // 255
     return pixels
+
+
+# MCC modern shoulder labels map to the Xbox black/white controls. These
+# redraws are placeholders, not CRC replacements for any native map bitmap.
+MCC_BUTTONS = [dict(name=f"mcc_{button}_butn__0", tag=f"mcc\\buttons\\{button}",
+                    bitmap=0, width=32, height=32, format="dxt3", scale=8,
+                    crc=0, svg=f"{button}_butn.svg", place=[1, 0, 0])
+               for button in ("black", "white")]
 
 
 def document(width: int, height: int, body: str) -> str:
@@ -183,7 +192,7 @@ def stencil(svg: str, cell: list, place: list, index: int, letter: list = (0, 0)
 
 
 def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
-    """The existing redraw's plain oval and black letter in the same cell."""
+    """The existing redraw's plain oval with a transparent letter cutout."""
     root = ElementTree.parse(ASSETS / "svg" / svg).getroot()
     parents = {child: parent for parent in root.iter() for child in parent}
     oval, letter = root.find(".//*[@id='oval']"), root.find(".//*[@id='letter']")
@@ -193,7 +202,11 @@ def classic(svg: str, color: str, letter_move: list = (0, 0)) -> str:
     if letter is not None:
         letter.set("fill", "#000000")
         letter.set("transform", f"translate({letter_move[0]} {letter_move[1]}) {letter.get('transform', '')}")
-        body += ElementTree.tostring(letter, encoding="unicode")
+        cut = ElementTree.tostring(letter, encoding="unicode")
+        body = ('<defs><mask id="classic-letter" maskUnits="userSpaceOnUse" '
+                'x="0" y="0" width="32" height="32">'
+                '<rect width="32" height="32" fill="white"/>' + cut +
+                '</mask></defs><g mask="url(#classic-letter)">' + body + '</g>')
     return document(32, 32, body)
 
 
@@ -211,7 +224,8 @@ def gameplay_gem(entry: dict) -> np.ndarray:
     left, top, right, bottom = [round(n * factor) for n in reference.getchannel("A").getbbox()]
     cell = (right - left, bottom - top)
     face = source.crop(bounds)
-    face.thumbnail(cell, Image.Resampling.LANCZOS)
+    # Pillow 13 applies the default reduction pass to RGBA; these assets use none.
+    face.thumbnail(cell, Image.Resampling.LANCZOS, reducing_gap=None)
     image = Image.new("RGBA", (entry["width"] * scale, entry["height"] * scale))
     image.paste(face, (left + (cell[0] - face.width) // 2, top + (cell[1] - face.height) // 2))
     return bleed(np.asarray(image).copy())
@@ -380,7 +394,7 @@ def layout(arguments) -> None:
     classic_buttons = [dict(entry) for entry in CLASSIC_BUTTONS]
     for entry, sprite in zip(classic_buttons, sprites):
         entry["letter"] = [round(n / sprite["place"][0], 4) for n in sprite["letter"]]
-    LIST.write_text(json.dumps({"assets": entries + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n")
+    LIST.write_text(json.dumps({"assets": entries + MCC_BUTTONS + HUD_BUTTONS + classic_buttons + GEM_BUTTONS + CONTROL_BUTTONS}, indent=1) + "\n")
 
 
 def build(arguments) -> None:

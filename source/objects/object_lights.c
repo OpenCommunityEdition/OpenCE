@@ -189,6 +189,8 @@ void shield_glow_update(void); /* port: port/linux/game/shield_glow.c */
 /* port: port/linux/src (halo.log) */
 void platform_log(const char *format, ...);
 
+#include "overshield_effect.h" /* port: port/linux/game/overshield_effect.c */
+
 /* ---------- constants */
 
 enum
@@ -712,6 +714,7 @@ void lights_initialize(
 void lights_dispose(
 	void)
 {
+	overshield_effect_reset(); /* port: queued identities and model heights belong to this map. */
 	cluster_partition_delete(&light_cluster_partition);
 
 	return;
@@ -780,6 +783,7 @@ boolean light_port_glow_set(
 void lights_initialize_for_new_map(
 	void)
 {
+	overshield_effect_reset(); /* port: queued identities and model heights belong to this map. */
 	light_port_glow_definition = NONE - 1; /* port: (looked for again) */
 	data_make_valid(light_data);
 	lights_game_globals->render_lights = TRUE;
@@ -791,6 +795,7 @@ void lights_initialize_for_new_map(
 void lights_dispose_from_old_map(
 	void)
 {
+	overshield_effect_reset(); /* port: queued identities and model heights belong to this map. */
 	data_make_invalid(light_data);
 	cluster_partition_make_invalid(&light_cluster_partition);
 
@@ -1183,11 +1188,34 @@ void lights_preprocess_scene(
 							definition->flags,
 							_light_definition_is_first_person_flashlight_bit))
 						{
-							first_person_weapon_center_flashlight(
+							boolean centered = first_person_weapon_center_flashlight(
 								light->object_index,
 								&light_parameters.position,
 								&light_parameters.forward,
 								&light_parameters.up);
+
+							/* port: a beam not on a first-person weapon
+							(another player's, or your own with no weapon in
+							hand), from the marker on the pose the frame draws
+							(render_interpolation.c): the light's own place is
+							the tick's, so it stepped at 30 a second while the
+							view moved every frame */
+							if (!centered)
+							{
+								struct object_marker markers[1];
+
+								if (object_get_marker_by_name(
+									light->object_index,
+									object_get_attachment_marker_name(light->object_index,
+										light->attachment_marker_index),
+									markers,
+									1) > 0)
+								{
+									light_parameters.position = markers[0].matrix.position;
+									light_parameters.forward = markers[0].matrix.forward;
+									light_parameters.up = markers[0].matrix.up;
+								}
+							}
 							adjusted = TRUE;
 						}
 						else if (object->object.type == _object_type_weapon
@@ -1213,7 +1241,13 @@ void lights_preprocess_scene(
 
 					light->rasterizer_light_index = rasterizer_light_submit(
 						&light_parameters);
-					debug_rasterizer_light_count = light->rasterizer_light_index + 1;
+					/* (port: the lights submitted so far: not a light the
+					window had no room for (MAXIMUM_LIGHTS_PER_WINDOW), whose
+					index is NONE: that made the count 0, and every object
+					lit by the ones before it failed render_objects.c's
+					check of their indices against it) */
+					if (light->rasterizer_light_index != NONE)
+						debug_rasterizer_light_count = (short)(light->rasterizer_light_index + 1);
 				}
 			}
 			else
@@ -2313,10 +2347,20 @@ void lights_prepare_for_object_dynamic(
 			MAXIMUM_RENDERED_POINT_LIGHTS);
 	}
 	light_marker_end();
-	for (light_index = 0; light_index < lighting->point_light_count; light_index++)
+	/* (port: and a light the window had no room for, with no rasterizer
+	index, lights nothing: left out) */
 	{
-		lighting->point_light_indices[light_index] =
-			light_get(lighting->point_light_indices[light_index])->rasterizer_light_index;
+		short kept = 0;
+
+		for (light_index = 0; light_index < lighting->point_light_count; light_index++)
+		{
+			long rasterizer_light_index =
+				light_get(lighting->point_light_indices[light_index])->rasterizer_light_index;
+
+			if (rasterizer_light_index != NONE)
+				lighting->point_light_indices[kept++] = rasterizer_light_index;
+		}
+		lighting->point_light_count = kept;
 	}
 
 	return;

@@ -214,6 +214,10 @@ void flag_set_trailing_shape(
 /* ---------- globals */
 
 struct data_array *flag_data;
+/* port: the game time the cloth last stepped and the frames' time since
+(flags_update) */
+static long flag_last_step_game_time = NONE;
+static real flag_pending_delta = 0.0f;
 
 /* ---------- public code */
 
@@ -231,6 +235,9 @@ void flags_initialize_for_new_map(
 	void)
 {
 	data_make_valid(flag_data);
+	/* port: the new map's game time starts again (flags_update) */
+	flag_last_step_game_time = NONE;
+	flag_pending_delta = 0.0f;
 
 	return;
 }
@@ -264,6 +271,31 @@ void flags_update(
 	real delta)
 {
 	long flag_index;
+	/* port: the cloth steps a tick at a time, as on the Xbox, which drew a
+	frame a tick. Each step moves every vertex to where its neighbours hold
+	it (flag_update), and the native builds stepped every frame, several a
+	tick (port/linux/game/render_interpolation.c): eight steps a tick at 240
+	frames a second held the cloth eight times as stiff, and it hung and
+	flapped unlike the Xbox's. Step on the first frame after each tick, for
+	all the time since the last step; the frames between draw it where its
+	object is drawn (flag_render_proper). The step is never longer than the
+	ticks since the last one: frames while the game time stands still (a
+	network client held for the host, a map download) add nothing, and a
+	game time gone back or jumping (a new map, a checkpoint) counts as a
+	tick, as contrails_update counts it. */
+	long ticks;
+
+	flag_pending_delta += delta;
+	if (flag_last_step_game_time == game_time_get())
+		return;
+	ticks = game_time_get() - flag_last_step_game_time;
+	if (flag_last_step_game_time == NONE || ticks < 1 || ticks > TICKS_PER_SECOND)
+		ticks = 1;
+	flag_last_step_game_time = game_time_get();
+	delta = flag_pending_delta;
+	if (delta > (real)ticks / TICKS_PER_SECOND)
+		delta = (real)ticks / TICKS_PER_SECOND;
+	flag_pending_delta = 0.0f;
 
 	for (flag_index = data_next_index(flag_data, NONE);
 		flag_index != NONE;
@@ -769,6 +801,29 @@ void flag_render_proper(
 		short i;
 		short x;
 		short y;
+		/* port: the cloth hangs from its first attachment marker where the
+		frame that stepped it drew it (flags_update, on the first frame after
+		a tick; game_frame reads the drawn pose, render_interpolation.c), and
+		later frames draw its object further on: drawn as far from there as
+		that marker is now, so that it stays on a running carrier's pole */
+		real_vector3d drawn_offset;
+
+		drawn_offset.i = drawn_offset.j = drawn_offset.k = 0.0f;
+		if (definition->attachment_points.count > 0)
+		{
+			struct object_marker marker;
+
+			if (object_get_marker_by_name(
+				flag->object_index,
+				TAG_BLOCK_GET_ELEMENT(&definition->attachment_points, 0, struct flag_attachment_point)->marker_name,
+				&marker,
+				1) > 0)
+			{
+				drawn_offset.i = marker.matrix.position.x - flag->first_attachment.x;
+				drawn_offset.j = marker.matrix.position.y - flag->first_attachment.y;
+				drawn_offset.k = marker.matrix.position.z - flag->first_attachment.z;
+			}
+		}
 
 		object_definition_get(object_get(flag->object_index)->definition_index);
 		vertices = rasterizer_dynamic_vertices_lock(vertex_buffer_index);
@@ -796,6 +851,10 @@ void flag_render_proper(
 				normalize3d(&vertex.normal);
 
 				vertex.position = point->position;
+				/* port: (drawn_offset, above) */
+				vertex.position.x += drawn_offset.i;
+				vertex.position.y += drawn_offset.j;
+				vertex.position.z += drawn_offset.k;
 				vertex.texcoord.x = x * one_over_width;
 				vertex.texcoord.y = y * one_over_height;
 				rasterizer_geometry_compress_vertices(
@@ -912,6 +971,10 @@ void flag_render_proper(
 				corner00->position.y) * 0.25f;
 			centroid.z = (corner11->position.z + corner01->position.z + corner10->position.z +
 				corner00->position.z) * 0.25f;
+			/* port: (drawn_offset, above) */
+			centroid.x += drawn_offset.i;
+			centroid.y += drawn_offset.j;
+			centroid.z += drawn_offset.k;
 
 			csmemset(&parameters, 0, sizeof(parameters));
 			parameters.unique_identifier = 1;

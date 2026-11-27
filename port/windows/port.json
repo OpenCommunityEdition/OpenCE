@@ -8,7 +8,8 @@
     "msvc_wide.c",
     "posix_update.c",
     "posix_upnp.c",
-    "posix_trace_marker.c"
+    "posix_trace_marker.c",
+    "posix_server.c"
   ],
   "libraries": [
     "ws2_32",

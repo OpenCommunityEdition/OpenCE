@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/controller_remapping_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" run="port controller cancel" back="true"/>
+		<on event="back" run="port controller cancel" back="true"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/header_profile_controller_setting"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/header_profile_controller_setting" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/controller_edit/header_profile_controller_setting">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/help" type="text" controller="1" left="68" top="320" width="482" height="90" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/help">
+		<data input="port controller update"/>
+		<on event="created" run="port controller init"/>
+		<on event="deleted" run="port controller close"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_player" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_group" x="54" y="103"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_1" x="54" y="133"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_2" x="54" y="163"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_3" x="54" y="193"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_4" x="54" y="223"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_5" x="54" y="253"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_6" x="54" y="283"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/button_defaults" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_player" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/player_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_player" x="200" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/player_label" type="text" controller="1" width="200" height="22" text="PLAYER:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_player" type="spinner" left="3" top="2" width="297" height="20" strings="P1|P2|P3|P4" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 300 19 306">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_group" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/group_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_group" x="200" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/group_label" type="text" controller="1" width="200" height="22" text="SHOW:" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_group" type="spinner" left="3" top="2" width="297" height="20" strings="MOVEMENT|COMBAT|GENERAL|COMMUNICATION|DEBUG" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 300 19 306">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_1" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a start" run="port controller bind"/>
+		<on event="x" run="port controller clear"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<on event="left" run="port controller left"/>
+		<on event="right" run="port controller right"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_action"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_binding" x="220"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_2" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a start" run="port controller bind"/>
+		<on event="x" run="port controller clear"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<on event="left" run="port controller left"/>
+		<on event="right" run="port controller right"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_action"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_binding" x="220"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_3" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a start" run="port controller bind"/>
+		<on event="x" run="port controller clear"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<on event="left" run="port controller left"/>
+		<on event="right" run="port controller right"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_action"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_binding" x="220"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_4" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a start" run="port controller bind"/>
+		<on event="x" run="port controller clear"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<on event="left" run="port controller left"/>
+		<on event="right" run="port controller right"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_action"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_binding" x="220"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_5" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a start" run="port controller bind"/>
+		<on event="x" run="port controller clear"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<on event="left" run="port controller left"/>
+		<on event="right" run="port controller right"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_action"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_binding" x="220"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/op_pad_6" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a start" run="port controller bind"/>
+		<on event="x" run="port controller clear"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<on event="left" run="port controller left"/>
+		<on event="right" run="port controller right"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_action"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_binding" x="220"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_action" type="text" controller="1" width="220" height="22" font="ui\small_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/pad_binding" type="text" controller="1" width="280" height="22" font="ui\large_ui" color="#FF2896FF" align="center" text_y="4" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a start" run="port controller defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/controller_remapping/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a start" run="port controller save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+</menus>

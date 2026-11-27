@@ -138,6 +138,13 @@ static void host_gl_buffer_write(GLenum target, unsigned offset, unsigned size, 
     uploads++;
 }
 
+#ifdef HALO_ANDROID
+#ifdef TEST_ANDROID_NORMAL
+static int android_geometry_fixes = 0;
+#else
+static int android_geometry_fixes = 1;
+#endif
+#endif
 #include "mirror.inc"
 
 static int draw_pages(unsigned first, unsigned count)
@@ -158,7 +165,7 @@ int main(int argc, char **argv)
     unsigned index, old_uploads;
     int rollover = argc > 1 && !strcmp(argv[1], "rollover");
     device.frame = rollover ? ~0UL - 1 : 100;
-#ifdef HALO_ANDROID
+#if defined(HALO_ANDROID) && !defined(TEST_ANDROID_NORMAL)
     /* First-use and reused ranges must always go to the caller's existing
     streaming path, without creating GPU storage or consulting tracking. */
     for (index = 0; index < 1200; index++)
@@ -200,7 +207,7 @@ int main(int argc, char **argv)
     index = mapped;
     write_pages(302, 1, 6);
     CHECK(draw_pages(302, 1));
-#if defined(HALO_ANDROID) || defined(TEST_DESKTOP)
+#if defined(TEST_DESKTOP)
     CHECK(mapped == 0); /* every persistent-cache upload is ordered */
 #else
     CHECK(mapped == index + 1); /* fast path returns after the fence */

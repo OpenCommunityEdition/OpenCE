@@ -114,6 +114,8 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
+#include "mcc_cache.h" /* port: preserve MCC-authored gameplay icons */
 #include "cseries/cseries.h"
 
 #include "cseries/errors.h"
@@ -146,6 +148,7 @@ symbols in this file:
 #include "text/text_group.h"
 #include "text/unicode.h"
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
+#include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 
 #include <stddef.h>
 
@@ -468,6 +471,7 @@ static void render_state_text(
 /* port: original Xbox high-resolution glyphs, port/linux/game/hud_hires_tags.c */
 boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	rectangle2d *cursor, pixel32 color);
+#include "keyboard_glyphs.h" /* port: optional semantic keyboard prompts; custom icons stay native */
 struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
 
 static void render_state_bitmap(
@@ -541,8 +545,8 @@ static void render_state_bitmap(
 	draws a button by its place among the HUD globals' button icons: before
 	the map's own picture of it is looked for, which a Custom Edition map's
 	message icons (13 sequences to the Xbox's 24) may not have, so that the
-	button was not drawn */
-	if (hud_hires_button_draw(icon, cursor_bounds, color))
+	button was not drawn. An MCC map's own buttons are drawn as its HUD's are */
+	if (!mcc_cache_tags_loaded() && hud_hires_button_draw(icon, cursor_bounds, color))
 		return;
 	if (icon->frame_rate)
 		frame_index = game_time_get() / icon->frame_rate;
@@ -555,6 +559,11 @@ static void render_state_bitmap(
 	if (bitmap && _texture_cache_bitmap_get_hardware_format(
 		(struct bitmap_data *)bitmap, FALSE, TRUE))
 	{
+		if (mcc_hud_icon_draw(bitmap_group_index, bitmap, clip, cursor_bounds, color, icon, FALSE))
+			return;
+		/* port: retain MCC icon ownership before the high-resolution fallback. */
+		if (mcc_cache_tags_loaded() && hud_hires_button_draw(icon, cursor_bounds, color))
+			return;
 		bitmap = hud_hires_sprite_bitmap(bitmap, icon->sequence_index);
 		scale = local_player_count() > 1 ? 0.75f : 1.0f;
 		point.x = (short)(icon->offset.x * scale + cursor_bounds->x0);
@@ -1438,6 +1447,9 @@ void hud_messaging_update(
 			input_abstraction_get_local_player_preferences(
 				local_player_index,
 				&preferences);
+			/* port: physical prompt buttons for optional controller layouts
+			(port/linux/game/controller_remap_game.c); profile data stays stock. */
+			controller_remap_prompt(local_player_index, &preferences);
 			if (objective_active)
 			{
 				struct hud_color_definition *objective_color =
@@ -1594,6 +1606,10 @@ void hud_messaging_update(
 					case _hud_message_type_icon:
 						{
 							short icon_index = NONE;
+							/* port: resolve keyboard actions before controller translation loses
+							 * their meaning. The feature declines unsupported/custom icons. */
+							if (keyboard_hud_prompt(local_player_index, element->data, &line_cursor, pixel_color))
+								break;
 
 							if (element->data > _icon_right_stick)
 							{
@@ -1787,7 +1803,7 @@ void hud_messaging_update(
 								draw_string_set_indents(line_cursor.x0 - line_bounds.x0, 0);
 								draw_unicode_string_compute_bounds(
 									&line_bounds,
-									L"<no button icon>",
+									(icon_index == CONTROLLER_REMAP_UNBOUND ? L"UNBOUND" : L"<no button icon>") /* port: explicit cleared controller action */,
 									&text_bounds,
 									&line_cursor);
 								line_cursor.x0 -= 3;
@@ -1797,7 +1813,7 @@ void hud_messaging_update(
 									NULL,
 									NULL,
 									0,
-									L"<no button icon>");
+									(icon_index == CONTROLLER_REMAP_UNBOUND ? L"UNBOUND" : L"<no button icon>") /* port: explicit cleared controller action */);
 								line_bounds.y0 = line_cursor.y0;
 							}
 						}

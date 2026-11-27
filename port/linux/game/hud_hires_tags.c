@@ -33,6 +33,9 @@ When the texture cannot be drawn, the sprites are drawn from their bitmap.
 #include "rasterizer/rasterizer.h"
 #include "text/draw_string.h"
 #include "hud_button_layout.h"
+#include "hud_hires_crosshairs.h"
+#include "controller_glyphs.h"
+#include "keyboard_glyphs.h"
 #include "scenario/scenario_definitions.h"
 #include "cache/texture_cache.h"
 #ifdef HALO_ANDROID
@@ -164,6 +167,8 @@ static void hud_hires_sprite_bitmaps_forget(
 	}
 	hires_sprite_bitmap_count = 0;
 	hud_buttons_forget();
+	controller_glyphs_dispose();
+	keyboard_glyphs_dispose();
 
 	return;
 }
@@ -368,6 +373,24 @@ struct bitmap_data const *hud_hires_sprite_bitmap(
 	return bitmap;
 }
 
+/* CE packs 2x and 8x into the same sequence. Only the supplied 2x and
+ * reticle have replacements; the original 8x must keep its own pixels.
+ * Identify the registered stock sheet, then use the existing CRC-checked,
+ * setting-gated placeholder path. No tags, bounds or anchoring are changed. */
+struct bitmap_data const *hud_hires_crosshair_bitmap(struct bitmap_data const *bitmap,
+    short sequence_index,short frame_index)
+{
+    long index;
+    if (!custom_edition_cache_tags_loaded() || !config_boolean("display.high_res_hud") ||
+        frame_index!=0 || (sequence_index!=0 && sequence_index!=1)) return bitmap;
+    for (index=0;index<hires_sprite_bitmap_count;index++)
+        if (hires_sprite_bitmaps[index].bitmap==bitmap && !strcmp(
+            hud_hires_asset_tag(hires_sprite_bitmaps[index].asset),
+            "ui\\hud\\bitmaps\\sniper\\hud_reticles_scope"))
+            return hud_hires_sprite_bitmap(bitmap,sequence_index);
+    return bitmap;
+}
+
 /* whether the bitmap at address that `asset` stands for is a Custom Edition
 map's stock one (its pixels are not those the texture was drawn from) */
 long hud_hires_asset_stock_custom_edition(
@@ -465,12 +488,8 @@ static boolean ce_hud_buttons_stock(struct icon_hud_element_definition const *ic
 	return TRUE;
 }
 
-/* Match the controller entry itself: weapon icons may reuse its sequence.
- * Draw the existing Xbox menu faces with straight alpha, independently of
- * the messaging sheet and its tint. CE custom sheets also need this fallback
- * with High-Res HUD off: their stock button entries can name weapon art. */
-boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
-	rectangle2d *cursor, pixel32 color)
+/* Shared legacy glyph ownership for gameplay and optional menu legends. */
+struct bitmap_data *hud_hires_button_bitmap(short style, short slot)
 {
 	static char const *names[] = {
 		"ui\\shell\\bitmaps\\a_butn", "ui\\shell\\bitmaps\\b_butn",
@@ -484,13 +503,52 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 		"ui\\hud\\buttons\\gem_a", "ui\\hud\\buttons\\gem_b",
 		"ui\\hud\\buttons\\gem_x", "ui\\hud\\buttons\\gem_y",
 		"ui\\shell\\bitmaps\\black_butn", "ui\\shell\\bitmaps\\white_butn"};
+    struct bitmap_data *bitmap;
+    long asset;
+    if (style < 0 || style > 2 || slot < 0 || slot >= 14) return NULL;
+	if (style != hud_buttons_style)
+	{
+		hud_buttons_forget();
+		hud_buttons_style = style;
+	}
+	if (!hud_buttons[slot].attempted)
+	{
+		hud_buttons[slot].attempted = TRUE;
+		for (asset = 0; asset < hud_hires_asset_count(); asset++)
+		{
+			if (strcmp(hud_hires_asset_tag(asset), slot >= 6 ? hud_button_control_name(slot) : style == 0 ? classic_names[slot] :
+				style == 1 ? gem_names[slot] : names[slot])) continue;
+			bitmap = bitmap_2d_new(slot >= 6 ? 64 : 32, slot >= 6 ? 64 : 32, 0, 11);
+			if (!bitmap) break;
+			if (!rasterizer_bitmap_new(bitmap))
+			{
+				bitmap_delete(bitmap);
+				break;
+			}
+			hud_hires_register_placeholder(asset, bitmap->hardware_format);
+			hud_buttons[slot].asset = asset;
+			hud_buttons[slot].bitmap = bitmap;
+			break;
+		}
+	}
+	bitmap = hud_buttons[slot].bitmap;
+    return bitmap;
+}
+
+/* Match the controller entry itself: weapon icons may reuse its sequence.
+ * Draw the existing Xbox menu faces with straight alpha, independently of
+ * the messaging sheet and its tint. CE custom sheets also need this fallback
+ * with High-Res HUD off: their stock button entries can name weapon art. */
+boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
+	rectangle2d *cursor, pixel32 color)
+{
 	struct icon_hud_element_definition const *buttons;
 	struct rasterizer_dynamic_screen_geometry_parameters parameters;
 	struct dynamic_screen_vertex vertices[4];
 	struct bitmap_data *bitmap;
 	real viewport, scale, x, y, width, height, u, v;
 	short advance;
-	long index, asset;
+	long index;
 	short i;
 	short style, slot;
 
@@ -507,37 +565,13 @@ boolean hud_hires_button_draw(struct icon_hud_element_definition const *icon,
 	if (!ce_hud_buttons_stock(icon, index)) return FALSE;
 	if (!config_boolean("display.high_res_hud"))
 		return ce_hud_button_draw(icon, cursor, color);
+	style = controller_glyph_style();
+	if (controller_glyph_draw(style, (short)index, icon, cursor, color)) return TRUE;
 	slot = index < 6 ? (short)index : hud_button_control_slot((short)index,
 		icon->frame_rate > 0 ? game_time_get() / icon->frame_rate : 0);
 	if (slot < 0) return FALSE;
-	style = (!strcmp(config_string("display.hud_button_style"), "dark_gems") || !strcmp(config_string("display.hud_button_style"), "menu_gems")) ? 2 :
-		!strcmp(config_string("display.hud_button_style"), "gems");
-	if (style != hud_buttons_style)
-	{
-		hud_buttons_forget();
-		hud_buttons_style = style;
-	}
-	if (!hud_buttons[slot].attempted)
-	{
-		hud_buttons[slot].attempted = TRUE;
-		for (asset = 0; asset < hud_hires_asset_count(); asset++)
-		{
-			if (strcmp(hud_hires_asset_tag(asset), slot >= 6 ? hud_button_control_name(slot) : style == 0 ? classic_names[index] :
-				style == 1 ? gem_names[index] : names[index])) continue;
-			bitmap = bitmap_2d_new(slot >= 6 ? 64 : 32, slot >= 6 ? 64 : 32, 0, 11);
-			if (!bitmap) break;
-			if (!rasterizer_bitmap_new(bitmap))
-			{
-				bitmap_delete(bitmap);
-				break;
-			}
-			hud_hires_register_placeholder(asset, bitmap->hardware_format);
-			hud_buttons[slot].asset = asset;
-			hud_buttons[slot].bitmap = bitmap;
-			break;
-		}
-	}
-	bitmap = hud_buttons[slot].bitmap;
+	if (style >= 3) style = 0; /* unavailable new artwork: the legacy fallback */
+	bitmap = hud_hires_button_bitmap(style, slot);
 	if (!bitmap) return FALSE;
 	viewport = local_player_count() > 1 ? 0.75f : 1.0f;
 	scale = viewport;

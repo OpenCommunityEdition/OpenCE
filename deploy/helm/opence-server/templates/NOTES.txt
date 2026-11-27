@@ -1,0 +1,33 @@
+OpenCE dedicated server {{ .Chart.Version }}: {{ include "opence-server.fullname" . }} in namespace {{ .Release.Namespace }}.
+
+Rotation: {{ join ", " .Values.server.rotation | default "the server's default" }}.
+{{- if kindIs "invalid" .Values.server.public }}
+Listed in everyone's server browser{{ with .Values.server.name }} as "{{ . }}"{{ end }}, unless config.toml or the web page turns server.public off.
+{{- else if .Values.server.public }}
+Listed in everyone's server browser{{ with .Values.server.name }} as "{{ . }}"{{ end }}.
+{{- else }}
+Not listed: players join with the invite link from the log, or on the LAN.
+{{- end }}
+
+The log (the ready line, players, games):
+
+  kubectl -n {{ .Release.Namespace }} logs -f deploy/{{ include "opence-server.fullname" . }}
+
+Players reach UDP port {{ .Values.service.port }} through Service {{ include "opence-server.fullname" . }} ({{ .Values.service.type }}).
+{{- if eq .Values.service.type "ClusterIP" }}
+A ClusterIP Service is not reachable from outside the cluster: set service.type to LoadBalancer or
+NodePort for internet play.
+{{- end }}
+{{- if gt (int .Values.web.port) 0 }}
+
+The web page, API and remote console:
+
+  kubectl -n {{ .Release.Namespace }} port-forward deploy/{{ include "opence-server.fullname" . }} {{ .Values.web.port }}
+  open http://127.0.0.1:{{ .Values.web.port }}/
+{{- if not .Values.web.existingSecret }}
+
+The admin password:
+
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "opence-server.secretName" . }} -o jsonpath='{.data.{{ .Values.web.key }}}' | base64 -d
+{{- end }}
+{{- end }}

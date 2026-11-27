@@ -1,0 +1,23 @@
+{{- if and .Values.web.service.enabled (gt (int .Values.web.port) 0) }}
+# The web page, its API and the remote console, inside the cluster only: for an Ingress with TLS,
+# or kubectl port-forward.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opence-server.fullname" . }}-web
+  labels:
+    {{- include "opence-server.labels" . | nindent 4 }}
+  {{- with .Values.web.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "opence-server.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: web
+      port: {{ .Values.web.service.port }}
+      targetPort: web
+      protocol: TCP
+{{- end }}

@@ -37,9 +37,10 @@ A bitmap's pixels are read from the file as the texture cache loads them
 as the hardware wants them as a Custom Edition map's are
 (rasterizer_xbox_bitmap_rebuild_hardware_format); the renderer is told
 which keep their channels where Halo PC does (multipurpose maps and HUD
-meters: custom_edition_bitmaps.c). A bitmap whose pixels are more than a
-quarter of the texture cache is left out: it could not be drawn with what
-the map draws around it. A bitmap is drawn, not simulated: nothing a network
+meters: custom_edition_bitmaps.c), unless the mod's mod.toml says its keep
+them where the Xbox does (channel_order = "xbox": bitmaps taken from an Xbox
+map). A bitmap whose pixels are more than a quarter of the texture cache is
+left out: it could not be drawn with what the map draws around it. A bitmap is drawn, not simulated: nothing a network
 game's machines agree on reads one.
 
 The map's bitmap tag takes the file's values in place, so everything that
@@ -1255,7 +1256,8 @@ boolean mod_bitmaps_read(
 	}
 	halo_custom_edition_texels_channels(
 		buffer,
-		mod_bitmaps_globals.orders_found || custom_edition_cache_tags_loaded() ?
+		!port_mods_file_xbox_channels(made->file) &&
+		(mod_bitmaps_globals.orders_found || custom_edition_cache_tags_loaded()) ?
 			(unsigned char)custom_edition_bitmap_channel_order(made->tag_index, (long)(bitmap - made->bitmaps)) :
 			_custom_edition_channels_xbox);
 	/* (on failure it logs, and the texture shows the pixels as read) */

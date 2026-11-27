@@ -73,9 +73,11 @@ index and tag, since the map placed them at the same index everywhere.
 /* ---------- headers */
 
 #include "cseries.h"
+#include "mcc_object_names.h"
 #include "cseries/errors.h"
 #include "cache/cache_files.h"
 #include "camera/camera_scripting.h"
+#include "camera/dead_camera.h"
 #include "camera/director.h"
 #include "camera/observer.h"
 #include "cutscene/cinematics.h"
@@ -120,8 +122,17 @@ index and tag, since the map placed them at the same index everywhere.
 #include "coop_pickups.h"
 #include "coop_vehicles.h"
 #include "coop_spectate.h"
+#include "coop_sound_sync.h"
 #include "network_coop.h"
+#include "vehicle_riding.h"
 #include "network_distributed.h"
+#include "../src/server_events.h" /* port: port/linux/src/server_events.c */
+#include "../src/server_json.h" /* port: port/linux/src/server_json.c */
+#include "../src/server_log.h" /* port: port/linux/src/server_log.c */
+
+/* players.c's ownership helpers, absent from its original header. */
+void network_player_detach_unit(long player_index);
+void local_player_set_player_index(short local_player_index, long player_index);
 
 /* ---------- constants */
 
@@ -318,7 +329,9 @@ struct distributed_coop_presentation_message
 
 /* Something that happens once. Which fields mean what depends on the kind:
 
-	sound             type: _coop_sound_ kind; tag_index; object_index (the source, or NONE); reals[0]: scale
+	sound             type: _coop_sound_ kind; tag_index; object_index (the source, or NONE); reals[0]: scale;
+	                  target: a looping sound's start that the host resends, one that plays once,
+	                  how many milliseconds ago it started it (NONE: just now; coop_sound_sync.c)
 	title             value: title index; reals[0]: delay in seconds
 	hud               type: _coop_hud_ kind; value
 	player_effect     type: _coop_player_effect_ kind; reals: the function's arguments
@@ -457,6 +470,17 @@ static struct
 	/* looking through the host's camera: its scripted cutscene camera, or
 	its view for a player with nothing else to look at */
 	boolean host_camera;
+	/* the presentations in a row that wanted that camera and had one that
+	never moved (client_host_camera_unmoved: logged after a second, as a
+	dedicated server of this build's moves it within a tick of a map's first
+	cutscene), and the view watched in its place (client_watch_cutscene) */
+	short host_camera_unmoved_ticks;
+	struct dead_camera unmoved_camera;
+	/* the unit the host's scripts last started a custom animation on in this
+	cinematic, as a cutscene's actors are animated: the one that view watches
+	(cutscene_subject_set FALSE outside a cinematic) */
+	boolean cutscene_subject_set;
+	long cutscene_subject;
 	/* the eased view behind the host, used while there is nothing else to
 	watch (watching_host_valid is FALSE until it is first set) */
 	boolean watching_host_valid;
@@ -526,6 +550,18 @@ static struct
 	boolean refresh;
 } host_resend;
 
+/* Checkpoints restore player_data, but not the live machines' player
+table. A team wipe may rewind only while both still name the saved team. */
+struct coop_checkpoint_players
+{
+	long players[MAXIMUM_TRACKED_PLAYERS];
+	long machine_players[HALO_PORT_MAXIMUM_NETWORK_MACHINES][MAXIMUM_LOCAL_PLAYERS];
+	short count;
+	boolean valid;
+};
+
+static struct coop_checkpoint_players checkpoint_players;
+
 /* client: the host's snap count last seen for each of its groups */
 static struct
 {
@@ -576,6 +612,11 @@ static void client_play_presentation(void);
 void unit_scripting_set_current_vitality_of(long unit_index, real body_vitality, real shield_vitality);
 /* port_config.c */
 int config_boolean(char const *name);
+long config_integer(char const *name);
+char const *config_string(char const *name);
+int halo_server_mode(void);
+/* p2p_lobby.c: chosen visibility, independent of listing transport state */
+int p2p_hosting_listed(void);
 
 /* ---------- private code */
 
@@ -1289,10 +1330,20 @@ static struct
 } host_hud_state;
 
 /* host: the looping sounds the scripts have started (music, ambience).
-They are resent every OBJECT_REFRESH_TICKS so a late joiner hears them. */
+They are resent every OBJECT_REFRESH_TICKS so a late joiner hears them.
+One that plays once (a cutscene's music or dialogue: a fake impulse one)
+ends when the sound system has played it, which a host that draws nothing
+(a dedicated server: debug_no_drawing) never does: there it is ended once
+it has had the time to play (length, the most its sounds can take, and
+LOOPING_SOUND_END_MARGIN_TICKS), as the scripts' stop would end it, and is
+not resent in that margin's time before then, when a client's copy may
+have ended and a client of an earlier build would start it again. */
 enum
 {
 	MAXIMUM_LOOPING_SOUNDS = 32,
+	LOOPING_SOUND_END_MARGIN_TICKS = 2 * TICKS_PER_SECOND,
+	/* (a sound's time, its linked permutations together, taken as an hour at most) */
+	MAXIMUM_LOOPING_SOUND_PART_MILLISECONDS = 60 * 60 * 1000,
 };
 
 static struct
@@ -1300,8 +1351,23 @@ static struct
 	long definition_index;
 	long object_index;
 	real scale;
+	long start_time;
+	/* (ticks; 0: it is never ended here) */
+	long length;
 } host_looping_sounds[MAXIMUM_LOOPING_SOUNDS];
 static short host_looping_sound_count;
+
+/* client: the looping sounds that play once (a cutscene's music or
+dialogue: fake impulse ones) the host's events started here. One that is no
+longer playing here has played out, but the host's copy can play on longer
+(a dedicated server, which renders no sound, never finishes it), and its
+resends would start it again from the beginning, over and over. The host's
+stop forgets it, so the scripts can start it again. */
+static struct
+{
+	long definition_indices[MAXIMUM_LOOPING_SOUNDS];
+	short count;
+} client_looping_sounds;
 
 static void host_send_object_names(
 	void)
@@ -1310,6 +1376,8 @@ static void host_send_object_names(
 	struct distributed_coop_object_names *names = &message.names;
 	short name_index;
 
+	/* Expanded MCC maps carry all names in their dedicated messages. */
+	if (mcc_object_names_active()) return;
 	csmemset(names, 0, sizeof(*names));
 	names->structure_bsp_index = global_structure_bsp_index_get();
 	names->name_count = (short)MIN(global_scenario_get()->object_names.count, MAXIMUM_OBJECT_NAMES_PER_SCENARIO);
@@ -1436,12 +1504,20 @@ static long camera_object_get(
 static void host_presentation(
 	struct distributed_coop_presentation *presentation)
 {
-	struct observer_result const *camera = observer_get_camera(0);
+	/* the first local player's camera (director.c's), or, on a host with no
+	player of its own (a dedicated server), the first observer's while it
+	films the scripts' camera (director_unattended_scripted_camera): else
+	none */
+	short observer_index = local_player_get_next(NONE);
+	struct observer_result const *camera;
 	struct hud_timer_state timer;
 	real_rgb_color fade_color;
 	boolean fading_out;
 	long elapsed;
 
+	if (observer_index == NONE && director_unattended_scripted_camera(0))
+		observer_index = 0;
+	camera = observer_get_camera(observer_index);
 	csmemset(presentation, 0, sizeof(*presentation));
 	SET_FLAG(presentation->flags, _presentation_cinematic_bit, cinematic_in_progress());
 	SET_FLAG(presentation->flags, _presentation_letterbox_bit, cinematic_globals->show_letterbox);
@@ -1500,6 +1576,7 @@ static void host_presentation(
 static void client_cinematic_end(
 	void)
 {
+	coop_presentation.cutscene_subject_set = FALSE;
 	if (!coop_presentation.cinematic_started)
 		return;
 	coop_presentation.cinematic_started = FALSE;
@@ -1547,6 +1624,79 @@ static boolean client_watch_host_from_behind(
 	if (!distributed_axes_make_valid(forward, up))
 		observer_up_from_forward(forward, up);
 	return valid_real_vector3d_axes2(forward, up);
+}
+
+/* client: whether the host's camera is one that never moved, as a map's
+start leaves an observer (observer_clear: at the world's origin, looking
+down x). A dedicated server of an earlier build films no cutscene: it has no
+player, and the camera it sends, its first observer's, stays so (its
+director_unattended_scripted_camera came later). Its clients would watch
+every cutscene from the origin through it */
+static boolean client_host_camera_unmoved(
+	struct distributed_coop_presentation const *presentation)
+{
+	struct distributed_vector forward;
+	struct distributed_vector up;
+
+	distributed_vector_pack(global_forward3d, DISTRIBUTED_UNIT_SCALE, &forward);
+	distributed_vector_pack(global_up3d, DISTRIBUTED_UNIT_SCALE, &up);
+	return presentation->camera_position.x == global_origin3d->x &&
+		presentation->camera_position.y == global_origin3d->y &&
+		presentation->camera_position.z == global_origin3d->z &&
+		presentation->camera_forward.i == forward.i && presentation->camera_forward.j == forward.j &&
+		presentation->camera_forward.k == forward.k &&
+		presentation->camera_up.i == up.i && presentation->camera_up.j == up.j && presentation->camera_up.k == up.k;
+}
+
+/* client: in place of a host's camera that never moved, the cutscene's
+camera watches its actor, the unit the host's scripts last animated in it
+(cutscene_subject), else this machine's player, else the first player with
+a unit, as spectating frames a teammate (coop_spectate_camera: from in
+front of one the scripts hold, as a cutscene holds them all). The camera is
+set relative to the unit, at its eyes' height (its face, not its middle,
+where a wall brings the camera close) and a depth back from it, which the
+observer shortens where something is in the way */
+static void client_watch_cutscene(
+	void)
+{
+	struct dead_camera *camera = &coop_presentation.unmoved_camera;
+	short local_player_index = local_player_get_next(NONE);
+	long player_index = local_player_index != NONE ? local_player_get_player_index(local_player_index) : NONE;
+	long unit_index = player_index != NONE ? player_get(player_index)->unit_index : NONE;
+	struct object_datum *unit;
+	real_vector3d forward;
+	real_vector3d up;
+	real_point3d eye;
+	real_point3d behind;
+	real height;
+
+	if (coop_presentation.cutscene_subject_set &&
+		object_try_and_get_and_verify_type(coop_presentation.cutscene_subject, _object_mask_unit))
+	{
+		unit_index = coop_presentation.cutscene_subject;
+	}
+	if (unit_index == NONE)
+	{
+		struct data_iterator iterator;
+		struct player_datum *player;
+
+		data_iterator_new(&iterator, player_data);
+		while (unit_index == NONE && (player = data_iterator_next(&iterator)) != NULL)
+			unit_index = player->unit_index;
+	}
+	if (unit_index == NONE || !(unit = object_try_and_get(unit_index)))
+		return;
+	camera->unit_index = unit_index;
+	coop_spectate_camera(camera);
+	vector3d_from_euler_angles2d(&forward, &camera->facing);
+	observer_up_from_forward(&forward, &up);
+	unit_get_camera_position(unit_index, &eye);
+	height = PIN(eye.z - unit->object.bounding_sphere_center.z, 0.0f, unit->object.bounding_sphere_radius);
+	behind.x = -forward.i * camera->distance;
+	behind.y = -forward.j * camera->distance;
+	behind.z = -forward.k * camera->distance + height;
+	if (valid_real_vector3d_axes2(&forward, &up))
+		scripted_camera_set_camera_point_relative(&behind, &forward, &up, camera->field_of_view, 0, unit_index);
 }
 
 /* client: looks through the host's camera, or with its own */
@@ -1671,9 +1821,17 @@ static void client_apply_unit_animation(
 		return;
 	}
 	if (event->tag_index == NONE)
+	{
 		unit_stop_custom_animation(event->object_index);
+	}
 	else if (distributed_graph_animation(event->tag_index, event->value))
+	{
 		unit_port_play_user_animation(event->object_index, event->tag_index, event->value, event->interpolate, event->frame);
+		/* (a cutscene's actor, for a host whose camera never moved:
+		client_watch_cutscene) */
+		coop_presentation.cutscene_subject = event->object_index;
+		coop_presentation.cutscene_subject_set = TRUE;
+	}
 }
 
 static void client_apply_scenery_animation(
@@ -1686,6 +1844,43 @@ static void client_apply_scenery_animation(
 	/* scenery animations have no random permutations, so the name finds the same one */
 	if (scenery_index != NONE && animation)
 		scenery_animation_start_at_frame(scenery_index, event->tag_index, animation->name, event->frame);
+}
+
+/* index of the looping sound in client_looping_sounds, or NONE */
+static short client_looping_sound_find(
+	long definition_index)
+{
+	short index;
+
+	for (index = 0; index < client_looping_sounds.count; index++)
+	{
+		if (client_looping_sounds.definition_indices[index] == definition_index)
+			return index;
+	}
+	return NONE;
+}
+
+static void client_looping_sound_started(
+	long definition_index)
+{
+	struct looping_sound_definition *definition = looping_sound_definition_get(definition_index);
+
+	if (TEST_FLAG(definition->flags, _looping_sound_fake_impulse_sound_bit) &&
+		definition->runtime_scripting_sound_index != NONE &&
+		client_looping_sound_find(definition_index) == NONE &&
+		client_looping_sounds.count < MAXIMUM_LOOPING_SOUNDS)
+	{
+		client_looping_sounds.definition_indices[client_looping_sounds.count++] = definition_index;
+	}
+}
+
+static void client_looping_sound_forget(
+	long definition_index)
+{
+	short index = client_looping_sound_find(definition_index);
+
+	if (index != NONE)
+		client_looping_sounds.definition_indices[index] = client_looping_sounds.definition_indices[--client_looping_sounds.count];
 }
 
 static void client_apply_sound(
@@ -1706,16 +1901,27 @@ static void client_apply_sound(
 		}
 		break;
 	case _coop_sound_looping_start:
-		/* a resent sound that is already playing here is left alone */
+		/* a resent sound that is already playing here is left alone, and so
+		is one that has played out here (client_looping_sounds) */
 		if (distributed_tag_of_group(event->tag_index, LOOPING_SOUND_DEFINITION_TAG) &&
-			looping_sound_definition_get(event->tag_index)->runtime_scripting_sound_index == NONE)
+			looping_sound_definition_get(event->tag_index)->runtime_scripting_sound_index == NONE &&
+			client_looping_sound_find(event->tag_index) == NONE)
 		{
+			/* (one that plays once starts where the host has reached) */
+			coop_sound_sync_begin(event->tag_index,
+				TEST_FLAG(looping_sound_definition_get(event->tag_index)->flags,
+					_looping_sound_fake_impulse_sound_bit) ? event->target : NONE);
 			scripted_looping_sound_start(event->tag_index, object_index, scale);
+			client_looping_sound_started(event->tag_index);
 		}
 		break;
 	case _coop_sound_looping_stop:
 		if (distributed_tag_of_group(event->tag_index, LOOPING_SOUND_DEFINITION_TAG))
+		{
+			client_looping_sound_forget(event->tag_index);
+			coop_sound_sync_end(event->tag_index);
 			scripted_looping_sound_stop(event->tag_index);
+		}
 		break;
 	default:
 		break;
@@ -2034,9 +2240,12 @@ void network_coop_new_game(
 	csmemset(host_friendly_fire, 0, sizeof(host_friendly_fire));
 	csmemset(&host_sent_screen_effect, 0, sizeof(host_sent_screen_effect));
 	csmemset(&host_resend, 0, sizeof(host_resend));
+	csmemset(&checkpoint_players, 0, sizeof(checkpoint_players));
 	csmemset(&players_vitality, 0, sizeof(players_vitality));
 	host_attachment_count = 0;
 	host_looping_sound_count = 0;
+	client_looping_sounds.count = 0;
+	coop_sound_sync_reset();
 	host_hud_state.objective = NONE;
 	host_hud_state.nav_point_count = 0;
 	skip_vote_clear();
@@ -2047,6 +2256,114 @@ void network_coop_new_game(
 	coop_enemies_new_game();
 	coop_pickups_new_game();
 	coop_vehicles_new_game();
+}
+
+/* game_state.c calls only after the checkpoint file was written. This
+metadata stays outside the saved image, as the live machine table does. */
+void network_coop_checkpoint_saved(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short machine_index;
+	short local_player_index;
+
+	checkpoint_players.valid = FALSE;
+	checkpoint_players.count = 0;
+	if (!coop_host())
+		return;
+	csmemset(checkpoint_players.players, NONE, sizeof(checkpoint_players.players));
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+
+		if (player->quit_out_of_game)
+			continue;
+		if (!VALID_INDEX(index, MAXIMUM_TRACKED_PLAYERS))
+			return;
+		checkpoint_players.players[index] = iterator.datum_index;
+		checkpoint_players.count++;
+	}
+	for (machine_index = 0; machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine_index++)
+	{
+		long *players = machine_get_player_list(machine_index);
+
+		for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+			checkpoint_players.machine_players[machine_index][local_player_index] = players[local_player_index];
+	}
+	checkpoint_players.valid = checkpoint_players.count > 0;
+}
+
+static boolean checkpoint_players_match(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short count = 0;
+	short machine_index;
+	short local_player_index;
+
+	if (!checkpoint_players.valid)
+		return FALSE;
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		short index = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+
+		if (player->quit_out_of_game)
+			continue;
+		if (!VALID_INDEX(index, MAXIMUM_TRACKED_PLAYERS) ||
+			checkpoint_players.players[index] != iterator.datum_index)
+		{
+			return FALSE;
+		}
+		count++;
+	}
+	if (count != checkpoint_players.count)
+		return FALSE;
+	for (machine_index = 0; machine_index < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine_index++)
+	{
+		long *players = machine_get_player_list(machine_index);
+
+		for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+		{
+			if (checkpoint_players.machine_players[machine_index][local_player_index] != players[local_player_index])
+				return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+/* Only the host chooses. Unknown values use the automatic policy too;
+PUBLIC is a visibility choice, including games protected by a password. */
+/* whether the game hosted is public, for network.coop_team_wipe "auto": a
+player's listed lobby (p2p_hosting_listed), or a dedicated server's
+server.public with internet play, which its lobby's own flag does not say */
+static boolean network_coop_hosting_public(
+	void)
+{
+	if (halo_server_mode())
+		return config_boolean("server.public") && config_boolean("network.online");
+	return p2p_hosting_listed() != 0;
+}
+
+boolean network_coop_wipe_reverts(
+	void)
+{
+	char const *mode;
+
+	if (!coop_host())
+		return FALSE;
+	mode = config_string("network.coop_team_wipe");
+	if (!strcmp(mode, "respawn") || (strcmp(mode, "revert") && network_coop_hosting_public()))
+		return FALSE;
+	if (!checkpoint_players_match())
+	{
+		error(_error_silent, "co-op: team wipe respawns without a revert: no checkpoint with the current players and machines");
+		return FALSE;
+	}
+	return TRUE;
 }
 
 /* A network game on a campaign scenario with no game engine. Checking the
@@ -2113,6 +2430,184 @@ boolean network_coop_players_friendly_fire(
 	/* one who is away is hurt whatever either chose; else both must play
 	with it */
 	return victim->idle_ticks > FRIENDLY_FIRE_AWAY_TICKS || (!attacker->declined && !victim->declined);
+}
+
+boolean network_coop_player_away(
+	long player_index)
+{
+	struct friendly_fire_player *entry;
+
+	if (!coop_host())
+		return FALSE;
+	entry = host_friendly_fire_player(player_index);
+	return entry && entry->idle_ticks > FRIENDLY_FIRE_AWAY_TICKS;
+}
+
+boolean network_coop_host_dedicated(
+	void)
+{
+	struct network_game *game;
+
+	if (game_connection() == _game_connection_network_server)
+		return halo_server_mode() != 0;
+	if (!network_coop_active() || !(game = network_game_get_game()))
+		return FALSE;
+	return TEST_FLAG(game->cooperative_flags, _network_game_cooperative_dedicated_bit);
+}
+
+boolean network_coop_bsp_switch_majority(
+	void)
+{
+	return coop_host() && halo_server_mode() && strcmp(config_string("server.coop_bsp_switch"), "anyone") != 0;
+}
+
+long network_coop_bsp_switch_cooldown_ticks(
+	void)
+{
+	long seconds;
+
+	if (!coop_host() || !halo_server_mode())
+		return 0;
+	seconds = config_integer("server.coop_bsp_switch_cooldown_seconds");
+	return seconds < 0 ? 0 : MIN(seconds, 300) * TICKS_PER_SECOND;
+}
+
+/* how often a player waiting at a loading zone is told so */
+#define BSP_SWITCH_WAITING_TICKS (3 * TICKS_PER_SECOND)
+
+void network_coop_tell_bsp_switch_waiting(
+	long player_index,
+	long more,
+	long in,
+	long total)
+{
+	static long told_times[MAXIMUM_TRACKED_PLAYERS];
+	long absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(player_index);
+	long machine_index = distributed_player_machine((short)absolute_index);
+	char text[128];
+
+	if (!coop_host() || absolute_index >= MAXIMUM_TRACKED_PLAYERS ||
+		(told_times[absolute_index] && game_time_get() - told_times[absolute_index] < BSP_SWITCH_WAITING_TICKS &&
+			game_time_get() >= told_times[absolute_index]))
+	{
+		return;
+	}
+	told_times[absolute_index] = game_time_get() ? game_time_get() : 1;
+	if (more > 0)
+		snprintf(text, sizeof(text), "Waiting for %ld more player%s to cross (%ld of %ld)", more, more == 1 ? "" : "s",
+			in, total);
+	else
+		snprintf(text, sizeof(text), "The loading zone opens in %ld seconds", total);
+	if (machine_index == NONE)
+	{
+		short local_player_index = player_get(player_index)->local_player_index;
+		wchar_t wide[128];
+		long index;
+
+		if (local_player_index == NONE)
+			return;
+		for (index = 0; text[index] && index < (long)NUMBEROF(wide) - 1; index++)
+			wide[index] = (wchar_t)(unsigned char)text[index];
+		wide[index] = 0;
+		hud_print_message(local_player_index, wide);
+		return;
+	}
+	distributed_send_notice_to_machine(machine_index, text);
+}
+
+void network_coop_note_bsp_switch(
+	short from,
+	short to,
+	long const *player_indices,
+	long count)
+{
+	char names[96] = "", notice[160];
+	struct server_json json;
+	long index;
+
+	if (!coop_host())
+		return;
+	server_json_begin(&json);
+	server_json_object_begin(&json, NULL);
+	server_json_string(&json, "event", "coop_bsp_switch");
+	server_json_integer(&json, "from", from);
+	server_json_integer(&json, "to", to);
+	server_json_array_begin(&json, "players");
+	for (index = 0; index < count; index++)
+	{
+		char name[16] = "";
+
+		if (player_indices[index] == NONE)
+			continue;
+		{
+			struct player_datum *player = player_get(player_indices[index]);
+			long character;
+
+			/* (printable ASCII of the player's name) */
+			for (character = 0; character < (long)NUMBEROF(player->name) && player->name[character] &&
+				character < (long)sizeof(name) - 1; character++)
+			{
+				name[character] = player->name[character] >= 0x20 && player->name[character] < 0x7F ?
+					(char)player->name[character] : '?';
+			}
+			name[character] = 0;
+		}
+		server_json_string(&json, NULL, name);
+		if (strlen(names) + strlen(name) + 3 < sizeof(names))
+		{
+			if (names[0])
+				strcat(names, index == count - 1 ? " and " : ", ");
+			strcat(names, name);
+		}
+	}
+	server_json_array_end(&json);
+	server_json_object_end(&json);
+	if (halo_server_mode())
+	{
+		server_event_add("game", server_json_text(&json));
+		server_log(_server_log_info, "coop", "the loading zone to part %d crossed by %s (from part %d)", to,
+			names[0] ? names : "nobody", from);
+	}
+	server_json_free(&json);
+	snprintf(notice, sizeof(notice), "%s moved the team on", names[0] ? names : "A player");
+	distributed_send_notice(notice);
+}
+
+/* a dedicated server's co-op entry's riding rule (NONE: the entry gives
+none), set for every entry it applies so the next cannot inherit it */
+static short riding_entry_rule = NONE;
+
+void network_game_port_vehicle_riding_entry(
+	short rule)
+{
+	riding_entry_rule = rule == NONE || rule == FALSE ? rule : TRUE;
+}
+
+/* the host's decision for the game about to start, the only writer of the
+riding bit: it is made from this game alone, so nothing of an earlier game
+(a co-op game's option, a gametype's flag) is carried over */
+void network_game_port_vehicle_riding_start(
+	struct network_game *game)
+{
+	boolean riding = vehicle_riding_decide(
+		game->variant.game_engine_index != game_engine_none,
+		TEST_FLAG(game->variant.universal_variant.flags, _game_variant_vehicle_riding_bit),
+		config_boolean("network.vehicle_riding") != 0,
+		riding_entry_rule,
+		halo_server_mode() != 0,
+		config_boolean("server.vehicle_riding_override_gametype") != 0);
+
+	SET_FLAG(game->cooperative_flags, _network_game_cooperative_vehicle_riding_bit, riding);
+}
+
+/* whether the host's decision for the running game is to carry players standing on a vehicle (bit 3 of the
+cooperative_flags, which travel with every settings send: vehicle_riding.c) */
+boolean network_game_port_vehicle_riding(
+	void)
+{
+	struct network_game *game = network_game_get_game();
+
+	return game && TEST_FLAG(game->cooperative_flags, _network_game_cooperative_vehicle_riding_bit);
 }
 
 boolean network_coop_devices_remote(
@@ -2225,9 +2720,55 @@ static short host_looping_sound_find(
 	return NONE;
 }
 
+/* the most a sound plays, its linked permutations together, in
+milliseconds, or 0 for none (coop_sound_sync.c: the tag's
+longest_permutation_length is a single permutation's, a little over a second
+of a cutscene's music of 86) */
+static long looping_sound_part_milliseconds(
+	long sound_index)
+{
+	long length;
+
+	if (sound_index == NONE)
+		return 0;
+	length = coop_sound_sync_sound_milliseconds(sound_index);
+	return PIN(length, 0, MAXIMUM_LOOPING_SOUND_PART_MILLISECONDS);
+}
+
+/* the most ticks a looping sound that plays once can take (each track's
+start, loop and stop sounds, the longer of a loop or stop and its
+alternate), or 0 for one that does not play once or whose sounds give no
+length */
+static long looping_sound_play_once_ticks(
+	long definition_index)
+{
+	struct looping_sound_definition *definition = looping_sound_definition_get(definition_index);
+	long longest = 0;
+	long track_index;
+
+	if (!TEST_FLAG(definition->flags, _looping_sound_fake_impulse_sound_bit))
+		return 0;
+	for (track_index = 0; track_index < definition->tracks.count && track_index < MAXIMUM_TRACKS_PER_LOOPING_SOUND;
+		track_index++)
+	{
+		struct looping_sound_track *track =
+			TAG_BLOCK_GET_ELEMENT(&definition->tracks, track_index, struct looping_sound_track);
+		long length = looping_sound_part_milliseconds(track->start_sound.index) +
+			MAX(looping_sound_part_milliseconds(track->loop_sound.index),
+				looping_sound_part_milliseconds(track->alternate_loop_sound.index)) +
+			MAX(looping_sound_part_milliseconds(track->stop_sound.index),
+				looping_sound_part_milliseconds(track->alternate_stop_sound.index));
+
+		longest = MAX(longest, length);
+	}
+	return longest * TICKS_PER_SECOND / 1000;
+}
+
 /* host, each tick: a looping sound that stopped without the scripts
 stopping it (it ended, or a skipped cutscene's revert took it) is stopped on
-the clients too; the rest are started again with the resent state */
+the clients too; one that plays once is ended where nothing draws once it
+has had the time to play (host_looping_sounds); the rest are started again
+with the resent state */
 static void host_send_looping_sounds(
 	void)
 {
@@ -2236,8 +2777,18 @@ static void host_send_looping_sounds(
 	while (index < host_looping_sound_count)
 	{
 		long definition_index = host_looping_sounds[index].definition_index;
+		long length = debug_no_drawing ? host_looping_sounds[index].length : 0;
+		long played = game_time_get() - host_looping_sounds[index].start_time;
 		struct distributed_coop_event *event;
 
+		if (length > 0 && played >= length + LOOPING_SOUND_END_MARGIN_TICKS &&
+			looping_sound_definition_get(definition_index)->runtime_scripting_sound_index != NONE)
+		{
+			/* (its stop, sent and taken out of the list as the scripts' is;
+			the next pass takes it out if no stop could be sent) */
+			scripted_looping_sound_stop(definition_index);
+			continue;
+		}
 		if (looping_sound_definition_get(definition_index)->runtime_scripting_sound_index == NONE)
 		{
 			if ((event = event_new(_coop_event_sound)) != NULL)
@@ -2248,12 +2799,17 @@ static void host_send_looping_sounds(
 			host_looping_sounds[index] = host_looping_sounds[--host_looping_sound_count];
 			continue;
 		}
-		if (host_resend.refresh && (event = event_new(_coop_event_sound)) != NULL)
+		if (host_resend.refresh && !(length > 0 && played + LOOPING_SOUND_END_MARGIN_TICKS >= length) &&
+			(event = event_new(_coop_event_sound)) != NULL)
 		{
 			event->type = _coop_sound_looping_start;
 			event->tag_index = definition_index;
 			event->object_index = host_looping_sounds[index].object_index;
 			event->reals[0] = host_looping_sounds[index].scale;
+			/* (one that plays once: how long ago, so a machine that starts it
+			now starts it where this one is) */
+			if (host_looping_sounds[index].length > 0 && played > 0)
+				event->target = played * 1000 / TICKS_PER_SECOND;
 		}
 		index++;
 	}
@@ -2289,6 +2845,8 @@ void network_coop_note_sound(
 			host_looping_sounds[index].definition_index = definition_index;
 			host_looping_sounds[index].object_index = object_index;
 			host_looping_sounds[index].scale = scale;
+			host_looping_sounds[index].start_time = game_time_get();
+			host_looping_sounds[index].length = looping_sound_play_once_ticks(definition_index);
 		}
 	}
 }
@@ -2356,6 +2914,25 @@ static void send_nav_point(
 	event->reals[0] = vertical_offset;
 }
 
+/* host: whether a nav point is on an object that is gone or dead, which a
+player's HUD drops (hud_update_nav_point_local_player). It is kept, not
+forgotten: the list is outside the checkpoint, and a revert brings the
+object back with the script that marked it already past. */
+static boolean host_nav_point_object_dead(
+	short index)
+{
+	struct object_datum *object;
+
+	if (host_hud_state.nav_points[index].kind != _coop_nav_point_team_object &&
+		host_hud_state.nav_points[index].kind != _coop_nav_point_unit_object)
+	{
+		return FALSE;
+	}
+	object = object_try_and_get(host_hud_state.nav_points[index].marker);
+
+	return !object || TEST_FLAG(object->object.damage_flags, _object_dead_bit);
+}
+
 void network_coop_note_nav_point(
 	short kind,
 	short nav_index,
@@ -2384,9 +2961,19 @@ void network_coop_note_nav_point(
 	}
 	if (index == host_hud_state.nav_point_count)
 	{
+		/* (full: one on a dead object makes way, the dead kept but never sent) */
 		if (index == MAXIMUM_NAV_POINTS)
-			return;
-		host_hud_state.nav_point_count++;
+		{
+			for (index = 0; index < host_hud_state.nav_point_count && !host_nav_point_object_dead(index); index++)
+			{
+			}
+			if (index == host_hud_state.nav_point_count)
+				return;
+		}
+		else
+		{
+			host_hud_state.nav_point_count++;
+		}
 	}
 	host_hud_state.nav_points[index].kind = kind;
 	host_hud_state.nav_points[index].nav_index = nav_index;
@@ -2416,6 +3003,11 @@ static void host_send_hud_state(
 	}
 	for (index = 0; index < host_hud_state.nav_point_count; index++)
 	{
+		/* (not one on a dead object: a script rarely takes one off a dead
+		enemy, and resent, it flashed up on every client until the client
+		dropped it again) */
+		if (host_nav_point_object_dead(index))
+			continue;
 		send_nav_point(host_hud_state.nav_points[index].kind, host_hud_state.nav_points[index].nav_index,
 			host_hud_state.nav_points[index].target, host_hud_state.nav_points[index].marker,
 			host_hud_state.nav_points[index].vertical_offset);
@@ -2690,6 +3282,101 @@ boolean network_coop_vote_skip(
 	return TRUE;
 }
 
+/* A checkpoint holds gameplay players, but the session roster and the machine
+table live outside it. Keep the host's current membership when loading an older
+checkpoint: a departed player must not come back, nor a late joiner disappear.
+This runs before the saved-game camera and input caches are rebuilt. */
+void network_coop_restore_players(void)
+{
+	struct network_game *game;
+	struct data_iterator iterator;
+	struct player_datum *player;
+	short machine, local;
+	long slot;
+
+	if (!coop_host())
+		return;
+	game = network_game_get_game();
+	if (!game || !player_data || !player_data->valid)
+		return;
+	for (local = 0; local < MAXIMUM_LOCAL_PLAYERS; local++)
+		local_player_set_player_index(local, NONE);
+	for (machine = 0; machine < HALO_PORT_MAXIMUM_NETWORK_MACHINES; machine++)
+		csmemset(machine_get_player_list(machine), NONE, MAXIMUM_LOCAL_PLAYERS * sizeof(long));
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = data_iterator_next(&iterator)) != NULL)
+	{
+		struct network_player *member;
+		long unit_index;
+
+		slot = DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index);
+		member = slot < HALO_PORT_MAXIMUM_NETWORK_PLAYERS ? &game->players[slot] : NULL;
+		if (network_player_is_valid(member) && member->player_list_index == slot &&
+			member->machine_index == player->network_player_data.machine_index &&
+			member->controller_index == player->network_player_data.controller_index)
+		{
+			player->network_player_data = *member;
+			csmemcpy(player->name, member->name, sizeof(player->name));
+			player->quit_out_of_game = FALSE;
+			player->quit_out_of_game_time = NONE;
+			machine_get_player_list(member->machine_index)[member->controller_index] = iterator.datum_index;
+			if (network_game_player_is_local(member))
+				local_player_set_player_index(member->controller_index, iterator.datum_index);
+		}
+		else
+		{
+			/* Retain a quit datum until its slot is reused, as a normal leave
+			does. network_game_spawn_player then forgets all its object owners. */
+			unit_index = player->unit_index;
+			network_player_detach_unit(iterator.datum_index);
+			if (unit_index != NONE)
+				object_delete(unit_index);
+			player->quit_out_of_game = TRUE;
+			player->quit_out_of_game_time = NONE;
+		}
+	}
+	for (slot = 0; slot < HALO_PORT_MAXIMUM_NETWORK_PLAYERS; slot++)
+	{
+		struct network_player *member = &game->players[slot];
+		long player_index;
+
+		if (!network_player_is_valid(member) || member->player_list_index != slot)
+			continue;
+		player = distributed_player((short)slot);
+		if (player && !player->quit_out_of_game)
+			continue;
+		if (!network_game_spawn_player(member))
+		{
+			error(_error_silent, "co-op: could not restore current player %ld", slot);
+			continue;
+		}
+		player_index = distributed_player_from_byte((byte)slot);
+		if (network_game_player_is_local(member))
+			local_player_set_player_index(member->controller_index, player_index);
+	}
+}
+
+/* Retire queued actions and client playback from the discarded world. Keep
+the host's comparison baselines: treating a restored device as newly loaded
+would suppress the state clients need. Checkpoint and session metadata stay. */
+void network_coop_reset_recovery(void)
+{
+	if (coop_client())
+	{
+		client_stop_script_sounds();
+		client_cinematic_end();
+		client_host_camera_set(FALSE);
+	}
+	csmemset(&coop_presentation, 0, sizeof(coop_presentation));
+	csmemset(&coop_events, 0, sizeof(coop_events));
+	csmemset(&client_devices, 0, sizeof(client_devices));
+	csmemset(client_names_differing, 0, sizeof(client_names_differing));
+	csmemset(&host_resend, 0, sizeof(host_resend));
+	csmemset(host_player_structure_bsps, NONE, sizeof(host_player_structure_bsps));
+	skip_vote_clear();
+}
+
 /* The host reverted its game state, clock included. The clock is
 put back, since clients and the netcode expect it to only go forward, and
 the script threads' wake times move by the same amount so they still wake
@@ -2716,6 +3403,7 @@ void network_coop_reverted(
 	}
 	/* (the dropships' riders kept are of the game state reverted from) */
 	coop_enemies_reset();
+	network_distributed_reverted();
 	error(_error_silent, "co-op: reverted %ld ticks, clock kept at %ld", ticks, now);
 	event_new(_coop_event_reverted);
 }
@@ -2909,7 +3597,14 @@ void network_coop_handle_object_transforms(
 		distributed_vector_unpack(&transform->forward, DISTRIBUTED_UNIT_SCALE, &forward);
 		distributed_vector_unpack(&transform->up, DISTRIBUTED_UNIT_SCALE, &up);
 		if (distributed_point_valid(&transform->position, UNIT_WORLD_BOUND) && distributed_axes_make_valid(&forward, &up))
+		{
+			real_point3d before = object_get(object_index)->object.position;
+			real_vector3d before_forward = object_get(object_index)->object.forward;
+			real_vector3d before_up = object_get(object_index)->object.up;
+
 			object_set_position(object_index, &transform->position, &forward, &up);
+			network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, _network_vehicle_write_coop);
+		}
 	}
 }
 
@@ -3027,6 +3722,8 @@ void network_coop_handle_object_names(
 	struct distributed_coop_object_names const *names = entries;
 	short name_index;
 
+	if (mcc_object_names_active()) return;
+
 	if (!coop_client())
 		return;
 	if (names->structure_bsp_index != global_structure_bsp_index_get() ||
@@ -3114,6 +3811,8 @@ static void client_presentation_apply(
 	struct distributed_coop_presentation const *presentation)
 {
 	boolean cinematic = TEST_FLAG(presentation->flags, _presentation_cinematic_bit);
+	boolean host_camera_wanted;
+	boolean host_camera_unmoved;
 
 	player_input_enable(!presentation->input_disabled);
 	if (presentation->players_vitality_set && distributed_real_valid(presentation->players_maximum_body_vitality) &&
@@ -3139,19 +3838,36 @@ static void client_presentation_apply(
 	{
 		client_cinematic_end();
 	}
-	/* Use the host's camera while its scripts control it. Spectate instead
-	when the cutscene leaves the camera with the player, or when the watched
-	teammate rides an AI-flown Pelican (a level's insertion): shots filmed
-	beside a moving Pelican shake against this machine's copy of it. A player
-	with no unit and nobody to watch also gets the host's view, rather than
-	a dead camera at the world origin. */
-	client_host_camera_set((coop_presentation.cinematic_started && presentation->camera_scripted &&
-		!coop_spectate_watching_rider(0)) || coop_spectate_nothing_to_watch(0));
+	/* Use the host's camera while its scripts control it, a dead player's
+	too: the cutscene's camera wins over spectating (shots filmed by a moving
+	Pelican follow this machine's copy of it: camera_object_offset). Spectate
+	instead only when the cutscene leaves the camera with the player. A
+	player with no unit and nobody to watch also gets the host's view,
+	rather than a dead camera at the world origin. A camera that never moved
+	(a dedicated server of an earlier build's: client_host_camera_unmoved)
+	is not looked through: the cutscene's camera watches its actors instead
+	(client_watch_cutscene), rather than the world's origin. */
+	host_camera_wanted = (coop_presentation.cinematic_started && presentation->camera_scripted) ||
+		coop_spectate_nothing_to_watch(0);
+	host_camera_unmoved = host_camera_wanted && client_host_camera_unmoved(presentation);
+	if (!host_camera_unmoved)
+		coop_presentation.host_camera_unmoved_ticks = 0;
+	else if (coop_presentation.host_camera_unmoved_ticks < TICKS_PER_SECOND &&
+		++coop_presentation.host_camera_unmoved_ticks == TICKS_PER_SECOND)
+	{
+		error(_error_silent, "co-op: the host's camera stays at the world's origin (a dedicated server of an "
+			"earlier build films no cutscene): this machine watches the cutscene's actors");
+	}
+	client_host_camera_set(host_camera_wanted);
 	/* (also outside a cinematic: a cutscene that leaves the players their
 	controls shows the bars too) */
 	cinematic_show_letterbox(TEST_FLAG(presentation->flags, _presentation_letterbox_bit));
 	objects_port_set_activating_cluster((short)(presentation->activating_cluster - 1));
-	if (coop_presentation.host_camera)
+	if (coop_presentation.host_camera && host_camera_unmoved)
+	{
+		client_watch_cutscene();
+	}
+	else if (coop_presentation.host_camera)
 	{
 		real_vector3d forward, up;
 

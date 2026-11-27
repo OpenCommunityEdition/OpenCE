@@ -47,6 +47,33 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
     host's is once that stops, or if they drift apart while it moves;
   - which named objects exist, so scripted creates and deletes match.
 
+  The camera sent is the host's first local player's. A dedicated server
+  has no local player, so while the scripts have the camera
+  (`camera_control`) its first observer films their camera as a player's
+  would (`director_unattended_scripted_camera`, director.c); before, it
+  never ran, and every client watched a cutscene from the world's origin.
+  Only the camera's values changed: no network version. A dedicated server
+  of an earlier build still sends that camera, which stays as a map's start
+  leaves an observer (at the world's origin, looking down x), where no shot
+  is. A client that gets it keeps the cutscene's view but watches the
+  cutscene's actors instead (`client_watch_cutscene`, network_coop.c): the
+  unit the host's scripts last started a custom animation on, which every
+  build sends, else its own player, framed as spectating frames a teammate
+  the scripts hold.
+
+  The scripts' looping sounds (music, ambience, a cutscene's music and
+  dialogue) are resent every two seconds, so a machine that joins hears
+  them. The resends of one that plays once (a fake impulse looping sound)
+  say how many milliseconds ago the host started it (the event's `target`),
+  and a machine that starts it from a resend starts it there
+  (`coop_sound_sync.c`): a start sound that has played out is skipped, the
+  part playing starts at the permutation and block that time falls in, and a
+  sound that has played out does not start. Each machine still picks its own
+  pitches and permutations. A start with no time (`NONE`: the scripts' own
+  start, and every start from a host built before this) plays from the
+  beginning, and a client built before this ignores the time, so neither
+  needs a new network version.
+
   Script actions naming player0 also reach the players beyond player1.
   They use the same reverse datum order as the script's `(players)` list,
   skipping players without units, so a scripted BSP transition does not
@@ -65,8 +92,14 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   outside the loaded BSP and falling for two seconds is brought back beside
   the host, else a teammate. A dead
   player watches a living teammate (`coop_spectate.c`) and comes back
-  beside one once it is safe. With everyone dead they come back where they
-  were at the last checkpoint, without a revert. A mission the scripts fail
+  beside one once it is safe. With everyone dead, TEAM WIPE in Co-op
+  Options (`network.coop_team_wipe`) defaults to AUTO: private games revert
+  the checkpoint; public games respawn at checkpoint positions without
+  reverting the world. REVERT CHECKPOINT and RESPAWN ONLY override the
+  visibility choice, including public games with passwords. Reverting
+  requires a saved checkpoint with the same players and machine
+  assignments; otherwise the host logs the fallback and respawns them.
+  A mission the scripts fail
   with players still alive reverts to the last checkpoint on the host, as a
   skipped cutscene does (below); a client never reverts on its own. A level
   won ends the round as in multiplayer, and the next round is the
@@ -161,16 +194,81 @@ A host's game advertisement says that it plays this netcode. A client does
 not join a host that does not (one of network version 4 built before the
 lockstep netcode was removed, set to play it): it tells the player why.
 
+## OpenCE network agreement
+
+OpenCE network version 42 replaced version 41 for Xbox, Custom Edition and MCC sessions;
+version 44 (below, "Versions") replaces it.
+Advertisements and ordinary join requests carry a version; one this build
+does not play with is rejected before admission ("Versions": version 43
+plays with 44, but not on an MCC map). There is no separate MCC capability
+envelope or optional shoulder-camera protocol. Retired fork message IDs 101 and
+102 remain unused. The historical version-41 record is retained as a test fixture,
+not a crossplay promise.
+
+Every settings transfer sends the complete shared `network_game` record, including
+the two 32-byte MCC digests (zero for Xbox/CE). The reassembler pins its total size,
+checks offsets and the terminated map name, and clears interrupted staging before
+accepting another record. MCC identity resolution and content validation remain
+MCC-owned and run only for MCC map names.
+
+The distributed header adds a checkpoint epoch. The host controls checkpoint
+recovery; stale updates from an earlier epoch cannot mutate the restored world.
+Shared co-op recovery restores the current roster and resets replica state.
+Small client-clock deficits recover through bounded actual simulation ticks.
+
+Scripted player poses carry five signed-16-bit direction vectors (30 bytes) for
+desired facing/aim/look and current aim/look, plus suspension in the unit flags.
+The host sends this extension when input is inhibited or a unit is suspended.
+Clients validate the entire extension (a pose that is not unit vectors is
+left out, the unit's other state and the message's other units kept); normal
+input keeps local prediction and omits the vectors. Matching position does
+not suppress orientation correction.
+
+Version 42 also requires initialized three-point boat controls and the corrected
+shared console-syntax/checkpoint lifetime. MCC snapshots include extra grenades,
+campaign state, named objects and game speed (messages 97-100). Package sharing,
+installed-content validation and conversion progress use messages 103-106, with
+their own bounds, host authority and map-family checks described below.
+
+The version increase is necessary for both changed wire layouts and simulation
+behavior peers must agree on. Tests cover ordinary join admission, exact settings
+round trips, message direction, checkpoint epochs, recovery and scripted poses.
+Runtime validation and its limits are recorded in the MCC upstream validation log;
+passing unit checks alone does not establish every-map compatibility.
+
 ## Versions
 
 The native builds' network code has a version, an unsigned 16-bit number
 (`HALO_PORT_NETWORK_VERSION` in `port/linux/include/halo_port_limits.h`),
-raised with any change to what the machines send each other. A host puts it
-in its game's advertisement (reserved bytes that hosts built before there
-was a version send as zeros, so they are version 0). A client does not join
-a host of another version: it shows a message box that says which of the
-two is newer, with both versions ("update the game" or "ask the host to
-update"), and stays in the list of games. Version 1 was the first of this
+raised with any change to what the machines send each other. A host puts a
+version in its game's advertisement (reserved bytes that hosts built before
+there was a version send as zeros, so they are version 0). A build plays
+with a range of versions, from `HALO_PORT_NETWORK_VERSION_OLDEST` to its own
+(`HALO_PORT_NETWORK_VERSION_PLAYS`): a client joins a host of any of them,
+and says the host's version in its join request when it is older (a host of
+a build before the range takes only its own); a host takes a client of any
+of them, in a game on an MCC map from `HALO_PORT_NETWORK_VERSION_OLDEST_MCC`.
+A client does not join a host of a version outside it: it shows a message
+box that says which of the two is newer, with both versions ("update the
+game" or "ask the host to update"), and stays in the list of games.
+
+A version raised for a change that the version before it still plays with
+(the wire format recorded in `network_format.txt` the same, and nothing
+either side does that the other's game needs to know) keeps
+`HALO_PORT_NETWORK_VERSION_OLDEST`; a change it cannot play with raises
+`HALO_PORT_NETWORK_VERSION_OLDEST` to the new version. A host advertises
+`HALO_PORT_NETWORK_VERSION_ADVERTISED`, or `network.advertise_version` when
+this build plays with it (an MCC map's game at least
+`HALO_PORT_NETWORK_VERSION_OLDEST_MCC`), in its advertisement and its server
+browser listing: builds released before the range join only a host that
+advertises their own version, so it is kept at the version players have
+while a newer one plays with it. Version 43, as released (Build 344 on,
+with vehicle riding), sends what 44 sends; 44 changed MCC package sharing
+alone, so 43 plays with 44 but not on an MCC map, where a host of 44 leaves
+out the base resources a machine of 43 cannot find on its own. A host of
+44 that changes to an MCC map with a machine of 43 in its lobby goes on:
+that machine's package check fails, as it does for any machine without the
+map, and the start leaves it out. Version 1 was the first of this
 netcode; version 2 lets a machine join a game in progress; version 3 puts
 each player in its slot of the host's player list on every machine;
 version 4 plays the European (PAL) maps as the North American ones
@@ -270,7 +368,134 @@ browser names in its gametype column ("SWAT", "HC CTF"); a browser takes a
 mode for a Slayer game only, and one it does not know as none. Then version 38
 lets the host's shield effects be `players` (SHIELD EFFECTS' PLAYERS' OWN), a
 value of distributed message 91 that tells each client to draw its own
-settings', not synced.
+settings', not synced. Then version 39 marks a dedicated server's game (a
+host with no player of its own, `halo --server`: "Dedicated servers"
+below) with a flag of its LAN advertisement (`HALO_PORT_ADVERTISED_DEDICATED_FLAG`,
+0x04 of the third reserved byte) and of its internet listing (32), which
+the server browser shows. With no new version, each client then tells the
+host its build (distributed message 92, `_distributed_message_client_build`,
+reliably once a game after its ready, over its connection alone): its
+number, configuration, the label it shows ("OpenCE Linux | build 282
+(release)"), the GitHub repository it is made from (owner/name, which the
+build scripts take from CI's `GITHUB_REPOSITORY` or the checkout's origin
+remote) and the mods it plays, a line each ("folder version", in the load
+order); the host keeps it printable and logs it once, and a dedicated
+server shows it in `/api/players` (`client`). A host without the message
+drops it as a kind it does not know.
+Distributed message 93 (`network_damage.c`) needs no new version either,
+as a host that does not know it drops it: a client whose players' shots
+leave from elsewhere than their units' cameras (a VR build, whose weapon
+fires from the player's hand) sends the host where from, unreliably when it
+changes and every eighth tick: an offset from the camera of no more than 0.4
+world units (a player leaning out and an arm). The host keeps it a second,
+for that machine's own players only. When none of the shooter's eyes (nor a
+vehicle's gun) had a line to a reported hit's target, the host's line of
+sight check then also looks from the hand, with the line from the eye to it
+clear (a hand through a wall does not hit) and the hand where one firing at
+the target can be: no more than 0.05 world units behind the eye along the
+line to the target, 0.2 to its side and 0.1 above it (a client cannot claim
+a hand far past a corner). Such hits are counted in the host's log, and the
+host's `network.fire_origins` (true by default) turns the hand off.
+Then version 40 adds to the join request (`message_client_join_game_request`,
+0x70 bytes before) a Discord account's pass, 170 bytes, and its proof, 64
+(`port/linux/src/player_link.c`; `docs/master_protocol.md`, "Player keys,
+links and passes"), all zero for none: a dedicated server refuses a machine
+from a VPN's, Tor exit's or datacenter's address with one of five new
+rejection codes (`_rejection_code_vpn_link_required` and the four after it,
+`port/linux/game/network_link.c`), and a client refused with the first joins
+again at once with its pass, bound to the tunnel's session. A build before
+them shows the codes as the game being closed.
+
+Then version 41 changes both vote messages' entries (`network_votekick.c`:
+the request's first byte, once the player's index, is the vote's kind; the
+status's first byte, once the player's index, is the kind, and it carries
+the no votes), adds `_rejection_code_address_full` (a host's
+`server.max_machines_per_address`), and a dedicated server's map vote
+(`network_map_vote.c`), in the lobby too, over the machines' streams as map
+sharing's: the host's choices (map and gametype, 8 at most), their votes,
+the time left and the winner (`_distributed_message_map_vote`, 94, to each
+client reliably every second and as it changes), and a client's choice
+(`_distributed_message_map_vote_choice`, 95), taken only from the machine's
+own stream, at most four a second, one counted per machine. A co-op
+game's flags also tell its clients whether the host is a dedicated server
+(`_network_game_cooperative_dedicated_bit`: its loading zones then ask for
+most of the living players).
+
+OpenCE network version 42 adds MCC package identity, admission and host-only
+sharing to the shared agreement. Join requests carry this version explicitly;
+settings carry a zero MCC identity for Xbox/CE. Checkpoint epochs, recovery,
+scripted poses and shared boat/console fixes require matching peers.
+
+Then version 43 changes what the machines simulate and send: on an MCC map a
+vector damage impulse follows the damage's direction (`mcc_damage.c`), and on
+every map a vehicle on its side (`vehicle_is_flipped`: its up below 0.2)
+throws its riders, as the retail game does, not only one upside down. Chat
+lines carry `_chat_line_host_bit`, and the chat settings the host's machine
+(`_chat_config_host_machine_bit`, `network_chat.c`), so every machine draws
+the host's name white; a co-op cutscene's sound event carries in `target` the
+milliseconds the host has played of it, so a machine that joins during it
+starts it there (`coop_sound_sync.c`). A host now waits for a machine's MCC
+conversion (message 106) out of that machine's allowance: holding a round's
+start beyond the ordinary wait spends it, time not holding earns it back at a
+third of the rate, up to the round's limit (`mcc_load_network.h`), so a
+machine that pulses without converting cannot hold every round's start. A
+version 42 build computes MCC impulses the other way, and its scripted poses'
+validation drops the message's other units with a bad pose.
+
+Version 43 also carries a rider standing on a vehicle: the deck part of a unit's
+state and the host's riding decision for the game, made at its start and
+kept until the map ends, a co-op flag of the game's settings
+(`_network_game_cooperative_vehicle_riding_bit`, bit 3;
+`port/linux/game/vehicle_riding.c`).
+It also carries a rider's cabin: its enclosure verdict while it stands as
+well as in the air. It ships with the rest of version 43, which no released
+build has.
+The deck part's verdict bits (1 open, 2 enclosed, 0 unknown) are sent in
+every window tick, riding included. Riding, they carry the standing cabin
+verdict (its grace counted by the sender: the host for its broadcast, a
+client for its own riders' predictions); in a protected jump,
+its raw sample; in a shallow jump, the air verdict as before. Bit 3 of the
+flags (the part stays 28 bytes) says that a verdict in the air is cabin
+evidence, a protected jump's sample or the host's word for it, rather than
+that legacy one. A client takes the host's verdict for the cabin of its own
+player and of every other rider, whatever its own samples say.
+
+The host takes a rider's word in its vehicle's frame and checks it there; a
+client places riders on its own copy of the deck. The host takes the words of
+the players riding in a second pass, after the vehicles of the tick have moved
+(the first takes those on foot), so a word naming a place on the deck is
+checked against the deck where it now is.
+For a round trip and a jitter after the host's copy or the client's changed
+between riding and not (a take-off or a landing the two disagree about), a
+word within `debug.riding_transition_leash` (0.25 world units, host only) of
+where the host's copy stands is taken as the place it names in the world
+rather than as a deck place: a position allowance during the disagreement,
+never a speed. A vehicle's netcode writes (the host's snaps, a client's corrections)
+carry its riders along but are recorded apart from its motion, in a
+correction each vehicle keeps, so they never count as the deck's speed. A
+vehicle a client follows (the host's word is its place, not its updates) is
+measured by the time elapsed since the rider's last tick, and a change of the
+vehicle's role (simulated or followed) takes no correction across it.
+None of this adds a byte: the cabin bit (bit 3 of the flags) is the only change to the deck part,
+which stays 28 bytes, and the version stays 43.
+
+Message 107 carries the host's riding rules: the map's choice (its boolean
+`vehicle_riding` global or startup call; none when the map makes none) and
+the host's latched `debug.riding_` values (damage speed, teleport step, moved
+alone, air grip, look carry, enclosure grace ticks; not the transition
+leash, which only the host uses). The host sends it reliably to every client
+at each map start, again when either changes, and to a late joiner at its
+ready. A client prefers the choice to the cooperative bit and takes the
+values over its own config (clamped as its own latch clamps them) until the
+next game; before the message it keeps its own. The values are the latched
+ones, so a config change on the host waits for the next map; a co-op host's
+revert or saved-game load reads the config again, and the new values are
+sent again then. It ships with
+the rest of version 43, which stays 43.
+
+Version 44 unifies MCC offers under Map Sharing and lets a receiver satisfy
+omitted base resources with its own validated local files. Message layouts
+are unchanged; the changed sharing agreement requires matching peers.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -333,25 +558,40 @@ out, in which it picks its addresses at will: `ip=2001:db8:1:2::/64`
 (`p2p_peer_endpoint_text`), and for the votes a stand-in address in
 240.0.0.0/4 made from it (`p2p_peer_endpoint_address`). The console's `kick <player
 name>` drops a player as `ban` does (every machine told), but adds no line
-and keeps no address out: the player may join again at once.
+and keeps no address out: the player may join again at once. Besides
+`bans.txt`, the host keeps out a machine dropped for cheating or banned for
+ever while it runs, by its address as it joined (an internet play peer's
+stand-in), its real address and its hardware id, any of them; a dedicated
+server's ban for a while (`ban <player> 30m`) is left to its `bans.txt`
+line, whose `until=` ends it, and its `unban` lets the machine in again by
+the line's address or hardware id (`network_game_server_port_forget_kicked_address`).
 
-The players' votes to kick a player (`network_votekick.c`): a client sends
-`_distributed_message_votekick` (the player's absolute index) reliably, and
-the host takes it only from the client's stream. The host alone counts:
+The players' votes to kick a player and to end the game
+(`network_votekick.c`): a client sends `_distributed_message_votekick` (the
+vote's kind, the player's absolute index for a kick, and yes or no)
+reliably, and the host takes it only from the client's stream. The host
+alone counts:
 one vote per real address (an internet play peer's endpoint, not its
 stand-in), and votes again deduplicated by hardware id, which only ever
 removes votes (the players who may vote are counted by address alone, so a
-copied hardware id cannot lower the votes needed). A vote needs more than
-half of the players who may vote, the target counted, and at least two;
+copied hardware id cannot lower the votes needed). A vote needs yes votes
+scaled with the players who may vote, the target counted (more than half
+up to 8, then 40% and at least 5 up to 32, then 30% and at least 13), or a
+fixed percentage of them (`network.votekick_threshold` `static`,
+`network.votekick_percent`), at least two, and more yes than no; one the no votes have made lost ends at
+once;
 starting one needs `network.votekick_minutes` played on this host in its
 own ticks, voting two minutes; one vote runs at a time, and a failed vote
 cools its starter down and protects its target. A vote that passes kicks as
 the `kick` command does, and the host refuses the address and hardware id
 for `network.votekick_ban_minutes`. The host sends each client
 `_distributed_message_votekick_status` every second while a vote runs (and
-as it changes), for the scoreboard, whose right click frees the mouse to
-pick a player; the host's own scoreboard adds Kick and Ban. Builds without
-votes drop both kinds as unknown, so the network version is unchanged.
+as it changes: its kind, yes, no and needed), for the vote's box at the
+left of the HUD (F1 votes yes, F2 no) and the scoreboard, whose right click
+frees the mouse to pick a player; the host's own scoreboard adds Kick and
+Ban. A vote to end the game ("!endgame" in the chat, `network.vote_end_game`)
+counts as a kick's with no target, from 30 seconds played and not in a
+game's first minute, and ends the game as `sv_end_game` does.
 
 The text chat (`network_chat.c`): a client sends its player's line to the
 host (`_distributed_message_chat_up`, reliably), which takes it only from
@@ -373,6 +613,12 @@ the host's lines, its own too, so every machine shows them in one order,
 and takes them (and the chat settings below) only over the host's
 connection's stream: a datagram from the host's address could be anyone's.
 Each local player's view shows the lines that player hears.
+A person on the machine running the game has their name drawn white, on
+that machine and on each client. The host marks the line (the next flag
+after the notice). Other names keep their team's colors, and the words
+stay pale blue. The line is still 68 bytes. A client whose host does not
+mark the line still draws white for a person on the machine the chat
+settings name, or on the first machine.
 The host's own `/mute <player> [minutes]` and `/unmute <player>` are
 commands, not lines: it keeps a mute by the player's name (in ASCII,
 matched in either case, as the host keeps names apart) and its minutes by
@@ -387,17 +633,14 @@ machine's voice either (`network_voice.c`'s `voice_host_relay`, by the
 names of the network game's players, which the lobby has too). A
 machine's own scoreboard mute stays its own: it plays none of that
 machine's voice and shows none of its players' lines, and tells no one.
-The host's chat settings (`network.text_chat`: on, links allowed, or off;
-always off while its game is listed in the server browser,
-`p2p_hosting_listed`) go to every client in
+The host's chat settings (`network.text_chat`: on, links allowed, or off),
+in every game, listed in the server browser or not, go to every client in
 `_distributed_message_chat_config` (one byte of flags), reliably, as they
 change and every 3 seconds. A client without them (from a host without the
-chat, or before they come) has the chat off, and so does a client in a
-public game it joined from the server browser, whatever its host sends (a
-changed host could turn the chat on): while the tunnel reaches the host of
-the listing it joined (`p2p_join_listing`, `p2p_joined_listed_host`; any
-other invite joined since forgets it), it takes no chat line or notice and
-sends none. A client refuses a line the
+chat, or before they come) has the chat off. (Older builds keep the chat
+off in a public game a player hosts, whatever its host sends: they take no
+line from that host and send none, so their players there have no chat;
+the messages are unchanged, and the network version with them.) A client refuses a line the
 settings refuse before sending it, and the host refuses it again whatever
 the client knew, telling its machine why: a changed build gets no further.
 Links are found in the line's text (`chat_text_has_link`): a scheme, `www.`,
@@ -470,13 +713,56 @@ do (in free for all, a team of its own).
 
 The game is closed to joins while its machines load and after it ends.
 A machine must join within 10 seconds of connecting; in a game, the host
-drops a machine it has heard nothing from for 15 seconds, and one that
+drops a machine it has heard nothing from for 15 seconds
+(`network.client_timeout_seconds`), and one that
 joined the game in progress and has not loaded in two minutes.
 
 Until it has loaded, the machine hears none of the game's messages (which a
 machine in the pregame refuses, and which the others no longer need), only
 a pregame keep-alive every five seconds from the host
 (`network_server_manager.c`, `network_server_message_handler.c`).
+
+## Dedicated servers
+
+A dedicated server (`halo --server`: `docs/dedicated_server.md`) is a host
+as any other, with these differences, all on the host's side:
+
+- **No player of its own.** The host machine is in the game as machine 0
+  but has no player, so its lobby counts the joined machines' players only
+  (`network_server_manager.c`'s `server_ok_to_countdown`, which asks
+  `server_director_ok_to_countdown` for `server.min_players` and
+  `server.team_start`), and a game with one team's players may start (the
+  next players to join balance the teams). The host waits for no player of
+  its own to precache, and a client's player that quits the game does not
+  end the host's (`network_client_manager.c`: only a local player's quit
+  leaves).
+- **No ticks of its own player.** The host's own action queue may hold no
+  action (`player_queues_new.c`), as a game with no local player has none.
+- **The director.** `port/linux/game/server_director.c` drives the lobby as
+  a player at the pregame screen would: it sets the map and gametype of the
+  rotation's entry, starts the countdown once the server's own rule allows
+  it (`network_game_server_port_ok_to_countdown`, the rule the server checks
+  each tick, then `network_game_server_port_countdown_begin`), and after the postgame
+  goes back to the lobby with the next entry. The clients see a lobby, a
+  game and a postgame as with any host.
+- **Shutdown.** On SIGTERM, a game in progress goes to its postgame, and
+  the host tells every machine it goes (`network_game_server_graceful_shutdown`)
+  before it exits, so that the clients show the scores rather than a lost
+  connection.
+- **The flags.** Since version 39 a dedicated server's LAN advertisement
+  carries `HALO_PORT_ADVERTISED_DEDICATED_FLAG` and its internet listing the
+  dedicated flag (32); a listing published to the master servers is the
+  same signed listing (`docs/master_protocol.md`), and the master's probe
+  is answered on the tunnel's socket (`p2p.c`, `server_master_probe`).
+- **The timeout.** `network.client_timeout_seconds` (15 seconds by
+  default) sets how long a host waits for a silent machine, and two more
+  waits with it: how long a stream's writes may stall before its connection
+  is dropped (`network_connection.c`), on every machine, clients too; and
+  how long a host in a game rides out its network going (an address
+  renewed, a wifi drop: `network_game_server_network_lost`). So it is not
+  the host's alone, and not a dedicated server's only: each machine reads
+  its own setting, and nothing on the wire changes (the machines need not
+  agree on it).
 
 ## Map sharing
 
@@ -505,7 +791,9 @@ its name alone beside it, has its name given back as the map lists find it.
   downloading starts the others without it: the machine's players are held
   out of the game, and so is any player it asks for meanwhile (a machine
   whose download began in the lobby does not know the game has started),
-  and the machine joins the game in progress once the map is there. A
+  and the machine joins the game in progress once the map is there. Not
+  told to load, it is neither waited for nor timed out while the others
+  load, even if the map is there before they have loaded. A
   client told to start before its download is done (by a host of an earlier
   build) puts the start off until the map is there, rather than loading a
   map it does not have yet (the damaged disc error, which stops the game).
@@ -529,8 +817,13 @@ its name alone beside it, has its name given back as the map lists find it.
   others on port 5153 (of two downloading, the one of the lower machine
   connects). Each end says which files it has, whole or by piece, and tells
   the other of each piece it gets; the client asks for the rarest pieces
-  first (from a random place, so that clients ask for different pieces), two
-  at a time from each connection, sixteen in all, and the last few again of
+  first (from a random place, so that clients ask for different pieces),
+  eight at a time of the host (as many as every version sends at once: it
+  refuses more, so this needs no network version; two at a time held a
+  download from it to about 15 MB/s, a piece coming a round trip, about two
+  frames, after it is asked for), two of another player (who sends 10 MB/s
+  at most, so that a slow one holds few of the last pieces), thirty-two in
+  all, and the last few again of
   whoever is quicker. The pieces' hashes come from the host (from the
   others it named after ten seconds without them, and from the connections
   other machines made after thirty), all of them within a minute, checked
@@ -578,6 +871,158 @@ its name alone beside it, has its name given back as the map lists find it.
   A download that brings nothing for a minute, or a host that does not
   answer in 30 seconds, leaves the game, saying why.
 - The download's progress is drawn at the top of the screen.
+
+## MCC package sharing
+
+MCC supports host-only delivery for eligible local and Workshop packages.
+It uses MCC-owned messages **103** (request) and **104** (response),
+separate from CE sharing 83-86. Every map family uses network version **44** for automatic sharing and local base dependencies.
+The shared settings record includes two 32-byte MCC digests, zero for Xbox/CE:
+the gameplay/resource identity and the required-JSON identity. The distributed
+header is 12 bytes, including its checkpoint epoch.
+
+- **Permission and admission.** The existing `network.map_share` setting
+  enables both CE and MCC sharing. MCC offers only the current validated
+  package automatically; no manual approval list is required. Loose maps and
+  `_shared` are not packages to offer. An existing `mcc_share.txt` may supply
+  optional maker attribution but cannot enable or block sharing. The client requires `network.map_download`
+  (existing default on) and explicit acceptance of the size/maker prompt.
+  Before acceptance it receives only an offer; it creates no stage and requests
+  no file chunks. If either setting is off, the download action is absent.
+  Valid Workshop IDs offer a Workshop page; other content requires manual
+  installation. A Workshop page alone does not install anything in a browser.
+  Manual-install and failed-download guidance leaves the unjoinable session
+  before displaying at the main menu. Only its copied text and Workshop origin
+  survive that deliberate disconnect; it holds no host slot or transfer alive.
+  Dismissal, another session or leaving the menu clears it. Live download
+  consent still requires the current host's exact content identity.
+- **The game's start.** A machine fetching the package from the host (its
+  download prompt, then the transfer) does not hold the game's start, as a
+  Custom Edition map's downloader does not: the host leaves it and its players
+  out of the start (`network_game_server_hold_map_fetcher_players`) and it
+  joins the game in progress once it has the package. A machine still checking
+  its own copy does hold the start, until its admission ends: told to load
+  before then, it could not.
+- **Messages and bounds.** `MANIFEST` responses carry up to 16 file entries per
+  page. The full offer has at most 168 entries, each with kind, a 128-byte path
+  buffer, size and SHA-256. Exactly one map is required. `CHUNK` requests up to
+  3072 bytes; the client window is 16 and the host supports four transfers.
+  Reserved fields, counts, lengths, session IDs, offsets and sender roles are
+  checked. Only the sender's established reliable stream is accepted; datagrams
+  and responses from other peers cannot supply content. Backpressure retries
+  preserve pending responses, and manifest/data traffic consumes the shared
+  `network.map_share_upload` allowance.
+- **Selected files.** `mcc_share_package_build` uses the validated resource
+  selection cached by `mcc_validation_resources`; it does not scan arbitrary
+  siblings. Only used package `bitmaps.map`/`sounds.map` are eligible, including
+  their resolved Workshop fallback paths. Root/shared base resources and
+  package copies matching an installed base are omitted. Joiners must provide
+  matching local dependencies; the complete gameplay fingerprint still covers
+  their contents, and missing or mismatched resources prevent admission. Recognized
+  package/campaign/mission JSON and referenced supported PNG previews travel
+  with the map; `credits.txt`, `readme.txt`, `license.txt` and a valid bounded
+  Workshop sidecar preserve attribution. `ModInfo.json` is parsed metadata,
+  not an unchecked credit file. Map-only local packages are supported.
+- **Metadata and size checks.** JSON is limited to 256 KiB per file; PNG to
+  8 MiB and 2048 by 2048 pixels, using the existing supported decoder subset.
+  The metadata planner allows at most 160 entries and 24 MiB; the staging
+  envelope independently caps metadata at 32 MiB, each map/resource at 768 MiB
+  and the whole offer at 1 GiB. Credit text is capped at 64 KiB. The client
+  checks free space for the offer plus 64 MiB before writing. Nested paths are
+  allowed only for recognized JSON/PNG; devices, traversal, duplicate names
+  and file/directory collisions are refused. Required JSON is reparsed and
+  hashed separately from gameplay. Unreferenced files fail validation; invalid
+  optional PNGs are discarded before publication, retaining placeholder art.
+- **Staging and identity.** Files are exclusively created in an owned
+  `mcc_staging/dl_<digest>` directory and checked in order. The staged gameplay
+  and required-metadata identities must match the advertised values. Native
+  publication atomically moves the complete directory to a separate
+  `mcc_maps/dl_<digest>` without replacing any destination. The exact installed
+  snapshot is rechecked before successful `DONE` and joining resumes; existing local and Steam
+  packages remain untouched. Cleanup is limited to owned staging entries.
+  Native path checks refuse symlinks/reparse points and special files. These
+  checks address untrusted remote paths, not concurrent filesystem replacement
+  by another process with the same local user's authority.
+- **Lifecycle.** The offer expires after two minutes; a waiting client sends
+  bounded heartbeats. Initial unanswered requests time out after 30 seconds,
+  stalled downloads after 60 seconds. Leaving, map/identity changes, disabling
+  downloads and host preparation revision changes invalidate stale transfers
+  and consent. Requests remain bound to the host's current package. Required
+  campaign JSON is delivered upfront; subsequent mission maps/resources are
+  obtained before their own admission, under the same host-only policy.
+  A validated successful `DONE` releases its transfer slot and grants at most
+  15 seconds for the client's following player-add request. That admission
+  grace protects against the host's older playerless-machine deadline, but
+  does not report content as still missing or hold players out of the game.
+  Player admission, peer/session removal, map/identity changes, host opt-out
+  or expiry clears it. Cancelled, expired, premature or replayed `DONE`
+  messages cannot grant or renew the grace period.
+
+Installed packages use a separate bounded validation hold, even when both
+sharing preferences are off. Reliable MCC message **105** binds a client
+generation to the exact advertised map name/origin, checksum, gameplay digest
+and metadata digest. The host acknowledges before the client begins its
+asynchronous file checks. Five-second heartbeats keep a twenty-second liveness
+window, but never extend the absolute two-minute validation deadline. Expired
+or completed holds cannot be restarted by replaying `BEGIN` on the same
+connection and host revision. `READY` grants only the existing fifteen-second
+player-add grace; it does not prove that an untrusted client checked its files.
+Actual map loading still fingerprints content independently.
+
+Local validation enumerates distinct usable files only for resource types the
+map references. An explicit package override stays authoritative; an unreadable
+or invalid override reports its file error instead of trying base alternatives.
+Each distinct combination still requires the full gameplay SHA-256. An unchanged
+failed exact path is not hashed again after discovery rescans; changed files or
+required metadata permit a fresh check. These are local work and diagnostic
+changes, with no change to message layouts, fingerprint framing or version 44.
+
+After admission, synchronous MCC conversion has a separate bounded progress
+contract in `mcc_load_network.c` and `mcc_load_network_game.c`. Reliable message
+**106** carries the exact admitted name/origin, checksum and both digests,
+the game round, and an increasing work sequence (204 bytes after the unchanged
+12-byte distributed header). Both sending and accepted state advancement are
+limited to once per five seconds. A host waits for a progressing joined peer
+for at most thirty seconds without new progress and at most four minutes from
+the original round binding. Replays cannot restart either expired hold. The
+client also has the four-minute absolute bound; its existing 75-second
+pre-start transport-silence timeout remains unchanged. Progress never marks a
+machine loaded, bypasses file identity checks or reuses the missing-map state.
+
+The server's ordinary distributed-data gate requires an already loaded player,
+so minimal MCC-only routes in `network_server_message_handler.c` admit messages
+105/106 from joined reliable connections before that gate. Their MCC handlers
+still check joined-peer state, exact framing, identity and sender roles; datagrams
+cannot establish these holds. The small start, timeout and loaded-ack hooks in
+the server/client managers connect the MCC state to the existing lifecycle.
+Terminal loaded acknowledgement retires the peer, all-loaded clears the host
+binding, and the client's first game update clears its binding. Disconnect,
+peer departure, changed identity/revision and round changes invalidate stale
+state. Xbox/CE retain their established loading and timeout paths.
+
+`mcc_loading` feeds this contract independently of its visual feedback: null
+renderers and disabled loading presentation still begin/end the network work
+lifecycle. Conversion pulses only write bounded reliable transport messages.
+They never idle or dispatch the network, advance simulation, run widgets or
+invoke normal frame callbacks while tags are incomplete.
+
+Downloaded-file verification stays within its existing transfer. Manifest
+heartbeats keep the connection responsive while the bounded checker runs,
+without resetting the eighty-second last-data-progress bound. Publication
+promotes SHA, CRC and selected-resource facts only after the complete file
+snapshot remains unchanged. Local installed identity is established before
+successful `DONE`, avoiding a second full-content pass. Cancellation joins the
+owned checker and closes its readers before any stage cleanup. A package
+already published survives a subsequent admission failure.
+
+Implementation lives in `mcc_share.c`, `mcc_share_package.c`,
+`mcc_share_session.c`, `mcc_share_stage.c` and the MCC metadata helpers.
+Managed-copy receipts and the removal UI preserve separate ownership of
+downloaded snapshots.
+Browser publication uses an owned OPFS journal and commit record instead of a
+directory rename; see [browser storage](../../docs/reading/browser_imports.md).
+Browser gameplay, downloads and persistence have their own Milestone 14
+validation gates; native results do not establish browser compatibility.
 
 ## Stages
 
@@ -673,13 +1118,12 @@ its name alone beside it, has its name given back as the map lists find it.
    rest is on the ground, so it lies limp again where it stops instead of
    keeping the pose of its fall in the air. A client puts its copies there, and the difference is
    drawn fading over a few ticks (`render_interpolation.c`) instead of a
-   jump. A vehicle no player drives is carried between those updates along
-   the positions the host sent, a recording's lifepod as well as a Pelican.
-   Its physics velocity swings about that path, so the carry steps from
-   one of those positions to the next, and a jump further than a step of
-   the path is left where the host put it. The host's word that it is at
-   rest stops that step, and the step is kept only for the last gap
-   between positions, so a late word does not drive it on. A client drives its own player's vehicle and sends where it is,
+   jump. A vehicle no player drives, a recording's lifepod as well as a
+   Pelican, moves toward each new position the host sends at its path's
+   speed (the last two positions' difference over the host's ticks between
+   them), and goes on along the path for a few ticks if the next is late,
+   coming back to the newest if none comes. A
+   jump further than a step of the path is left where the host put it. A client drives its own player's vehicle and sends where it is,
    which the host takes within a tolerance, as it does its own player's
    unit, and no further from an anchor (one it took, a newer once a
    second) than the vehicle moves in the client's ticks since, those no

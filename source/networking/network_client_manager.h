@@ -14,6 +14,23 @@ header included in hcex build.
 
 /* ---------- structures */
 
+/* port: a game this client found, as a probe tells it (halo --probe:
+port/linux/game/network_test.c) */
+struct network_advertised_game_summary
+{
+	wchar_t name[16];
+	char map_name[0x80];
+	short engine_type;
+	short player_count;
+	short maximum_player_count;
+	boolean open;
+	boolean has_teams;
+	boolean in_progress;
+	boolean dedicated;
+	word version;
+	byte kind;
+};
+
 struct network_advertised_game;
 struct network_connection;
 struct network_game;
@@ -54,6 +71,19 @@ boolean network_game_client_advertised_game_compatible(
 	struct network_game_client *client,
 	struct network_advertised_game const *game,
 	boolean tell);
+/* port: the player told why a host of this network version (and netcode)
+cannot be joined (the server browser's rows of another version too) */
+void network_game_client_tell_version(
+	unsigned int theirs,
+	boolean distributed);
+/* port: whether the advertised game's host is a dedicated server */
+boolean network_game_client_advertised_game_dedicated(
+	struct network_game_client *client,
+	struct network_advertised_game const *game);
+/* port: the client's index'th advertised game, if it is a game: TRUE */
+boolean network_game_client_port_advertised_game_summary(
+	long index,
+	struct network_advertised_game_summary *summary);
 boolean network_game_client_initiate_join_game(
 	struct network_game_client *client,
 	struct network_advertised_game *game,

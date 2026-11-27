@@ -117,6 +117,9 @@ enum
 	HILL_SCORE_SOUND_INTERVAL = 5*TICKS_PER_SECOND,
 	HILL_30_SECOND_WARNING = 30*TICKS_PER_SECOND,
 	HILL_60_SECOND_WARNING = TICKS_PER_MINUTE,
+
+	/* port: Multi-Hill's most hills at once (king_variant.multi_hill) */
+	MAXIMUM_HILLS_AT_ONCE = 5,
 };
 
 enum
@@ -161,6 +164,32 @@ typedef char verify_scenario_netgame_flag_size[
 typedef char verify_scenario_netgame_flags_offset[
 	offsetof(struct scenario, netgame_flags) == 0x378 ? 1 : -1];
 
+/* port: a hill in play (Multi-Hill has several at once): where it is, and
+who holds it. The first is king_globals' own hill (king_hills_to_globals),
+which a game of one hill plays as January did */
+struct king_hill
+{
+	long hill_id;
+	long hill_point_count;
+	real_point3d hill_points[MAXIMUM_HILL_POINTS];
+	real_point2d convex_hull[MAXIMUM_HILL_POINTS];
+	real_point3d hill_center;
+	real hill_top;
+	real hill_bottom;
+	long hill_state;
+	long hill_controlled_count;
+	long hill_previous_controller;
+};
+
+/* port: the hills after the first that the host sends its clients after
+king_globals (game_engine_king_write_network_state), with Multi-Hill on
+only: a game of one hill sends what January's layout holds */
+struct king_extra_hills_network_state
+{
+	long hill_count;
+	long hill_ids[MAXIMUM_HILLS_AT_ONCE - 1];
+};
+
 /* ---------- prototypes */
 
 static void point3d_to_point2d(
@@ -168,12 +197,23 @@ static void point3d_to_point2d(
 	real_point2d *points2d,
 	long point_count);
 static void find_hill(
-	void);
+	struct king_hill *hill);
 static long find_next_hill(
 	long hill_id);
 static boolean player_inside_hill(
 	long player_index);
+static boolean player_inside_this_hill(
+	long player_index,
+	struct king_hill const *hill);
 static void king_calculate_hill_state(
+	struct king_hill *hill);
+static void king_render_hill(
+	struct king_hill const *hill);
+static long king_hills_wanted(
+	void);
+static void king_pick_extra_hills(
+	boolean moving);
+static void king_hills_to_globals(
 	void);
 
 /* ---------- globals */
@@ -187,6 +227,9 @@ static struct king_globals king_globals = { 0 };
  * corroborated by January: same .bss contribution offset, width and neighbours */
 static short king_engine_num_hills = 0;
 static short king_engine_hills[MAXIMUM_HILLS] = { 0 };
+/* port: the hills in play (the first king_globals' own), and how many */
+static struct king_hill king_hills[MAXIMUM_HILLS_AT_ONCE] = { 0 };
+static short king_hill_count = 0;
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -238,6 +281,18 @@ static void king_engine_pregame_post_rasterize(
 static void king_engine_post_rasterize(
 	void)
 {
+	short hill_index;
+
+	/* port: each hill in play (Multi-Hill's several) */
+	for (hill_index = 0; hill_index < king_hill_count; hill_index++)
+		king_render_hill(&king_hills[hill_index]);
+
+	return;
+}
+
+static void king_render_hill(
+	struct king_hill const *hill)
+{
 	struct game_globals *game_globals;
 	struct game_globals_multiplayer_information *multiplayer_information;
 	long hill_point_count;
@@ -257,14 +312,14 @@ static void king_engine_post_rasterize(
 		struct game_globals_multiplayer_information);
 	hill_perimeter = 0.0f;
 	shader_index = multiplayer_information->hill_shader.index;
-	hill_point_count = king_globals.hill_point_count;
+	hill_point_count = hill->hill_point_count;
 
-	for (point_index = 0; point_index < king_globals.hill_point_count; point_index++)
+	for (point_index = 0; point_index < hill->hill_point_count; point_index++)
 	{
 		hill_perimeter += distance3d(
-			&king_globals.hill_points[point_index],
-			&king_globals.hill_points[
-				point_index + 1 == king_globals.hill_point_count ? 0 : point_index + 1]);
+			&hill->hill_points[point_index],
+			&hill->hill_points[
+				point_index + 1 == hill->hill_point_count ? 0 : point_index + 1]);
 	}
 
 	inverse_segment_count = (real)(1.0/floor(hill_perimeter + 0.5f));
@@ -278,17 +333,17 @@ static void king_engine_post_rasterize(
 		real_vector3d sides[2];
 		real_vector3d normal;
 		real edge_length = distance3d(
-			&king_globals.hill_points[point_index],
-			&king_globals.hill_points[
+			&hill->hill_points[point_index],
+			&hill->hill_points[
 				point_index + 1 == hill_point_count ? 0 : point_index + 1]);
 		real edge_end_u = (edge_length + accumulated_distance)*texels_per_unit;
 
 		accumulated_distance = edge_length + accumulated_distance;
 		csmemset(vertices, 0, sizeof(vertices));
-		vertices[1].position = king_globals.hill_points[point_index];
+		vertices[1].position = hill->hill_points[point_index];
 		vertices[1].position.z += 0.8f;
-		vertices[0].position = king_globals.hill_points[point_index];
-		vertices[2].position = vertices[3].position = king_globals.hill_points[
+		vertices[0].position = hill->hill_points[point_index];
+		vertices[2].position = vertices[3].position = hill->hill_points[
 			point_index + 1 == hill_point_count ? 0 : point_index + 1];
 		vertices[2].position.z += 0.8f;
 
@@ -437,11 +492,17 @@ static boolean king_engine_initialize_for_new_map(
 		}
 	}
 
-	king_globals.hill_id = 0;
+	csmemset(king_hills, 0, sizeof(king_hills));
+	king_hills[0].hill_id = 0;
 	king_globals.hill_timer = HILL_MOVE_TIME;
-	king_globals.hill_previous_controller = NONE;
-	king_globals.hill_state = king_hill_uncontrolled;
-	find_hill();
+	king_hills[0].hill_previous_controller = NONE;
+	king_hills[0].hill_state = king_hill_uncontrolled;
+	find_hill(&king_hills[0]);
+	king_hill_count = 1;
+	/* port: Multi-Hill's other hills (the host's, on its clients:
+	game_engine_king_read_network_state) */
+	king_pick_extra_hills(FALSE);
+	king_hills_to_globals();
 	match_assert(
 		"c:\\halo\\SOURCE\\game\\game_engine_king.c",
 		0x154,
@@ -789,28 +850,30 @@ static void king_engine_update(
 		--king_globals.hill_timer == 0)
 	{
 		king_globals.hill_timer = HILL_MOVE_TIME;
-		king_globals.hill_id = find_next_hill(king_globals.hill_id);
-		find_hill();
+		king_hills[0].hill_id = find_next_hill(king_hills[0].hill_id);
+		find_hill(&king_hills[0]);
 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
 		/* port: and no more tries than there are hills: a map whose hills
 		have no area (two flags, or flags in a line) has none to find, and
 		the next hill of one hill is itself */
 		hill_tries = 0;
-		while (king_globals.hill_point_count == 0)
+		while (king_hills[0].hill_point_count == 0)
 		{
-			error(2, "failed to find hill #%d most likely bad point placement", king_globals.hill_id);
-			if (king_globals.hill_id == 0 || ++hill_tries >= MAXIMUM_HILLS)
+			error(2, "failed to find hill #%d most likely bad point placement", king_hills[0].hill_id);
+			if (king_hills[0].hill_id == 0 || ++hill_tries >= MAXIMUM_HILLS)
 				break;
 
-			king_globals.hill_id = find_next_hill(king_globals.hill_id);
-			find_hill();
+			king_hills[0].hill_id = find_next_hill(king_hills[0].hill_id);
+			find_hill(&king_hills[0]);
 			game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
 		}
+		/* port: and Multi-Hill's others move with it */
+		king_pick_extra_hills(TRUE);
 	}
 
-	if (king_globals.hill_point_count > 0)
+	if (king_hills[0].hill_point_count > 0)
 	{
-		real_point3d position = king_globals.hill_center;
+		real_point3d position = king_hills[0].hill_center;
 
 		game_engine_set_goal_position(0, &position, 0.0f, "crown_blue", NONE, NONE, NONE);
 	}
@@ -818,7 +881,28 @@ static void king_engine_update(
 	{
 		console_printf(FALSE, "FAILED TO FIND HILL");
 	}
-	king_calculate_hill_state();
+	/* port: Multi-Hill's other hills' markers (goals 1 on), and none for
+	the slots of hills no longer in play */
+	{
+		short hill_index;
+
+		for (hill_index = 1; hill_index < MAXIMUM_HILLS_AT_ONCE; hill_index++)
+		{
+			if (hill_index < king_hill_count && king_hills[hill_index].hill_point_count > 0)
+			{
+				real_point3d position = king_hills[hill_index].hill_center;
+
+				game_engine_set_goal_position(hill_index, &position, 0.0f, "crown_blue", NONE, NONE, NONE);
+			}
+			else if (game_engine_get_goal_in_use(hill_index))
+			{
+				game_engine_clear_goal_position(hill_index);
+			}
+		}
+		for (hill_index = 0; hill_index < king_hill_count; hill_index++)
+			king_calculate_hill_state(&king_hills[hill_index]);
+	}
+	king_hills_to_globals();
 
 	return;
 }
@@ -843,7 +927,7 @@ static void point3d_to_point2d(
 }
 
 static void find_hill(
-	void)
+	struct king_hill *hill)
 {
 	struct scenario *scenario = global_scenario_get();
 	long flag_indices[MAXIMUM_HILL_POINTS];
@@ -860,10 +944,10 @@ static void find_hill(
 		0.0f,
 		0.0f,
 		_netgame_flag_hill,
-		(short)king_globals.hill_id,
+		(short)hill->hill_id,
 		MAXIMUM_HILL_POINTS,
 		flag_indices);
-	king_globals.hill_point_count = point_count;
+	hill->hill_point_count = point_count;
 	if (point_count)
 	{
 		for (i = 0; i < point_count; i++)
@@ -898,38 +982,54 @@ static void find_hill(
 		hull_point_count = convex_hull2d(point_count, points2d, hull_indices);
 		for (i = 0; i < hull_point_count; i++)
 		{
-			king_globals.hill_points[i] = points[hull_indices[i]];
-			king_globals.convex_hull[i] = points2d[hull_indices[i]];
+			hill->hill_points[i] = points[hull_indices[i]];
+			hill->convex_hull[i] = points2d[hull_indices[i]];
 		}
-		king_globals.hill_point_count = hull_point_count;
+		hill->hill_point_count = hull_point_count;
 
-		minimum = king_globals.hill_points[0];
-		maximum = king_globals.hill_points[0];
+		minimum = hill->hill_points[0];
+		maximum = hill->hill_points[0];
 		for (i = 0; i < hull_point_count; i++)
 		{
-			minimum.x = MIN(minimum.x, king_globals.hill_points[i].x);
-			minimum.y = MIN(minimum.y, king_globals.hill_points[i].y);
-			minimum.z = MIN(minimum.z, king_globals.hill_points[i].z);
-			maximum.x = MAX(maximum.x, king_globals.hill_points[i].x);
-			maximum.y = MAX(maximum.y, king_globals.hill_points[i].y);
-			maximum.z = MAX(maximum.z, king_globals.hill_points[i].z);
+			minimum.x = MIN(minimum.x, hill->hill_points[i].x);
+			minimum.y = MIN(minimum.y, hill->hill_points[i].y);
+			minimum.z = MIN(minimum.z, hill->hill_points[i].z);
+			maximum.x = MAX(maximum.x, hill->hill_points[i].x);
+			maximum.y = MAX(maximum.y, hill->hill_points[i].y);
+			maximum.z = MAX(maximum.z, hill->hill_points[i].z);
 		}
-		king_globals.hill_bottom = minimum.z - 0.1f;
-		king_globals.hill_top = maximum.z + 0.8f;
-		king_globals.hill_center.x = (maximum.x + minimum.x)*0.5f;
-		king_globals.hill_center.y = (maximum.y + minimum.y)*0.5f;
-		king_globals.hill_center.z = (maximum.z + minimum.z)*0.5f;
+		hill->hill_bottom = minimum.z - 0.1f;
+		hill->hill_top = maximum.z + 0.8f;
+		hill->hill_center.x = (maximum.x + minimum.x)*0.5f;
+		hill->hill_center.y = (maximum.y + minimum.y)*0.5f;
+		hill->hill_center.z = (maximum.z + minimum.z)*0.5f;
 	}
 
 	return;
 }
 
+/* port: on any hill in play (Multi-Hill's several) */
 static boolean player_inside_hill(
 	long player_index)
 {
+	short hill_index;
+
+	for (hill_index = 0; hill_index < king_hill_count; hill_index++)
+	{
+		if (player_inside_this_hill(player_index, &king_hills[hill_index]))
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+static boolean player_inside_this_hill(
+	long player_index,
+	struct king_hill const *hill)
+{
 	boolean inside = FALSE;
 
-	if (player_index != NONE)
+	if (player_index != NONE && hill->hill_point_count > 0)
 	{
 		struct player_datum *player = player_get(player_index);
 
@@ -938,15 +1038,15 @@ static boolean player_inside_hill(
 			struct unit_datum *unit = unit_get(player->unit_index);
 			real_point3d const *position = &unit->object.bounding_sphere_center;
 
-			if (position->z >= king_globals.hill_bottom && position->z <= king_globals.hill_top)
+			if (position->z >= hill->hill_bottom && position->z <= hill->hill_top)
 			{
 				real_point2d point;
 
 				point.x = position->x;
 				point.y = position->y;
 				inside = convex_hull2d_test_point(
-					king_globals.hill_point_count,
-					king_globals.convex_hull,
+					hill->hill_point_count,
+					hill->convex_hull,
 					&point,
 					0.0f);
 			}
@@ -956,8 +1056,9 @@ static boolean player_inside_hill(
 	return inside;
 }
 
+/* (port: a hill's, of the players on it: those on the hills, on this one) */
 static void king_calculate_hill_state(
-	void)
+	struct king_hill *hill)
 {
 	struct player_datum *player;
 
@@ -971,7 +1072,8 @@ static void king_calculate_hill_state(
 		player = (struct player_datum *)data_iterator_next(&player_iterator);
 		while (player)
 		{
-			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_iterator.datum_index)])
+			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_iterator.datum_index)] &&
+				(king_hill_count == 1 || player_inside_this_hill(player_iterator.datum_index, hill)))
 			{
 				if (player->team_index)
 					blue_count++;
@@ -985,32 +1087,32 @@ static void king_calculate_hill_state(
 		{
 			if (red_count)
 			{
-				king_globals.hill_state = king_hill_contested;
-				if (king_globals.hill_controlled_count > HILL_CONTROL_TIME)
+				hill->hill_state = king_hill_contested;
+				if (hill->hill_controlled_count > HILL_CONTROL_TIME)
 					game_engine_play_multiplayer_sound(_multiplayer_sound_hill_contested);
-				king_globals.hill_controlled_count = 0;
+				hill->hill_controlled_count = 0;
 			}
 			else
 			{
-				if (king_globals.hill_state == king_hill_controlled_blue)
-					king_globals.hill_controlled_count++;
+				if (hill->hill_state == king_hill_controlled_blue)
+					hill->hill_controlled_count++;
 				else
-					king_globals.hill_controlled_count = 0;
-				king_globals.hill_state = king_hill_controlled_blue;
+					hill->hill_controlled_count = 0;
+				hill->hill_state = king_hill_controlled_blue;
 			}
 		}
 		else if (!red_count)
 		{
-			king_globals.hill_state = king_hill_uncontrolled;
-			king_globals.hill_controlled_count = 0;
+			hill->hill_state = king_hill_uncontrolled;
+			hill->hill_controlled_count = 0;
 		}
 		else
 		{
-			if (king_globals.hill_state == king_hill_controlled_red)
-				king_globals.hill_controlled_count++;
+			if (hill->hill_state == king_hill_controlled_red)
+				hill->hill_controlled_count++;
 			else
-				king_globals.hill_controlled_count = 0;
-			king_globals.hill_state = king_hill_controlled_red;
+				hill->hill_controlled_count = 0;
+			hill->hill_state = king_hill_controlled_red;
 		}
 	}
 	else
@@ -1023,7 +1125,8 @@ static void king_calculate_hill_state(
 		player = (struct player_datum *)data_iterator_next(&player_iterator);
 		while (player)
 		{
-			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_iterator.datum_index)])
+			if (king_globals.on_the_hill[DATUM_INDEX_TO_ABSOLUTE_INDEX(player_iterator.datum_index)] &&
+				(king_hill_count == 1 || player_inside_this_hill(player_iterator.datum_index, hill)))
 			{
 				controller = player_iterator.datum_index;
 				player_count++;
@@ -1033,35 +1136,35 @@ static void king_calculate_hill_state(
 
 		if (player_count > 1)
 		{
-			king_globals.hill_state = king_hill_contested;
-			if (king_globals.hill_controlled_count > HILL_CONTROL_TIME)
+			hill->hill_state = king_hill_contested;
+			if (hill->hill_controlled_count > HILL_CONTROL_TIME)
 				game_engine_play_multiplayer_sound(_multiplayer_sound_hill_contested);
-			king_globals.hill_controlled_count = 0;
-			king_globals.hill_previous_controller = NONE;
+			hill->hill_controlled_count = 0;
+			hill->hill_previous_controller = NONE;
 		}
 		else if (player_count)
 		{
-			if (king_globals.hill_state == king_hill_controlled &&
-				controller == king_globals.hill_previous_controller)
+			if (hill->hill_state == king_hill_controlled &&
+				controller == hill->hill_previous_controller)
 			{
-				king_globals.hill_controlled_count++;
+				hill->hill_controlled_count++;
 			}
 			else
 			{
-				king_globals.hill_controlled_count = 0;
-				king_globals.hill_previous_controller = controller;
+				hill->hill_controlled_count = 0;
+				hill->hill_previous_controller = controller;
 			}
-			king_globals.hill_state = king_hill_controlled;
+			hill->hill_state = king_hill_controlled;
 		}
 		else
 		{
-			king_globals.hill_previous_controller = NONE;
-			king_globals.hill_state = king_hill_uncontrolled;
-			king_globals.hill_controlled_count = 0;
+			hill->hill_previous_controller = NONE;
+			hill->hill_state = king_hill_uncontrolled;
+			hill->hill_controlled_count = 0;
 		}
 	}
 
-	if (king_globals.hill_controlled_count == HILL_CONTROL_TIME)
+	if (hill->hill_controlled_count == HILL_CONTROL_TIME)
 		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_controlled);
 
 	return;
@@ -1087,6 +1190,108 @@ static long find_next_hill(
 	/* January and the later Xbox build both leave the no-candidate result
 	 * undefined. The caller expects maps to provide at least two hill ids. */
 	return next_hill_id;
+}
+
+/* port: the hills Multi-Hill plays at once (king_variant.multi_hill: 2 to
+5, else one) */
+static long king_hills_wanted(
+	void)
+{
+	long wanted = game_engine_get_variant()->game_engine_variant.king.multi_hill;
+
+	return wanted >= 2 ? MIN(wanted, MAXIMUM_HILLS_AT_ONCE) : 1;
+}
+
+static boolean king_hill_in_play(
+	long hill_id,
+	short hill_count)
+{
+	short hill_index;
+
+	for (hill_index = 0; hill_index < hill_count; hill_index++)
+	{
+		if (king_hills[hill_index].hill_id == hill_id)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+/* port: Multi-Hill's hills after the first: other hills of the map than
+those in play, each with an area (find_hill finds its points), as many as
+the map has up to the number wanted. Moving (the hills' minute is up), not
+the ones they were where the map has others, as the first moves */
+static void king_pick_extra_hills(
+	boolean moving)
+{
+	long previous_ids[MAXIMUM_HILLS_AT_ONCE];
+	short previous_count = king_hill_count;
+	long wanted = king_hills_wanted();
+	short hill_index;
+
+	for (hill_index = 0; hill_index < MAXIMUM_HILLS_AT_ONCE; hill_index++)
+		previous_ids[hill_index] = hill_index < previous_count ? king_hills[hill_index].hill_id : NONE;
+	king_hill_count = 1;
+	while (king_hill_count < wanted && king_engine_num_hills > 0)
+	{
+		struct king_hill *hill = &king_hills[king_hill_count];
+		short start_index = random_range(0, king_engine_num_hills);
+		boolean found = FALSE;
+		short pass;
+
+		/* (first a hill that was not in play, then any not in play) */
+		for (pass = moving ? 0 : 1; pass < 2 && !found; pass++)
+		{
+			short i;
+
+			for (i = 0; i < king_engine_num_hills && !found; i++)
+			{
+				long hill_id = king_engine_hills[(start_index + i)%king_engine_num_hills];
+				boolean was_in_play = FALSE;
+				short previous_index;
+
+				for (previous_index = 0; previous_index < previous_count; previous_index++)
+				{
+					if (previous_ids[previous_index] == hill_id)
+						was_in_play = TRUE;
+				}
+				if (king_hill_in_play(hill_id, king_hill_count) || (pass == 0 && was_in_play))
+					continue;
+				csmemset(hill, 0, sizeof(*hill));
+				hill->hill_id = hill_id;
+				hill->hill_previous_controller = NONE;
+				hill->hill_state = king_hill_uncontrolled;
+				find_hill(hill);
+				found = hill->hill_point_count > 0;
+			}
+		}
+		if (!found)
+			break;
+		king_hill_count++;
+	}
+
+	return;
+}
+
+/* port: king_globals' hill (January's one, which the host sends its
+clients) from the first in play */
+static void king_hills_to_globals(
+	void)
+{
+	struct king_hill const *hill = &king_hills[0];
+
+	king_globals.hill_id = hill->hill_id;
+	king_globals.hill_point_count = hill->hill_point_count;
+	csmemcpy(king_globals.hill_points, hill->hill_points, sizeof(king_globals.hill_points));
+	csmemcpy(king_globals.convex_hull, hill->convex_hull, sizeof(king_globals.convex_hull));
+	king_globals.hill_center = hill->hill_center;
+	king_globals.hill_top = hill->hill_top;
+	king_globals.hill_bottom = hill->hill_bottom;
+	king_globals.hill_state = hill->hill_state;
+	king_globals.hill_controlled_count = hill->hill_controlled_count;
+	king_globals.hill_previous_controller = hill->hill_previous_controller;
+
+	return;
 }
 
 /* ---------- engine table */
@@ -1130,7 +1335,10 @@ struct game_engine king_engine =
 };
 
 typedef char verify_king_network_state_size[
-	sizeof(struct king_globals) <= GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
+	sizeof(struct king_globals) + sizeof(struct king_extra_hills_network_state) <=
+		GAME_ENGINE_MAXIMUM_NETWORK_STATE_SIZE ? 1 : -1];
+typedef char verify_king_hill_points[
+	MAXIMUM_HILL_POINTS == NUMBEROF(king_globals.hill_points) ? 1 : -1];
 
 /* the distributed netcode (port/linux/game/network_distributed.c): the game
 type's state the host sends its clients */
@@ -1138,10 +1346,24 @@ long game_engine_king_write_network_state(
 	byte *buffer,
 	long size)
 {
+	struct king_extra_hills_network_state extra_hills;
+	short hill_index;
+
 	if (size < (long)sizeof(king_globals))
 		return 0;
 	csmemcpy(buffer, &king_globals, sizeof(king_globals));
-	return sizeof(king_globals);
+	/* port: Multi-Hill's other hills after it (a game of one hill sends
+	January's state alone, as older builds read it) */
+	if (king_hill_count <= 1)
+		return sizeof(king_globals);
+	if (size < (long)(sizeof(king_globals) + sizeof(extra_hills)))
+		return sizeof(king_globals);
+	csmemset(&extra_hills, 0, sizeof(extra_hills));
+	extra_hills.hill_count = king_hill_count - 1;
+	for (hill_index = 1; hill_index < king_hill_count; hill_index++)
+		extra_hills.hill_ids[hill_index - 1] = king_hills[hill_index].hill_id;
+	csmemcpy(buffer + sizeof(king_globals), &extra_hills, sizeof(extra_hills));
+	return sizeof(king_globals) + sizeof(extra_hills);
 }
 
 /* a client: the sounds of a team's score passing from previous_score to
@@ -1204,11 +1426,20 @@ boolean game_engine_king_read_network_state(
 	boolean first)
 {
 	struct king_globals state;
+	struct king_extra_hills_network_state extra_hills;
+	boolean hills_moved = FALSE;
 	long team_index;
+	short hill_index;
 
-	if (size != (long)sizeof(state))
+	/* port: and Multi-Hill's other hills after it */
+	csmemset(&extra_hills, 0, sizeof(extra_hills));
+	if (size == (long)(sizeof(state) + sizeof(extra_hills)))
+		csmemcpy(&extra_hills, buffer + sizeof(state), sizeof(extra_hills));
+	else if (size != (long)sizeof(state))
 		return FALSE;
 	csmemcpy(&state, buffer, sizeof(state));
+	if (!VALID_INDEX(extra_hills.hill_count, MAXIMUM_HILLS_AT_ONCE))
+		return FALSE;
 	for (team_index = 0; team_index < (long)NUMBEROF(state.score); team_index++)
 	{
 		if (!first)
@@ -1217,12 +1448,31 @@ boolean game_engine_king_read_network_state(
 	csmemcpy(king_globals.score, state.score, sizeof(king_globals.score));
 	csmemcpy(king_globals.score_tick, state.score_tick, sizeof(king_globals.score_tick));
 	king_globals.hill_timer = state.hill_timer;
-	if (state.hill_id != king_globals.hill_id)
+	if (state.hill_id != king_hills[0].hill_id)
 	{
-		king_globals.hill_id = state.hill_id;
-		find_hill();
-		if (!first)
-			game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
+		king_hills[0].hill_id = state.hill_id;
+		find_hill(&king_hills[0]);
+		hills_moved = TRUE;
 	}
+	for (hill_index = 1; hill_index <= extra_hills.hill_count; hill_index++)
+	{
+		struct king_hill *hill = &king_hills[hill_index];
+		long hill_id = extra_hills.hill_ids[hill_index - 1];
+
+		if (hill_index < king_hill_count && hill->hill_id == hill_id)
+			continue;
+		csmemset(hill, 0, sizeof(*hill));
+		hill->hill_id = hill_id;
+		hill->hill_previous_controller = NONE;
+		hill->hill_state = king_hill_uncontrolled;
+		find_hill(hill);
+		hills_moved = TRUE;
+	}
+	if (king_hill_count != extra_hills.hill_count + 1)
+		hills_moved = TRUE;
+	king_hill_count = (short)(extra_hills.hill_count + 1);
+	king_hills_to_globals();
+	if (hills_moved && !first)
+		game_engine_play_multiplayer_sound(_multiplayer_sound_hill_move);
 	return TRUE;
 }

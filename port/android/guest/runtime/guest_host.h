@@ -38,6 +38,11 @@ void host_set_tp(unsigned int thread);
 __guest_thread_start(thread); returns 0 or an errno value */
 int host_thread_create(unsigned int thread, unsigned int stack_size);
 
+/* MCC tag address space (host_mcc_memory.c), independent of the guest pools.
+Reserve returns the address or negative errno; release returns zero or negative errno. */
+long long host_mcc_memory_reserve(unsigned int address, unsigned int size);
+int host_mcc_memory_release(unsigned int address, unsigned int size);
+
 /* ---------- memory write tracking (port/linux/src/memory_watch.c) */
 
 void host_memory_watch_initialize(void);
@@ -68,8 +73,13 @@ int host_sdl_gl_make_current(unsigned int window, unsigned int context);
 int host_sdl_gl_set_swap_interval(int interval);
 int host_sdl_gl_swap_window(unsigned int window);
 int host_sdl_poll_event(void *event);
+/* SDL's text input for the window (Android's keyboard while a name is typed:
+sdl_platform.c), started as the SDL_TextInputType given, one line and with no
+autocorrection, or stopped (-1); whether it runs */
+int host_sdl_text_input(unsigned int window, int type);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
+int host_sdl_open_url(const char *url);
 /* the keyboard's keys by name (the controls' bindings, xinput_sdl.c) */
 void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
 int host_sdl_scancode_from_name(const char *name);
@@ -115,6 +125,9 @@ void host_gl_wait_frame(unsigned int slot);
 
 /* ---------- Android */
 
+/* SoC classification for the immutable rendering policy. */
+int host_android_chip_family(void);
+
 /* the storage directories the port uses, copied into buffer */
 void host_android_path(int which, char *buffer, unsigned int size);
 
@@ -137,5 +150,60 @@ void host_touch_scene(int scene);
 /* the game control on each of the 16 controller buttons (touch_game.c),
 for the overlay's labels */
 void host_touch_bindings(const int *controls);
+/* the overlay's devices: 1, a touchscreen; 2, a game controller; 0 until it
+has looked */
+int host_touch_devices(void);
+
+/* ---------- the server browser's master servers (host_https.c) */
+
+/* a GET of an https:// url (port/linux/src/master_list.c): 1 with the
+status, the headers ("Name: value" lines) and up to body_capacity bytes of
+the body (its size in body_size), else 0 and why in error */
+int host_https_get(const char *url, int *status, char *headers, int headers_size, char *body, int body_capacity,
+	int *body_size, char *error, int error_size);
+
+/* an MCC package's fingerprint (SHA-256 and CRC32) on the host's threads, with the CPU's
+instructions, and kept on the card (port/android/host/host_mcc_hash.c, which says what each
+does; the guest's side is port/linux/game/mcc_resource_check.inl's) */
+int host_mcc_hash_start(unsigned int request);
+int host_mcc_hash_wait(int id, int milliseconds, unsigned int result);
+void host_mcc_hash_cancel(int id);
+/* a file's plain SHA-256 and size, on the host's threads (an MCC package a host offers) */
+int host_sha256_start(unsigned int path);
+int host_sha256_poll(int id, unsigned int digest, unsigned int size);
+void host_sha256_cancel(int id);
+/* the Steam Workshop screen, whose Steam client is the host's (port/android/host/steam_downloads.c, which
+says what each does; the guest's wrappers are port/linux/src/steam_screen.c's) */
+void host_steam_open(unsigned int data_root);
+void host_steam_close(void);
+int host_steam_poll(void);
+int host_steam_count(void);
+int host_steam_view(void);
+int host_steam_first(void);
+void host_steam_set_first(int first);
+int host_steam_chosen(void);
+void host_steam_set_chosen(int chosen);
+void host_steam_row(int place, unsigned int name, int name_size, unsigned int state, int state_size);
+void host_steam_details(int place, unsigned int title, int title_size, unsigned int text, int text_size,
+	unsigned int author, int author_size);
+void host_steam_choose(int place);
+int host_steam_back(void);
+int host_steam_picture(unsigned int key, unsigned int pixels);
+int host_steam_text_wanted(unsigned int initial, int initial_size, unsigned int secret);
+void host_steam_text_caption(int kind, unsigned int text, int text_size);
+void host_steam_text_typed(int kind, unsigned int text, int saved);
+/* MCC's shared sets (the base resources no host sends): queued when missing */
+int host_steam_shared_fetch(unsigned int data_root);
+int host_steam_shared_state(void);
+/* a whole Workshop item installed in mcc_maps for a joiner (a package with no resource maps of its own) */
+int host_steam_install_start(unsigned int data_root, unsigned int id_low, unsigned int id_high);
+int host_steam_install_status(void);
+/* its progress, in KB: done, of all (0 not yet known), and a second */
+void host_steam_install_progress(unsigned int progress);
+/* files put in mcc_maps by the Steam downloader since the last ask (once) */
+int host_steam_take_rescan(void);
+/* a Workshop item's author's name, asked of Steam on the host's thread (port/linux/src/workshop_authors.c's
+workshop_authors_get) */
+int host_steam_author(unsigned int item_id, unsigned int name, int name_size);
 
 #endif

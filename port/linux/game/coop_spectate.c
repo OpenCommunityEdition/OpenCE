@@ -8,7 +8,8 @@ follows a teammate from behind, and A (jump on the keyboard) switches to
 the next one. director.c and hud.c call in here.
 
 It also draws the line telling players about the vote to skip a cutscene
-(network_coop.c counts the votes).
+(network_coop.c counts the votes; on the touchscreen, the button they tap
+is touch_cinematic.c's).
 */
 
 #include "cseries.h"
@@ -28,6 +29,7 @@ It also draws the line telling players about the vote to skip a cutscene
 
 #include "coop_spectate.h"
 #include "network_coop.h"
+#include "touch_cinematic.h"
 
 #include <math.h>
 
@@ -154,27 +156,6 @@ long coop_spectate_unit(
 	return *watched != NONE ? player_get(*watched)->unit_index : NONE;
 }
 
-boolean coop_spectate_watching_rider(
-	short local_player_index)
-{
-	long self = local_player_get_player_index(local_player_index);
-	long watched = coop_spectate_watched[local_player_index];
-	long unit_index;
-	long driver_index;
-
-	if (self == NONE || player_get(self)->unit_index != NONE)
-		return FALSE;
-	/* the scripted camera may have been running since before this player
-	died, so nobody has been picked to watch yet */
-	if (watched == NONE || !player_try_and_get(watched) || player_get(watched)->unit_index == NONE)
-		watched = next_living_player(self, NONE);
-	unit_index = watched != NONE ? player_get(watched)->unit_index : NONE;
-	if (unit_index == NONE || !unit_is_passenger(unit_index))
-		return FALSE;
-	driver_index = unit_get(object_get(unit_index)->object.parent_object_index)->unit.driver_object_index;
-	return driver_index == NONE || unit_get(driver_index)->unit.player_index == NONE;
-}
-
 boolean coop_spectate_nothing_to_watch(
 	short local_player_index)
 {
@@ -278,6 +259,9 @@ void coop_skip_vote_draw(
 		return;
 	if (voted)
 		usnprintf(text, NUMBEROF(text) - 1, L"VOTED TO SKIP   %d OF %d", votes, voters);
+	/* (the touchscreen's button: touch_cinematic.c) */
+	else if (touch_cinematic_button_enabled())
+		usnprintf(text, NUMBEROF(text) - 1, L"TAP SKIP TO VOTE   %d OF %d", votes, voters);
 	else
 		usnprintf(text, NUMBEROF(text) - 1, L"PRESS SPACE OR A TO VOTE TO SKIP   %d OF %d", votes, voters);
 	text[NUMBEROF(text) - 1] = 0;

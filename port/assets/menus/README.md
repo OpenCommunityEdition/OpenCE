@@ -191,7 +191,9 @@ difficulty` are the port's, as the Xbox's take the Xbox's widgets. The
 settings screens': `port settings save` (OK) writes the settings changed
 (config.toml's, or `profile.<field>`: the profile being edited) and applies
 them, `port settings defaults` shows the defaults, `port settings help` the
-help of the row chosen; Controls Setup's `controls ...` bind the keyboard
+help of the row chosen; HDR Calibration's `port hdr calibration` (a
+`<data>`) has the renderer draw the pattern of the row chosen at the values
+shown; Controls Setup's `controls ...` bind the keyboard
 and mouse's controls (Enter takes the next key or button pressed; left and
 right choose which of two; Escape cancels, Delete clears); Change Color's
 `color picker ...` (the Xbox's names) set the profile's colour. The others
@@ -214,3 +216,6 @@ map=...>`), else a placeholder, placed where the PC version's picture is in
 its frame (`--pictures`: only where, not the picture, is read);
 `NON_HANDDRAWN.md` lists both. It needs `rsvg-convert`, Pillow, NumPy and
 SciPy.
+
+Port-owned settings screens can be regenerated without PC tags with
+`python tools/ce_menus.py --settings-only`; new screens are registered for embedding.

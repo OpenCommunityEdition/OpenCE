@@ -12,16 +12,19 @@ game. The platform layer cannot see the game's types, so it asks here
 #include "input/input.h"
 #include "input/input_abstraction.h"
 #include "interface/ui_widget.h"
+#include "network_coop.h"
 
 /* asks whether a cinematic is playing that A would skip
-(player_control.c, player_control_action_test_check_reset_input_blob); tests
+(player_control.c, player_control_action_test_check_reset_input_blob), or
+in network co-op vote to skip: a client's own cinematic is never skippable,
+as only the host runs the scripts that make it so (network_coop.c); tests
 cinematic_globals first because the controller is read before the game exists
 during input_initialize and shell_initialize, and game_initialize makes it
 after the game time globals that game_in_progress reads (game.c) */
 int touch_game_cinematic_skippable(void)
 {
 	return cinematic_globals && game_in_progress() && cinematic_in_progress() &&
-		cinematic_can_be_skipped();
+		(cinematic_can_be_skipped() || network_coop_skip_offered());
 }
 
 /* asks whether a cinematic is playing, skippable or not: the player has no

@@ -133,6 +133,9 @@ boolean director_inhibited_facing(
 	short local_player_index);
 boolean director_inhibited_input(
 	short local_player_index);
+/* port: for the sounds' Doppler effect (sound_manager.c) */
+long director_get_followed_unit(
+	short local_player_index);
 director_perspective director_get_perspective(
 	short local_player_index);
 short director_desired_perspective(
@@ -156,6 +159,12 @@ void director_initialize_for_saved_game(
 	void);
 void director_update(
 	real time_delta_sec);
+/* port: whether the observer films the scripts' camera for a host with no
+player of its own (a dedicated server): its network co-op clients are shown
+where the camera looks (network_coop.c), the first observer, as its first
+local player's would be */
+boolean director_unattended_scripted_camera(
+	short local_player_index);
 
 /* ---------- globals */
 

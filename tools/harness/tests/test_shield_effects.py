@@ -28,7 +28,7 @@ def generated(fault=None):
     return (('enums.inc', enums), ('under_test.inc', code))
 
 
-@pytest.mark.parametrize('case', ['offline', 'host', 'client', 'client_untrusted'])
+@pytest.mark.parametrize('case', ['offline', 'host', 'client', 'client_untrusted', 'coop'])
 def test_case(case):
     status, output = run(build('shield_effects', generated()), case)
     assert status == 0, output
@@ -40,6 +40,7 @@ def test_case(case):
     (('message.effects >= NUMBER_OF_SHIELD_EFFECTS', 'message.effects > NUMBER_OF_SHIELD_EFFECTS'),
      'client_untrusted'),
     (('"light_show_overshield", "players"', '"light_show_overshield", "own"'), 'host'),
+    (('if (network_coop_active())', 'if (0)'), 'coop'),
 ])
 def test_negative_control(fault, case):
     status, output = run(build('shield_effects', generated(fault)), case)

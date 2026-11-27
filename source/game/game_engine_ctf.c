@@ -144,6 +144,10 @@ enum
 	CTF_ENDGAME_SOUND_TIMEOUT = 2 * TICKS_PER_SECOND,
 	CTF_STARTING_LOCATION_RATING_WARMUP = TICKS_PER_SECOND,
 	CTF_STARTING_LOCATION_BAD_TEAM_INDEX = 3,
+	/* port: with Kills Score on (the variant's kills_score), a kill's points,
+	and a capture's where the variant keeps none */
+	CTF_KILL_POINTS = 1,
+	CTF_DEFAULT_CAPTURE_POINTS = 25,
 };
 
 enum
@@ -360,13 +364,58 @@ static void ctf_engine_player_damaged_player(
 	return;
 }
 
+/* port: whether kills score (the editor's Kills Score: a kill is a point for
+the killer's team, as in Slayer, and a capture is worth ctf_capture_points) */
+static boolean ctf_kills_score(
+	void)
+{
+	return game_engine_get_variant()->game_engine_variant.ctf.kills_score != 0;
+}
+
+/* port: a capture's points: 1, or with Kills Score on the editor's Kills per
+Capture (25 where the variant keeps none) */
+static long ctf_capture_points(
+	void)
+{
+	long points = game_engine_get_variant()->game_engine_variant.ctf.points_per_capture;
+
+	if (!ctf_kills_score())
+		return 1;
+	return points > 0 ? points : CTF_DEFAULT_CAPTURE_POINTS;
+}
+
+/* port: with Kills Score on, a kill scores for the killer's team (a betrayal
+takes the point away); a client of the distributed netcode has the host's
+scores (game_engine_ctf_read_network_state): its copy of a kill would count
+twice */
 static void ctf_engine_player_killed_player(
 	long killing_player_index,
 	long killing_object_index,
 	long dead_player_index,
 	boolean friendly_fire)
 {
+	struct player_datum *dead_player = player_get(dead_player_index);
+
+	if (ctf_kills_score() && !dead_player->quit_out_of_game && killing_player_index != NONE &&
+		!network_game_distributed_client() && game_engine_can_score())
+	{
+		long team_index = player_get(killing_player_index)->team_index;
+
+		if (VALID_INDEX(team_index, NUMBER_OF_CTF_TEAMS))
+			ctf_globals.scores[team_index] += friendly_fire ? -CTF_KILL_POINTS : CTF_KILL_POINTS;
+	}
+
 	return;
+}
+
+/* port: a player's points with Kills Score on: the kills, less the
+betrayals, and a capture's points for each flag scored */
+static long ctf_player_points(
+	struct player_datum *player)
+{
+	return (long)player->statistics.kills[0] * CTF_KILL_POINTS -
+		(long)player->statistics.friendly_fire_kills * CTF_KILL_POINTS +
+		(long)player->statistics.multiplayer_statistics.ctf_statistics.flag_scores * ctf_capture_points();
 }
 
 static void ctf_engine_prespawn_player_update(
@@ -428,10 +477,12 @@ static wchar_t *ctf_get_score_string(
 {
 	struct player_datum *player = player_get(player_index);
 
+	/* port: (with Kills Score on, the player's points) */
 	usprintf(
 		buffer,
 		L"%d",
-		player->statistics.multiplayer_statistics.ctf_statistics.flag_scores);
+		ctf_kills_score() ? ctf_player_points(player) :
+			(long)player->statistics.multiplayer_statistics.ctf_statistics.flag_scores);
 
 	return buffer;
 }
@@ -520,6 +571,8 @@ static boolean ctf_engine_initialize_for_new_map(
 	}
 
 	ctf_globals.score_to_win = game_engine_get_variant()->universal_variant.score_to_win;
+	/* port: with Kills Score on, the editor's captures to win, in points */
+	ctf_globals.score_to_win *= ctf_capture_points();
 
 	starting_location_count = player_get_starting_location_count();
 	for (starting_location_index = 0;
@@ -843,7 +896,12 @@ static long ctf_get_score(
 	struct player_datum *player = player_get(player_index);
 
 	if (score_type == _get_score_individual)
+	{
+		/* port: (with Kills Score on, the player's points) */
+		if (ctf_kills_score())
+			return ctf_player_points(player);
 		return player->statistics.multiplayer_statistics.ctf_statistics.flag_scores;
+	}
 
 	return ctf_globals.scores[player->team_index];
 }
@@ -1215,7 +1273,8 @@ static void ctf_award_capture(
 		0x1B6,
 		NONE != team_index);
 
-	ctf_globals.scores[team_index]++;
+	/* port: (a capture's points: 1, or Kills Score's) */
+	ctf_globals.scores[team_index] += ctf_capture_points();
 	player->statistics.multiplayer_statistics.ctf_statistics.flag_scores++;
 	ctf_show_capture(player_index, player->team_index);
 	if (VALID_INDEX(team_index, NUMBER_OF_CTF_TEAMS))

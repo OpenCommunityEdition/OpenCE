@@ -55,6 +55,7 @@ load_after = ["hd_textures"]  # mods it plays over: they load before it
 load_before = ["fixes"]       # mods that play over it: they load after it
 incompatible = ["other_audio"]  # mods it cannot be played with
 format = 1                    # the mods' format it is made for
+channel_order = "pc"          # "xbox": its multipurpose maps and HUD meters are in the Xbox's channel order
 ```
 
 `load_after`, `load_before` and `incompatible` name other mods by their `id`
@@ -211,7 +212,10 @@ plays), and `debug.txt` and the console say why.
 - Halo PC keeps the channels of a model shader's multipurpose maps and of
   the HUD's meters in another order than the Xbox. The game finds those
   bitmaps among the mod's and draws them in the Xbox's order, as it does for
-  Custom Edition maps (`custom_edition_bitmaps.c`).
+  Custom Edition maps (`custom_edition_bitmaps.c`). A mod whose bitmaps are
+  already in the Xbox's order (taken from an Xbox map, say) says
+  `channel_order = "xbox"` in `mod.toml`, and they are drawn as they are.
+  It is the whole mod's: keep bitmaps of the two orders in two mods.
 - The pixels are read from the file when the texture cache loads them, not
   kept in memory.
 

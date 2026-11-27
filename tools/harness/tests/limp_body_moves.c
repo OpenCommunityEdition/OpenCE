@@ -61,6 +61,9 @@ static void object_set_position(long index, real_point3d const *position, real_v
 static void render_interpolation_correct_object(long index, real_vector3d const *offset) { interpolations++; }
 static boolean distributed_vehicle_unsteered(long index) { return FALSE; }
 static boolean distributed_object_follows_host(long index) { return FALSE; }
+static void network_objects_vehicle_writing(long index, short kind) { }
+static void network_objects_vehicle_written(long index, real_point3d const *before,
+	real_vector3d const *before_forward, real_vector3d const *before_up, short kind) { }
 static boolean distributed_transform_valid(real_point3d const *position, real_vector3d const *forward, real_vector3d const *up,
 	real_vector3d const *velocity, real_vector3d const *angular_velocity, real_vector3d *valid_forward, real_vector3d *valid_up)
 {
@@ -127,7 +130,7 @@ static void receive(real x, real y, real z, boolean at_rest)
 	if (distance(&position, &body.object.position) > REMOTE_OBJECT_TOLERANCE)
 	{
 		network_objects_reconcile(BODY, &position, &forward, &up, &body.object.translational_velocity, NULL,
-			at_rest ? 0.0f : REMOTE_BLEND_DISTANCE);
+			at_rest ? 0.0f : REMOTE_BLEND_DISTANCE, 0);
 	}
 }
 
@@ -220,7 +223,7 @@ int main(int argc, char **argv)
 		real_vector3d forward = {1.0f, 0.0f, 0.0f}, up = {0.0f, 0.0f, 1.0f};
 
 		lying(0.0f, 0.0f);
-		network_objects_reconcile(BODY, &position, &forward, &up, NULL, NULL, REMOTE_BLEND_DISTANCE);
+		network_objects_reconcile(BODY, &position, &forward, &up, NULL, NULL, REMOTE_BLEND_DISTANCE, 0);
 		CHECK(body.object.position.x == 0.25f, "the fake world: blended halfway");
 		CHECK(!limp(), "blended: still lying limp where it was");
 		settled("blended");

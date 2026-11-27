@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The PC version's menus: ui\shell\main_menu\multiplayer_type_select\join_game (tools/ce_menus.py) -->
 <menus>
-	<widget name="main_menu/multiplayer_type_select/join_game/browser_mode_spinner" type="spinner" left="3" top="2" width="97" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" string_list="main_menu/multiplayer_type_select/join_game/join_game_mode" font="ui\large_ui" color="#FFCCCCCC" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 100 19 106">
+	<widget name="main_menu/multiplayer_type_select/join_game/browser_mode_spinner" type="spinner" left="3" top="2" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" color="#FFCCCCCC" align="center" list_flags="items_from_strings" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" strings="ALL GAMES|DEDICATED|P2P GAMES" setting="network.browser_source" values="all|dedicated|players" width="117" footer_bounds="7 120 19 126" font="ui\small_ui" text_y="3">
 		<on event="left_mouse" run="mouse spinner 1wide click"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/gamespy_error_fullscreen" width="640" height="480" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/black">
@@ -9,6 +9,7 @@
 		<on event="start" run="gamespy dismiss error"/>
 		<on event="b" run="gamespy dismiss error"/>
 		<on event="back" run="gamespy dismiss error"/>
+		<child widget="main_menu/multiplayer_type_select/join_game/error_words" x="192" y="176"/>
 		<child widget="error/error_modal"/>
 		<child widget="error/error_modal_button_bar" x="194" y="309"/>
 	</widget>
@@ -110,8 +111,8 @@
 		<child widget="main_menu/multiplayer_type_select/join_game/gamespy_error_fullscreen"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/filters/filters_screen"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/join_game/op_browser_mode" width="150" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds_sm2" color="#FF2896FF">
-		<child widget="main_menu/multiplayer_type_select/join_game/browser_mode_spinner" x="25" y="1"/>
+	<widget name="main_menu/multiplayer_type_select/join_game/op_browser_mode" width="150" height="28" flags="pass_unhandled_to_focused_child" color="#FF2896FF">
+		<child widget="main_menu/multiplayer_type_select/join_game/browser_mode_spinner" x="16" y="1"/>
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/op_sort_header_classic" width="20" height="18" bitmap="bitmaps/server_header_background_0" string_list="main_menu/multiplayer_type_select/join_game/join_game_column_headers" string_index="1" font="ui\small_ui" color="#FFFFFFFF" text_y="1">
 		<on event="a" run="gamespy select header"/>
@@ -166,12 +167,12 @@
 		<child widget="main_menu/multiplayer_type_select/join_game/header_sort_arrows" x="24" y="4"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/sort_header_type"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/join_game/page_count_label" type="text" controller="1" width="170" height="30" font="ui\small_ui" color="#FFFFFFFF" text_flags="no_focus_test">
+	<widget name="main_menu/multiplayer_type_select/join_game/page_count_label" type="text" controller="1" width="170" height="30" font="ui\small_ui" color="#FFFFFFFF" text_flags="no_focus_test" align="center">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/player_count_label" type="text" controller="1" width="170" height="30" font="ui\small_ui" color="#FFFFFFFF" text_flags="no_focus_test">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/screen_stats_container" controller="1" width="640" height="480" color="#FFFFFFFF" align="right">
-		<child widget="main_menu/multiplayer_type_select/join_game/server_count_label" x="450" y="60"/>
+		<child widget="main_menu/multiplayer_type_select/join_game/server_count_label" x="410" y="60"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/player_count_label" x="15" y="60"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/page_count_label" x="310" y="60"/>
 	</widget>
@@ -191,7 +192,7 @@
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/multiplayer_type_select/join_game/scroll_up_arrow" x="268" y="3"/>
 	</widget>
-	<widget name="main_menu/multiplayer_type_select/join_game/server_count_label" type="text" controller="1" width="170" height="30" font="ui\small_ui" color="#FFFFFFFF" align="right" text_flags="no_focus_test">
+	<widget name="main_menu/multiplayer_type_select/join_game/server_count_label" type="text" controller="1" height="30" font="ui\small_ui" color="#FFFFFFFF" align="right" text_flags="no_focus_test" width="210">
 	</widget>
 	<widget name="main_menu/multiplayer_type_select/join_game/server_item_1" width="620" height="18" bitmap="bitmaps/server_item_bkds">
 		<on event="a" run="gamespy select item"/>

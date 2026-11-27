@@ -26,6 +26,8 @@ final class TouchLayout {
     static final float MAX_OPACITY = 1f;
     static final float MIN_SENSITIVITY = 0.25f;
     static final float MAX_SENSITIVITY = 4f;
+    /** the Options button's radius, before a finger's width (minimumRadius) */
+    static final float OPTIONS_RADIUS = 34;
     /**
      * the largest minimum radius: a finger's width is capped here on a small,
      * dense display, where the D-pad's buttons (69 apart) would overlap
@@ -35,7 +37,7 @@ final class TouchLayout {
     /** the saved grid */
     private static final float GRID_WIDTH = 960;
     private static final float GRID_HEIGHT = 540;
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
     private static final int MAX_FILE_LENGTH = 65536;
 
     /** each kind's default place on the grid, and its radius */
@@ -85,6 +87,11 @@ final class TouchLayout {
     float opacity = 1f;
     /** the move stick goes where the thumb lands in the lower left, not at its place */
     boolean floatingStick = false;
+    /** a finger that holds a button also aims when it swipes */
+    boolean buttonsAim = true;
+    /** where the Options button is, in logical units; NaN until it is dragged (TouchControls then places it) */
+    private float optionsX = Float.NaN;
+    private float optionsY = Float.NaN;
 
     TouchLayout() {
         resetDefaults();
@@ -98,6 +105,8 @@ final class TouchLayout {
             control.x *= width / this.width;
             control.y *= height / this.height;
         }
+        optionsX *= width / this.width;
+        optionsY *= height / this.height;
         this.width = width;
         this.height = height;
         keepAllInside();
@@ -168,6 +177,7 @@ final class TouchLayout {
 
     /** the default controls, at their default places, sizes and visibility */
     void resetDefaults() {
+        optionsX = optionsY = Float.NaN;
         controls.clear();
         for (int i = 0; i < DEFAULTS.length; i++)
             controls.add(new Control(i, DEFAULTS[i][0] * width / GRID_WIDTH, DEFAULTS[i][1] * height / GRID_HEIGHT));
@@ -203,6 +213,31 @@ final class TouchLayout {
         return duplicate(type);
     }
 
+    boolean optionsMoved() {
+        return !Float.isNaN(optionsX);
+    }
+
+    float optionsX() {
+        return optionsX;
+    }
+
+    float optionsY() {
+        return optionsY;
+    }
+
+    float optionsRadius() {
+        return Math.max(OPTIONS_RADIUS, minimumRadius);
+    }
+
+    /** places the Options button, kept whole on the display */
+    void moveOptions(float x, float y) {
+        if (!Float.isFinite(x) || !Float.isFinite(y))
+            return;
+        float radius = optionsRadius();
+        optionsX = Math.max(radius, Math.min(width - radius, x));
+        optionsY = Math.max(radius, Math.min(height - radius, y));
+    }
+
     /** moves a control, keeping all of it on the display */
     void move(int control, float x, float y) {
         if (!Float.isFinite(x) || !Float.isFinite(y))
@@ -223,6 +258,8 @@ final class TouchLayout {
     private void keepAllInside() {
         for (int i = 0; i < size(); i++)
             move(i, x(i), y(i));
+        if (optionsMoved())
+            moveOptions(optionsX, optionsY);
     }
 
     /** the layout as a layout file's text, with the look sensitivity */
@@ -236,6 +273,11 @@ final class TouchLayout {
         values.setProperty("gyroscope", Boolean.toString(gyroscopeEnabled));
         values.setProperty("opacity", Float.toString(opacity));
         values.setProperty("floating-stick", Boolean.toString(floatingStick));
+        values.setProperty("buttons-aim", Boolean.toString(buttonsAim));
+        if (optionsMoved()) {
+            values.setProperty("options.x", Float.toString(optionsX * GRID_WIDTH / width));
+            values.setProperty("options.y", Float.toString(optionsY * GRID_HEIGHT / height));
+        }
         values.setProperty("count", Integer.toString(size()));
         values.setProperty("sensitivity", Float.toString(sensitivity));
         for (int i = 0; i < size(); i++) {
@@ -280,6 +322,20 @@ final class TouchLayout {
                 layout.opacity = opacity;
                 layout.floatingStick = readBoolean(values, "floating-stick");
             }
+            if (version >= 4) {
+                layout.buttonsAim = readBoolean(values, "buttons-aim");
+                // (no place: Options where it always was)
+                String x = values.getProperty("options.x");
+                String y = values.getProperty("options.y");
+                if (x != null || y != null) {
+                    float optionsX = Float.parseFloat(x);
+                    float optionsY = Float.parseFloat(y);
+                    if (!validPlace(optionsX, optionsY))
+                        throw new IllegalArgumentException("Invalid Options place");
+                    layout.optionsX = optionsX;
+                    layout.optionsY = optionsY;
+                }
+            }
             for (int i = 0; i < count; i++)
                 layout.controls.add(readControl(values, i, version));
             return new Configuration(layout, sensitivity);
@@ -307,8 +363,7 @@ final class TouchLayout {
         String shown = values.getProperty(key + "visible");
         float size = version >= 2 ? Float.parseFloat(values.getProperty(key + "size")) : 1f;
         boolean validType = type >= 0 && type < BASE_COUNT && (index >= BASE_COUNT ? type != LEFT : type == index);
-        boolean validPlace = Float.isFinite(x) && Float.isFinite(y) && x >= 0 && x <= GRID_WIDTH
-            && y >= 0 && y <= GRID_HEIGHT;
+        boolean validPlace = validPlace(x, y);
         boolean validSize = Float.isFinite(size) && size >= MIN_SIZE && size <= MAX_SIZE;
         if (!validType || !validPlace || !validSize || !("true".equals(shown) || "false".equals(shown)))
             throw new IllegalArgumentException("Invalid control in layout file");
@@ -323,6 +378,11 @@ final class TouchLayout {
         if (!("true".equals(value) || "false".equals(value)))
             throw new IllegalArgumentException("Invalid " + key + " option");
         return Boolean.parseBoolean(value);
+    }
+
+    /** a place on the saved grid */
+    private static boolean validPlace(float x, float y) {
+        return Float.isFinite(x) && Float.isFinite(y) && x >= 0 && x <= GRID_WIDTH && y >= 0 && y <= GRID_HEIGHT;
     }
 
     static boolean validSensitivity(float value) {

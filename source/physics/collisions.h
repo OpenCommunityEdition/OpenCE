@@ -163,6 +163,9 @@ short collision_move_pill(
 	real_vector3d *clipped_velocity,
 	short maximum_collision_count,
 	struct collision_plane *collisions);
+/* port: (vehicle_riding.c) */
+void collision_move_pill_carry(unsigned long flags, real_point3d const *position, real_vector3d const *displacement,
+	real height, real radius, long biped_index, long vehicle_index, real_point3d *carried_position);
 short collision_move_sphere(
 	unsigned long flags,
 	real_point3d const *position,

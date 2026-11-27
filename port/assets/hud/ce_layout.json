@@ -312,6 +312,60 @@
    "crc": 1316117604,
    "coverage": true,
    "point_threshold": true
+  },
+  {
+   "name": "ce_sniper_scope",
+   "tag": "ui\\hud\\bitmaps\\sniper\\hud_reticles_scope",
+   "bitmap": 0,
+   "width": 64,
+   "height": 64,
+   "scale": 8,
+   "format": "a8r8g8b8",
+   "ce_only": true,
+   "size": 16384,
+   "crc": 3359213591,
+   "cells": [
+    {
+     "xbox": [
+      0,
+      0,
+      25,
+      18
+     ],
+     "source_png": "corrections/scope.png",
+     "crop": [
+      50,
+      26,
+      188,
+      112
+     ],
+     "kind": "alpha"
+    },
+    {
+     "xbox": [
+      51.5,
+      0.5,
+      61.5,
+      10.5
+     ],
+     "source_png": "corrections/scope.png",
+     "crop": [
+      241,
+      12,
+      301,
+      73
+     ],
+     "kind": "alpha"
+    }
+   ],
+   "sprites": [
+    {
+     "sequence": 0
+    },
+    {
+     "sequence": 1
+    }
+   ]
   }
  ]
 }

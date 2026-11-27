@@ -1,0 +1,21 @@
+suite: persistence
+templates:
+  - templates/state-pvc.yaml
+release:
+  name: opence-server
+tests:
+  - it: makes no claim without persistence
+    asserts:
+      - hasDocuments: { count: 0 }
+  - it: makes the state claim with persistence
+    set:
+      persistence: { enabled: true, size: 3Gi, storageClass: fast }
+    asserts:
+      - equal: { path: metadata.name, value: opence-server-state }
+      - equal: { path: spec.resources.requests.storage, value: 3Gi }
+      - equal: { path: spec.storageClassName, value: fast }
+  - it: makes none for an existing claim
+    set:
+      persistence: { enabled: true, existingClaim: mine }
+    asserts:
+      - hasDocuments: { count: 0 }

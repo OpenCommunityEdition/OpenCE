@@ -8,8 +8,9 @@
   the HUD messages'): redraws by saulob (`port/assets/buttons`).
 - **The high-res HUD** (its meters, icons, scopes and messages, and the
   weapons' reticles): redraws by MrBruh (`port/assets/hud`), based on
-  reference photos by Aerocatia. The sniper rifle's zoom labels (2x, 10x)
-  are set in Overpass (`port/assets/fonts`).
+  reference photos by Aerocatia. The corrected rocket/sniper reticles and
+  sniper zoom labels (2x, 10x) use artwork supplied by the project owner
+  (`port/assets/hud/corrections`); original artist attribution is unverified.
 - **The menus' mouse cursor** (the blue arrow the menus show for the
   mouse): by pugzysixtyfour (`port/assets/cursor`).
 
@@ -23,3 +24,6 @@
 - **The Mods menu's warning icons** (a mod out of its requested order, and
   a mod that cannot be played): `triangle-alert` and `circle-x` from
   [Lucide](https://lucide.dev) 1.53.0, under the same licence.
+
+- **Additional controller button styles**: supplied by the contributor
+  (`port/assets/controller_buttons`); original artist attribution is unverified.

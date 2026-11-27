@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/discord_account_settings_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/header_profile_network_settings"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/header_profile_network_settings" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/network_setup/header_profile_network_settings">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/help" type="text" controller="1" left="68" top="350" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/help">
+		<data input="port settings help"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_discord_account" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_1" x="54" y="103"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_2" x="54" y="133"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_3" x="54" y="163"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_4" x="54" y="193"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_action" x="54" y="223"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_share" x="54" y="253"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/button_defaults" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_discord_account" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/discord_account_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/discord_account_value" x="286" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/discord_account_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/discord_account_value" type="text" controller="1" width="212" height="22" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_1" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_1_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_1_value" x="130" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_1_label" type="text" controller="1" width="130" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_1_value" type="text" controller="1" width="382" height="22" font="ui\small_ui" color="#FF2896FF" align="left" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_2" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_2_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_2_value" x="130" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_2_label" type="text" controller="1" width="130" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_2_value" type="text" controller="1" width="382" height="22" font="ui\small_ui" color="#FF2896FF" align="left" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_3" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_3_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_3_value" x="130" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_3_label" type="text" controller="1" width="130" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_3_value" type="text" controller="1" width="382" height="22" font="ui\small_ui" color="#FF2896FF" align="left" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_master_4" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_4_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_4_value" x="130" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_4_label" type="text" controller="1" width="130" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_master_4_value" type="text" controller="1" width="382" height="22" font="ui\small_ui" color="#FF2896FF" align="left" text_y="5" text_flags="no_focus_test">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_action" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_action_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_action_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_action_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_action_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NO CHANGE|WITH MASTER 1|WITH MASTER 2|WITH MASTER 3|WITH MASTER 4|UNLINK ALL" setting="link.action" values="none|link_1|link_2|link_3|link_4|unlink" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/op_link_share" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_share_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_share_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_share_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/link_share_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="WHEN ASKED|ALWAYS|NEVER" setting="network.link_share" values="when_needed|always|never" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings defaults"/>
+		<on event="start" run="port settings defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings save" back="true"/>
+		<on event="start" run="port settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/labels">
+		<string text="DISCORD ACCOUNT:"/>
+		<string text="MASTER 1:"/>
+		<string text="MASTER 2:"/>
+		<string text="MASTER 3:"/>
+		<string text="MASTER 4:"/>
+		<string text="LINK:"/>
+		<string text="SHOW TO SERVERS:"/>
+	</strings>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/words">
+		<string text="NOT LINKED"/>
+		<string text="LINKED AS"/>
+		<string text="WAITING: CODE"/>
+		<string text="REVOKED"/>
+		<string text="EXPIRED:"/>
+		<string text="OF"/>
+		<string text="A SERVER NEEDS IT"/>
+		<string text="NONE"/>
+	</strings>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/network_setup/discord_account/help_strings">
+		<string text=""/>
+		<string text="The Discord account linked to this game, and with\nhow many of the master servers."/>
+		<string text="A master server (masters.txt) and the account\nlinked with it: a server it lists lets it in."/>
+		<string text="A master server (masters.txt) and the account\nlinked with it: a server it lists lets it in."/>
+		<string text="A master server (masters.txt) and the account\nlinked with it: a server it lists lets it in."/>
+		<string text="A master server (masters.txt) and the account\nlinked with it: a server it lists lets it in."/>
+		<string text="WITH MASTER n opens that master's page in the\nbrowser (on OK). UNLINK ALL forgets the account."/>
+		<string text="Which servers see your Discord account: WHEN\nASKED, those that block VPNs, joined from one."/>
+	</strings>
+</menus>

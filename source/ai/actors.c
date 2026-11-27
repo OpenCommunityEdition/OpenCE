@@ -281,6 +281,7 @@ symbols in this file:
 /* ---------- headers */
 
 #include "cseries.h"
+#include "mcc_grenades.h" /* port: port/linux/game/mcc_grenades.h */
 #include "actors.h"
 #include "actor_definitions.h"
 #include "actor_placement.h"
@@ -3367,6 +3368,9 @@ void actor_died(
 			grenade_roll < actor_variant_definition->items.dont_drop_grenades_chance)
 		{
 			csmemset(unit->unit.grenade_counts, 0, sizeof(unit->unit.grenade_counts));
+			/* port: and MCC's expanded grenade inventory */
+			if (mcc_grenades_active())
+				mcc_grenades_clear(actor->meta.unit_index);
 		}
 
 		if (weapon_index != NONE)
@@ -4240,6 +4244,32 @@ static void actor_update(
 	return;
 }
 
+/* port: an actor whose unit is dead dies with it. unit_died takes the actor
+away, but a unit can be marked dead without it (object_deplete_body: a
+damage region that forces death, a script's vitality set to 0). Its actor
+was then kept, counted by its encounter, so a mission waiting for the
+encounter to die waited forever, and its nav point pointed at a body every
+client had dead. A feigned death (its timer running) and a player's unit
+are left as they are. */
+static boolean actor_port_unit_dead(
+	long actor_index)
+{
+	struct actor_datum *actor = actor_get(actor_index);
+	struct unit_datum *unit;
+
+	if (actor->meta.swarm || actor->meta.unit_index == NONE)
+		return FALSE;
+	unit = unit_get(actor->meta.unit_index);
+	if (!TEST_FLAG(unit->object.damage_flags, _object_dead_bit) || unit->unit.feign_death_timer > 0 ||
+		unit->unit.player_index != NONE || unit->unit.actor_index != actor_index)
+	{
+		return FALSE;
+	}
+	unit_died(actor->meta.unit_index, FALSE);
+
+	return TRUE;
+}
+
 void actors_update(
 	void)
 {
@@ -4256,6 +4286,10 @@ void actors_update(
 		if (actor->meta.erase_next_tick)
 		{
 			actor_erase(iterator.index, FALSE);
+		}
+		/* port: (actor_port_unit_dead) */
+		else if (actor_port_unit_dead(iterator.index))
+		{
 		}
 		else if (actor->state.mode > _actor_mode_braindead)
 		{

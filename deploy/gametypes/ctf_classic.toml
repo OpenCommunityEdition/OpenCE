@@ -1,0 +1,27 @@
+# Capture the flag as players remember it: three captures, the flag must be
+# at home to score.
+base = "ctf"
+name = "Classic CTF"
+
+[universal]
+teams = true
+score_to_win = 3
+respawn_time = 5
+weapon_set = "normal"
+vehicle_set = "default"
+radar = true
+
+[options]
+time_limit = 25
+friendly_fire = "off"
+vehicle_respawn_time = 90
+auto_team_balance = true
+radar_players = "friends"
+team_vehicles = "pc"
+
+[ctf]
+assault = false
+reset_on_capture = false
+flag_must_reset = false
+flag_at_home_to_score = true
+single_flag_time = 0

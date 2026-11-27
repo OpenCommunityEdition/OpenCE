@@ -16,6 +16,58 @@ Physical mice use the same control bindings. During play, F12 toggles mouse
 capture; captured mode hides Android's pointer and uses relative movement for
 continuous aiming, while releasing capture restores normal pointer behavior.
 
+## Importing MCC packages
+
+Quit the game, then long-press its launcher icon and choose **Import MCC maps**.
+The first-run game-data screen also has an import button. Copy a complete Halo 1
+Workshop package from your computer to a selectable folder (for example Downloads)
+or a ZIP on the phone. Select **Workshop package**, then **Choose folder** or
+**Choose ZIP**. Keep `ModInfo.json`, `CampaignInfo.json`, the mission JSON files
+and maps together. Steam is not needed on Android.
+
+Keep the supplied PNG previews too, including `assets` when present. Folder
+and ZIP imports preserve these images and their relative metadata paths.
+MCC level panels automatically use `Images.Large`, falling back to
+`Images.Thumbnail` or the question-mark picture. The image fits inside the
+existing thumbnail box in each menu style. Supported PNGs are 8-bit RGB/RGBA,
+non-interlaced, at most 2048 by 2048 pixels and 8 MiB per file; other encodings
+keep the placeholder. See [MCC previews](../../docs/reading/mcc_level_previews.md).
+
+The importer defaults to the Workshop ID as its destination folder; an optional
+name can use letters, digits, spaces, underscores and hyphens. It checks package
+paths, metadata, campaign completeness and MCC cache headers before offering
+installation. It copies the package's maps into `mcc_maps/<package>`, retaining
+metadata subfolders and writing `workshop_id.txt`. Folder and ZIP inputs share
+the same importer. Android document URIs are read as streams through the system
+picker, with no broad storage permission.
+
+Use the shared-resource modes separately: singleplayer requires `bitmaps.map`;
+multiplayer requires `bitmaps.map` and `sounds.map`. Select one resource set at a
+time. These are installed under `mcc_maps/_shared/singleplayer` or `multiplayer`.
+The engine performs its normal full map/resource validation when loading; an
+importer's header check does not establish full gameplay compatibility.
+
+An existing destination requires explicit replacement confirmation. New files
+are staged outside `mcc_maps`; a failed publish restores the old package. An
+interrupted replacement is recovered at the next import. Cancellation removes
+staged files, and installed Xbox/CE maps and game saves are preserved. Imports
+are serialized and the activity refuses to import while the game process runs.
+Limits are 4,096 files, 16 GiB total, less than 2 GiB per map, 256 KiB per JSON
+file and 64 declared campaign missions. Hub/flashback mission kinds are refused.
+
+Start the game after importing. Enable **CAMPAIGN MISSIONS** in Settings >
+Network Setup > Map Sharing > MCC Packages for mission ordering and progression;
+it is off by default. **COLLECTION FOLDERS** can group identified imported
+packages without Steam. See [MCC packages](../../docs/mcc_maps.md) for desktop
+discovery, resource rules and compatibility limits.
+
+The archived [Android importer test](https://github.com/chestahh/GulchCE/blob/1db929c5e34101a45f644436e031016b5584c7bf/tools/test_mcc_android_importer.py)
+compiles and runs the actual Java core with
+JDK 17+, including failure rollback, cancellation, malformed metadata, path
+traversal and legacy/save preservation. These checks do not exercise an Android
+document provider or establish on-device rendering compatibility. This wider
+test is not included in the focused upstream regression subset.
+
 ## Requirements
 
 You do not need the Xbox SDK. You need the tools of the Linux build (Python,
@@ -73,6 +125,19 @@ of the whole `save` folder stops there.
 `ninja android` builds only the game image and the native libraries.
 
 ## Game data
+
+MCC maps need a fixed 64 MiB virtual address window for their linked tags.
+The Android host attempts to reserve the usual `0x50000000` window at app
+startup, before the guest and renderer allocate memory. This reserves address
+space, not 64 MiB of physical RAM. Unloading an MCC map discards its pages
+but retains the reservation for the next load; exiting the process releases it.
+Xbox and Custom Edition keep their existing memory paths.
+
+If another mapping already occupies the window, the app leaves it untouched
+and MCC loading fails safely. Logcat (`halo`) lists overlapping mappings;
+the load error in `debug.txt` identifies the requested address. This is an
+address-space conflict, not a duplicate map file. Early reservation cannot
+guarantee that every device makes this address available.
 
 The game needs the `maps/` folder from an Xbox disc image (`.xiso` or
 `.iso`) of any version of the game. The app extracts `maps/` from the disc
@@ -140,9 +205,39 @@ value. Touches that start in the edge-gesture zones of Android do not tap
 or scroll at the sides, and do not scroll at the top and bottom, because the
 first swipe from an edge in full screen only shows the system bars.
 
-A tap during a cinematic that can be skipped skips it, as A does. On the
-on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
-"A =ENTER" to accept the name.
+During a cinematic that can be skipped, a SKIP button shows at the top
+right, in the black bar: tap it to skip the cinematic, as A does. Taps
+elsewhere do nothing, so a stray tap does not skip it. In network co-op,
+SKIP votes to skip, the line at the bottom counts the votes, and the button
+reads VOTED once you have voted; the cinematic is skipped once more than
+half the players have voted. The button follows the touch controls
+(`input.touch_controls`): while a controller is connected, or with `off`,
+there is no button and any tap skips, or votes to skip, as A does
+(`port/linux/game/touch_cinematic.c`).
+
+On the game's on-screen keyboard (a player profile's name), tap a key to
+press it, "B =BACK" to cancel and "A =ENTER" to accept the name.
+
+While a name is typed, on the game's on-screen keyboard or in a menu's text
+field (Server Setup's server name and password, a game's password when
+joining it), Android's keyboard comes up as well when the touch controls
+would show (see "Touch controls"). Its letters, numbers, symbols (those of
+ASCII only) and backspace type into the name, and its Enter accepts it, as a
+keyboard's Enter does. A name is typed as a visible password to Android's
+keyboard, so that it offers no suggestions and does not learn the names
+typed. The back gesture closes Android's keyboard first; it comes back with
+the next name begun, and the game's own keyboard takes taps meanwhile. A
+Bluetooth or USB keyboard types into the names in the same way, with or
+without Android's keyboard (`port/linux/src/sdl_platform.c`, "the system's
+on-screen keyboard").
+
+After a multiplayer game, the carnage report shows buttons in place of its
+prompt at the bottom: the host's CONTINUE goes on to the next game (PICK
+GAME), as A does, and LEAVE leaves the game, as B does (the host's LEAVE
+ends it for everyone). A client has LEAVE only. The buttons follow the touch
+controls (`input.touch_controls`): while a controller is connected, or with
+`off`, the report shows the prompt as on the Xbox, and A and B act as before
+(`port/linux/game/touch_postgame.c`).
 
 ### Touch controls
 
@@ -166,11 +261,14 @@ Gamepads): with "Swap triggers", the right trigger's button says "Grenade".
 The stick moves the player with every "Stick layout", southpaw too.
 
 A finger that holds a button can also swipe to look, so you can fire and
-aim with one thumb. The controls are a finger wide (48 dp) or larger, but
+aim with one thumb ("Held buttons don't aim" in General turns this off).
+The controls are a finger wide (48 dp) or larger, but
 on a small screen of high density they stay apart rather than reach that
 size. A short tap reaches the game even when it is shorter than one frame.
 Swipes that start in the edge-gesture zones of Android do not turn the
-view. The swipe aims as the controller's stick does, not as a mouse: the
+view or place the floating stick, but a control drawn in one still presses
+(Android keeps the zones while the system bars are hidden: with 3-button
+navigation, all of where the bar was). The swipe aims as the controller's stick does, not as a mouse: the
 aim slows over a target and follows a moving one, as with a controller,
 and it follows the profile's "invert look" (the gyroscope turns the view
 as the phone turns, never inverted). The setting `input.touch_aim_assist`
@@ -193,11 +291,14 @@ The buttons at the top of the screen:
     vibration setting of the game's profile), aiming with the gyroscope
     (off by default), a floating move stick (off by default: the stick goes
     where your thumb lands in the lower left of the screen), the opacity of
-    the controls, "Hide or add buttons" (hide a button, add a copy of a
+    the controls, "Held buttons don't aim" (off by default: a finger
+    that swipes from a button only holds it),
+    "Hide or add buttons" (hide a button, add a copy of a
     button) and "Edit buttons size".
-  - "Edit buttons layout": drag the controls to new positions, then push
-    "Save". "Export" and "Import" write and read a layout file with the
-    file picker of the system.
+  - "Edit buttons layout": drag the controls, and the "Options" button
+    itself, to new positions, then push "Save" in the middle of the
+    screen. "Export" and "Import", beside it, write and read a layout
+    file with the file picker of the system.
   - "Look sensitivity".
 
 "Hide" and "Options" act when the finger lifts on them: a swipe that
@@ -220,13 +321,29 @@ get the default values again, delete the file.
 
 The settings are the settings of Linux, without the window, the mouse and
 the paths. Refer to [port/linux/README.md](../linux/README.md#settings).
+Some video settings also apply on Android, with these notes; the first three
+have rows of their own in Video Setup:
+
+- `display.resolution_scaling` (`RESOLUTION` in the menus) is `"original"`
+  (the default) for the Xbox's 640x480 scaled up, or `"native"` for the
+  display's own resolution: sharper, but more work for the GPU, and the
+  display must fit in the GPU's largest render target.
+- `display.max_fps` (`FRAME RATE LIMIT`) limits the frame rate while
+  `display.vsync` is off: `0` (the default) is twice the display's refresh
+  rate, `-1` no limit, or the most frames each second.
+- `display.show_fps` (`SHOW FRAMES`) draws the frame rate at the bottom right
+  of a game, which is the quickest way to see what a device manages; the
+  same setting on the other ports (`port/linux/README.md`).
+
 These settings are only for Android:
 
 | Setting | Function |
 | --- | --- |
 | `input.touch_aim_assist` | `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
-| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
+| `input.touch_controls` | The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The carnage report's CONTINUE and LEAVE buttons follow the same rule (otherwise it shows its A and B prompt), and so does a cinematic's SKIP button (otherwise any tap skips it). The menus take taps in any case. |
 | `display.screen_width` | The number of columns of the 480-line picture. `0` (the default): the shape of the display (1068 on a 20:9 phone). `640`: the 4:3 shape of the Xbox. |
+| `display.stats_log` | `false` (the default): `true` writes a line a second to the log with the frame rate, the mode, the map, the renderer and the size of the 3D view, for a bug report or to compare two builds. |
+| `display.resolution_scaling` | Also Linux's, with another default on Android. `"original"` (the default): the game draws the 480 lines of the Xbox, which the display scales up. `"native"`: the game draws at the display's resolution (1080 lines on a 1080p phone). `"75%"`, `"50%"` or `"25%"`: that part of the display's resolution each way, scaled up: less for the GPU to draw, for more frames a second and less heat. Video Setup's Resolution Scaling sets it, from the next frame. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to cached textures by page protection. `false`: it compares page contents once a frame instead, which is slower. Geometry uses the streaming path in either mode. Refer to "Limits". |
 
@@ -415,6 +532,25 @@ functions of OpenGL ES 3.2 if they are available:
   the query buffer of desktop OpenGL. A read of the counters themselves
   waits for the GPU, which halved the frame rate on Turnip (Zink).
 
+`host_gl_wait_frame` in [`host/host_gl.c`](host/host_gl.c) releases an upload
+ring slot only after GPU completion. A signaled fence takes the normal path;
+if the one-second wait times out or fails, `glFinish` completes queued work
+before the slot is reused. Failed fence creation uses the same fallback.
+This can stall longer than one second under GPU pressure, but cannot safely
+be replaced by treating a timeout as completion. The first fallback is logged.
+The contract applies to every Android chip policy and map family, including
+frames drawn during loading; it neither reads nor deletes saved games or maps.
+
+[`test_android_frame_fences.py`](../../tools/test_android_frame_fences.py)
+compiles the production host fence and upload functions with a delayed fake
+GPU. Timeout, wait failure and fence creation failure previously let queued
+draws read the next upload's bytes. The test covers those failures, successful
+waits and repeated slot reuse. This establishes a synchronization defect found
+while investigating [issue #80](https://github.com/chestahh/GulchCE/issues/80),
+not that it explains the reported save-folder workaround. An affected-device
+comparison across consecutive matches with the original saves retained is
+still needed to establish whether that issue is resolved.
+
 ### Calling conventions
 
 Some files of the game declare a function differently from its definition,
@@ -463,20 +599,51 @@ assembly of the port is necessary:
 
 ## Geometry uploads
 
-Android streams vertex and index data from the current CPU bytes instead
-of reusing the persistent geometry mirror or its cached index extents.
-This is automatic; no console command or configuration change is needed.
+Android selects its rendering fixes once at startup from the chip identity:
+
+| Chip | Geometry fixes | Custom Edition texture fixes |
+| --- | --- | --- |
+| Qualcomm Snapdragon | On | On |
+| MediaTek | Off | On |
+| Other identified vendors, including Google Tensor and Samsung Exynos | Off | Off |
+| Unknown or conflicting identity | On | On |
+
+The host reads `ro.soc.manufacturer` and `ro.soc.model`, falling back to
+`ro.hardware` and `ro.board.platform` on older devices. Phone brand is not
+used: Samsung phones, for example, can have different chip vendors. Mali
+and PowerVR GPU names alone do not identify a chip vendor. Unrecognized
+identifiers retain both fixes. The policy is selected before the game
+creates resources, stays fixed for the process, and is logged at startup.
+No console command, configuration change or device permission is needed.
+
+With geometry fixes enabled, Android bypasses the persistent geometry
+mirror and its cached index extents and uses the upload paths below.
 Affected players reported that bypassing the cache resolved stretched or
 missing geometry, with some also reporting better performance. The exact
 cache failure mechanism remains unconfirmed.
 
-The Android-only guard in `mirror_range` uses the existing streaming
-fallback. Streamed upload methods, frame fences, shaders, texture caching
-and CPU write tracking are unchanged. Desktop and web retain their cache.
-Xbox and Custom Edition maps keep their existing loaders and resource
+With geometry fixes disabled, Android uses the normal persistent mirror
+and fixed stream buffers, without registering static-cache entries or
+allocating per-draw pooled buffers. Desktop and web retain their existing
+geometry cache and upload paths. These geometry
+changes preserve shaders, texture caching and CPU write tracking.
+Xbox, Custom Edition and MCC maps keep their existing loaders and resource
 paths. `tools/test_android_mirror_uploads.py` checks the bypass with large
 and reused ranges, frame-counter rollover and desktop/web cache controls;
-it does not substitute for device gameplay validation.
+it does not substitute for device gameplay validation. The chip and policy
+matrix is covered by `tools/test_android_render_policy.py`.
+
+Streamed vertices and indices go into pooled buffers, a buffer for each
+draw that no queued draw reads, written with `glBufferSubData` and reused
+only after the ring's frame fence (`web_chunk_get`, as the web build does):
+unsynchronized writes into the frame's one stream buffer drew some
+geometry as long spikes on Snapdragon. Geometry the game writes once (the
+models and BSPs of Xbox, Custom Edition and mod maps) gets GL buffers of
+its own, filled at its first draw and released when it unloads; a range
+whose storage GL cannot allocate is streamed instead.
+`tools/test_android_static_geometry.py` checks both with fake GL: no upload
+writes a buffer a queued draw reads, and the static ranges' reuse, unload
+and reload, address reuse and allocation failure.
 
 ## Find problems
 
@@ -515,3 +682,25 @@ it does not substitute for device gameplay validation.
   point to an integer in a SIMD register (`fcvtzs s0, s1`, an illegal
   instruction there), so `tools/android_asm_convert.py` writes each as the
   vector form, which leaves the register and the exception flags the same.
+
+## Custom Edition texture storage
+
+When the chip policy enables texture fixes, cached Custom Edition textures
+on Android use stable individual allocations,
+created on demand with a 128 MiB pixel limit and 8,192-entry limit, outside the
+fixed Xbox memory window. This avoids exhausting the old arena with textures
+needed in the same frame and avoids re-uploading surviving textures after
+compaction. Current-frame entries cannot be evicted. Normal GPU caching,
+texture conversion and HUD replacements remain. With texture fixes disabled,
+Custom Edition uses the established Xbox texture arena and normal GPU cache.
+The blanket GL shadow-state refresh before every draw is disabled on all
+Android devices; resource deletion and context changes still invalidate state
+where necessary. Desktop, web and other map storage paths retain their
+established behavior. Fullscreen behavior is unchanged.
+
+Cleanup releases bindings and GPU copies before pixel/header reuse. Map unload,
+cache flush and mod reload release the stored pixels. Diagnostics are limited to
+an unload summary and the first allocation failure per cache lifetime in the
+normal platform log. No test log files, per-frame reports, texture fingerprints
+or uniform readbacks run in the permanent build. The cache can still exhaust
+its limit or system memory; normal fallback handling remains available.

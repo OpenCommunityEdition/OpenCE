@@ -249,6 +249,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
@@ -258,6 +259,7 @@ symbols in this file:
 #include "networking/network_connection.h"
 #include "networking/network_game_globals.h"
 #include "networking/network_game_manager.h"
+#include "mcc_identity.h" /* port: attach MCC content identity to host settings */
 #include "networking/network_game_protocol.h"
 #include "networking/network_messages.h"
 #include "networking/network_server_manager_internal.h"
@@ -273,6 +275,18 @@ boolean network_voice_handles_message(word const *message, word size);
 void network_voice_handle_message(long machine_index, word const *message, word size);
 /* port/linux/game/map_share.c's: map sharing, in the lobby too */
 boolean map_share_handles_message(word const *message, word size);
+/* port/linux/game/mcc_share.c's: MCC package sharing, in the lobby too */
+boolean mcc_share_game_handles_message(word const *message, word size);
+void mcc_share_game_handle_message(long machine_index, word const *message, word size, boolean from_stream);
+/* port: port/linux/game/mcc_cache.c's (a level of an MCC map) and
+port/linux/src/p2p_lobby.c's (the network version advertised) */
+boolean mcc_level_name(char const *name);
+unsigned int network_version_advertised(int mcc);
+#include "mcc_load_network.h" /* port: MCC send-only loading progress */
+#include "mcc_admission.h" /* port: MCC validation before players and precaching */
+#include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
+boolean network_map_vote_handles_message(word const *message, word size);
+void network_map_vote_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void map_share_handle_message(long machine_index, word const *message, word size, boolean from_stream);
 void network_distributed_handle_stream_message(long machine_index, word const *message, word size);
 
@@ -440,6 +454,12 @@ struct message_client_join_game_request
 	byte join_game_token[JOIN_GAME_TOKEN_LENGTH];
 	/* port: the machine's hardware id, as hex, as it tells it (p2p.c) */
 	char hardware_id[0x20];
+	/* port: a Discord account's pass and its proof for this connection, all
+	zero for none (port/linux/src/player_link.c: a dedicated server that
+	refused the machine for its VPN asks for it) */
+	byte link_pass[170];
+	byte link_proof[64];
+	word network_version; /* port: shared agreement before host admission */
 };
 
 struct message_client_settings_request
@@ -792,7 +812,12 @@ boolean network_game_server_send_game_settings_to_client_machine(
 	long game_size)
 {
 	struct message_server_game_settings_update message;
+	struct network_game mcc_settings; /* port: fingerprint extension, no host record mutation */
 	long offset;
+
+	game = mcc_identity_host_settings(game, game_size, &mcc_settings); /* port: MCC admission */
+	if (!game) return FALSE;
+	game_size = sizeof(mcc_settings); /* port: one versioned record for every map family */
 
 	for (offset = 0; offset < game_size; offset += sizeof(message.data))
 	{
@@ -1074,8 +1099,13 @@ boolean network_game_server_send_game_settings_to_all_machines(
 	long game_size)
 {
 	struct message_server_game_settings_update message;
+	struct network_game mcc_settings; /* port: fingerprint extension, no host record mutation */
 	long offset;
 	boolean result = TRUE;
+
+	game = mcc_identity_host_settings(game, game_size, &mcc_settings); /* port: MCC admission */
+	if (!game) return FALSE;
+	game_size = sizeof(mcc_settings); /* port: one versioned record for every map family */
 
 	match_assert(
 		"c:\\halo\\SOURCE\\networking\\network_server_message_handler.c",
@@ -1397,6 +1427,43 @@ boolean network_game_server_handle_client_message(
 					}
 					break;
 				}
+				/* port: receive MCC loading work on the joined reliable stream,
+				 * including while the loaded host still waits in pregame. */
+				if (mcc_load_network_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+						mcc_load_network_handle_message(machine_index, message, message_buffer_size, TRUE);
+					break;
+				}
+				/* port: MCC validation must precede player addition and loading;
+				 * only an already joined machine's reliable stream can hold it. */
+				if (mcc_admission_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						mcc_admission_handle_message(machine_index, message, message_buffer_size, TRUE);
+					}
+					break;
+				}
+				/* (port: MCC package sharing's, the same way: mcc_share.c) */
+				if (mcc_share_game_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						mcc_share_game_handle_message(machine_index, message, message_buffer_size, TRUE);
+					}
+					break;
+				}
 				/* (port: map sharing's from any machine that joined, in the
 				lobby too, from its stream alone: map_share.c) */
 				if (map_share_handles_message(message, message_buffer_size))
@@ -1408,6 +1475,20 @@ boolean network_game_server_handle_client_message(
 					{
 						network_game_server_client_machine_heard(server, machine);
 						map_share_handle_message(machine_index, message, message_buffer_size, TRUE);
+					}
+					break;
+				}
+				/* (port: a dedicated server's map vote's, in the lobby too,
+				from its stream alone: network_map_vote.c) */
+				if (network_map_vote_handles_message(message, message_buffer_size))
+				{
+					long machine_index;
+
+					if (network_game_server_client_machine_is_joined_to_game(server, machine) &&
+						network_game_server_get_client_machine(server, machine, &machine_index))
+					{
+						network_game_server_client_machine_heard(server, machine);
+						network_map_vote_handle_message(machine_index, message, message_buffer_size, TRUE);
 					}
 					break;
 				}
@@ -1782,10 +1863,15 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			}
 
 			/* the native builds' network version and netcode (a client
-			refuses a host of another version, or of the lockstep netcode
-			older builds had: network_client_manager.c) */
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(HALO_PORT_NETWORK_VERSION & 0xFF);
-			advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(HALO_PORT_NETWORK_VERSION >> 8);
+			refuses a host of a version it does not play with, or of the
+			lockstep netcode older builds had: network_client_manager.c):
+			the version advertised, network.advertise_version's */
+			{
+				unsigned int version = network_version_advertised(mcc_level_name(game->map.name));
+
+				advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET] = (byte)(version & 0xFF);
+				advertisement.reserved[HALO_PORT_ADVERTISED_VERSION_OFFSET + 1] = (byte)(version >> 8);
+			}
 			advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] =
 				HALO_PORT_ADVERTISED_DISTRIBUTED_FLAG;
 			if (network_game_server_get_state(server, NULL) != _network_game_server_state_pregame ||
@@ -1793,6 +1879,10 @@ static boolean network_game_server_handle_message_client_broadcast_game_search(
 			{
 				advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] |= HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG;
 			}
+			/* port: a dedicated server, with no player of its own
+			(port/linux/game/server_director.c) */
+			if (halo_server_mode())
+				advertisement.reserved[HALO_PORT_ADVERTISED_FLAGS_OFFSET] |= HALO_PORT_ADVERTISED_DEDICATED_FLAG;
 			/* (an OpenCE gametype's kind, the server browser's name for it) */
 			advertisement.reserved[HALO_PORT_ADVERTISED_KIND_OFFSET] = game_modes_kind(&game->variant,
 				&game->variant_options);
@@ -1960,6 +2050,23 @@ static boolean network_game_server_handle_message_client_join_game_request(
 			boolean full = network_game_server_get_state(server, NULL) == _network_game_server_state_pregame &&
 				!network_game_has_free_player_slot(network_game_server_get_game(server));
 
+			/* port: discovery is advisory; direct joins must prove a shared
+			recovery agreement before ordinary admission: a version this
+			build plays with, in a game on an MCC map one that plays MCC
+			sharing as this build does (halo_port_limits.h) */
+			{
+				struct network_game const *joined = network_game_server_get_game(server);
+				boolean mcc = joined && mcc_level_name(joined->map.name);
+
+				if (!HALO_PORT_NETWORK_VERSION_PLAYS(join_game_request.network_version, mcc))
+				{
+					network_event("join requires OpenCE network version %u to %u (client %u)",
+						mcc ? HALO_PORT_NETWORK_VERSION_OLDEST_MCC : HALO_PORT_NETWORK_VERSION_OLDEST,
+						HALO_PORT_NETWORK_VERSION, join_game_request.network_version);
+					return FALSE;
+				}
+			}
+
 			/* port: its hardware id, as it tells it: hex only (anything else
 			left out), no more than its field; the host logs it, and refuses
 			one it banned (network_game_server_accept_client_machine_into_game) */
@@ -1978,6 +2085,10 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				join_game_request.machine_name,
 				(char *)join_game_request.machine_name,
 				sizeof(join_game_request.machine_name));
+			/* port: the Discord pass it showed, if any, for the door
+			(network_game_server_accept_client_machine_into_game) */
+			network_game_server_set_machine_link(server_client_machine, join_game_request.link_pass,
+				join_game_request.link_proof, (char const *)join_game_request.machine_name);
 			network_connection_get_address(
 				network_game_server_get_client_connection(server_client_machine),
 				&source_address,
@@ -1996,8 +2107,18 @@ static boolean network_game_server_handle_message_client_join_game_request(
 				{
 					/* (the Xbox game refused a machine not named in the
 					development kit's d:\hosts.txt: a stray file of that name
-					on a PC refused machines) */
-					if (network_game_server_accept_client_machine_into_game(server, server_client_machine))
+					on a PC refused machines. port: a dedicated server's word
+					filter refuses one whose player's name it keeps out,
+					network_chat.c) */
+					boolean name_refused = network_chat_name_blocked(machine_name, MAXIMUM_MACHINE_NAME_LENGTH);
+
+					if (name_refused)
+					{
+						network_event("refusing a machine @%s: its name has words the server's filter keeps out",
+							transport_address_to_string(&source_address));
+						network_game_server_refuse_with(_rejection_code_name_refused);
+					}
+					if (!name_refused && network_game_server_accept_client_machine_into_game(server, server_client_machine))
 					{
 						struct message_server_machine_accepted acceptance;
 						struct network_message *reply;
@@ -2421,6 +2542,9 @@ static boolean network_game_server_handle_message_client_player_settings_request
 	word *message,
 	short message_size)
 {
+	/* port: MCC's in-game picker admits only an authenticated, team-only change */
+	if (mcc_ui_team_request(server, client_machine, message, message_size))
+		return TRUE;
 	/* (port: not once the game has started: every machine loads it from
 	the settings sent with the start) */
 	if (network_game_server_lobby_is_open(server))
@@ -2514,9 +2638,11 @@ static boolean network_game_server_handle_message_client_game_start_request(
 			short countdown_event = (short)game_start_request.countdown_time;
 
 			/* port: the pregame screen's faster and slower, from any machine;
-			to stop the countdown or start at once (a script's), the host's own
-			(the Xbox game took any event from any machine, and a machine
-			could hold the lobby or skip the countdown) */
+			to stop the countdown or start at once (a script's, or the host's
+			faster), the host's own (the Xbox game took any event from any
+			machine, and a machine could hold the lobby or skip the countdown) */
+			if (countdown_event == _network_game_server_countdown_event_player_joined)
+				countdown_event = network_game_server_client_machine_faster_event(server, client_machine);
 			if ((countdown_event == _network_game_server_countdown_event_player_left &&
 					network_game_server_client_machine_may_slow_countdown(server, client_machine)) ||
 				countdown_event == _network_game_server_countdown_event_player_joined ||

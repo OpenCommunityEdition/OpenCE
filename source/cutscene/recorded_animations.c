@@ -106,6 +106,7 @@ symbols in this file:
 #include "units/unit_control_data.h"
 #include "units/units.h"
 #include "units/vehicles.h"
+#include "mcc_recordings.h" /* port: port/linux/game/mcc_recording_control.c */
 
 /* ---------- constants */
 
@@ -745,6 +746,10 @@ static boolean recorded_animation_play_internal(
 						(byte const *)animation->event_stream.address + animation->event_stream.size);
 
 					unit_set_actively_controlled(unit_index, TRUE);
+
+					/* port: MCC weapon-only recordings inherit the target's directions.
+					The private playback controller is only available here. */
+					mcc_recording_control_begin(unit_index, animation, &thread->controller);
 					SET_FLAG(
 						thread->flags,
 						_recording_thread_unit_was_controlled_bit,

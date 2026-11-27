@@ -1,0 +1,66 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+# In: the players' UDP on the tunnel port, and the web port from webFrom alone. Out: DNS, TCP to
+# the MQTT brokers and the master servers, UDP to the internet (STUN, the players' ports); nothing
+# on the private ranges.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "opence-server.fullname" . }}
+  labels:
+    {{- include "opence-server.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "opence-server.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: UDP
+          port: {{ .Values.network.tunnelPort }}
+      {{- with $np.from }}
+      from:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- if and $np.webFrom (gt (int .Values.web.port) 0) }}
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.web.port }}
+      from:
+        {{- toYaml $np.webFrom | nindent 8 }}
+    {{- end }}
+    {{- with $np.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    - to:
+        {{- toYaml $np.dns.to | nindent 8 }}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- if or $np.internet.tcpPorts $np.internet.udp }}
+    - to:
+        - ipBlock:
+            cidr: {{ $np.internet.cidr }}
+            {{- with $np.internet.except }}
+            except:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+      ports:
+        {{- range $np.internet.tcpPorts }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+        {{- if $np.internet.udp }}
+        # every UDP port: STUN (19302, 3478) and the players' own
+        - protocol: UDP
+        {{- end }}
+    {{- end }}
+    {{- with $np.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

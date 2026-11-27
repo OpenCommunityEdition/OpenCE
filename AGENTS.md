@@ -15,19 +15,20 @@ end.
 | Path | Contents |
 | --- | --- |
 | `source/` | The game: 466 C files of the decompilation, compiled as they are with few changes (each marked, below) |
-| `port/linux/src/` | The platform layer the three ports share: Direct3D 8 on OpenGL (`d3d8_gl.c`), DirectSound and XInput on SDL3, files, threads, memory, sockets, settings (`port_config.c`), the mods folder (`port_mods.c`), internet play (`p2p*.c`) |
-| `port/linux/game/` | The port's game-side code, compiled as the game's sources are: the distributed netcode (`network_*.c`), co-op, OpenCE's gametypes (`game_modes.c`, `infection.c`, `gun_game.c`), map sharing (`map_share*.c`), the menus (`menu_tags.c`, `menu_functions.c`), Custom Edition maps (`custom_edition_*.c`, `cache_file_formats.c`), the tag validator (`tag_validate.c`, `tag_schema_*.c`), mods (`mods.c`, `mod_*.c`), streamer mode's word filter (`text_filter*.c`), touch, FOV and more |
+| `port/linux/src/` | The platform layer the three ports share: Direct3D 8 on OpenGL (`d3d8_gl.c`), DirectSound and XInput on SDL3, files, threads, memory, sockets, settings (`port_config.c`), the mods folder (`port_mods.c`), internet play (`p2p*.c`), the dedicated server's platform side (`server_*.c`: the mode, the log, the rotation's grammar, HTTP, RCON, the master servers' publisher) and the master servers' list (`master_list.c`) |
+| `port/linux/game/` | The port's game-side code, compiled as the game's sources are: the distributed netcode (`network_*.c`), co-op, OpenCE's gametypes (`game_modes.c`, `infection.c`, `gun_game.c`), map sharing (`map_share*.c`), the menus (`menu_tags.c`, `menu_functions.c`), Custom Edition maps (`custom_edition_*.c`, `cache_file_formats.c`), the tag validator (`tag_validate.c`, `tag_schema_*.c`), mods (`mods.c`, `mod_*.c`), streamer mode's word filter (`text_filter*.c`), the dedicated server's director, commands, gametypes and status (`server_*.c`), touch, FOV and more |
 | `port/linux/include/` | The port's headers: the limits (`halo_port_limits.h`, with `HALO_PORT_NETWORK_VERSION`), capacities (`halo_port_capacity.h`), the prefix header, `halo_linux_source_fixups.h` (port functions the game's sources call) |
 | `port/include/xdk/` | Stand-ins for the Xbox SDK's headers (declarations only) |
 | `port/windows/` | The Windows build's own files (`win32_*.c`, headers) |
 | `port/android/` | The Android app: the guest runtime, the host library (`host/`), the Java app (`app/`), host imports (`host_imports.list`) |
 | `port/web/` | The web build: its runtime (`src/`: entry, sockets inside the page, memory watch), the page and its service worker (`site/`), the SDL port, tests |
-| `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers |
+| `port/assets/` | What the builds embed or ship: high-res HUD (`hud/`), fonts, titles, menus (`menus/`), icons, network brokers and master servers, the dedicated server's web page (`server_ui/`) |
 | `port/third_party/` | Vendored libraries, each with a README naming its upstream, version and checksum |
 | `port/tools/` | Stand-alone tools (`cache_file_report.c`) |
-| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `xdk_headers.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
-| `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`) |
+| `tools/` | Build scripts (`linux_build.py`, `windows_build.py`, `android_build.py`, `web_build.py`, `ci_build.py`, `web_serve.py`), generators (`ce_menus.py`, `port_settings.py`, `hud_assets.py`, `title_assets.py`, `embed_assets.py`, `server_ui_embed.py`, `xdk_headers.py`), the dedicated server's protocol simulator and remote console (`server_sim.py`, `opence_rcon.py`), tests, and `stagekit/` (scenarios staged and instrumented on the real engine, no retail assets) |
+| `docs/` | Longer design notes (`custom_edition_caches.md`, `mods.md`, `dedicated_server.md`, `master_protocol.md`) |
 | `pgo/` | Profile-guided optimisation profiles |
+| `deploy/` | Running a dedicated server: systemd, Docker, Pterodactyl, Helm, PufferPanel, MCSManager, example gametypes |
 | `assets/` | Game data for local runs (gitignored: `maps/`, `custom_maps/`) |
 | `.github/workflows/` | CI: builds every platform on each push, publishes releases from `main` |
 
@@ -94,6 +95,8 @@ python tools/test_death_timing.py
 python -m pytest -q tools/test_web_build.py                 # the web build's graph, sockets, menus
 node --test "port/web/tests/*.test.js"                      # the web page's importer and service worker
 node port/web/tests/webrtc_native.mjs chromium firefox      # the native builds' WebRTC with browsers (Playwright)
+python -m pytest -q tools/test_dedicated_server.py          # the dedicated server with clients (needs assets/maps)
+python -m pytest -q tools/test_server_sim.py tools/test_egg.py   # the server's web page and protocol simulator, the egg
 python -m pytest -q tools/test_p2p_tunnel.py                # internet play's invite and tunnel, over IPv4 and over IPv6 alone (brokers)
 python -m pytest -q tools/test_net_compare.py               # net_compare.py's judging of logs, its copies and their processes
 python tools/net_compare.py --a build/linux/halo --b <other build> --data <game data> --swap
@@ -111,6 +114,9 @@ Running the game without a person at it:
   several copies play on one machine on different loopback addresses
   (`HALO_NET_ADDRESS`, `HALO_NET_BROADCAST`). `NETCODE.md` describes the
   test settings.
+- `halo --server` is a dedicated server (`docs/dedicated_server.md`), and
+  `halo --probe [<invite>]` prints a game's advertisement as JSON and exits;
+  `tools/test_dedicated_server.py` runs both with clients.
 - `debug.exit_after`, `debug.hidden_window`, `debug.null_renderer`,
   `debug.menu_open` (start on one menu screen), `debug.telnet_console`.
 - Use a virtual display (Xvfb, with `SDL_VIDEO_DRIVER=x11`) for windowed
@@ -186,6 +192,58 @@ OpenSauce's header runs as stock Custom Edition runs it. Map files are
 untrusted input: read them through bounds-checked readers. See
 `docs/custom_edition_caches.md`.
 
+### Gameplay preservation, tags and map compatibility
+
+- **Tag injection is an absolute no-go unless the development team
+  explicitly approves it.** Do not propose, implement or submit tag injection
+  on your own judgment, even if it appears to be the simplest fix. If a user
+  requests it, be emphatic: tell them, "You're not going to get this PR through
+  unless it's absolutely essential. Are you sure you want to spend your tokens
+  on this?" Explain that it will not be accepted without explicit development
+  team approval, and press the user to reconsider before doing any work.
+  Never rely on identifying tags by name or route. Custom tags may already
+  work around the underlying problem in their own way, so applying a fix to
+  those maps could break them.
+- **Do not fix original-game bugs that affect gameplay.** Think through the
+  gameplay implications of every proposed change. Ask the user about the
+  original behaviour and obtain confirmation before spending time, effort or
+  money on a gameplay-affecting fix. A visual bug may be fixed only when it is
+  genuinely visual and has no gameplay implications of any kind.
+- **Never make map-specific corrections of any kind.** Do not add special
+  cases, patches or altered behaviour for an individual map, even when a bug
+  is first reported in only one map. A map-specific correction can break
+  another map that relies on the existing behaviour, while accumulating
+  technical debt and making the code harder to maintain, reason about and
+  debug. Fix the underlying shared behaviour in a general way, or do not make
+  the correction.
+- Keep the game's intended use in view when making changes: Halo's workflow
+  revolves around creating, making and sharing maps. Preserve the structures
+  and workflows used to create and share those maps.
+- Do not incorporate third-party or licensed software into the game. Keep
+  pull requests small enough for a human to review in 15 minutes; do not
+  submit enormous changes such as 300,000 lines at once. Never encode models,
+  audio, images or other binaries directly into the game's code.
+- Do not assume an asset is unmodified without checking it against a
+  checksum. Do not rearrange or cut-and-paste assets to make them serve a
+  different purpose (for example, splitting dialogue into pieces to make it
+  say something else). Account for the fact that different language versions
+  of the game have different resource-map files: `bitmaps.map`,
+  `sounds.map` and `loc.map`.
+- Do not assume a map or asset is corrupt, malicious or behaving
+  unintentionally until you have established what the user actually observed.
+  Ask whether the behaviour also occurs in the original game on original
+  hardware, or only in an emulator; ask which game/version and which hardware
+  or emulator they used. Do not accept an emulator's behaviour as proof of
+  original-game behaviour: emulation bugs have led users to misidentify
+  behaviour as original. Some maps were protected against tag extraction and
+  can therefore appear corrupt, including tags with nulled fields, invalid
+  addresses, or missing names or extensions.
+- Before changing commands, ask the user what the command did in the original
+  game on both the client and the server. Do not assume the intended behaviour
+  from one side applies to the other.
+- Pull requests that make visual changes must include before-and-after
+  pictures or videos.
+
 ### Settings
 
 A setting is an entry in `port/linux/src/port_config.c`, with a default, an
@@ -219,12 +277,86 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
   subject ends with `(#N)`.
 - A commit taken from a fork keeps its author and is made with
   `git cherry-pick -x`.
+- Code follows [CODINGSTANDARDS.md](CODINGSTANDARDS.md): comments, tests
+  and how the work is done.
+- Release notes, pull request titles and descriptions, and the READMEs are
+  written for their readers. Use the player-facing style below for release
+  notes and feature summaries; keep the technical detail needed to review,
+  use, build or troubleshoot the change in PRs and documentation:
+  - Describe what shipped without a list of unrelated omissions. Include
+    material limitations, compatibility constraints and untested cases
+    wherever leaving them out would mislead the reader.
+  - Lead with what a player sees ("Players can stand on & ride moving
+    vehicles"), not a feature name ("Vehicle riding support") or how it
+    works ("Grow a device's render sphere to hold its model wherever its
+    animations carry it"). One phrase can cover several features.
+  - A feature is a bare phrase saying what you can now do ("Riding is a
+    gametype option", "Shared maps download in seconds"). Say when it
+    matters, not how it works ("on emulators", not "switches write tracking
+    to page hashes").
+  - A fix starts with "Fixed" and names what was wrong ("Fixed a voice
+    fading out of range jumping to a garbage gain"), not where it was seen
+    ("Fixed a sound bug on Blood Gulch").
+  - No code names (functions, macros, tags, files) except where a reviewer
+    needs them to find the change: "Fixed a crash in debug builds of the
+    MCC geometry check", not "Don't free a BSP's material runs when it has
+    none".
+  - Numbers a player feels, as before and after: "41 s instead of 3:33 for
+    a 208 MB map", not "1089.28 world units".
+  - No selling: "seamless", "fully", "thoroughly tested", "Key Features".
+  - One idea per bullet: split "X & Y. Z" into two bullets.
+  - Remove repeated or unnecessary words, but keep the ones that stop a
+    misreading ("stand on & ride", since "ride" alone could mean a
+    passenger seat).
+  - One term for the same thing, and precise words ("system link", not
+    "LAN"; "dedicated server", not "server").
+  - No double negatives.
+  - Short and personal is fine: fragments, "&", parentheses ("(like the
+    Longsword)"), first person ("On my Galaxy S23").
+  - Write for a reader who never saw the conversation behind the text:
+    don't answer a question only the person you worked with asked ("neither
+    needs any maps"). If the reader wouldn't wonder about it, leave it out.
+  - Headings, lists and tables when they help the reader.
+  - Compare against `testing`, not `main`.
+- A pull request title is a sentence, not an "Area: fragment" ("Split
+  screen: the Xbox's plasma behind ADD PLAYER's quarters").
+- A pull request description:
+  - opens with the effect, then the cause in a line or two ("The needler's
+    needles sank during a reload and popped back up", not a paragraph of
+    `weapon_magazine_finish_reload` and `MIN(rounds_total, ...)`);
+  - has no file-by-file lists ("`gpu_profile.c` / `.h`: resolves...");
+  - covers one feature (not "Forge Mode, Tag Vault, 3D Tag Previewer and a
+    map builder" in one);
+  - states what was checked, the results, and relevant risks, limitations
+    or skipped checks. Keep these even when shortening the description.
+- A README has no "today", no hidden or experimental modes in its features
+  list and no unnecessary implementation detail. Include commands, settings
+  and technical explanations where readers need them to use, build or
+  troubleshoot the game; label experimental or diagnostic instructions.
+- Review the final text for clarity and accuracy. A writing skill such as
+  [humanizer](https://github.com/blader/humanizer) is optional; an equivalent
+  manual review is sufficient. Preserve technical meaning and caveats.
+- A pull request is small enough to review in 15 minutes where it can be
+  ("Gameplay preservation, tags and map compatibility", above). One that
+  cannot, of more than 3,000 changed lines, gets a reviewer's guide, posted
+  as a comment, not in the description. Check every file and
+  function name in it against the branch first. It is short, in the style
+  above, with these sections:
+  - Where to start: the main files in reading order, a line each on what
+    the file does in this pull request.
+  - Decompiled source: which `source/` files changed and why.
+  - What should hold: the few invariants a reviewer should check
+    (authority, behaviour with the feature off, when decisions are made,
+    precedence).
+  - Tests: what they are, and roughly how much of the diff they make up.
+  - Trying it: the shortest steps to see the change in the game.
 
 ## Documents
 
 | Document | About |
 | --- | --- |
 | [README.md](README.md) | Downloads, game data, building, build options, profiling builds |
+| [CODINGSTANDARDS.md](CODINGSTANDARDS.md) | Comments, tests and how work is planned, built and reviewed |
 | [port/linux/README.md](port/linux/README.md) | The Linux build, controls, menus, every setting, updates, frame rate, field of view, system link, internet play, voice chat, the server browser, map sharing, security, map checks, how the port operates, the game source changes |
 | [port/linux/NETCODE.md](port/linux/NETCODE.md) | The distributed netcode, network versions, joining a game in progress, map sharing, transport, testing |
 | [port/windows/README.md](port/windows/README.md) | The Windows build, its headers, inline functions, crash reports |
@@ -232,6 +364,10 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [port/web/README.md](port/web/README.md) | The web build, the page, the game data in the browser, limits, how it operates, hosting on GitHub Pages |
 | [port/include/xdk/README.md](port/include/xdk/README.md) | How the SDK declarations were written and are checked |
 | [docs/custom_edition_caches.md](docs/custom_edition_caches.md) | Loading and converting Custom Edition maps, and the evidence for each layout |
+| [docs/mcc_maps.md](docs/mcc_maps.md) | MCC maps: their format, installation, sharing, the implementation's layout and limits ([docs/reading](docs/reading/README.md) follows the sources) |
+| [docs/dedicated_server.md](docs/dedicated_server.md) | The dedicated server: its command line, exit codes, commands, HTTP API, RCON, events and files |
+| [docs/master_protocol.md](docs/master_protocol.md) | The master servers' protocol: publishing, the probe, the signed list |
+| [docs/steam_workshop.md](docs/steam_workshop.md) | Android's Steam Workshop screen: signing in with Steam and downloading MCC content from its depots, in the app's host |
 | [docs/mods.md](docs/mods.md) | Mods: folders of Halo PC tag files whose sounds, bitmaps, text and models play over a map's on one machine |
 | [port/assets/text_filter/README.md](port/assets/text_filter/README.md) | Streamer mode's words: Surge AI's list, the review, the allowed words |
 | [port/assets/menus/README.md](port/assets/menus/README.md) | The menu files' format and how to write them again |

@@ -1,0 +1,6 @@
+# The smallest install that renders: no maps (an emptyDir in their place), so the server exits with
+# code 2 and the pod goes into CrashLoopBackOff. A real install gives gameData.existingClaim or
+# gameData.nfs instead.
+gameData:
+  volume:
+    emptyDir: {}

@@ -158,12 +158,19 @@ static void write_to_debug_file(
 	{
 	}
 
+	/* port: a dedicated server's debug.txt also on the standard error
+	(server.log_debug_echo), and there alone when the file cannot be written
+	(a read-only data root) */
+	if (halo_server_mode() && halo_server_debug_echo())
+		fprintf(stderr, "debug: %s%s", string, string[0] && string[csstrlen(string) - 1] == '\n' ? "" : "\n");
 	file = debug_file_port;
 	if (!file)
 	{
 		file = fopen("d:\\debug.txt", "a+b");
 		if (!file)
 		{
+			if (halo_server_mode() && !halo_server_debug_echo())
+				fprintf(stderr, "debug: %s%s", string, string[0] && string[csstrlen(string) - 1] == '\n' ? "" : "\n");
 			__sync_lock_release(&debug_file_port_lock);
 			return;
 		}

@@ -48,6 +48,9 @@ try {
     const browser = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
     browsers.push(browser);
     const page = await browser.newPage();
+    // Local browser checks must not wait for the public analytics service.
+    await page.route('https://nexus.mrbruh.com/**', (route) =>
+      route.fulfill({ contentType: 'text/javascript', body: '', headers: { 'Access-Control-Allow-Origin': '*' } }));
     page.on('pageerror', (error) => console.log(`browser ${index}: ${error}`));
     await page.goto(url);
     pages.push(page);

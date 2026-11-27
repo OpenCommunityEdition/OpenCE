@@ -538,6 +538,7 @@ symbols in this file:
 
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
+#include "keyboard_glyphs.h" /* port: port/linux/game/keyboard_glyphs.c */
 #include "infection.h" /* port: port/linux/game/infection.c */
 #include "cseries_windows.h"
 #include "errors.h"
@@ -596,7 +597,13 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "units/bipeds.h"
 #include "units/units.h"
 #include "custom_edition_cache.h" /* port: port/linux/game/custom_edition_cache.c */
+#include "mcc_cache.h" /* port: port/linux/game/mcc_cache.h */
+#include "mcc_objects.h" /* port: port/linux/game/mcc_objects.h */
+#include "mcc_player.h" /* port: port/linux/game/mcc_player.h */
+#include "mcc_ui_teams.h" /* port: port/linux/game/mcc_ui_teams.c */
+#include "server_team_switch.h" /* port: port/linux/game/server_team_switch.c */
 #include "latency_meter.h" /* port: port/linux/game/latency_meter.c */
+#include "touch_postgame.h" /* port: port/linux/game/touch_postgame.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -1930,11 +1937,12 @@ static void scoreboard_menu_items(
 		labels[item][0] = 0;
 	}
 	offered[_scoreboard_item_vote] = TRUE;
-	if (network_votekick_get_status(&status) &&
+	if (network_votekick_get_status(&status) && status.kind == _network_vote_kick &&
 		status.player_index == DATUM_INDEX_TO_ABSOLUTE_INDEX(scoreboard_menu.player_index))
 	{
 		usprintf(labels[_scoreboard_item_vote], status.voted ? L"Voted to kick (%d of %d)" :
-			L"Vote to kick (%d of %d)", status.votes, status.needed);
+			status.voted_no ? L"Voted not to kick (%d of %d)" : L"Vote to kick (%d of %d)", status.votes,
+			status.needed);
 	}
 	else
 	{
@@ -2480,10 +2488,12 @@ static void game_engine_rasterize_scoreboard(
 		struct data_iterator iterator;
 		struct player_datum *target;
 		wchar_t const *name = L"?";
-		wchar_t const *note = vote.voted ? L" (you voted)" : vote.may_vote ? L"" : L" (too new to vote)";
+		wchar_t const *note = vote.voted ? L" (you voted yes)" : vote.voted_no ? L" (you voted no)" :
+			vote.may_vote ? L"  F1 yes, F2 no" : L" (too new to vote)";
 
 		data_iterator_new(&iterator, player_data);
-		while ((target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		while (vote.kind == _network_vote_kick &&
+			(target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 		{
 			if (DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index) == vote.player_index)
 			{
@@ -2496,8 +2506,16 @@ static void game_engine_rasterize_scoreboard(
 		color.red = 1.0f;
 		color.green = 0.75f;
 		color.blue = 0.3f;
-		usprintf(row_string, L"Vote to kick %s: %d of %d, %d s left%s", name, vote.votes, vote.needed,
-			vote.seconds_left, note);
+		if (vote.kind == _network_vote_end_game)
+		{
+			usprintf(row_string, L"Vote to end the game: %d yes, %d no, %d needed, %d s left%s", vote.votes,
+				vote.no_votes, vote.needed, vote.seconds_left, note);
+		}
+		else
+		{
+			usprintf(row_string, L"Vote to kick %s: %d yes, %d no, %d needed, %d s left%s", name, vote.votes,
+				vote.no_votes, vote.needed, vote.seconds_left, note);
+		}
 		scoreboard_draw_row(row_string, FALSE, &color, next_row++, top, left, FALSE);
 	}
 	if (network && pointer_state >= 0)
@@ -2966,6 +2984,10 @@ void game_engine_post_rasterize_post_game(
 		draw_string_set_color(&prompt_color);
 
 		server = global_network_game_server_get();
+		/* port: on the touchscreen, buttons for the prompt's A and B
+		(port/linux/game/touch_postgame.c) */
+		if (touch_postgame_draw(font_index, server != NULL, &prompt_color))
+			return;
 		if (server)
 		{
 			bounds.x0 = 380;
@@ -3548,6 +3570,50 @@ static real game_engine_get_friendly_bonus(
 	return rating * 3.0f + 1.0f;
 }
 
+/* port: Teamplay Options' FORCE TEAM SPAWNS (game_variant_options): a team
+game other than CTF spawns a red or blue player as CTF does, only at the
+map's CTF starting locations, and only at his own team's. Not on a map with
+no CTF starting location for one of the teams, where his team would have
+nowhere to spawn */
+static long game_engine_get_type(
+	void);
+
+static boolean game_engine_force_team_spawns(
+	long player_index)
+{
+	struct player_datum *player = player_get(player_index);
+	boolean team_has_spawn[2] = { FALSE, FALSE };
+	short starting_location_count;
+	short starting_location_index;
+
+	if (!game_engine_running() ||
+		!game_engine_has_teams() ||
+		game_engine_get_type() == game_engine_ctf ||
+		!game_variant_options_get()->force_team_spawns ||
+		(player->team_index != _team_red && player->team_index != _team_blue))
+	{
+		return FALSE;
+	}
+
+	starting_location_count = player_get_starting_location_count();
+	for (starting_location_index = 0;
+		starting_location_index < starting_location_count;
+		starting_location_index++)
+	{
+		struct player_starting_location const *starting_location =
+			player_get_starting_location(starting_location_index);
+
+		if ((starting_location->team_index == _team_red ||
+				starting_location->team_index == _team_blue) &&
+			match_game_type(game_engine_ctf, 4, starting_location->game_types))
+		{
+			team_has_spawn[starting_location->team_index] = TRUE;
+		}
+	}
+
+	return team_has_spawn[_team_red] && team_has_spawn[_team_blue];
+}
+
 static real default_starting_location_rate_function(
 	long player_index,
 	struct player_starting_location const *starting_location)
@@ -3556,7 +3622,7 @@ static real default_starting_location_rate_function(
 	real rating = 1.0f;
 
 	if (game_engine_running() &&
-		game_engine_test_flag(0) &&
+		(game_engine_test_flag(0) || game_engine_force_team_spawns(player_index)) &&
 		player->team_index != starting_location->team_index)
 	{
 		rating = 0.0f;
@@ -5046,6 +5112,12 @@ void game_engine_player_killed(
 	if (!game_engine)
 		return;
 
+	/* port: the death of an MCC team change is no one's kill (mcc_ui_teams.c) */
+	mcc_ui_team_respawn_death(&killing_player_index, &killing_object_index, dead_player_index, &friendly_fire);
+	/* port: and a dedicated server's !switch's (server_team_switch.c) */
+	server_team_switch_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
+		&friendly_fire);
+
 	/* the distributed netcode: a client's copy of a death has the host's
 	killer (port/linux/game/network_distributed.c) */
 	network_distributed_player_killed(&killing_player_index, &killing_object_index, dead_player_index,
@@ -5100,6 +5172,11 @@ void game_engine_player_killed(
 
 	if (!player_kill)
 		dead_player->respawn_timer += global_variant.universal_variant.suicide_penalty;
+
+	/* port: a dedicated server's !switch moves the dead here, as the auto
+	team balance below does, once their unit has dropped what it carried
+	(server_team_switch.c) */
+	server_team_switch_player_dead(dead_player_index);
 
 	/* port: the gametype's auto team balance (game_variant_options): the host
 	moves the dead to the other team when his is two or more bigger (his
@@ -5292,13 +5369,17 @@ void game_engine_update_non_deterministic(
 			if (game_engine_globals.postgame_progress > 1.0f)
 				game_engine_globals.postgame_progress = 1.0f;
 
-			if (test_any_gamepad_button(0) || test_any_gamepad_button(12))
+			/* port: or the touchscreen's buttons for A and B
+			(port/linux/game/touch_postgame.c) */
+			if (test_any_gamepad_button(0) || test_any_gamepad_button(12) ||
+				touch_postgame_pressed(_gamepad_analog_button_a))
 			{
 				if (global_network_game_server_get())
 				network_game_server_reset_to_pregame(
 					global_network_game_server_get());
 			}
-			else if (test_any_gamepad_button(1) || test_any_gamepad_button(13))
+			else if (test_any_gamepad_button(1) || test_any_gamepad_button(13) ||
+				touch_postgame_pressed(_gamepad_analog_button_b))
 			{
 				network_game_abort();
 			}
@@ -5624,6 +5705,13 @@ void game_engine_playlist_next(
 	struct game_variant variant;
 
 	csstrcpy(global_stage.map_name, "levels\\test\\carousel\\carousel");
+	/* port: a dedicated server's rotation's next map, not carousel, which it
+	may not have (port/linux/game/server_director.c) */
+	if (halo_server_mode() && server_director_first_level())
+	{
+		csstrncpy(global_stage.map_name, server_director_first_level(), sizeof(global_stage.map_name) - 1);
+		global_stage.map_name[sizeof(global_stage.map_name) - 1] = 0;
+	}
 	map_name = main_get_multiplayer_map_name();
 	if (map_name && map_name[0])
 	{
@@ -7319,6 +7407,13 @@ void game_engine_variant_cleanup(
 	struct game_variant original = *variant;
 
 	variant->human_readable_game_description[NUMBEROF(variant->human_readable_game_description) - 1] = 0;
+	/* port: the CTF/Slayer game type of an earlier build (10) is capture the
+	flag with Kills Score on (game_engine_ctf.c) */
+	if (variant->game_engine_index == 10)
+	{
+		variant->game_engine_index = game_engine_ctf;
+		variant->game_engine_variant.ctf.kills_score = TRUE;
+	}
 	variant->game_engine_index = PIN(variant->game_engine_index, 1, 5);
 	variant->universal_variant.teams = !!variant->universal_variant.teams;
 	variant->universal_variant.odd_man_out = !!variant->universal_variant.odd_man_out;
@@ -7342,12 +7437,25 @@ void game_engine_variant_cleanup(
 		variant->universal_variant.teams = TRUE;
 		variant->game_engine_variant.ctf.flag_at_home_to_score = !!variant->game_engine_variant.ctf.flag_at_home_to_score;
 		variant->game_engine_variant.ctf.single_flag_time = FLOOR(variant->game_engine_variant.ctf.single_flag_time, 0);
+		/* port: Kills Score, and a capture's points (25 where none are kept:
+		a gametype of a build without them) */
+		variant->game_engine_variant.ctf.kills_score = !!variant->game_engine_variant.ctf.kills_score;
+		if (variant->game_engine_variant.ctf.points_per_capture <= 0)
+			variant->game_engine_variant.ctf.points_per_capture = 25;
+		variant->game_engine_variant.ctf.points_per_capture =
+			PIN(variant->game_engine_variant.ctf.points_per_capture, 1, 100);
 		break;
 
 	case game_engine_slayer:
 		variant->game_engine_variant.slayer.no_death_bonus = !!variant->game_engine_variant.slayer.no_death_bonus;
 		variant->game_engine_variant.slayer.no_kill_penalty = !!variant->game_engine_variant.slayer.no_kill_penalty;
 		variant->game_engine_variant.slayer.kill_in_order = !!variant->game_engine_variant.slayer.kill_in_order;
+		break;
+
+	case game_engine_king:
+		/* port: Multi-Hill's hills at once: 2 to 5, else none */
+		if (variant->game_engine_variant.king.multi_hill < 2 || variant->game_engine_variant.king.multi_hill > 5)
+			variant->game_engine_variant.king.multi_hill = 0;
 		break;
 
 	case game_engine_oddball:
@@ -7630,8 +7738,14 @@ real game_engine_get_starting_location_rating(
 	long player_index,
 	struct player_starting_location const *starting_location)
 {
-	if (!match_game_type(game_engine_get_type(), 4, starting_location->game_types))
+	/* port: (or CTF's: game_engine_force_team_spawns) */
+	if (!match_game_type(
+		game_engine_force_team_spawns(player_index) ? game_engine_ctf : game_engine_get_type(),
+		4,
+		starting_location->game_types))
+	{
 		return 0.0f;
+	}
 
 	if (nearby_vehicle(player_index, starting_location))
 		return 0.0f;
@@ -7837,6 +7951,9 @@ long game_engine_remap_vehicle(
 	long vehicle_definition_index)
 {
 	long result = vehicle_definition_index;
+
+	if (mcc_vehicle_placement_rules())
+		return result;
 
 	/* port: a Halo Custom Edition map's vehicles are chosen by their
 	placements, and its scripts may create any
@@ -8192,8 +8309,10 @@ static void game_engine_update_weapons(
 			match_assert(
 				"c:\\halo\\SOURCE\\game\\game_engine.c",
 				0x83E,
-				(item->object.scale >= 0.5f) &&
-					(item->object.scale <= 3.f));
+				((item->object.scale >= 0.5f) &&
+					(item->object.scale <= 3.f)) ||
+				/* port: MCC-authored miniature items retain their tag scale. */
+				mcc_item_small_scale(item->object.scale));
 		}
 
 		/*
@@ -8858,6 +8977,10 @@ static boolean internal_rasterize_score(
 			buffer,
 			format,
 			buffer_size);
+		/* port: preserve the identified hint's wording and offer its score key
+		 * to the optional keyboard prompt feature before semantic context is lost. */
+		buffer[buffer_size - 1] = 0;
+		keyboard_score_hint(player_index, buffer, buffer_size);
 		break;
 	default:
 		result = FALSE;
@@ -9010,6 +9133,8 @@ static void game_engine_update_item_spawn(
 					definition_index,
 					NONE);
 				placement_data.position = equipment->position;
+				if (mcc_cache_tags_loaded())
+					vector3d_from_angle(&placement_data.forward, equipment->facing);
 				/* port: Halo PC faces a Custom Edition map's items the way
 				their placements do, where the Xbox copied only the position */
 				if (custom_edition_cache_tags_loaded())
@@ -9294,6 +9419,10 @@ void game_engine_postspawn_player_update(
 			unit->unit.grenade_counts[
 				_unit_grenade_covenant_plasma] =
 				(char)starting_plasma_grenade_count;
+			/* port: and MCC's expanded grenade types (mcc_player.c) */
+			mcc_player_postspawn_grenades(unit_index,
+				global_variant.universal_variant.weapon_set == _game_engine_weapons_no_grenades &&
+				!game_engine_infinite_grenades_internal());
 		}
 	}
 	/* port: an OpenCE gametype's mode's equipment (Gun Game's weapon,

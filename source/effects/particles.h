@@ -182,6 +182,9 @@ void particle_new(
 	struct new_particle_data const *data);
 void particles_update(
 	real dt);
+/* port: whether the particle is drawn yet (a tick's update past it) */
+boolean particle_drawn(
+	long particle_index);
 
 /* ---------- globals */
 

@@ -83,6 +83,7 @@ symbols in this file:
 #include "effects/effect_definitions.h"
 #include "effects/effects.h"
 #include "effects/material_effects.h"
+#include "game/game.h" /* port: game_players_are_double_speed (particle_drawn) */
 #include "game/players.h"
 #include "interface/first_person_weapons.h"
 #include "memory/data.h"
@@ -104,6 +105,9 @@ enum
 };
 
 #define PARTICLE_SHARED_LIFESPAN 0.7f
+/* port: a fixed timestep's tick and the frames' sum of one differ by
+rounding */
+#define PARTICLE_DRAW_TICK_TOLERANCE 0.001f
 
 enum particle_effect_markers
 {
@@ -198,6 +202,11 @@ static boolean particle_next_frame(
 static boolean particle_update_frame_time(
 	long particle_index,
 	real dt);
+/* port: (particle_drawn) */
+static boolean particle_age_drawn(
+	real age,
+	real update_dt,
+	real tick_dt);
 static boolean particle_update_physics(
 	long particle_index,
 	real dt);
@@ -218,6 +227,12 @@ static real particles_leftover_ticks = 0.f;
 static long particles_update_ticks = 0;
 static long particles_tick_frame_indices[MAXIMUM_PARTICLE_UNRENDERED_FRAME_COUNT + 1];
 static long particles_tick_frame_head = 0;
+/* port: the Xbox drew a frame a tick, so a particle's first update before it was
+drawn was a whole tick, and one that lives a tick or less (a plasma impact's
+bolts, some flashes) died in it unseen. The frames between the ticks update
+particles a fraction of a tick at a time, so particle_drawn holds a particle
+back until a tick's update has passed, the dt of the last update kept here. */
+static real particles_last_update_dt = 0.f;
 
 static char const *particle_effect_marker_names[NUMBER_OF_PARTICLE_EFFECT_MARKERS] =
 {
@@ -1001,12 +1016,40 @@ void particle_new(
 	return;
 }
 
+/* port: whether the particle is drawn yet (render_particles.c) */
+boolean particle_drawn(
+	long particle_index)
+{
+	struct particle_datum *particle = particle_get(particle_index);
+	struct particle_definition *definition = particle_definition_get(particle->definition_index);
+
+	/* (one that animates once a tick steps its first frame at the first tick
+	of particles_update, a fraction of a tick after its creation or almost a
+	whole one, and dies at a later one: it is drawn from that first step, the
+	Xbox's first update) */
+	if (TEST_FLAG(definition->flags, _particle_definition_animate_once_per_frame_bit) &&
+		particle->frame_time != -1.0f)
+	{
+		return TRUE;
+	}
+
+	return particle_age_drawn(
+		particle->age,
+		particles_last_update_dt,
+		game_players_are_double_speed()
+			? 1.0f / (2 * TICKS_PER_SECOND)
+			: 1.0f / TICKS_PER_SECOND);
+}
+
 void particles_update(
 	real dt)
 {
 	long particle_index;
 
 	profile_enter(particles_update_section);
+
+	/* port: (particle_drawn) */
+	particles_last_update_dt = dt;
 
 	{
 		long tick;
@@ -1063,3 +1106,19 @@ void particles_update(
 }
 
 /* ---------- private code */
+
+/* port: a tick's update in one step (the Xbox's frame, which a fixed timestep keeps)
+draws what it leaves, as did the Xbox, and so does any particle created after
+it (age 0). Otherwise a particle is drawn once its age is past a tick: past it,
+not at it, because the frames' steps can add up to a particle's span of exactly
+a tick, and one that lives a tick then lasts until the next update. */
+static boolean particle_age_drawn(
+	real age,
+	real update_dt,
+	real tick_dt)
+{
+	if (update_dt >= tick_dt * (1.0f - PARTICLE_DRAW_TICK_TOLERANCE) && age <= update_dt)
+		return TRUE;
+
+	return age > tick_dt * (1.0f + PARTICLE_DRAW_TICK_TOLERANCE);
+}

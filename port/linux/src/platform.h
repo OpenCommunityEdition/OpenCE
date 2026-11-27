@@ -34,6 +34,11 @@ the SDK headers are read, exactly as game code sees them. */
 /* prints "halo-linux: <message>" to stderr */
 void platform_log(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
+/* opens the url in the system's browser (a Discord link's page: player_link.c);
+in the web build, the page offers it to be opened (a page may open a tab only
+when it is clicked) */
+void platform_open_url(const char *url);
+
 /* reports an SDK entry point the Linux port does not implement, once per
 name; the caller then behaves as a failing or empty call */
 void platform_unimplemented(const char *name);

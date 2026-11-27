@@ -87,6 +87,18 @@ waiting to run would otherwise read a later frame's vertices. */
 
 static GLsync frame_fences[FRAME_FENCE_SLOTS];
 
+static void finish_frame_without_fence(void)
+{
+	static int reported;
+
+	if (!reported)
+	{
+		host_logf(HOST_LOG_WARN, "GPU: frame fence unavailable or incomplete; finishing queued work before buffer reuse");
+		reported = 1;
+	}
+	glFinish();
+}
+
 void host_gl_fence_frame(uint32_t slot)
 {
 	if (slot >= FRAME_FENCE_SLOTS)
@@ -94,14 +106,21 @@ void host_gl_fence_frame(uint32_t slot)
 	if (frame_fences[slot])
 		glDeleteSync(frame_fences[slot]);
 	frame_fences[slot] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	if (!frame_fences[slot])
+		finish_frame_without_fence();
 }
 
 void host_gl_wait_frame(uint32_t slot)
 {
+	GLenum status;
+
 	if (slot >= FRAME_FENCE_SLOTS || !frame_fences[slot])
 		return;
-	/* at most a second: a lost context must not hang the game */
-	glClientWaitSync(frame_fences[slot], GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+	/* A timeout or failed wait does not release the GPU's ownership of the
+	ring slot. Its next unsynchronized upload must wait for completion too. */
+	status = glClientWaitSync(frame_fences[slot], GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+	if (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED)
+		finish_frame_without_fence();
 	glDeleteSync(frame_fences[slot]);
 	frame_fences[slot] = NULL;
 }

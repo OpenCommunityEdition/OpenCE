@@ -40,6 +40,7 @@ CLIENT_PORT = 0x141F
 MESSAGE_TYPE_PACKET = 3
 PACKET_VERSION = 1
 JOIN_TOKEN = b"message in a bottle"[:16]  # network_game_generate_join_game_token (DEBUG builds)
+NETWORK_VERSION = 44
 SETTINGS_FRAGMENT_SIZE = 0xE00
 NONE = -1
 
@@ -191,7 +192,8 @@ class Machine:
         # then the machine's hardware id, 32 hex digits (p2p.c's p2p_hardware_id),
         # one of its own so bans and kick votes tell the machines apart
         hardware_id = b"%032x" % self.index
-        self.send(message(CLIENT_JOIN_GAME_REQUEST, wide(self.name, 32) + JOIN_TOKEN + hardware_id))
+        # (and no Discord account's pass and proof: 170 and 64 zero bytes, player_link.c)
+        self.send(message(CLIENT_JOIN_GAME_REQUEST, wide(self.name, 32) + JOIN_TOKEN + hardware_id + bytes(170 + 64) + struct.pack(">H", NETWORK_VERSION)))
         self.state = "joining"
 
     def receive(self):

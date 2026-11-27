@@ -102,6 +102,7 @@ symbols in this file:
 
 #include "cseries/cseries.h"
 #include "observer.h"
+#include "director.h" /* port: director_unattended_scripted_camera */
 
 #include "game/players.h"
 #include "networking/network_connection.h"
@@ -392,6 +393,16 @@ void observer_dispose_from_old_map(
 	return;
 }
 
+/* port: where the camera looks from before its offset and distance: the
+head in first person, the vehicle a chase camera circles. The camera's
+velocity was this point's (observer_postcheck). For the sounds' Doppler
+effect (sound_manager.c). */
+real_point3d const *observer_get_focus_position(
+	short local_player_index)
+{
+	return &observer_get(local_player_index)->focus_position;
+}
+
 struct observer_result const *observer_get_camera(
 	short local_player_index)
 {
@@ -445,7 +456,10 @@ void observer_reconnect_to_structure_bsp(
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
 	{
-		if (local_player_get_player_index(local_player_index) != NONE)
+		/* port: and a host's with no player of its own, filming the scripts'
+		camera (director.c) */
+		if (local_player_get_player_index(local_player_index) != NONE ||
+			director_unattended_scripted_camera(local_player_index))
 		{
 			struct observer *observer = observer_get(local_player_index);
 
@@ -1311,7 +1325,10 @@ void observer_update(
 		local_player_index < MAXIMUM_NUMBER_OF_LOCAL_PLAYERS;
 		local_player_index++)
 	{
-		if (local_player_get_player_index(local_player_index) != NONE)
+		/* port: and a host's with no player of its own, filming the scripts'
+		camera (director.c) */
+		if (local_player_get_player_index(local_player_index) != NONE ||
+			director_unattended_scripted_camera(local_player_index))
 		{
 			struct observer *observer = observer_get(local_player_index);
 

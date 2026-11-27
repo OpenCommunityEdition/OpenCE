@@ -74,6 +74,7 @@ symbols in this file:
 #include "scenario/scenario_definitions.h"
 #include "text/draw_string.h"
 #include "text/text_group.h"
+#include "mcc_hud_draw.h" /* port: port/linux/game/mcc_hud_draw.c */
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 
 /* ---------- constants */
@@ -125,6 +126,11 @@ typedef char verify_hud_global_default_title_bounds_offset[
 
 struct cinematic_global_data *cinematic_globals = NULL;
 
+/* port: whether the checkpoint a skip of the cinematic goes back to has been
+taken (cinematic_port_checkpoint); main.c holds any other until the cinematic
+can no longer be skipped */
+static boolean cinematic_skip_checkpoint_taken = FALSE;
+
 /* ---------- public code */
 
 void cinematic_initialize(
@@ -156,6 +162,7 @@ void cinematic_initialize_for_new_map(
 		cinematic_globals->queued_titles,
 		NONE,
 		sizeof(cinematic_globals->queued_titles));
+	cinematic_skip_checkpoint_taken = FALSE; /* port */
 
 	return;
 }
@@ -164,8 +171,27 @@ void cinematic_skip_start(
 	void)
 {
 	cinematic_globals->can_be_skipped = TRUE;
+	/* port: its checkpoint is the next one taken */
+	cinematic_skip_checkpoint_taken = FALSE;
 
 	return;
+}
+
+/* port: a checkpoint was taken or gone back to (game_state.c): the first one
+taken while a cinematic can be skipped is the one its skip goes back to */
+void cinematic_port_checkpoint(
+	void)
+{
+	cinematic_skip_checkpoint_taken = cinematic_globals->can_be_skipped;
+}
+
+/* port: whether a checkpoint taken now would replace the one the cinematic's
+skip goes back to, and the skip would go back to partway into the cinematic
+and play the rest of it again (a map's script that saves every so often) */
+boolean cinematic_port_holds_checkpoints(
+	void)
+{
+	return cinematic_globals->can_be_skipped && cinematic_skip_checkpoint_taken;
 }
 
 void cinematic_skip_stop(
@@ -463,15 +489,37 @@ void cinematic_render(
 					(title->shadow_color & 0x00FFFFFF));
 
 				{
-					/* the bounds are for 640 columns: on a wider screen move
-					them so they keep their place relative to its sides */
+					/* port: the bounds are for 640 columns: on a wider screen
+					move them so the edge the text is justified to (its middle,
+					if centered) keeps its place relative to the screen's sides,
+					where the Xbox's 4:3 picture had it. Moving the middle of a
+					right-justified title's box (most chapter titles: a box from
+					near the left edge) left the text short of the right side.
+					The justification is draw_string.c's: 0 left, 1 right,
+					2 center */
 					static rectangle2d wide_bounds;
-					short shift = (short)(((title_bounds->x0 + title_bounds->x1) / 2) *
-						(halo_screen_width() - 640) / 640);
+					short anchor;
+					short shift;
+
+					switch (title->justification)
+					{
+					case 0:
+						anchor = title_bounds->x0;
+						break;
+					case 1:
+						anchor = title_bounds->x1;
+						break;
+					default:
+						anchor = (short)((title_bounds->x0 + title_bounds->x1) / 2);
+						break;
+					}
+					shift = (short)(anchor * (halo_screen_width() - 640) / 640);
 
 					wide_bounds = *title_bounds;
 					wide_bounds.x0 += shift;
 					wide_bounds.x1 += shift;
+					/* port: MCC title layout uses the final screen anchor. */
+					mcc_hud_title_bounds(&wide_bounds, title->justification, title->text_flags);
 					title_bounds = &wide_bounds;
 				}
 				rasterizer_draw_unicode_string(

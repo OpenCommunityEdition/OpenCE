@@ -20,6 +20,7 @@ that runs here.
 */
 
 #include "host.h"
+#include "host_mcc_memory.h"
 #include "tomlc17.h"
 
 #include <SDL3/SDL.h>
@@ -350,6 +351,7 @@ static void *game_main(void *unused)
 		(landscape) unless display.screen_width says otherwise (d3d8_gl.c) */
 		const SDL_DisplayMode *mode;
 		char width[16];
+		char refresh[16];
 
 		SDL_InitSubSystem(SDL_INIT_VIDEO);
 		mode = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
@@ -361,6 +363,13 @@ static void *game_main(void *unused)
 			snprintf(width, sizeof(width), "%d", (480 * longer / shorter) & ~1);
 			environment_set(&environment, "HALO_DISPLAY_WIDTH", width);
 			host_logf(HOST_LOG_INFO, "display %dx%d: rendering %sx480", mode->w, mode->h, width);
+		}
+		if (mode)
+		{
+			/* display.max_fps's "twice the refresh rate" (sdl_platform.c):
+			the guest cannot ask SDL for the display mode */
+			snprintf(refresh, sizeof(refresh), "%g", mode->refresh_rate > 0.0f ? mode->refresh_rate : 60.0f);
+			environment_set(&environment, "HALO_DISPLAY_REFRESH", refresh);
 		}
 		{
 			/* dp for the touch controls (port/linux/src/touch_input.c): SDL
@@ -447,6 +456,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved)
 	(void)vm;
 	(void)reserved;
 	host_memory_reserve_early();
+	/* MCC must reserve before the guest and renderer make allocations. */
+	host_mcc_memory_initialize();
 	return JNI_VERSION_1_6;
 }
 

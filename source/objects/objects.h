@@ -425,11 +425,21 @@ boolean object_has_node(long object_index, short node_index);
 void object_set_automatic_deactivation(long object_index, boolean automatic_deactivation);
 void object_set_visibility(long object_index, boolean visible_flag);
 void object_get_velocities(long object_index, real_vector3d *translational_velocity, real_vector3d *angular_velocity);
+/* port: for the sounds' Doppler effect (game_sound.c, sound_manager.c) */
+void object_get_point_velocity(long object_index, real_point3d const *point, real_vector3d *velocity);
 struct location *object_get_location(long object_index, struct location *location);
 void object_start_interpolation(long object_index, short frame_count);
 void object_offset_interpolation(long object_index, real_vector3d *offset);
 void object_permute_region(long object_index, char *permutation_name, short desired_region_index, boolean active_flag);
 boolean object_get_function_value(long object_index, short function_index, real *value_reference);
+/* port: the picture is drawn between ticks. While this is set, a function
+read for drawing is the tick's value moved forward by the fraction of the
+tick that has passed. */
+void object_functions_set_for_render(boolean for_render);
+void object_function_values_for_render(long object_index, real values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS]);
+/* port: forgets the inputs kept for the objects' pictures (objects.c's
+object_function_inputs), when a load puts the objects back or a map starts */
+void object_function_inputs_forget(void);
 short objects_in_clusters_by_indices(unsigned long class_flags, short cluster_count, short const *cluster_indices, short maximum_object_count, long *object_indices);
 long object_index_from_name_index(short name_index);
 /* port: this object takes a scenario name nobody holds, the way a placed
@@ -470,6 +480,9 @@ void objects_scripting_attach(long parent_object_index, char const *parent_marke
 void object_delete_immediately(long object_index);
 void objects_garbage_collection(void);
 void objects_update(void);
+/* port: an object's update count (vehicle_riding.c) */
+void object_count_update(long object_index);
+long object_update_count(long object_index);
 void objects_memory_compact(void);
 
 

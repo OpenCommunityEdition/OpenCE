@@ -32,7 +32,9 @@ marked as touch */
 void touch_input_menu_read(struct platform_ui_pointer *pointer);
 
 /* outside the menus, presses A for a few polls after a tap when a
-cinematic can be skipped (the on-screen controls: touch_input_controls) */
+cinematic can be skipped, or voted to skip in network co-op: on its skip
+button where one shows (port/linux/game/touch_cinematic.c) (the on-screen
+controls: touch_input_controls) */
 void touch_input_gamepad(XINPUT_GAMEPAD *pad);
 /* the taps outside the menus since the last call while the text chat's
 on-screen keyboard is up (port/linux/game/network_chat.c), and where the
@@ -60,6 +62,14 @@ int touch_input_aim_assist(void);
 
 /* port 0's motors, for the phone's vibration while the touch controls show */
 void touch_input_rumble(unsigned int left, unsigned int right);
+#endif
+
+#ifdef HALO_ANDROID
+/* whether the game's own touchscreen buttons show (the carnage report's:
+port/linux/game/touch_postgame.c), as the touch controls would: on a
+touchscreen, with input.touch_controls "on", or "auto" while no controller
+is connected */
+int touch_input_screen_buttons(void);
 #endif
 
 #endif

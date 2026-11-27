@@ -117,6 +117,7 @@ symbols in this file:
 #include "models/models.h"
 #include "networking/network_connection.h"
 #include "objects/objects.h"
+#include "rasterizer/rasterizer.h" /* port: rasterizer_memory_alloc */
 #include "rasterizer/rasterizer_model_types.h"
 #include "render/render.h"
 #include "saved games/game_state.h"
@@ -125,12 +126,7 @@ symbols in this file:
 #include "sound/sound_manager.h"
 #include "units/units.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
-#include "shaders/shader_definitions.h" /* port: (the shield's flare on the arms) */
-#include "shaders/shaders.h"
-/* port: port/linux/game/shield_color.c */
-real_rgb_color const *shield_color_colors(long unit_index, real_rgb_color const *colors);
-/* port: port/linux/game/overshield_effect.c */
-real const *overshield_effect_values(long unit_index, real const *values, boolean arms);
+#include "viewmodel_shield.h" /* port: port/linux/game/viewmodel_shield.c */
 
 /* ---------- constants */
 
@@ -509,7 +505,21 @@ void first_person_weapon_draw(
 					struct animation_graph *animation_graph= animation_graph_definition_get(
 						weapon_definition->weapon.interface_definition.first_person_animations.index);
 					struct render_lighting *lighting= object_get_cached_render_lighting(unit_index, FLT_MAX);
+					real values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
+					real const *weapon_functions = weapon->object.outgoing_function_values;
+					real const *unit_functions = unit->object.outgoing_function_values;
+					real *kept;
 
+					/* port: the tick's functions, moved into this frame, so the
+					charge clicks with the picture instead of once a tick; kept
+					in the rasterizer's memory for the frame, as the groups drawn
+					later read them (render_objects.c) */
+					object_function_values_for_render(first_person_weapon->weapon_index, values);
+					if ((kept = rasterizer_memory_alloc(values, sizeof(values))) != NULL)
+						weapon_functions = kept;
+					object_function_values_for_render(unit_index, values);
+					if ((kept = rasterizer_memory_alloc(values, sizeof(values))) != NULL)
+						unit_functions = kept;
 					model_effect.modifier_shader= NULL;
 					if (TEST_FLAG(unit->unit.flags, _unit_active_camouflaged_bit) ||
 						unit->unit.active_camouflage>0.0f)
@@ -540,7 +550,7 @@ void first_person_weapon_draw(
 							model_node_matrices,
 							NULL,
 							weapon->object.outgoing_change_colors,
-							weapon->object.outgoing_function_values,
+							weapon_functions,
 							lighting,
 							&render.camera.position,
 							0.0f,
@@ -548,30 +558,6 @@ void first_person_weapon_draw(
 							first_person_weapon->weapon_index,
 							0,
 							FLAG(_render_model_first_person_bit));
-					}
-
-					/* port: the shield's flare on the arms as on the body, the
-					unit's own modifier shader (display.viewmodel_shield,
-					view_fov.c), in the color chosen for it as on the body
-					(display.shield_color, shield_color.c); the weapon above is
-					drawn without it */
-					if (viewmodel_shield_is_visible())
-					{
-						struct object_definition *unit_definition= object_definition_get(object_get(unit_index)->definition_index);
-
-						if (unit_definition->object.modifier_shader.index!=NONE)
-						{
-							struct shader *modifier_shader= shader_definition_get(unit_definition->object.modifier_shader.index);
-
-							if (shader_type_is_valid_for_modifier(modifier_shader->base.type))
-							{
-								model_effect.modifier_shader= modifier_shader;
-								model_effect.modifier_animation.colors= shield_color_colors(unit_index,
-									unit->object.outgoing_change_colors);
-								model_effect.modifier_animation.values= overshield_effect_values(unit_index,
-									unit->object.outgoing_function_values, TRUE);
-							}
-						}
 					}
 
 					if (first_person_weapon->hands_node_remapping_table_valid &&
@@ -583,13 +569,16 @@ void first_person_weapon_draw(
 							weapon_definition->weapon.interface_definition.first_person_animations.index,
 							first_person_weapon->node_matrices,
 							first_person_weapon->hands_node_remapping_table);
+						/* port: only the posed hands receive the shield modifier (viewmodel_shield.c). */
+						viewmodel_shield_apply(render.local_player_index, unit_index,
+							first_person_interface->hands.index, model_node_matrices, unit_functions, &model_effect);
 						render_model(
 							first_person_interface->hands.index,
 							0.0f,
 							model_node_matrices,
 							NULL,
 							unit->object.outgoing_change_colors,
-							unit->object.outgoing_function_values,
+							unit_functions,
 							lighting,
 							&render.camera.position,
 							0.0f,
@@ -689,13 +678,14 @@ short first_person_weapon_get_marker_by_name_render(
 	return 0;
 }
 
-void first_person_weapon_center_flashlight(
+boolean first_person_weapon_center_flashlight(
 	long unit_index,
 	real_point3d *position,
 	real_vector3d *forward,
 	real_vector3d *up)
 {
 	short local_player_index= first_person_weapon_index_from_unit_index(unit_index);
+	boolean centered= FALSE; /* port: returned */
 
 	if (local_player_index!=NONE)
 	{
@@ -716,11 +706,12 @@ void first_person_weapon_center_flashlight(
 				position->z= marker.matrix.position.z - marker.matrix.forward.k*0.5f;
 				*forward= marker.matrix.forward;
 				*up= marker.matrix.up;
+				centered= TRUE;
 			}
 		}
 	}
 
-	return;
+	return centered;
 }
 
 boolean first_person_weapon_adjust_light(
@@ -900,6 +891,9 @@ static void first_person_weapon_forget_weapon(
 
 	return;
 }
+
+/* port: MCC equipment replacement invalidates the cached weapon before deletion. */
+#include "mcc_first_person.inl" /* port: port/linux/game/mcc_first_person.inl */
 
 static void first_person_weapon_predict(
 	short local_player_index)
@@ -1463,9 +1457,12 @@ static void first_person_weapon_build_node_matrices(
 			&render.camera.forward,
 			&render.camera.up);
 		/* the pose between the last two ticks (render_interpolation.c) */
-		/* port: no more nodes than the weapon's matrices hold (a map's count) */
+		/* port: no more nodes than the weapon's matrices hold (a map's count);
+		the weapon and its graph tell its poses from another weapon's */
 		render_interpolation_first_person(
 			local_player_index,
+			first_person_weapon->weapon_index,
+			weapon_definition->weapon.interface_definition.first_person_animations.index,
 			first_person_weapon->node_matrices,
 			(short)MIN(animation_graph->nodes.count, MAXIMUM_NODES_PER_ANIMATION),
 			&render.camera);
