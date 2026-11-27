@@ -47,6 +47,11 @@ int host_memory_initialize(uint32_t image_base, uint32_t image_size);
 int host_memory_fixed_unavailable(void);
 /* lists the mappings below 4 GB in logcat and, if file is not NULL, in it */
 void host_memory_report_low_mappings(FILE *file);
+/* why the fixed ranges could not be had, for the message the player sees
+(and so a screenshot of it): the device ("device: <model>, Android <n>,
+Java heap <size>"), then the reasons recorded, each on a line of its own,
+cut at size */
+void host_memory_unavailable_reason(char *text, size_t size);
 /* Makes the write tracking compare page contents instead of catching page
 faults (host_watch_hash.h), for when the app cannot receive its own
 SIGSEGV (ARM translation). Call before the guest starts. */

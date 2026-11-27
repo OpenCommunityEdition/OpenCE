@@ -467,21 +467,75 @@ static int reserve(uint64_t address, uint64_t size, int reclaim_art)
 	return -1;
 }
 
+/* "device: <model>, Android <n>, Java heap <size>" (no newline) */
+static void device_line(char *text, size_t size)
+{
+	char model[PROP_VALUE_MAX] = "", heap[PROP_VALUE_MAX] = "", release[PROP_VALUE_MAX] = "";
+
+	__system_property_get("ro.product.model", model);
+	__system_property_get("dalvik.vm.heapsize", heap);
+	__system_property_get("ro.build.version.release", release);
+	snprintf(text, size, "device: %s, Android %s, Java heap %s", model[0] ? model : "unknown",
+		release[0] ? release : "unknown", heap[0] ? heap : "unknown");
+}
+
+/* whether text has line ("\n" and the line) as a whole line already */
+static int has_line(const char *text, const char *line)
+{
+	size_t length = strlen(line);
+	const char *found = text;
+
+	while ((found = strstr(found, line)) != NULL)
+	{
+		if (found[length] == '\0' || found[length] == '\n')
+			return 1;
+		found++;
+	}
+	return 0;
+}
+
+/* (the reasons without the attempts' headings, "at start-up (JNI_OnLoad):",
+and each reason once: the attempts usually find the same, and the message
+must fit on a phone's screen in landscape with its OK button) */
+void host_memory_unavailable_reason(char *text, size_t size)
+{
+	const char *line = findings;
+	size_t used;
+
+	if (!size)
+		return;
+	device_line(text, size);
+	if (!findings[0])
+	{
+		used = strlen(text);
+		snprintf(text + used, size - used, "\n(no reason recorded)");
+		return;
+	}
+	while (*line)
+	{
+		size_t length = strcspn(line, "\n");
+		char reason[512];
+
+		snprintf(reason, sizeof(reason), "\n%.*s", (int)length, line);
+		line += length + (line[length] == '\n');
+		if (length == 0 || reason[strlen(reason) - 1] == ':' || has_line(text, reason))
+			continue;
+		used = strlen(text);
+		snprintf(text + used, size - used, "%s", reason);
+	}
+}
+
 /* the mappings below 4 GB, for a report of why the fixed ranges could not
 be had (logcat, and memory_map.txt in the data folder: host_main.c) */
 void host_memory_report_low_mappings(FILE *file)
 {
 	FILE *maps = fopen("/proc/self/maps", "r");
 	char line[512];
-	char model[PROP_VALUE_MAX] = "", heap[PROP_VALUE_MAX] = "", release[PROP_VALUE_MAX] = "";
 
-	__system_property_get("ro.product.model", model);
-	__system_property_get("dalvik.vm.heapsize", heap);
-	__system_property_get("ro.build.version.release", release);
 	if (file)
 	{
-		fprintf(file, "device: %s, Android %s, Java heap %s\n", model[0] ? model : "unknown",
-			release[0] ? release : "unknown", heap[0] ? heap : "unknown");
+		device_line(line, sizeof(line));
+		fprintf(file, "%s\n", line);
 		fprintf(file, "why:\n%s\nmappings below 4 GB:\n", findings[0] ? findings : "(no reason recorded)\n");
 	}
 	if (!maps)
