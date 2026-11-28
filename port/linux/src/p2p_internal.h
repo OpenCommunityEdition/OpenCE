@@ -104,8 +104,9 @@ int p2p_local_candidates(struct p2p_candidate *candidates, int maximum_count);
 identifier is (p2p_identifier) */
 const unsigned char *p2p_public_key(void);
 /* this run's Ed25519 public key (the X25519 one's, p2p_ed25519_to_x25519),
-and a signature with it */
+its seed (secret: never sent or logged) and a signature with it */
 const unsigned char *p2p_signing_key(void);
+const unsigned char *p2p_signing_seed(void);
 void p2p_sign(const void *message, int size, unsigned char *signature);
 /* the identifier of the machine with this public key */
 void p2p_identifier_for(const unsigned char *public_key, unsigned char *identifier);
@@ -376,6 +377,20 @@ slot's retained copy, sent on subscribing */
 void p2p_lobby_slot_heard(const char *hash_text, const unsigned char *payload, int size, int retained);
 /* a query was heard */
 void p2p_lobby_query_heard(void);
+
+enum
+{
+	P2P_MM_MAXIMUM_TOPICS = NUMBER_OF_P2P_MM_PLAYLISTS * NUMBER_OF_P2P_MM_SMALL_SIZES,
+	P2P_MM_TOPIC_SIZE = 48,
+};
+/* replaces the topics subscribed before */
+void p2p_signal_mm_topics(const char topics[][P2P_MM_TOPIC_SIZE], int count);
+void p2p_signal_mm_publish(const char *topic, const unsigned char *payload, int size);
+void p2p_mm_heard(const unsigned char *payload, int size);
+int p2p_mm_active(void);
+/* call under p2p_lock; it drops the lock around each signature check */
+int p2p_mm_verify_pass(unsigned long now);
+void p2p_mm_update(unsigned long now, int can_host, const unsigned char *token);
 /* a probe of a host (its identifier) ended: its ping in milliseconds, -1 if
 it was not reached; under p2p_lock */
 void p2p_lobby_probed(const unsigned char *identifier, int ping);
