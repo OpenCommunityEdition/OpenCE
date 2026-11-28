@@ -43,7 +43,9 @@ on top of it, whole until the next tick and fading from then on (no more than
 a few world units of it: further is a jump). A local player's view glides so
 with their unit, and with what it rides. A point placed on an object from the
 tick, such as a nav marker, is moved as far as the object is drawn from there
-(render_interpolation_object_point).
+(render_interpolation_object_point). With smooth motion off, a player the host
+sees riding a vehicle its netcode moved since that player's last tick is drawn
+carried by that move, with all it carries, as the tick will carry it.
 */
 
 #include "cseries.h"
@@ -62,6 +64,13 @@ tick, such as a nav marker, is moved as far as the object is drawn from there
 int config_boolean(const char *name);
 unsigned long config_changes(void);
 
+/* port/linux/src/server_mode.c */
+int halo_server_mode(void);
+
+/* vehicle_riding_bipeds.c's */
+void biped_riding_correct_riders(long vehicle_index, real_vector3d const *offset);
+boolean biped_riding_uncarried_write(long biped_index, real_vector3d *offset, real *dyaw);
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -71,6 +80,12 @@ unsigned long config_changes(void);
 /* (by absolute index: the object array's all) */
 #define MAXIMUM_INTERPOLATED_OBJECTS MAXIMUM_OBJECTS_PER_MAP
 #define MAXIMUM_INTERPOLATED_NODES 64
+
+/* (smooth motion off) the most objects, and their nodes, a frame draws carried
+with their riders: past them a rider and all it carries are drawn as simulated,
+never a part of them */
+#define CARRIED_OBJECTS 256
+#define CARRIED_NODES 2048
 
 /* world units (10 feet each) a node may move in one tick before it snaps:
 well beyond any vehicle, short of any teleport */
@@ -158,6 +173,7 @@ struct interpolated_camera
 	/* its player's unit (or what it rides) corrected: as an object's */
 	real_vector3d correction;
 	real_vector3d correction_pending;
+	real_vector3d snapshot_shift;
 };
 
 struct interpolated_first_person
@@ -187,6 +203,8 @@ static boolean interpolation_cut_pending;
 static long interpolation_cut_tick = NONE;
 static long interpolation_frame;
 static boolean interpolation_rendering;
+/* (between a frame's begin and end, with smooth motion on or off) */
+static boolean interpolation_drawing;
 static real interpolation_fraction = 1.0f;
 
 /* ---------- blending */
@@ -499,6 +517,8 @@ void render_interpolation_tick(void)
 		{
 			struct interpolated_camera *camera = &interpolated_cameras[local_player_index];
 
+			/* (the next tick's carry puts earlier writes in the observer itself) */
+			camera->snapshot_shift = *global_zero_vector3d;
 			if (camera->valid)
 				correction_advance(&camera->correction, &camera->correction_pending);
 		}
@@ -630,6 +650,7 @@ void render_interpolation_cut(void)
 void render_interpolation_frame_begin(void)
 {
 	interpolation_rendering = halo_interpolation_enabled();
+	interpolation_drawing = TRUE;
 	interpolation_frame++;
 	interpolation_fraction = game_time_get_tick_fraction();
 }
@@ -637,6 +658,7 @@ void render_interpolation_frame_begin(void)
 void render_interpolation_frame_end(void)
 {
 	interpolation_rendering = FALSE;
+	interpolation_drawing = FALSE;
 }
 
 real render_interpolation_fraction(void)
@@ -644,11 +666,130 @@ real render_interpolation_fraction(void)
 	return interpolation_rendering ? interpolation_fraction : 1.0f;
 }
 
+/* a player's biped as this frame draws it: its family's run of carried_objects,
+none when drawn as simulated */
+struct carried_rider
+{
+	long frame;
+	long biped_index;
+	short first_object;
+	short object_count;
+};
+
+struct carried_object
+{
+	long object_index;
+	short first_node;
+};
+
+static struct carried_rider carried_riders[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+static struct carried_object carried_objects[CARRIED_OBJECTS];
+static real_matrix4x3 carried_nodes[CARRIED_NODES];
+static long carried_frame;
+static short carried_object_count;
+static short carried_node_count;
+
+/* the object's nodes, and its children's, in the frame's arena moved by the offset: FALSE when any has too many or none,
+or they do not all fit (the caller then drops the family: a part drawn moved beside one not would come apart) */
+static boolean render_interpolation_carry_family(long object_index, real_vector3d const *offset)
+{
+	struct object_datum *object = object_get(object_index);
+	long node_count = object->object.node_matrices.size / (long)sizeof(real_matrix4x3);
+	long child_index;
+	real_matrix4x3 const *simulated;
+	real_matrix4x3 *nodes;
+	long node_index;
+
+	if (node_count < 1 || node_count > MAXIMUM_INTERPOLATED_NODES ||
+		carried_object_count == CARRIED_OBJECTS || carried_node_count + node_count > CARRIED_NODES)
+		return FALSE;
+	simulated = object_header_block_get(object_index, &object->object.node_matrices);
+	nodes = carried_nodes + carried_node_count;
+	/* (never object_get_node_matrices: it asks for this drawn pose) */
+	memcpy(nodes, simulated, node_count * sizeof(real_matrix4x3));
+	for (node_index = 0; node_index < node_count; node_index++)
+	{
+		nodes[node_index].position.x += offset->i;
+		nodes[node_index].position.y += offset->j;
+		nodes[node_index].position.z += offset->k;
+	}
+	carried_objects[carried_object_count].object_index = object_index;
+	carried_objects[carried_object_count].first_node = carried_node_count;
+	carried_object_count++;
+	carried_node_count += (short)node_count;
+	for (child_index = object->object.first_child_object_index; child_index != NONE;
+		child_index = object_get(child_index)->object.next_object_index)
+	{
+		if (!render_interpolation_carry_family(child_index, offset))
+			return FALSE;
+	}
+	return TRUE;
+}
+
+/* a player's biped the host's next tick carries by the netcode's writes of its vehicle since its last, drawn there with
+all it carries (a client's player too, seen in third person; a local one's view is moved by
+render_interpolation_carried_camera) */
+static real_matrix4x3 *render_interpolation_carried_nodes(long object_index)
+{
+	struct carried_rider *rider;
+	real_vector3d offset;
+	real dyaw;
+	long root_index;
+	short player_index;
+	short first_node;
+	short at;
+
+	if (!object_try_and_get(object_index) || halo_server_mode())
+		return NULL;
+	root_index = object_get_ultimate_parent(object_index);
+	if (object_get(root_index)->object.type != _object_type_biped || unit_get(root_index)->unit.player_index == NONE)
+		return NULL;
+	player_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(unit_get(root_index)->unit.player_index);
+	if (player_index >= HALO_PORT_MAXIMUM_NETWORK_PLAYERS)
+		return NULL;
+	if (carried_frame != interpolation_frame)
+	{
+		carried_frame = interpolation_frame;
+		carried_object_count = 0;
+		carried_node_count = 0;
+	}
+	rider = &carried_riders[player_index];
+	if (rider->frame != interpolation_frame || rider->biped_index != root_index)
+	{
+		rider->frame = interpolation_frame;
+		rider->biped_index = root_index;
+		rider->first_object = carried_object_count;
+		rider->object_count = 0;
+		/* (none owed, or not a number: drawn as simulated) */
+		if (biped_riding_uncarried_write(root_index, &offset, &dyaw) &&
+			offset.i * offset.i + offset.j * offset.j + offset.k * offset.k > 0.f)
+		{
+			first_node = carried_node_count;
+			if (render_interpolation_carry_family(root_index, &offset))
+				rider->object_count = (short)(carried_object_count - rider->first_object);
+			else
+			{
+				carried_object_count = rider->first_object;
+				carried_node_count = first_node;
+			}
+		}
+	}
+	for (at = rider->first_object; at < rider->first_object + rider->object_count; at++)
+	{
+		if (carried_objects[at].object_index == object_index)
+			return carried_nodes + carried_objects[at].first_node;
+	}
+	return NULL;
+}
+
 real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 {
 	struct interpolated_object *record;
 	long absolute_index;
 
+	/* (smooth motion off: only a rider is drawn apart from the tick) */
+	if (!interpolation_rendering)
+		return interpolation_drawing && object_index != NONE ? render_interpolation_carried_nodes(object_index) : NULL;
 	if (!interpolation_rendering || !interpolated_objects || object_index == NONE)
 		return NULL;
 	absolute_index = DATUM_INDEX_TO_ABSOLUTE_INDEX(object_index);
@@ -719,15 +860,15 @@ real_matrix4x3 *render_interpolation_object_node_matrices(long object_index)
 }
 
 /* a point placed on the object from the tick, moved with the object's root
-to where this frame draws it: unchanged outside a frame between ticks, or
-for an object not blended */
+to where this frame draws it: unchanged outside a frame, or for an object
+drawn as simulated */
 void render_interpolation_object_point(long object_index, real_point3d *point)
 {
 	struct object_datum *object;
 	real_matrix4x3 const *drawn;
 	real_matrix4x3 const *simulated;
 
-	if (!interpolation_rendering || object_index == NONE)
+	if (!interpolation_drawing || object_index == NONE)
 		return;
 	drawn = render_interpolation_object_node_matrices(object_index);
 	object = object_try_and_get(object_index);
@@ -804,9 +945,31 @@ void render_interpolation_correct_object(long object_index, real_vector3d const 
 	{
 		render_interpolation_correct_object(child_index, offset);
 	}
+	/* (its riders are moved by the same write, by their carry, but are not its children) */
+	if (object->object.type == _object_type_vehicle)
+		biped_riding_correct_riders(object_index, offset);
 }
 
 /* ---------- camera */
+
+/* an uncarried rider's observer still lacks the write that shifted its snapshots */
+void render_interpolation_camera_unmoved(long object_index, real_vector3d const *offset)
+{
+	short local_player_index;
+
+	if (!halo_interpolation_enabled())
+		return;
+	for (local_player_index = 0; local_player_index < MAXIMUM_LOCAL_PLAYERS; local_player_index++)
+	{
+		struct interpolated_camera *camera = &interpolated_cameras[local_player_index];
+
+		if (!camera->valid || player_control_get_unit_index(local_player_index) != object_index)
+			continue;
+		camera->snapshot_shift.i -= offset->i;
+		camera->snapshot_shift.j -= offset->j;
+		camera->snapshot_shift.k -= offset->k;
+	}
+}
 
 static struct observer_result direct_cameras[MAXIMUM_LOCAL_PLAYERS];
 
@@ -870,14 +1033,49 @@ static struct observer_result const *render_interpolation_direct_camera(
 #endif
 }
 
+static struct observer_result carried_cameras[MAXIMUM_LOCAL_PLAYERS];
+
+/* With smooth motion off a frame is drawn once a tick, after the host's
+netcode moved the vehicle a local player rides and before the player's next
+tick carries it by that write (vehicle_riding_bipeds.c): drawn as the tick
+will carry it, the deck stays under the view. */
+static struct observer_result const *render_interpolation_carried_camera(
+	short local_player_index,
+	struct observer_result const *observer)
+{
+	struct observer_result *carried;
+	real_vector3d offset;
+	real dyaw;
+
+	if (!interpolation_drawing || interpolation_rendering || !observer ||
+		director_get_perspective(local_player_index) != _director_perspective_first_person ||
+		cinematic_in_progress() ||
+		!biped_riding_uncarried_write(player_control_get_unit_index(local_player_index), &offset, &dyaw))
+	{
+		return observer;
+	}
+	carried = &carried_cameras[local_player_index];
+	*carried = *observer;
+	carried->position.x += offset.i;
+	carried->position.y += offset.j;
+	carried->position.z += offset.k;
+	if (dyaw != 0.f)
+	{
+		vehicle_riding_turn_vector(&carried->forward, dyaw);
+		vehicle_riding_turn_vector(&carried->up, dyaw);
+	}
+	return carried;
+}
+
 struct observer_result const *render_interpolation_camera(
 	short local_player_index,
 	struct observer_result const *observer)
 {
 	if (local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS)
 		return observer;
-	return render_interpolation_direct_camera(local_player_index,
-		render_interpolation_blended_camera(local_player_index, observer));
+	return render_interpolation_carried_camera(local_player_index,
+		render_interpolation_direct_camera(local_player_index,
+			render_interpolation_blended_camera(local_player_index, observer)));
 }
 
 /* between two of the observer's results: the position, the axes (up kept
@@ -967,6 +1165,7 @@ static struct observer_result const *render_interpolation_blended_camera(
 			camera->blended.position.z += drawn[0].position.z - nodes[0].position.z;
 			/* (the snapshots start again after) */
 			camera->valid = FALSE;
+			camera->snapshot_shift = *global_zero_vector3d;
 			return &camera->blended;
 		}
 	}
@@ -985,6 +1184,16 @@ static struct observer_result const *render_interpolation_blended_camera(
 			!(interpolation_cut_tick != NONE && interpolation_cut_tick > camera->tick);
 		camera->previous = camera->latest;
 		camera->latest = *observer;
+		if (camera->has_previous)
+		{
+			/* (only this snapshot precedes the rider's carry) */
+			camera->latest.position.x += camera->snapshot_shift.i;
+			camera->latest.position.y += camera->snapshot_shift.j;
+			camera->latest.position.z += camera->snapshot_shift.k;
+			if (observer_cut(&camera->previous, &camera->latest))
+				camera->latest = *observer;
+		}
+		camera->snapshot_shift = *global_zero_vector3d;
 		/* Several ticks since the last snapshot (a long frame): the objects
 		are drawn between the last two ticks, so the camera's previous is
 		where it was a tick ago, as nearly as a steady move from the last
