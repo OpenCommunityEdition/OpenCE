@@ -107,5 +107,8 @@ int hud_hires_override_point_threshold(long asset);
 long hud_hires_upscale_at(unsigned long address, long width, long height);
 unsigned int hud_hires_upscale_texture(const unsigned char *bgra, unsigned long width,
 	unsigned long height, long kind, unsigned long *levels);
+/* the GPU's upscale program built with the GL context (d3d8_gl.c,
+ * gl_initialize): built at a sheet's first draw, it held that frame up */
+void hud_hires_gl_initialize(void);
 
 #endif
