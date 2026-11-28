@@ -1010,7 +1010,9 @@ void compute_sound_obstruction(
 					&camera->position,
 					&source->location.position,
 					&listener_to_source);
-				if (!collision_test_vector(
+				/* port: whether it is blocked, from a test that ends at its
+				first hit (collision_port_test_vector_blocked) */
+				if (!collision_port_test_vector_blocked(
 					FLAG(_collision_test_front_facing_surfaces_bit) |
 						FLAG(_collision_test_structure_bit) |
 						FLAG(_collision_test_media_bit) |

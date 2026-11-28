@@ -138,6 +138,15 @@ boolean collision_test_pill_new(
 	real radius,
 	long ignore_object_index,
 	struct collision_result *collision);
+/* port: whether anything is in the vector's way, from a test that ends at
+its first hit (collisions.c) */
+boolean collision_port_test_vector_blocked(
+	unsigned long flags,
+	real_point3d const *point,
+	real_vector3d const *vector,
+	long ignore_object_index,
+	struct collision_result *collision);
+
 boolean collision_test_vector(
 	unsigned long flags,
 	real_point3d const *point,
