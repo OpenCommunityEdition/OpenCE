@@ -128,6 +128,8 @@ def generated(fault=None):
     code += 'union hs_boolean_result { boolean boolean; long value; };\n'
     code += define(hs, 'HS_EVALUATE_RETURN_BOOLEAN')
     code += evaluator(hs, 'scenario_trigger_volume_test_object_evaluate')
+    # (what the volume test found, as co-op's BSP switches note it: not under test here)
+    code += 'static boolean hs_volume_found(long thread, short volume, boolean found) { return found; }\n'
     code += evaluator(hs, 'hs_trigger_volume_test_objects_any_evaluate')
     return (('types.inc', types), ('under_test.inc', code))
 

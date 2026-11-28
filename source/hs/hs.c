@@ -15271,8 +15271,34 @@ static void main_set_map_name_evaluate(
 }
 HS_EVALUATE_VOID_STRING(main_set_multiplayer_map_name_evaluate, main_set_multiplayer_map_name)
 HS_EVALUATE_VOID_UNSIGNED_SHORT(main_set_difficulty_evaluate, main_set_difficulty)
+/* port: the latest volume_test_objects that found something: by which
+thread, in which volume, at what game time. A script that switches the BSP
+in the same tick switches it for whoever stands in that volume
+(players_coop_note_script_bsp_switch). */
+static long hs_volume_found_thread = NONE;
+static short hs_volume_found_volume = NONE;
+static long hs_volume_found_time = NONE;
+
+static boolean hs_volume_found(
+	long thread_index,
+	short trigger_volume_index,
+	boolean found)
+{
+	if (found)
+	{
+		hs_volume_found_thread = thread_index;
+		hs_volume_found_volume = trigger_volume_index;
+		hs_volume_found_time = game_time_get();
+	}
+
+	return found;
+}
+
 /* port: a campaign script still switches, and so does a player walking
-through a BSP trigger (main_switch_structure_bsp, not this). */
+through a BSP trigger (main_switch_structure_bsp, not this). In network
+co-op, a continuous script's switch back waits while players stand in the
+volume a script switched it for (players_coop_script_bsp_switch_allowed);
+the console's never does. */
 static void scenario_switch_structure_bsp_evaluate(
 	short function_index,
 	long thread_index,
@@ -15287,9 +15313,21 @@ static void scenario_switch_structure_bsp_evaluate(
 		structure_bsp_index = (short)arguments->value;
 		if (!game_engine_running() || global_structure_bsp_index_get() == NONE)
 		{
+			boolean console = hs_runtime_port_executing_console_command();
+			short from = global_structure_bsp_index_get();
+
 			scripted_multiplayer_bsp = NONE;
 			scripted_multiplayer_bsp_reported = FALSE;
-			scenario_switch_structure_bsp(structure_bsp_index);
+			if (console || players_coop_script_bsp_switch_allowed(structure_bsp_index,
+				hs_runtime_port_executing_script_type() == _hs_script_continuous))
+			{
+				if (scenario_switch_structure_bsp(structure_bsp_index))
+				{
+					players_coop_note_script_bsp_switch(from,
+						!console && hs_volume_found_thread == thread_index && hs_volume_found_time == game_time_get() ?
+							hs_volume_found_volume : NONE);
+				}
+			}
 		}
 		else if (scripted_multiplayer_bsp == NONE ||
 			scripted_multiplayer_bsp == structure_bsp_index)
@@ -15389,7 +15427,7 @@ HS_EVALUATE_VOID_STRING(xbox_set_machine_name_evaluate, xbox_set_machine_name)
 HS_EVALUATE_VOID_STRING(hs_help_evaluate, hs_help)
 HS_EVALUATE_RETURN_BOOLEAN(hs_not_evaluate, struct hs_arguments_boolean, (hs_not(arguments->value)))
 HS_EVALUATE_RETURN_BOOLEAN(scenario_trigger_volume_test_object_evaluate, struct hs_arguments_short_long, (scenario_trigger_volume_test_object(arguments->value0, arguments->value1)))
-HS_EVALUATE_RETURN_BOOLEAN(hs_trigger_volume_test_objects_any_evaluate, struct hs_arguments_short_long, (hs_trigger_volume_test_objects_any(arguments->value0, arguments->value1)))
+HS_EVALUATE_RETURN_BOOLEAN(hs_trigger_volume_test_objects_any_evaluate, struct hs_arguments_short_long, (hs_volume_found(thread_index, arguments->value0, hs_trigger_volume_test_objects_any(arguments->value0, arguments->value1))))
 HS_EVALUATE_RETURN_BOOLEAN(hs_trigger_volume_test_objects_all_evaluate, struct hs_arguments_short_long, (hs_trigger_volume_test_objects_all(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(recorded_animation_play_evaluate, struct hs_arguments_long_word, (recorded_animation_play(arguments->value0, arguments->value1)))
 HS_EVALUATE_RETURN_BOOLEAN(recorded_animation_play_and_delete_evaluate, struct hs_arguments_long_word, (recorded_animation_play_and_delete(arguments->value0, arguments->value1)))
