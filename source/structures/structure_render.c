@@ -101,6 +101,10 @@ symbols in this file:
 #include "structures/structure_bsp_definitions.h"
 #include "structures/structure_visibility.h"
 #include "tag_files/tag_groups.h"
+#include "cache/cache_files.h" /* port: shader_precompile.c */
+#include "rasterizer/rasterizer_lights.h" /* port: shader_precompile.c */
+#include "rasterizer/rasterizer_transparent_geometry.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -1132,4 +1136,98 @@ void structure_render_shadow(
 	profile_exit(render_structure_shadows_section);
 
 	return;
+}
+
+/* port: shader_precompile.c: the structure's passes over one surface of
+each of its materials (in every lightmap), the window's own surfaces put
+back after: its fog screens, one shadow, and the light passes with each
+light tag on the light at light_index (none if NONE) */
+void structure_render_precompile_shaders(long fake_light_index)
+{
+	static unsigned long saved_flags[NUMBEROF(render.environment_surface_flags)];
+	static long saved_indices[NUMBEROF(render.environment_surface_indices)];
+	struct structure_bsp *structure_bsp = global_structure_bsp_get();
+	long saved_count = render.environment_surface_count;
+	long count = 0;
+	short lightmap_index, material_index;
+
+	memcpy(saved_flags, render.environment_surface_flags, sizeof(saved_flags));
+	memcpy(saved_indices, render.environment_surface_indices, sizeof(saved_indices));
+	memset(render.environment_surface_flags, 0, sizeof(saved_flags));
+	for (lightmap_index = 0; lightmap_index < structure_bsp->lightmaps.count; lightmap_index++)
+	{
+		struct structure_lightmap *lightmap = TAG_BLOCK_GET_ELEMENT(&structure_bsp->lightmaps, lightmap_index, struct structure_lightmap);
+
+		for (material_index = 0; material_index < lightmap->materials.count; material_index++)
+		{
+			struct structure_material *material = TAG_BLOCK_GET_ELEMENT(&lightmap->materials, material_index, struct structure_material);
+			long surface = material->first_surface_index;
+
+			if (material->surface_count > 0 && surface >= 0 && surface < structure_bsp->surfaces.count &&
+				count < (long)NUMBEROF(render.environment_surface_indices))
+			{
+				render.environment_surface_flags[surface >> 5] |= 1UL << (surface & 31);
+				count++;
+			}
+		}
+	}
+	render.environment_surface_count = count;
+	/* (the indices from the bit vector, ascending, as the game makes them) */
+	structure_render_preprocess();
+	structure_render_lightmaps();
+	structure_render_diffuse_texture();
+	structure_render_specular_lightmaps();
+	structure_render_reflection_lightmap_masks();
+	structure_render_reflection_mirrors();
+	structure_render_reflections();
+	structure_render_transparent_geometry();
+	structure_render_fog();
+	structure_fog_screens_precompile_shaders();
+	rasterizer_transparent_geometry_draw(TRUE);
+	rasterizer_transparent_geometry_draw(FALSE);
+	rasterizer_transparent_geometry_stop();
+	rasterizer_transparent_geometry_begin();
+	/* (one shadow: every model into it, then over the surfaces) */
+	{
+		real_matrix4x3 shadow_matrix;
+		real_rgb_color shadow_color;
+		real shadow_radius = 1.0f;
+
+		matrix4x3_identity(&shadow_matrix);
+		shadow_matrix.position = global_window_parameters.camera.position;
+		shadow_color.red = shadow_color.green = shadow_color.blue = 0.5f;
+		rasterizer_environment_shadows_begin();
+		if (rasterizer_environment_shadow_begin(NONE, &shadow_matrix, &shadow_color, 1.0f, &shadow_radius))
+		{
+			shader_precompile_model_shadows();
+			structure_render_pass(render.environment_surface_indices, render.environment_surface_count,
+				structure_render_globals.environment_triangles_index, NULL, rasterizer_environment_shadow_draw, NULL, NULL);
+			rasterizer_environment_shadow_end();
+		}
+		rasterizer_environment_shadows_end();
+	}
+	if (fake_light_index != NONE)
+	{
+		struct rasterizer_light_submit_parameters *light = &rasterizer_lights.lights[fake_light_index];
+		void const *definition = light->definition;
+		struct tag_iterator iterator;
+		long light_tag;
+
+		tag_iterator_new(&iterator, 'ligh');
+		while ((light_tag = tag_iterator_next(&iterator)) != NONE)
+		{
+			light->definition = tag_get('ligh', light_tag);
+			rasterizer_environment_precompile_light_gel(light->definition);
+			rasterizer_environment_diffuse_lights_begin();
+			structure_render_diffuse_light(fake_light_index, &light->position, light->radius, 0, NULL);
+			rasterizer_environment_diffuse_lights_end();
+			rasterizer_environment_specular_lights_begin();
+			structure_render_specular_light(fake_light_index, &light->position, light->radius, 0, NULL);
+			rasterizer_environment_specular_lights_end();
+		}
+		light->definition = definition;
+	}
+	memcpy(render.environment_surface_flags, saved_flags, sizeof(saved_flags));
+	memcpy(render.environment_surface_indices, saved_indices, sizeof(saved_indices));
+	render.environment_surface_count = saved_count;
 }

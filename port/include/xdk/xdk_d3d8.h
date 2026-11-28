@@ -59,6 +59,11 @@ structures themselves */
 #define IDirect3DIndexBuffer8 D3DIndexBuffer
 #define IDirect3DPalette8 D3DPalette
 
+/* port: the Data of a texture's header handed out without its pixels while
+a map's GPU programs are made (source/cache/xbox_texture_cache.c): the GL
+layer takes only the kind of texture from it (port/linux/src/d3d8_gl.c) */
+#define D3D_PORT_TEXTURE_DATA_NO_PIXELS 0xFFFFF000UL
+
 /* Direct3DCreate8's argument: the January build passes 0
 (rasterizer_initialize and rasterizer_preinitialize in cachebeta.exe) */
 #define D3D_SDK_VERSION 0

@@ -60,6 +60,8 @@ symbols in this file:
 #include "shaders/shader_definitions.h"
 #include "shaders/shaders.h"
 #include "tag_files/tag_groups.h"
+#include "cache/cache_files.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -638,4 +640,23 @@ void lightning_submit(
 	}
 
 	return;
+}
+
+/* port: shader_precompile.c: each lightning's shader (the additive effect
+shader when it has none) */
+void lightning_precompile_shaders(void)
+{
+	struct tag_iterator iterator;
+	long index;
+
+	tag_iterator_new(&iterator, LIGHTNING_TAG);
+	while ((index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct lightning_definition *definition = lightning_definition_get(index);
+		struct shader const *shader = definition->shaders.count > 0 ?
+			&TAG_BLOCK_GET_ELEMENT(&definition->shaders, 0, struct shader_effect_definition)->shader :
+			&global_shader_effect_additive.shader;
+
+		shader_precompile_effect(shader, definition->map.index);
+	}
 }

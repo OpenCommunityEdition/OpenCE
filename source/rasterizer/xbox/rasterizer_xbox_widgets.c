@@ -85,6 +85,7 @@ symbols in this file:
 #include "rasterizer/rasterizer_widgets.h"
 #include "rasterizer/rasterizer.h"
 #include "rasterizer/rasterizer_console_vars.h"
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -1119,4 +1120,27 @@ static boolean rasterizer_widget_project_billboard(
 	}
 
 	return projected;
+}
+
+/* port: shader_precompile.c: the occlusion test's shader and the
+sprite's (lens flares, light volumes) with a 2D map */
+void rasterizer_widgets_precompile_shaders(void)
+{
+	_rasterizer_widget_begin(_widget_type_internal_occlusion_test, 0);
+	IDirect3DDevice8_Begin(global_d3d_device, D3DPT_TRIANGLEFAN);
+	IDirect3DDevice8_SetVertexData4f(global_d3d_device, 0, 0.0f, 0.0f, 0.5f, 1.0f);
+	IDirect3DDevice8_SetVertexData4f(global_d3d_device, 0, 1.0f, 0.0f, 0.5f, 1.0f);
+	IDirect3DDevice8_SetVertexData4f(global_d3d_device, 0, 1.0f, 1.0f, 0.5f, 1.0f);
+	IDirect3DDevice8_SetVertexData4f(global_d3d_device, 0, 0.0f, 1.0f, 0.5f, 1.0f);
+	IDirect3DDevice8_End(global_d3d_device);
+	_rasterizer_widget_end();
+	_rasterizer_widget_begin(_widget_type_internal_sprite, 0);
+	/* (TRUE: its texture is not loaded yet, and it is not drawn) */
+	if (!_rasterizer_widget_set_texture(0, NONE, 0))
+	{
+		memset(&widget_sprite_batch[0], 0, sizeof(widget_sprite_batch[0]));
+		widget_sprite_batch[0].color = 0xffffffff;
+		widget_sprite_batch_count = 1;
+	}
+	_rasterizer_widget_end();
 }

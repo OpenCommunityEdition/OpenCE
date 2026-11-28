@@ -595,6 +595,9 @@ struct program_entry
 	GLuint vertex_shader;
 	GLuint fragment_shader;
 	GLuint program;
+	/* linked while precompiling, its result not yet looked at
+	(precompile_finish) */
+	BOOL precompile_pending;
 	GLint constants;
 	GLint viewport_scale;
 	GLint viewport_offset;
@@ -1790,14 +1793,76 @@ void WINAPI D3DDevice_BlockUntilVerticalBlank(void)
 
 /* ---------- GL helpers */
 
+/* precompiling (port/linux/game/shader_precompile.c): while it is on, a
+draw makes its program and draws nothing, and shaders are compiled and
+programs linked without waiting for each, so that the driver can do them at
+once on its own threads (GL_KHR_parallel_shader_compile); their results are
+looked at once all of them are started (precompile_finish) */
+static BOOL precompiling;
+static GLuint *precompile_shaders;
+static unsigned long precompile_shader_count, precompile_shader_size;
+static struct program_entry **precompile_programs;
+static unsigned long precompile_program_count, precompile_program_size;
+
+/* adds the item to a growing list; FALSE if there is no room */
+static BOOL precompile_list_add(void **list, unsigned long *count, unsigned long *size, size_t item_size,
+	const void *item)
+{
+	if (*count == *size)
+	{
+		unsigned long grown_size = *size ? 2 * *size : 256;
+		void *grown = realloc(*list, grown_size * item_size);
+
+		if (!grown)
+			return FALSE;
+		*list = grown;
+		*size = grown_size;
+	}
+	memcpy((char *)*list + *count * item_size, item, item_size);
+	(*count)++;
+	return TRUE;
+}
+
+/* debug.shader_times: the time in milliseconds (shader_time's start) */
+static double shader_clock(void)
+{
+	struct timespec now;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	return (double)now.tv_sec * 1000.0 + (double)now.tv_nsec / 1000000.0;
+}
+
+/* the time since start in milliseconds, or below 0 if debug.shader_times
+is off */
+static double shader_time(double start)
+{
+	static int enabled = -1;
+
+	if (enabled < 0)
+		enabled = config_boolean("debug.shader_times") ? 1 : 0;
+	if (!enabled)
+		return -1.0;
+	return shader_clock() - start;
+}
+
 GLuint xgpu_compile_shader(GLenum type, const char *source, const char *what)
 {
 	GLuint shader = glCreateShader(type);
 	GLint status = 0;
+	double start = shader_clock();
+	double milliseconds;
 
 	glShaderSource(shader, 1, &source, NULL);
 	glCompileShader(shader);
+	if (precompiling && precompile_list_add((void **)&precompile_shaders, &precompile_shader_count,
+		&precompile_shader_size, sizeof(shader), &shader))
+	{
+		/* (its result looked at by precompile_finish) */
+		return shader;
+	}
 	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+	if ((milliseconds = shader_time(start)) >= 0.0)
+		platform_log("shader times: a %s shader compiled in %.1f ms", what, milliseconds);
 	if (!status)
 	{
 		char log[4096];
@@ -1814,11 +1879,15 @@ GLuint xgpu_link_program(GLuint vertex_shader, GLuint fragment_shader, const cha
 {
 	GLuint program = glCreateProgram();
 	GLint status = 0;
+	double start = shader_clock();
+	double milliseconds;
 
 	glAttachShader(program, vertex_shader);
 	glAttachShader(program, fragment_shader);
 	glLinkProgram(program);
 	glGetProgramiv(program, GL_LINK_STATUS, &status);
+	if ((milliseconds = shader_time(start)) >= 0.0)
+		platform_log("shader times: a %s program linked in %.1f ms", what, milliseconds);
 	if (!status)
 	{
 		char log[4096];
@@ -2190,6 +2259,21 @@ static BOOL bind_targets(BOOL *has_depth)
 		depth = NULL;
 	if (!color && !depth)
 		return FALSE;
+	/* (precompiling: nothing is drawn, so no target is bound nor marked
+	drawn into, which on a tiled GPU would send it what was drawn before
+	each time; the program's samples are the target's) */
+	if (precompiling)
+	{
+		samples = anti_aliasing() == _anti_aliasing_msaa ? anti_aliasing_samples : 0;
+		if (samples && !((color && (color->screen_buffer || color->target.samples)) ||
+			(depth && (depth->screen_buffer || depth->target.samples))))
+		{
+			samples = 0;
+		}
+		target_samples = samples ? samples : 1;
+		*has_depth = depth != NULL;
+		return TRUE;
+	}
 	if (color)
 	{
 		color->last_rendered = device.frame + 1;
@@ -3894,6 +3978,7 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	unsigned long hash, index;
 	struct fragment_entry **bucket;
 	struct fragment_entry *entry;
+	struct nv2a_pixel_shader_key canonical;
 	char *source;
 
 	for (index = 0; index < RECENT_FRAGMENT_COUNT; index++)
@@ -3914,6 +3999,20 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	entry = device_record_new(sizeof(*entry));
 	entry->hash = hash;
 	entry->key = *key;
+	/* port: a key whose GLSL does not depend on all of its bits (state the
+	game left set from an earlier draw) is another name for the shader of
+	the key with those bits cleared, so that each shader is compiled once
+	(nv2a_pixel_shader_key_canonicalize) */
+	canonical = *key;
+	nv2a_pixel_shader_key_canonicalize(&canonical);
+	if (!words_equal(&canonical, key, sizeof(*key)))
+	{
+		entry->shader = fragment_shader_get(&canonical);
+		entry->next = *bucket;
+		*bucket = entry;
+		recent[recent_next++ % RECENT_FRAGMENT_COUNT] = entry;
+		return entry->shader;
+	}
 	source = nv2a_pixel_shader_to_glsl(key);
 	entry->shader = xgpu_compile_shader(GL_FRAGMENT_SHADER, source, "pixel");
 	shader_hash_set(entry->shader, source);
@@ -3936,67 +4035,11 @@ static GLuint fragment_shader_get(const struct nv2a_pixel_shader_key *key)
 	return entry->shader;
 }
 
-static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_shader)
+/* a linked program's uniforms' places, and its samplers' units */
+static void program_uniforms_find(struct program_entry *entry)
 {
-	static struct program_entry *last;
-	unsigned long hash = (vertex_shader * 2654435761UL) ^ fragment_shader;
-	struct program_entry **bucket = &program_buckets[hash % PROGRAM_BUCKETS];
-	struct program_entry *entry;
 	int stage;
 
-	if (last && last->vertex_shader == vertex_shader && last->fragment_shader == fragment_shader)
-		return last;
-	for (entry = *bucket; entry; entry = entry->next)
-	{
-		if (entry->vertex_shader == vertex_shader && entry->fragment_shader == fragment_shader)
-		{
-			if (!entry->program)
-				return NULL;
-			last = entry;
-			return entry;
-		}
-	}
-	entry = device_record_new(sizeof(*entry));
-	entry->vertex_shader = vertex_shader;
-	entry->fragment_shader = fragment_shader;
-	memset(&entry->uniforms, 0xff, sizeof(entry->uniforms));
-	entry->next = *bucket;
-	*bucket = entry;
-	if (!vertex_shader || !fragment_shader)
-		return NULL;
-
-#ifndef HALO_GLES
-	entry->program = program_cache_load(shader_hash(vertex_shader), shader_hash(fragment_shader));
-	if (!entry->program)
-	{
-		/* (linked as xgpu_link_program does, keeping its binary) */
-		GLint status = 0;
-
-		entry->program = glCreateProgram();
-		glAttachShader(entry->program, vertex_shader);
-		glAttachShader(entry->program, fragment_shader);
-		if (program_cache.enabled)
-			glProgramParameteri(entry->program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
-		glLinkProgram(entry->program);
-		glGetProgramiv(entry->program, GL_LINK_STATUS, &status);
-		if (!status)
-		{
-			char log[4096];
-
-			glGetProgramInfoLog(entry->program, sizeof(log), NULL, log);
-			platform_log("cannot link the shader program: %s", log);
-			glDeleteProgram(entry->program);
-			entry->program = 0;
-			return NULL;
-		}
-		program_cache.linked++;
-		program_cache_store(entry->program, shader_hash(vertex_shader), shader_hash(fragment_shader));
-	}
-#else
-	entry->program = xgpu_link_program(vertex_shader, fragment_shader, "shader");
-	if (!entry->program)
-		return NULL;
-#endif
 	state_program(entry->program);
 	entry->constants = glGetUniformLocation(entry->program, "c");
 	entry->constant_count = XGPU_VERTEX_CONSTANT_COUNT;
@@ -4053,6 +4096,91 @@ static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_s
 		snprintf(name, sizeof(name), "tex%d", stage);
 		glUniform1i(glGetUniformLocation(entry->program, name), stage);
 	}
+}
+
+static struct program_entry *program_get(GLuint vertex_shader, GLuint fragment_shader)
+{
+	static struct program_entry *last;
+	unsigned long hash = (vertex_shader * 2654435761UL) ^ fragment_shader;
+	struct program_entry **bucket = &program_buckets[hash % PROGRAM_BUCKETS];
+	struct program_entry *entry;
+
+	if (last && last->vertex_shader == vertex_shader && last->fragment_shader == fragment_shader)
+		return last;
+	for (entry = *bucket; entry; entry = entry->next)
+	{
+		if (entry->vertex_shader == vertex_shader && entry->fragment_shader == fragment_shader)
+		{
+			if (!entry->program)
+				return NULL;
+			last = entry;
+			return entry;
+		}
+	}
+	entry = device_record_new(sizeof(*entry));
+	entry->vertex_shader = vertex_shader;
+	entry->fragment_shader = fragment_shader;
+	memset(&entry->uniforms, 0xff, sizeof(entry->uniforms));
+	entry->next = *bucket;
+	*bucket = entry;
+	if (!vertex_shader || !fragment_shader)
+		return NULL;
+
+#ifndef HALO_GLES
+	entry->program = program_cache_load(shader_hash(vertex_shader), shader_hash(fragment_shader));
+#endif
+	if (!entry->program && precompiling && precompile_list_add((void **)&precompile_programs,
+		&precompile_program_count, &precompile_program_size, sizeof(entry), &entry))
+	{
+		/* (the rest done by precompile_finish) */
+		entry->program = glCreateProgram();
+		glAttachShader(entry->program, vertex_shader);
+		glAttachShader(entry->program, fragment_shader);
+#ifndef HALO_GLES
+		if (program_cache.enabled)
+			glProgramParameteri(entry->program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+#endif
+		glLinkProgram(entry->program);
+		entry->precompile_pending = TRUE;
+		return entry;
+	}
+#ifndef HALO_GLES
+	if (!entry->program)
+	{
+		/* (linked as xgpu_link_program does, keeping its binary) */
+		GLint status = 0;
+		double start = shader_clock();
+		double milliseconds;
+
+		entry->program = glCreateProgram();
+		glAttachShader(entry->program, vertex_shader);
+		glAttachShader(entry->program, fragment_shader);
+		if (program_cache.enabled)
+			glProgramParameteri(entry->program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+		glLinkProgram(entry->program);
+		glGetProgramiv(entry->program, GL_LINK_STATUS, &status);
+		if ((milliseconds = shader_time(start)) >= 0.0)
+			platform_log("shader times: a shader program linked in %.1f ms", milliseconds);
+		if (!status)
+		{
+			char log[4096];
+
+			glGetProgramInfoLog(entry->program, sizeof(log), NULL, log);
+			platform_log("cannot link the shader program: %s", log);
+			glDeleteProgram(entry->program);
+			entry->program = 0;
+			return NULL;
+		}
+		program_cache.linked++;
+		program_cache_store(entry->program, shader_hash(vertex_shader), shader_hash(fragment_shader));
+	}
+#else
+	if (!entry->program)
+		entry->program = xgpu_link_program(vertex_shader, fragment_shader, "shader");
+	if (!entry->program)
+		return NULL;
+#endif
+	program_uniforms_find(entry);
 	last = entry;
 	return entry;
 }
@@ -4547,12 +4675,36 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			key->sampler_type[stage] = mode == 0x11 ? _xgpu_sampler_2d : _xgpu_sampler_none;
 			continue;
 		}
+		if (texture->Data == D3D_PORT_TEXTURE_DATA_NO_PIXELS)
+		{
+			/* port: a header without pixels (xbox_texture_cache.c), while
+			precompiling: its kind is the program's, and nothing is bound
+			(nothing is drawn); one left set after is none */
+			struct xgpu_texture_description description;
+
+			xgpu_texture_describe(texture->Format, texture->Size, &description);
+			gl_targets[stage] = GL_TEXTURE_2D;
+			gl_textures[stage] = 0;
+			key->sampler_type[stage] = !precompiling ? _xgpu_sampler_none :
+				description.cube_map ? _xgpu_sampler_cube :
+				description.depth > 1 ? _xgpu_sampler_3d : _xgpu_sampler_2d;
+			continue;
+		}
 		{
 			struct xgpu_render_target *target = xgpu_render_target_find(texture->Data);
 			struct xgpu_texture_description description;
 			GLenum gl_target;
 			GLuint gl_texture;
 
+			if (target && precompiling)
+			{
+				/* (precompiling: a 2D texture, not resolved: nothing is
+				drawn) */
+				gl_targets[stage] = GL_TEXTURE_2D;
+				gl_textures[stage] = 0;
+				key->sampler_type[stage] = _xgpu_sampler_2d;
+				continue;
+			}
 			if (target)
 			{
 				/* (multisampled: its pixels drawn since, resolved) */
@@ -4976,6 +5128,102 @@ static unsigned long model_light_register(int light)
 	return (unsigned long)(XGPU_VERTEX_CONSTANT_BIAS + (light ? -80 + light : -82));
 }
 
+/* the shaders compiled and programs linked while precompiling, waited for:
+each failure logged as it would have been, and each program kept in the
+cache and its uniforms found */
+static void precompile_finish(void)
+{
+	double start = shader_clock();
+	unsigned long index;
+	double milliseconds;
+
+	for (index = 0; index < precompile_program_count; index++)
+	{
+		struct program_entry *entry = precompile_programs[index];
+		GLint status = 0;
+
+		entry->precompile_pending = FALSE;
+		glGetProgramiv(entry->program, GL_LINK_STATUS, &status);
+		if (!status)
+		{
+			char log[4096];
+
+			glGetProgramInfoLog(entry->program, sizeof(log), NULL, log);
+			platform_log("cannot link the shader program: %s", log);
+			glDeleteProgram(entry->program);
+			entry->program = 0;
+			continue;
+		}
+#ifndef HALO_GLES
+		program_cache.linked++;
+		program_cache_store(entry->program, shader_hash(entry->vertex_shader), shader_hash(entry->fragment_shader));
+#endif
+		program_uniforms_find(entry);
+	}
+	for (index = 0; index < precompile_shader_count; index++)
+	{
+		GLint status = 0;
+
+		glGetShaderiv(precompile_shaders[index], GL_COMPILE_STATUS, &status);
+		if (!status)
+		{
+			char log[4096];
+
+			glGetShaderInfoLog(precompile_shaders[index], sizeof(log), NULL, log);
+			platform_log("cannot compile a shader while precompiling:\n%s", log);
+		}
+	}
+	if ((milliseconds = shader_time(start)) >= 0.0)
+	{
+		platform_log("shader times: precompile: %lu shaders and %lu programs waited for in %.1f ms",
+			precompile_shader_count, precompile_program_count, milliseconds);
+	}
+	precompile_shader_count = 0;
+	precompile_program_count = 0;
+}
+
+/* the driver's own threads for compiling and linking, as many as it will
+(GL_KHR_parallel_shader_compile, GL_ARB_parallel_shader_compile): NVIDIA's
+compiles one at a time unless asked. WebGL's extension has no such call;
+without one the driver compiles as it would */
+static void precompile_threads(void)
+{
+	static BOOL done;
+
+	if (done)
+		return;
+	done = TRUE;
+#if defined(HALO_GLES) && !defined(HALO_WEB)
+	if (host_gl_has_extension("GL_KHR_parallel_shader_compile") && halo_glMaxShaderCompilerThreadsKHR)
+		halo_glMaxShaderCompilerThreadsKHR(0xFFFFFFFFu);
+#elif !defined(HALO_GLES)
+	{
+		typedef void (GLAPIENTRY *threads_function)(GLuint count);
+		threads_function threads = NULL;
+
+		if (SDL_GL_ExtensionSupported("GL_KHR_parallel_shader_compile"))
+			threads = (threads_function)SDL_GL_GetProcAddress("glMaxShaderCompilerThreadsKHR");
+		else if (SDL_GL_ExtensionSupported("GL_ARB_parallel_shader_compile"))
+			threads = (threads_function)SDL_GL_GetProcAddress("glMaxShaderCompilerThreadsARB");
+		if (threads)
+			threads(0xFFFFFFFFu);
+	}
+#endif
+}
+
+int d3d_gl_shader_precompile(int on)
+{
+	if (on && device.gl_ready && !precompiling)
+		precompile_threads();
+	if (!on && precompiling)
+	{
+		precompiling = FALSE;
+		precompile_finish();
+	}
+	precompiling = on && device.gl_ready;
+	return precompiling;
+}
+
 static struct program_entry *prepare_draw(BOOL immediate)
 {
 	/* (the fixed-function program compiled only with OpenGL there: not by
@@ -5072,6 +5320,8 @@ static struct program_entry *prepare_draw(BOOL immediate)
 		gl_check_errors("program");
 		return NULL;
 	}
+	if (precompiling)
+		return NULL;
 	gl_check_errors("state");
 	if (immediate)
 		stats.immediate_draws++;
@@ -7230,7 +7480,8 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 	BOOL has_depth = FALSE;
 	DWORD index;
 
-	if (!device.gl_ready || !bind_targets(&has_depth))
+	/* (precompiling: nothing is drawn, nor cleared; no target is bound) */
+	if (!device.gl_ready || precompiling || !bind_targets(&has_depth))
 		return;
 	if (trace_frame())
 		platform_log("clear flags %lx color %08lx z %g count %lu target %08lx depth %08lx", (unsigned long)flags,

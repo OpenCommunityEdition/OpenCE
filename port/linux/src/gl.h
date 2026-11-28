@@ -125,6 +125,7 @@ this list to generate the guest's entry points */
 	X(glLinkProgram) \
 	X(glGetProgramiv) \
 	X(glGetProgramInfoLog) \
+	X(glDeleteProgram) \
 	X(glUseProgram) \
 	X(glGetUniformLocation) \
 	X(glUniform1i) \
@@ -139,10 +140,12 @@ this list to generate the guest's entry points */
 	X(glGetInternalformativ)
 /* entry points of extensions, which a driver may lack: loaded where the
 context has the extension, never required (gl_functions.c). On ES 3.0 and
-3.1 these stand in for glDrawElementsBaseVertex */
+3.1 these stand in for glDrawElementsBaseVertex; the last asks for the
+driver's threads while precompiling (d3d8_gl.c) */
 #define GL_OPTIONAL_FUNCTIONS(X) \
 	X(glDrawElementsBaseVertexEXT) \
-	X(glDrawElementsBaseVertexOES)
+	X(glDrawElementsBaseVertexOES) \
+	X(glMaxShaderCompilerThreadsKHR)
 /* ANDROID_GL_FUNCTIONS_END */
 #else
 #define GL_FUNCTIONS(X) \
@@ -379,6 +382,7 @@ pointers, sees the declarations without these aliases */
 #define glLinkProgram halo_glLinkProgram
 #define glGetProgramiv halo_glGetProgramiv
 #define glGetProgramInfoLog halo_glGetProgramInfoLog
+#define glDeleteProgram halo_glDeleteProgram
 #define glUseProgram halo_glUseProgram
 #define glGetUniformLocation halo_glGetUniformLocation
 #define glUniform1i halo_glUniform1i

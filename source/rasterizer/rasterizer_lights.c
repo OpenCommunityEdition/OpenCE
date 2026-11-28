@@ -103,6 +103,8 @@ symbols in this file:
 #include "rasterizer/xbox/rasterizer_xbox.h"
 #include "main/main.h"
 #include "view_fov.h" /* port: port/linux/game/view_fov.c */
+#include "cache/cache_files.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -1375,4 +1377,33 @@ void rasterizer_lens_flares_draw(
 	rasterizer_profile_end(_rasterizer_profile_lens_flares);
 
 	return;
+}
+
+/* port: shader_precompile.c: the sun glow of each lens flare that
+draws one, ahead of the camera */
+void rasterizer_sun_glows_precompile_shaders(void)
+{
+	struct tag_iterator iterator;
+	long tag_index;
+
+	tag_iterator_new(&iterator, LENS_FLARE_DEFINITION_TAG);
+	while ((tag_index = tag_iterator_next(&iterator)) != NONE)
+	{
+		struct lens_flare_definition *definition = lens_flare_definition_get(tag_index);
+
+		if (definition->occlusion_radius == 50.0f || TEST_FLAG(definition->flags, _lens_flare_sun_bit))
+		{
+			struct rasterizer_lens_flare_submit_parameters flare;
+
+			memset(&flare, 0, sizeof(flare));
+			flare.definition = definition;
+			flare.position.x = global_window_parameters.camera.position.x + 10.0f * global_window_parameters.camera.forward.i;
+			flare.position.y = global_window_parameters.camera.position.y + 10.0f * global_window_parameters.camera.forward.j;
+			flare.position.z = global_window_parameters.camera.position.z + 10.0f * global_window_parameters.camera.forward.k;
+			flare.compressed_direction = compress_real_vector3d_to_int32_clamp(
+				(union real_vector3d const *)&global_window_parameters.camera.forward);
+			flare.internal__occlusion_pixels = 1;
+			rasterizer_sun_glow_draw(&flare);
+		}
+	}
 }

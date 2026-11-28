@@ -756,6 +756,11 @@ void rasterizer_memory_pool_begin(void);
 void *rasterizer_memory_alloc(const void *src, unsigned long size);
 const void *rasterizer_memory_alloc_const(const void *src, unsigned long size);
 void rasterizer_memory_pool_end(void);
+/* port: how much of the pool is in use, and back to that much: the
+precompile's draws (port/linux/game/shader_precompile.c) give back what
+they took once drawn, so that the frame they come before has all of it */
+unsigned long rasterizer_memory_pool_used(void);
+void rasterizer_memory_pool_release(unsigned long used);
 void rasterizer_memory_pool_dispose(void);
 
 /* ---------- prototypes/RASTERIZER_LIGHTS.C */

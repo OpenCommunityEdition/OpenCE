@@ -93,6 +93,8 @@ symbols in this file:
 #include "render/render.h"
 #include "render/render_sprite.h"
 #include "saved games/game_state.h"
+#include "cache/cache_files.h" /* port: shader_precompile.c */
+#include "shader_precompile.h" /* port: port/linux/game/shader_precompile.c */
 
 /* ---------- constants */
 
@@ -1502,4 +1504,15 @@ void glow_submit(
 	}
 
 	return;
+}
+
+/* port: shader_precompile.c: each glow, with the additive effect shader */
+void glows_precompile_shaders(void)
+{
+	struct tag_iterator iterator;
+	long index;
+
+	tag_iterator_new(&iterator, GLOW_TAG);
+	while ((index = tag_iterator_next(&iterator)) != NONE)
+		shader_precompile_effect((struct shader const *)&global_shader_effect_additive, glow_definition_get(index)->texture.index);
 }
