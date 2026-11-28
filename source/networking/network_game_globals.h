@@ -53,6 +53,9 @@ boolean create_global_network_game_client(
 	void);
 void dispose_global_network_game_client(
 	void);
+/* port: matchmaking.c */
+boolean network_game_client_port_connection_ended(
+	void);
 boolean network_game_client_start_frame(
 	void);
 boolean network_game_client_end_frame(

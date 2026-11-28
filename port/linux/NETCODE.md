@@ -1332,6 +1332,17 @@ Unity's Netcode for Entities, lightyear, netfox and the Ares source):
   host every client's, a client its own players'), and the host's measure
   in ticks, which every machine is sent, for the others.
 
+## Matchmaking
+
+MATCHMAKING adds no game message and does not change the game's protocol: a
+matched game is an ordinary internet game. The search runs on the p2p thread
+over the signalling brokers (`p2p_matchmaking.c`). Each queue is a broker
+topic, `hceu/3/mm/<network version>/<playlist>/<size>`, on which a search
+publishes signed searching, hosting and cancel records every 3 s, at most
+four records a second. A record's signature is the run's key, and a held
+game's token is sealed to each member of its pool. A queue is ordered by key
+hash, so every machine elects the same host.
+
 ## Testing
 
 `debug.network_test` (`port/linux/game/network_test.c`) hosts or joins a

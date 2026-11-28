@@ -482,6 +482,18 @@ void dispose_global_network_game_client(
 	return;
 }
 
+/* port: set when the client's frame fails (the host is gone), not on a player's leave */
+static boolean network_game_client_connection_ended;
+
+boolean network_game_client_port_connection_ended(
+	void)
+{
+	boolean ended = network_game_client_connection_ended;
+
+	network_game_client_connection_ended = FALSE;
+	return ended;
+}
+
 boolean network_game_client_start_frame(
 	void)
 {
@@ -582,6 +594,9 @@ boolean network_game_client_start_frame(
 		}
 	}
 
+	/* port: matchmaking.c */
+	if (!result)
+		network_game_client_connection_ended = TRUE;
 	return result;
 }
 

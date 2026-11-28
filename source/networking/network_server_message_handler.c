@@ -250,6 +250,7 @@ symbols in this file:
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
+#include "matchmaking.h" /* port: port/linux/game/matchmaking.c */
 #include "bungie_net/common/message_header.h"
 #include "bungie_net/network/transport.h"
 #include "bungie_net/network/transport_endpoint_winsock.h"
@@ -2551,13 +2552,14 @@ static boolean network_game_server_handle_message_client_player_settings_request
 			/* port: a machine's own player, of its slot (the settings come
 			from the wire, and the Xbox game took any machine's, and wrote a
 			slot out of the list over the machines), with a name that ends,
-			and on a team of the game's: else the one the host has it on */
+			and on a team of the game's: else the one the host has it on (a
+			matchmade game's teams are the host's split) */
 			network_game_server_get_client_machine(server, client_machine, &machine_index);
 			network_game_server_clean_player_name(server, &player,
 				VALID_INDEX(player.player_list_index, MAXIMUM_NUMBER_OF_PLAYERS) ? player.player_list_index : NONE);
 			if (VALID_INDEX(player.player_list_index, MAXIMUM_NUMBER_OF_PLAYERS) &&
 				(!game->variant.universal_variant.teams ||
-					!VALID_INDEX(player.team_index, NUMBER_OF_MULTIPLAYER_TEAMS)))
+					!VALID_INDEX(player.team_index, NUMBER_OF_MULTIPLAYER_TEAMS) || matchmaking_game_locked()))
 			{
 				player.team_index = game->players[player.player_list_index].team_index;
 			}
