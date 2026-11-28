@@ -840,6 +840,22 @@ static void network_objects_vehicle_writing(
 		biped_riding_vehicle_writing(object_index);
 }
 
+/* object_set_position computes only the object's own nodes, its children's (a held weapon, a seated unit) wait
+for their next update: a frame drawn before that showed them where the object was */
+void network_objects_set_position(
+	long object_index,
+	real_point3d const *position,
+	real_vector3d const *forward,
+	real_vector3d const *up)
+{
+	long child_index;
+
+	object_set_position(object_index, position, forward, up);
+	for (child_index = object_get(object_index)->object.first_child_object_index; child_index != NONE;
+		child_index = object_get(child_index)->object.next_object_index)
+		object_compute_node_matrices_recursive(child_index);
+}
+
 /* (the transform checked) */
 static void distributed_object_move(
 	long object_index,
@@ -862,7 +878,7 @@ static void distributed_object_move(
 	offset.k = object->object.position.z - position->z;
 	distributed_body_unfix_pose(object_index);
 	network_objects_vehicle_writing(object_index, kind);
-	object_set_position(object_index, position, forward, up);
+	network_objects_set_position(object_index, position, forward, up);
 	network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, kind);
 	if (velocity)
 		object->object.translational_velocity = *velocity;
@@ -940,7 +956,7 @@ boolean network_objects_reconcile(
 		offset.k = object->object.position.z - blended.z;
 		distributed_body_unfix_pose(object_index);
 		network_objects_vehicle_writing(object_index, kind);
-		object_set_position(object_index, &blended, &valid_forward, &valid_up);
+		network_objects_set_position(object_index, &blended, &valid_forward, &valid_up);
 		network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, kind);
 		if (!distributed_object_follows_host(object_index))
 			render_interpolation_correct_object(object_index, &offset);
@@ -2902,7 +2918,7 @@ static void distributed_client_note_unsteered_path(
 			real_vector3d before_forward = object->object.forward;
 			real_vector3d before_up = object->object.up;
 
-			object_set_position(object_index, host_position, host_forward, host_up);
+			network_objects_set_position(object_index, host_position, host_forward, host_up);
 			network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, _network_vehicle_write_state);
 		}
 		return;
@@ -3747,7 +3763,7 @@ static void distributed_client_carry_unsteered_vehicles(
 			real_vector3d before_forward = object->object.forward;
 			real_vector3d before_up = object->object.up;
 
-			object_set_position(iterator.index, &position, &forward, &up);
+			network_objects_set_position(iterator.index, &position, &forward, &up);
 			network_objects_vehicle_written(iterator.index, &before, &before_forward, &before_up, _network_vehicle_write_carry);
 		}
 	}

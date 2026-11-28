@@ -3602,7 +3602,7 @@ void network_coop_handle_object_transforms(
 			real_vector3d before_forward = object_get(object_index)->object.forward;
 			real_vector3d before_up = object_get(object_index)->object.up;
 
-			object_set_position(object_index, &transform->position, &forward, &up);
+			network_objects_set_position(object_index, &transform->position, &forward, &up);
 			network_objects_vehicle_written(object_index, &before, &before_forward, &before_up, _network_vehicle_write_coop);
 		}
 	}

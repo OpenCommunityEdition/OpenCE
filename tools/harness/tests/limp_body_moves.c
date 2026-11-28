@@ -58,6 +58,8 @@ static void object_set_position(long index, real_point3d const *position, real_v
 	body.object.up = *up;
 	pose_compute();
 }
+static void network_objects_set_position(long index, real_point3d const *position, real_vector3d const *forward,
+	real_vector3d const *up) { object_set_position(index, position, forward, up); }
 static void render_interpolation_correct_object(long index, real_vector3d const *offset) { interpolations++; }
 static boolean distributed_vehicle_unsteered(long index) { return FALSE; }
 static boolean distributed_object_follows_host(long index) { return FALSE; }
