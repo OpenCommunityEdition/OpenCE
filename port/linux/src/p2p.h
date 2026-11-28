@@ -344,8 +344,16 @@ void p2p_hardware_id_sanitize(char *destination, int size, const char *source);
 
 /* the real address (network byte order) of the internet play peer of this
 virtual address (network byte order): where its packets come from; 0 if
-it is no peer's */
+it is no peer's. A peer reached over IPv6 has a stand-in in 240.0.0.0/4
+(reserved, no machine's) from its /64, the same for every address in it */
 unsigned long p2p_peer_endpoint_address(unsigned long virtual_address);
+/* the same as text, whole (an IPv4 address, or an IPv6 peer's /64:
+"2001:db8:1:2::/64"), for the host's own files; nonzero if it is a peer's */
+int p2p_peer_endpoint_text(unsigned long virtual_address, char *text, int size);
+/* an IPv6 address or /64 as a person may write it in the host's files
+(length bytes of text: "2001:DB8:B:0::/64", "2001:db8:b::1"), as
+p2p_peer_endpoint_text writes its /64, into normal; 0 if it is none */
+int p2p_address_text_normal(const char *text, int length, char *normal, int size);
 
 /* ---- map sharing between the players of a game (port/linux/game/map_share.c)
 
