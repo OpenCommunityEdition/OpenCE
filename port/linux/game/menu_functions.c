@@ -87,6 +87,7 @@ their handlers open opens.
 
 #include "halo_menus.h"
 #include "controller_remap.h"
+#include "matchmaking.h"
 #include "custom_edition_cache.h"
 #include "mcc_ui.h"
 #include "mcc_pause.h"
@@ -585,6 +586,13 @@ boolean pc_menu_profile_edit_begin(void)
 		return FALSE;
 	player_ui_begin_editing_profile(player_ui_get_active_player_profile_index(0));
 	return TRUE;
+}
+
+boolean pc_menu_player1_profile(void)
+{
+	struct player_profile profile;
+
+	return campaign_profile(0, &profile);
 }
 
 /* the game's own function of the name (as its tags name it), run for the
@@ -3351,6 +3359,8 @@ void network_game_server_port_set_cooperative_player_collisions(boolean player_c
 void network_game_server_port_set_cooperative_ally_friendly_fire(boolean ally_friendly_fire);
 void *global_network_game_client_get(void);
 void *global_network_game_server_get(void);
+void dispose_global_network_game_client(void);
+void dispose_global_network_game_server(void);
 boolean network_game_is_splitscreen_local(void);
 struct advertised_game *network_game_client_get_available_games(void *client);
 boolean network_game_client_advertised_game_is_valid(struct advertised_game *game);
@@ -3573,6 +3583,11 @@ static boolean multiplayer_player(short controller)
 	if (!campaign_profile(controller, &profile))
 		return campaign_fail();
 	return ui_widget_port_multiplayer_player(controller, player_ui_get_active_player_profile_index(0));
+}
+
+boolean pc_menu_multiplayer_player(short controller)
+{
+	return multiplayer_player(controller);
 }
 
 /* Create Game's ("join controller to mp game", first): player 1 in, and
@@ -6097,6 +6112,7 @@ link on the clipboard reached, its game then in the list */
 static boolean direct_link_from_clipboard(void)
 {
 	char text[TEXT_FIELD_LENGTH];
+	byte host[6];
 	char *link = text;
 	size_t length;
 
@@ -6107,6 +6123,8 @@ static boolean direct_link_from_clipboard(void)
 	for (length = strlen(link); length && (link[length - 1] == ' ' || link[length - 1] == '\t' ||
 		link[length - 1] == '\r' || link[length - 1] == '\n'); length--)
 		link[length - 1] = 0;
+	if (p2p_invite_host(link, host))
+		p2p_mm_cancel();
 	if (!*link || !p2p_join_invite(link))
 	{
 		platform_log("menus: the clipboard has no invite link");
@@ -6386,12 +6404,21 @@ ADD PLAYER */
 static boolean lobby_leave(struct widget_instance *widget, struct event_record *event, short controller,
 	boolean *widget_deleted)
 {
+	boolean left;
+
 	if (!lobby_controller_playing(controller))
 	{
 		lobby_join_reset();
 		return FALSE;
 	}
-	return ui_widget_port_unjoin_player(widget, event, widget_deleted);
+	left = ui_widget_port_unjoin_player(widget, event, widget_deleted);
+	/* (the Multiplayer menu keeps a server: the main menu's start ended it) */
+	if (left && matchmaking_game_locked() && global_network_game_server_get())
+	{
+		dispose_global_network_game_client();
+		dispose_global_network_game_server();
+	}
+	return left;
 }
 
 /* "port lobby player list initialize": on the joining controller's profile,
@@ -7231,7 +7258,7 @@ static void lobby_update(struct widget_instance *list)
 	}
 	lobby_join_help(list);
 	map_vote_lobby_check();
-	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams);
+	visible_set(named(list, "lobby_button_team", 0), game && game->variant.universal_variant.teams && !matchmaking_game_locked());
 	/* (the buttons' focus, off Switch Team when it is hidden) */
 	focus_off_hidden(named(list, "lobby_button_bar", 0));
 	visible_set(named(description, "lobby_right_item", 0), game != NULL && state >= _client_state_pregame);

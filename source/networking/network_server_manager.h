@@ -56,6 +56,8 @@ boolean network_game_server_port_countdown_paused(
 void network_game_server_port_countdown_begin(
 	struct network_game_server *server,
 	long milliseconds);
+void network_game_server_port_countdown_stop(
+	struct network_game_server *server);
 boolean network_game_server_port_start_sent(
 	struct network_game_server *server);
 boolean network_game_server_port_ok_to_countdown(
